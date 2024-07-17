@@ -212,7 +212,57 @@ class WineCharmApp(Gtk.Application):
     def on_activate(self, app):
         self.create_main_window()
         self.create_script_list()
-        self.initialize_template(default_template)
+        missing_programs = self.check_required_programs()
+        if missing_programs:
+            self.show_missing_programs_dialog(missing_programs)
+        else:
+            self.initialize_template(default_template)
+
+    def check_required_programs(self):
+        # Check if flatpak-spawn is available
+        if shutil.which("flatpak-spawn"):
+            return []
+
+        # Check other required programs if flatpak-spawn is not available
+        required_programs = [
+            'exiftool',
+            'wine',
+            'winetricks',
+            'wrestool',
+            'icotool',
+            'pgrep',
+            'gnome-terminal',
+            'xdg-open'
+        ]
+        missing_programs = [prog for prog in required_programs if not shutil.which(prog)]
+        return missing_programs
+
+
+    def show_missing_programs_dialog(self, missing_programs):
+        dialog = Gtk.Dialog(transient_for=self.window, modal=True)
+        dialog.set_title("Missing Programs")
+        dialog.set_default_size(300, 200)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_margin_top(10)
+        box.set_margin_bottom(10)
+        box.set_margin_start(10)
+        box.set_margin_end(10)
+        dialog.set_child(box)
+
+        label = Gtk.Label(label="The following required programs are missing:")
+        box.append(label)
+
+        for prog in missing_programs:
+            prog_label = Gtk.Label(label=prog)
+            prog_label.set_halign(Gtk.Align.START)
+            box.append(prog_label)
+
+        close_button = Gtk.Button(label="Close")
+        close_button.connect("clicked", lambda w: dialog.close())
+        box.append(close_button)
+
+        dialog.present()
 
     def create_main_window(self):
         self.window = Gtk.ApplicationWindow(application=self)
@@ -604,29 +654,33 @@ Categories=Game;Utility;
             winecharm_pid_output = subprocess.check_output(["pgrep", "-aif", "winecharm"]).decode()
             winecharm_pid_lines = winecharm_pid_output.splitlines()
             winecharm_pids = [int(line.split()[0]) for line in winecharm_pid_lines]
-            
-            # Get the list of all Wine exe processes
-            wine_exe_output = subprocess.check_output(["pgrep", "-aif", ".exe"]).decode()
-            wine_exe_lines = wine_exe_output.splitlines()
 
-            # Extract PIDs and reverse the list to kill child processes first
-            pids = []
-            for line in wine_exe_lines:
-                columns = line.split()
-                pid = int(columns[0])
-                if pid != 1 and pid not in winecharm_pids:  # Skip PID 1 and WineCharm PIDs
-                    pids.append(pid)
-            pids.reverse()
+            try:
+                # Get the list of all Wine exe processes
+                wine_exe_output = subprocess.check_output(["pgrep", "-aif", r"\.exe"]).decode()
+                wine_exe_lines = wine_exe_output.splitlines()
 
-            # Kill the processes
-            for pid in pids:
-                try:
-                    os.kill(pid, signal.SIGKILL)
-                    print(f"Terminated process with PID: {pid}")
-                except ProcessLookupError:
-                    print(f"Process with PID {pid} not found")
-                except PermissionError:
-                    print(f"Permission denied to kill PID: {pid}")
+                # Extract PIDs and reverse the list to kill child processes first
+                pids = []
+                for line in wine_exe_lines:
+                    columns = line.split()
+                    pid = int(columns[0])
+                    if pid != 1 and pid not in winecharm_pids:  # Skip PID 1 and WineCharm PIDs
+                        pids.append(pid)
+                pids.reverse()
+
+                # Kill the processes
+                for pid in pids:
+                    try:
+                        os.kill(pid, signal.SIGKILL)
+                        print(f"Terminated process with PID: {pid}")
+                    except ProcessLookupError:
+                        print(f"Process with PID {pid} not found")
+                    except PermissionError:
+                        print(f"Permission denied to kill PID: {pid}")
+            except subprocess.CalledProcessError:
+                print("No matching Wine exe processes found.")
+
         except subprocess.CalledProcessError as e:
             print(f"Error retrieving process list: {e}")
 
@@ -637,6 +691,7 @@ Categories=Game;Utility;
 
         # Updating script list so that stop buttons become play buttons
         self.create_script_list()
+
 
     def on_help_clicked(self, action, param):
         print("Help action triggered")
