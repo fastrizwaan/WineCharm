@@ -1,2 +1,2 @@
 # winecharm
-Wine GUI with pygobject for flatpak
+A charming Wine GUI
