@@ -1,0 +1,143 @@
+#!/bin/bash
+
+# Default installation directory
+PREFIX="/usr/local"
+
+# Help message
+show_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo "Install or uninstall WineCharm."
+    echo ""
+    echo "Options:"
+    echo "  -i, --install        Install WineCharm"
+    echo "  -p, --prefix PATH    Specify installation prefix (default: /usr/local)"
+    echo "  -u, --uninstall      Uninstall WineCharm"
+    echo "  -h, --help           Show this help message"
+}
+
+# Parse command-line arguments
+ACTION=""
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -i|--install) ACTION="install" ;;
+        -p|--prefix) PREFIX="$2"; shift ;;
+        -u|--uninstall) ACTION="uninstall" ;;
+        -h|--help) show_help; exit 0 ;;
+        *) echo "Unknown parameter passed: $1"; show_help; exit 1 ;;
+    esac
+    shift
+done
+
+if [ -z "$ACTION" ]; then
+    show_help
+    exit 1
+fi
+
+BIN_DIR="$PREFIX/bin"
+ICON_DIR="$PREFIX/share/icons/hicolor/scalable/apps"
+DESKTOP_DIR="$PREFIX/share/applications"
+
+# Files to be installed
+WINECHARM_PY="winecharm.py"
+ICON_FILE="io.github.fastrizwaan.WineCharm.svg"
+DESKTOP_FILE="io.github.fastrizwaan.WineCharm.desktop"
+
+# Function to check for Python dependencies
+check_python_deps() {
+    local deps=("gi" "fnmatch" "threading" "subprocess" "os" "time" "shutil" "shlex" "hashlib" "signal" "re" "yaml" "pathlib")
+    local missing_deps=()
+    
+    for dep in "${deps[@]}"; do
+        python3 -c "import $dep" 2>/dev/null
+        if [ $? -ne 0 ]; then
+            missing_deps+=("$dep")
+        fi
+    done
+    
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        echo "Missing Python dependencies: ${missing_deps[@]}"
+        echo "Please install them using: pip3 install ${missing_deps[@]}"
+        exit 1
+    else
+        echo "All required Python dependencies are installed."
+    fi
+}
+
+# Function to check for system dependencies
+check_system_deps() {
+    local deps=("install")
+    local missing_deps=()
+    
+    for dep in "${deps[@]}"; do
+        command -v $dep >/dev/null 2>&1 || missing_deps+=("$dep")
+    done
+    
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        echo "Missing system dependencies: ${missing_deps[@]}"
+        echo "Please install them using your package manager."
+        exit 1
+    else
+        echo "All required system dependencies are installed."
+    fi
+}
+
+# Function to check for external program dependencies
+check_required_programs() {
+    # Check other required programs availablility
+    local required_programs=("exiftool" "wine" "winetricks" "wrestool" "icotool" "pgrep" "gnome-terminal" "xdg-open")
+    local missing_programs=()
+    
+    for prog in "${required_programs[@]}"; do
+        if ! command -v $prog >/dev/null 2>&1; then
+            missing_programs+=("$prog")
+        fi
+    done
+    
+    if [ ${#missing_programs[@]} -ne 0 ]; then
+        echo "Missing required programs: ${missing_programs[@]}"
+        echo "Please install them using your package manager."
+        exit 1
+    else
+        echo "All required programs are installed."
+    fi
+}
+
+# Function to uninstall WineCharm
+uninstall_winecharm() {
+    echo "Uninstalling WineCharm..."
+    rm -f "$BIN_DIR/winecharm"
+    rm -f "$ICON_DIR/$ICON_FILE"
+    rm -f "$DESKTOP_DIR/$DESKTOP_FILE"
+    echo "WineCharm has been uninstalled successfully from $PREFIX."
+}
+
+# Function to install WineCharm
+install_winecharm() {
+    # Check dependencies
+    check_system_deps
+    check_python_deps
+    check_required_programs
+
+    # Create directories if they do not exist
+    mkdir -p "$BIN_DIR"
+    mkdir -p "$ICON_DIR"
+    mkdir -p "$DESKTOP_DIR"
+
+    # Install files
+    install -Dm755 "$WINECHARM_PY" "$BIN_DIR/winecharm"
+    install -Dm644 "$ICON_FILE" "$ICON_DIR/$ICON_FILE"
+    install -Dm755 "$DESKTOP_FILE" "$DESKTOP_DIR/$DESKTOP_FILE"
+
+    echo "WineCharm has been installed successfully in $PREFIX."
+}
+
+# Perform the action
+if [ "$ACTION" == "uninstall" ]; then
+    uninstall_winecharm
+elif [ "$ACTION" == "install" ]; then
+    install_winecharm
+else
+    show_help
+    exit 1
+fi
+

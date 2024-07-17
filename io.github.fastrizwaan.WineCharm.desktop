@@ -1,10 +1,11 @@
 [Desktop Entry]
 Name=WineCharm
 Type=Application
-Comment=Wine GUI using Zenity
+Comment=A charming Wine GUI
 Exec=winecharm %F
 MimeType=application/x-ms-dos-executable;application/x-winezgui-backup-file;
 Icon=io.github.fastrizwaan.WineCharm
 StartupNotify=true
 Categories=Game;Emulator
 Keywords=exe;wine;windows
+
