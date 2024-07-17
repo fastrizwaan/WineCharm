@@ -97,9 +97,17 @@ class WineCharmApp(Gtk.Application):
 
     def monitor_processes(self):
         while True:
-            time.sleep(1)  # Increase the interval to give some time buffer
+            time.sleep(5)  # Increase the interval to give some time buffer
             finished_processes = []
-            for script_stem, process_info in self.running_processes.items():
+            
+            # Create a copy of the dictionary keys
+            running_processes_keys = list(self.running_processes.keys())
+
+            for script_stem in running_processes_keys:
+                process_info = self.running_processes.get(script_stem)
+                if process_info is None:
+                    continue
+                
                 proc = process_info["proc"]
                 if proc and proc.poll() is not None:
                     finished_processes.append(script_stem)
@@ -114,7 +122,7 @@ class WineCharmApp(Gtk.Application):
                             finished_processes.append(script_stem)
                     else:
                         try:
-                            pgrep_output = subprocess.check_output(["pgrep", "-ai", exe_file]).decode()
+                            pgrep_output = subprocess.check_output(["pgrep", "-aif", exe_file]).decode()
                             if not pgrep_output:
                                 finished_processes.append(script_stem)
                         except subprocess.CalledProcessError:
@@ -122,6 +130,7 @@ class WineCharmApp(Gtk.Application):
 
             for script_stem in finished_processes:
                 GLib.idle_add(self.process_ended, script_stem)
+
 
     def initialize_template(self, template_dir):
         if not template_dir.exists():
@@ -492,7 +501,12 @@ class WineCharmApp(Gtk.Application):
             productname_match = re.search(r'Product Name\s+:\s+(.+)', product_output)
             productname = productname_match.group(1).strip() if productname_match else exe_no_space
 
-        progname = productname if productname and not any(char.isdigit() for char in productname) and productname.isascii() else exe_no_space
+        if "setup" in exe_name.lower() or "install" in exe_name.lower():
+            progname = exe_name
+        elif "setup" in productname.lower() or "install" in productname.lower():
+            progname = productname
+        else:
+            progname = productname if productname and not any(char.isdigit() for char in productname) and productname.isascii() else exe_no_space
 
         yaml_data = {
             'exe_file': str(exe_file),
@@ -505,10 +519,11 @@ class WineCharmApp(Gtk.Application):
         with open(yaml_file_path, 'w') as yaml_file:
             yaml.dump(yaml_data, yaml_file)
 
-        icon_path = self.extract_icon(exe_file, prefix_dir, exe_no_space)
+        icon_path = self.extract_icon(exe_file, prefix_dir, exe_no_space, progname)
         self.create_desktop_entry(progname, yaml_file_path, icon_path, prefix_dir)
 
         self.add_or_update_script_row(yaml_file_path)
+
 
 
     def extract_yaml_info(self, script):
@@ -518,8 +533,8 @@ class WineCharmApp(Gtk.Application):
             data = yaml.safe_load(file)
         return data['exe_file'], data['wineprefix'], data['progname'], data.get('args', '')
 
-    def extract_icon(self, exe_file, wineprefix, exe_no_space):
-        icon_path = wineprefix / f"{exe_no_space}.png"
+    def extract_icon(self, exe_file, wineprefix, exe_no_space, progname):
+        icon_path = wineprefix / f"{progname.replace(' ', '_')}.png"
         tempdir.mkdir(parents=True, exist_ok=True)
         ico_path = tempdir / f"{exe_no_space}.ico"
 
