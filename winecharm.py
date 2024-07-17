@@ -491,7 +491,7 @@ class WineCharmApp(Gtk.Application):
         else:
             productname_match = re.search(r'Product Name\s+:\s+(.+)', product_output)
             productname = productname_match.group(1).strip() if productname_match else exe_no_space
-        
+
         progname = productname if productname and not any(char.isdigit() for char in productname) and productname.isascii() else exe_no_space
 
         yaml_data = {
@@ -501,7 +501,7 @@ class WineCharmApp(Gtk.Application):
             'args': ""
         }
 
-        yaml_file_path = prefix_dir / f"{exe_no_space}.yml"
+        yaml_file_path = prefix_dir / f"{progname.replace(' ', '_')}.yml"
         with open(yaml_file_path, 'w') as yaml_file:
             yaml.dump(yaml_data, yaml_file)
 
@@ -509,6 +509,7 @@ class WineCharmApp(Gtk.Application):
         self.create_desktop_entry(progname, yaml_file_path, icon_path, prefix_dir)
 
         self.add_or_update_script_row(yaml_file_path)
+
 
     def extract_yaml_info(self, script):
         if not script.exists():
