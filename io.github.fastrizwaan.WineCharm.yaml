@@ -1,0 +1,225 @@
+id: io.github.fastrizwaan.WineCharm
+sdk: org.gnome.Sdk
+runtime: org.gnome.Platform
+base: org.winehq.Wine
+base-version: stable-23.08
+runtime-version: &runtime-version '46'
+command: winecharm
+
+#rename-icon: winezgui
+#rename-desktop-file: winezgui.desktop
+finish-args:
+  - --allow=devel # For Wine crash handling
+  - --allow=multiarch
+  - --device=all
+  - --env=GST_PLUGIN_SYSTEM_PATH=/app/lib32/gstreamer-1.0:/app/lib/gstreamer-1.0:/usr/lib/i386-linux-gnu/gstreamer-1.0:/usr/lib/x86_64-linux-gnu/gstreamer-1.0
+  - --env=WINEDLLPATH=/app/dlls/lib32:/app/dlls/lib:/app/lib32/wine/wined3d:/app/lib/wine/wined3d
+  - --env=LD_LIBRARY_PATH=/app/lib:/app/lib32
+
+    # Need to link .desktop files
+  - --filesystem=~/.local/share/applications:create
+  - --filesystem=~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm:create
+    # Desktop shortcut runs wine script from host
+  #- --talk-name=org.freedesktop.Flatpak
+  - --share=ipc
+  - --share=network
+  - --socket=pulseaudio
+  - --socket=x11
+  - --system-talk-name=org.freedesktop.UDisks2
+  - --talk-name=org.freedesktop.Notifications
+
+  - --talk-name=io.github.fastrizwaan.WineCharm
+  - --own-name=io.github.fastrizwaan.WineCharm
+  # Additional D-Bus services that might be required by your application or its dependencies
+  - --talk-name=org.gnome.SettingsDaemon
+  - --talk-name=org.gnome.SessionManager
+  - --talk-name=org.a11y.Bus
+    # Most Games write to their own directories
+#- --filesystem=host
+  - --filesystem=xdg-desktop
+  - --filesystem=xdg-documents
+  - --filesystem=xdg-download
+  - --filesystem=xdg-music
+  - --filesystem=xdg-pictures
+  - --filesystem=xdg-videos
+  # WineZGUI import wine prefix Needs access to copy games and runners from wine, bottles, playonlinux, lutris, heroic launcher data directories. 
+  # Using :ro messes up the path to /run/... instead of ~/ breaking copying
+  # flatpak bug with :ro breaks realpath.
+  - --filesystem=~/Games
+  - --filesystem=~/.wine
+  - --filesystem=~/.var/app/org.winehq.Wine/data/wine
+  - --filesystem=~/.var/app/com.usebottles.bottles/data/bottles
+  - --filesystem=~/.var/app/com.playonlinux.PlayOnLinux4/data/PlayOnLinux/wineprefix
+  - --filesystem=~/.var/app/org.phoenicis.playonlinux/.Phoenicis/containers/wineprefix
+  
+cleanup:
+  - '*.a'
+  - '*.la'
+  - /share/doc
+  - /share/man
+  - /lib/cmake
+  - /lib/pkgconfig
+  - /share/cmake
+  - /share/pkgconfig
+  - /share/bash-completion
+
+inherit-extensions:
+  - org.freedesktop.Platform.GL32
+  - org.freedesktop.Platform.Compat.i386
+  - org.freedesktop.Platform.ffmpeg_full.i386
+  - org.freedesktop.Platform.ffmpeg-full
+  - org.freedesktop.Platform.GL32
+  - org.freedesktop.Platform.VAAPI.Intel.i386
+  - org.winehq.Wine.DLLs
+  - org.winehq.Wine.gecko
+  - org.winehq.Wine.mono
+
+add-extensions:
+  com.valvesoftware.Steam.Utility:
+    subdirectories: true
+    directory: utils
+    versions: stable;beta;test;master
+    add-ld-path: lib
+    merge-dirs: share/vulkan/explicit_layer.d;share/vulkan/implicit_layer.d;
+    no-autodownload: true
+    autodelete: false
+
+modules:
+ 
+  # Create 32-bit directories
+  - name: compat
+    buildsystem: simple
+    build-commands:
+      - mkdir -p /app/lib/i386-linux-gnu
+      - mkdir -p /app/lib/i386-linux-gnu/GL
+      - mkdir -p /app/lib/debug/lib/i386-linux-gnu
+      - mkdir -p /app/lib/dri/intel-vaapi-driver
+      - mkdir -p /app/lib/i386-linux-gnu/dri/intel-vaapi-driver
+      - mkdir -p /app/lib/udev/rules.d
+      - mkdir -p /app/extensions/Plugins
+      - mkdir -p /app/lib64
+      - mkdir -p /app/lib32
+      - mkdir -p /app/lib/ffmpeg
+      - mkdir -p /app/lib32/ffmpeg
+      - mkdir -p /app/utils
+
+  - name: vulkan-tools
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DGLSLANG_INSTALL_DIR=/app
+      - -DVULKAN_HEADERS_INSTALL_DIR=/app
+      - -DCMAKE_BUILD_TYPE=Release
+    sources:
+      - type: git
+        url: https://github.com/KhronosGroup/Vulkan-Tools.git
+        tag: sdk-1.3.261.1
+        commit: a7da7027ca9fd0901639f02619c226da9c6036f1
+        x-checker-data:
+          type: git
+          tag-pattern: ^sdk-([\d.]+)$
+    modules:
+      - name: vulkan-tools
+        buildsystem: cmake-ninja
+        sources:
+          - type: git
+            url: https://github.com/KhronosGroup/Vulkan-Headers.git
+            tag: sdk-1.3.261.1
+            commit: 85c2334e92e215cce34e8e0ed8b2dce4700f4a50
+            x-checker-data:
+              type: git
+              tag-pattern: ^sdk-([\d.]+)$
+
+  - name: icoutils
+    build-options:
+      no-debuginfo: true  
+    buildsystem: autotools
+    sources:
+      - type: archive
+        url: http://savannah.nongnu.org/download/icoutils/icoutils-0.32.3.tar.bz2
+        mirror-urls: 
+          - https://download-mirror.savannah.gnu.org/releases/icoutils/icoutils-0.32.3.tar.bz2
+          - https://ftp.up.pt/pub/nongnu/icoutils/icoutils-0.32.3.tar.bz2
+        sha256: 17abe02d043a253b68b47e3af69c9fc755b895db68fdc8811786125df564c6e0
+
+  - name: perl
+    no-autogen: true
+    config-opts:
+    - "-des"
+    - "-Duseshrplib"
+    build-options:
+      cflags: "-fPIC"
+      ldflags: "-fpic"
+    sources:
+    - type: archive
+      url: https://www.cpan.org/src/5.0/perl-5.38.0.tar.xz
+      sha256: eca551caec3bc549a4e590c0015003790bdd1a604ffe19cc78ee631d51f7072e
+    - type: script
+      dest-filename: configure
+      commands:
+      - exec ./configure.gnu $@
+    post-install:
+      - find /app/lib/perl5 -type f -exec chmod u+w {} \;
+  
+  - name: exiftool
+    buildsystem: simple
+    build-commands:
+      - perl Makefile.PL
+      - make
+      - make install 
+    sources:
+      - type: archive
+        url: https://github.com/exiftool/exiftool/archive/refs/tags/12.68.tar.gz
+        sha256: 49273f93edcd32eee3725b458a2c7151d8e353281dc52bfa3d063c92962ab6d8
+        
+  - name: desktop-file-utils
+    build-options:
+      no-debuginfo: true  
+    buildsystem: meson
+    sources:
+      - type: archive
+        url: https://www.freedesktop.org/software/desktop-file-utils/releases/desktop-file-utils-0.27.tar.xz
+        sha256: a0817df39ce385b6621880407c56f1f298168c040c2032cedf88d5b76affe836
+
+  - name: psutil
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=/app psutil*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/19/74/f59e7e0d392bc1070e9a70e2f9190d652487ac115bb16e2eff6b22ad1d24/psutil-6.0.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+        sha256: 5fd9a97c8e94059b0ef54a7d4baf13b405011176c3b6ff257c247cae0d560ecd
+        only-arches:
+          - x86_64
+        x-checker-data:
+          type: pypi
+          name: psutil
+          packagetype: bdist_wheel
+
+  - name: pyyaml
+    buildsystem: simple
+    build-commands:
+      - pip3 install --prefix=/app PyYAML*.whl
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/7b/5e/efd033ab7199a0b2044dab3b9f7a4f6670e6a52c089de572e928d2873b06/PyYAML-6.0.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+        sha256: d2b04aac4d386b172d5b9692e2d2da8de7bfb6c387fa4f801fbf6fb2e6ba4673
+        only-arches:
+          - x86_64
+        x-checker-data:
+          type: pypi
+          name: PyYAML
+          packagetype: bdist_wheel
+        
+  - name: WineCharm
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 winecharm.py /app/bin/winecharm
+      - install -Dm644 io.github.fastrizwaan.WineCharm.svg /app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg
+      - install -Dm755 io.github.fastrizwaan.WineCharm.desktop /app/share/applications/io.github.fastrizwaan.WineCharm.desktop
+    sources:
+      - type: file
+        path: winecharm.py
+      - type: file
+        path: io.github.fastrizwaan.WineCharm.svg
+      - type: file
+        path: io.github.fastrizwaan.WineCharm.desktop
