@@ -59,6 +59,9 @@ class WineCharmApp(Gtk.Application):
 
         self.css_provider = Gtk.CssProvider()
         self.css_provider.load_from_data(b"""
+           .menu-button.flat:hover {
+                background-color: @headerbar_bg_color;
+            }
             .button-box button {
                 min-width: 80px;
                 min-height: 30px;
@@ -294,6 +297,8 @@ class WineCharmApp(Gtk.Application):
         self.menu_button = Gtk.MenuButton()
         menu_icon = Gtk.Image.new_from_icon_name("open-menu-symbolic")
         self.menu_button.set_child(menu_icon)
+        self.menu_button.add_css_class("flat")
+
         self.menu_button.set_tooltip_text("Menu")
         self.headerbar.pack_end(self.menu_button)
 
