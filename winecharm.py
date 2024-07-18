@@ -20,6 +20,7 @@ gi.require_version('Adw', '1')
 
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango
 
+
 author="Mohammed Asif Ali Rizvan"
 email="fast.rizwaan@gmail.com"
 copyright="GNU General Public License (GPLv3+)"
@@ -113,6 +114,8 @@ class WineCharmApp(Gtk.Application):
         self.monitor_thread = threading.Thread(target=self.monitor_processes)
         self.monitor_thread.daemon = True
         self.monitor_thread.start()
+
+
 
     def set_dynamic_variables(self):
         global runner, wine_version, template, arch
@@ -721,31 +724,26 @@ Categories=Game;Utility;
                 row.label.set_markup(f"<b>{row.label.get_text()}</b>")
             row = row.get_next_sibling()
 
-    def show_about_dialog(self, button=None):
-        about_dialog = Gtk.Dialog(transient_for=self.window, modal=True)
-        about_dialog.set_default_size(300, 200)
-        about_dialog.set_title("About WineCharm")
 
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        box.set_margin_top(10)
-        box.set_margin_bottom(10)
-        box.set_margin_start(10)
-        box.set_margin_end(10)
-        about_dialog.set_child(box)
-
-        about_content = self.load_about_content("About.yml")
-        about_label = Gtk.Label()
-        about_label.set_markup(about_content)
-        about_label.set_halign(Gtk.Align.START)
-        about_label.set_valign(Gtk.Align.START)
-        about_label.set_selectable(True)
-        box.append(about_label)
-
-        close_button = Gtk.Button(label="Close")
-        close_button.connect("clicked", lambda w: about_dialog.close())
-        box.append(close_button)
-
+    def show_about_dialog(self, action=None, param=None):
+        about_dialog = Adw.AboutWindow(
+            transient_for=self.window,
+            application_name="WineCharm",
+            application_icon="io.github.fastrizwaan.WineCharm",
+            version="0.2",
+            copyright="GNU General Public License (GPLv3+)",
+            comments="Wine GUI Application",
+            website="https://github.com/fastrizwaan/WineCharm",
+            developers=["Mohammed Asif Ali Rizvan"],
+            license_type=Gtk.License.GPL_3_0,
+            issue_url="https://github.com/fastrizwaan/WineCharm/issues"
+        )
         about_dialog.present()
+
+
+
+
+
 
 
     def on_settings_clicked(self, action, param):
