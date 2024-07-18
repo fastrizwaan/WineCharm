@@ -45,6 +45,9 @@ class WineCharmApp(Gtk.Application):
         self.play_stop_handlers = {}
         self.options_listbox = None
 
+        # Register the SIGINT signal handler
+        signal.signal(signal.SIGINT, self.handle_sigint)
+
         self.hamburger_actions = [
             ("🛠️ Settings...", self.on_settings_clicked),
             ("☠️ Kill all...", self.on_kill_all_clicked),
@@ -1473,6 +1476,9 @@ Categories=Game;Utility;
         except Exception as e:
             print(f"Error installing dxvk and vkd3d: {e}")
 
+    def handle_sigint(self, signum, frame):
+        print("\n")
+        self.quit()
 
 def main():
     app = WineCharmApp()
