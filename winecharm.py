@@ -285,6 +285,7 @@ class WineCharmApp(Gtk.Application):
         app_icon_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         app_icon_box.set_margin_start(10)
         app_icon = Gtk.Image.new_from_icon_name("io.github.fastrizwaan.WineCharm")
+        app_icon.set_pixel_size(24)  # Set icon size to 24
         app_icon_box.append(app_icon)
         self.headerbar.pack_start(app_icon_box)
 
