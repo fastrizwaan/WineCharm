@@ -53,7 +53,6 @@ class WineCharmApp(Gtk.Application):
             ("🚪 Quit...", self.quit_app)
         ]
 
-        self.default_icon_path = "default.png"
 
         self.css_provider = Gtk.CssProvider()
         self.css_provider.load_from_data(b"""
@@ -1106,17 +1105,21 @@ Categories=Game;Utility;
         icon_name = script.stem + ".png"
         icon_dir = script.parent
         icon_path = icon_dir / icon_name
+        default_icon_path = "/app/share/icons/hicolor/128x128/apps/org.winehq.Wine.png"  # Updated default icon path
+
         try:
             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(icon_path), 32, 32)
             return Gdk.Texture.new_for_pixbuf(pixbuf)
-        except Exception as e:
-            print(f"Error loading icon '{icon_path}': {e}")
+        except Exception:
+            print(f"Icon not found: {icon_name}")
             try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(self.default_icon_path, 32, 32)
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(default_icon_path, 32, 32)
                 return Gdk.Texture.new_for_pixbuf(pixbuf)
-            except Exception as e:
-                print(f"Error loading default icon '{self.default_icon_path}': {e}")
+            except Exception:
+                print(f"Error loading default icon: {default_icon_path}")
                 return None
+
+
 
     def create_icon_title_widget(self, script):
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
