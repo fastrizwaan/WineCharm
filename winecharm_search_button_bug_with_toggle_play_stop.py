@@ -20,24 +20,10 @@ gi.require_version('Adw', '1')
 
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango
 
-author="Mohammed Asif Ali Rizvan"
-email="fast.rizwaan@gmail.com"
-copyright="GNU General Public License (GPLv3+)"
-website="https://github.com/fastrizwaan/WineCharm"
-appname="WineCharm"
-version="0.2"
-
-# These needs to be dynamically updated:
-runner="" # which wine
-wine_version: "" # runner --version 
-template: "" # default: WineCharm-win64 ; #if not found in settings.yaml at winecharm directory add default_template
-arch: "" # default: win64 ; # #if not found in settings.yaml at winecharm directory add win64
-
-
 winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
 prefixes_dir = winecharmdir / "Prefixes"
 templates_dir = winecharmdir / "Templates"
-default_template = templates_dir / "WineCharm-win64"
+default_template = templates_dir / "WineCharm-default"
 
 applicationsdir = Path(os.path.expanduser("~/.local/share/applications")).resolve()
 tempdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/tmp")).resolve()
@@ -58,6 +44,7 @@ class WineCharmApp(Gtk.Application):
         self.running_processes = {}
         self.play_stop_handlers = {}
         self.options_listbox = None
+        self.search_active = False
 
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
@@ -69,7 +56,6 @@ class WineCharmApp(Gtk.Application):
             ("📖 About...", self.on_about_clicked),
             ("🚪 Quit...", self.quit_app)
         ]
-
 
         self.css_provider = Gtk.CssProvider()
         self.css_provider.load_from_data(b"""
@@ -114,101 +100,58 @@ class WineCharmApp(Gtk.Application):
         self.monitor_thread.daemon = True
         self.monitor_thread.start()
 
-    def set_dynamic_variables(self):
-        global runner, wine_version, template, arch
-        runner = subprocess.getoutput('which wine')
-        wine_version = subprocess.getoutput(f"{runner} --version")
-        template = "WineCharm-win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('template', "WineCharm-win64")
-        arch = "win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('arch', "win64")
-
-    def load_settings(self):
-        settings_file_path = winecharmdir / "settings.yml"
-        if settings_file_path.exists():
-            with open(settings_file_path, 'r') as settings_file:
-                return yaml.safe_load(settings_file)
-        return {}
-
-    def generate_about_yml(self):
-        about_file_path = winecharmdir / "About.yml"
-        if about_file_path.exists():
-            print(f"{about_file_path} already exists. Skipping generation.")
-            return
-
-        about_data = {
-            "Application": appname,
-            "Version": version,
-            "Copyright": copyright,
-            "Website": website,
-            "Author": author,
-            "E-mail": email,
-            "Wine_Runner": runner,
-            "Wine_Version": wine_version,
-            "Template": template,
-            "Wine_Arch": arch,
-            "WineZGUI_Prefix": str(winecharmdir),
-            "Wine_Prefix": str(default_template),
-            "Creation_Date": time.strftime("%a %b %d %I:%M:%S %p %Z %Y")
-        }
-
-        with open(about_file_path, 'w') as about_file:
-            yaml.dump(about_data, about_file, default_flow_style=False)
-        print(f"Generated {about_file_path}")
-
-    def generate_settings_yml(self):
-        settings_file_path = winecharmdir / "settings.yml"
-        if settings_file_path.exists():
-            print(f"{settings_file_path} already exists. Skipping generation.")
-            return
-
-        settings_data = {
-            "arch": arch,
-            "template": str(default_template),
-            "runner": runner
-        }
-
-        with open(settings_file_path, 'w') as settings_file:
-            yaml.dump(settings_data, settings_file, default_flow_style=False)
-        print(f"Generated {settings_file_path}")
-
-    def on_activate(self, app):
-        self.create_main_window()
-        self.create_script_list()
-        missing_programs = self.check_required_programs()
-        if missing_programs:
-            self.show_missing_programs_dialog(missing_programs)
+    def on_search_button_clicked(self, button):
+        if self.search_active:
+            self.vbox.remove(self.search_entry_box)
+            self.vbox.prepend(self.open_button)
+            self.search_active = False
+            self.filter_script_list("")  # Reset the list to show all scripts
         else:
-            self.initialize_template(default_template)
+            self.vbox.remove(self.open_button)
+            self.vbox.prepend(self.search_entry_box)
+            self.search_entry.grab_focus()
+            self.search_active = True
+            
+    def on_search_entry_activated(self, entry):
+        search_term = entry.get_text().lower()
+        self.filter_script_list(search_term)
 
-        self.set_dynamic_variables()
-        self.generate_about_yml()
-        self.generate_settings_yml()
+    def on_search_entry_changed(self, entry):
+        search_term = entry.get_text().lower()
+        self.filter_script_list(search_term)
 
-    def load_about_content(self, file_path):
-        try:
-            about_file_path = winecharmdir / file_path
-            with open(about_file_path, 'r') as file:
-                about_data = yaml.safe_load(file)
-                if not isinstance(about_data, dict):
-                    raise ValueError("YAML content is not a dictionary")
-                
-                max_key_length = max(len(key) for key in about_data.keys())
-                content = ""
-                for key, value in about_data.items():
-                    if key == "Website":
-                        value = f'<a href="{value}">{value}</a>'
-                    elif key in ["WineCharm_Prefix", "Wine_Prefix"]:
-                        value = f'<a href="file://{value}">{value}</a>'
-                    content += f"<tt><b>{key:<{max_key_length}}</b> : {value}</tt>\n"
-                return content
-        except Exception as e:
-            print(f"Error loading about content: {e}")
-            return "<b>Error loading about content.</b>"
+    def on_search_entry_key_pressed(self, controller, keyval, keycode, state):
+        if keyval == Gdk.KEY_Escape:
+            self.vbox.remove(self.search_entry_box)
+            self.vbox.prepend(self.open_button)
+            self.search_active = False
+            self.filter_script_list("")  # Reset the list to show all scripts
 
-
+    def filter_script_list(self, search_term):
+        scripts = self.find_python_scripts()
         
+        # Remove all existing rows
+        child = self.listbox.get_first_child()
+        while child:
+            next_child = child.get_next_sibling()
+            self.listbox.remove(child)
+            child = next_child
+
+        # Add filtered scripts
+        filtered_scripts = [script for script in scripts if search_term in script.stem.lower()]
+
+        for script in filtered_scripts:
+            row = self.create_script_row(script)
+            self.listbox.append(row)
+            row.set_visible(True)
+        
+        self.reselect_previous_row()
+
+
+
     def monitor_processes(self):
         while True:
-            time.sleep(3)  # Increase the interval to give some time buffer
+            time.sleep(1)  # Increase the interval to give some time buffer
             finished_processes = []
             
             # Create a copy of the dictionary keys
@@ -241,7 +184,6 @@ class WineCharmApp(Gtk.Application):
 
             for script_stem in finished_processes:
                 GLib.idle_add(self.process_ended, script_stem)
-
 
     def initialize_template(self, template_dir):
         if not template_dir.exists():
@@ -329,6 +271,14 @@ class WineCharmApp(Gtk.Application):
 
         print("Template initialization completed and UI updated.")
 
+    def on_activate(self, app):
+        self.create_main_window()
+        self.create_script_list()
+        missing_programs = self.check_required_programs()
+        if missing_programs:
+            self.show_missing_programs_dialog(missing_programs)
+        else:
+            self.initialize_template(default_template)
 
     def check_required_programs(self):
         # Check if flatpak-spawn is available
@@ -348,7 +298,6 @@ class WineCharmApp(Gtk.Application):
         ]
         missing_programs = [prog for prog in required_programs if not shutil.which(prog)]
         return missing_programs
-
 
     def show_missing_programs_dialog(self, missing_programs):
         dialog = Gtk.Dialog(transient_for=self.window, modal=True)
@@ -400,6 +349,10 @@ class WineCharmApp(Gtk.Application):
         self.menu_button.set_tooltip_text("Menu")
         self.headerbar.pack_end(self.menu_button)
 
+        self.search_button = Gtk.Button.new_from_icon_name("system-search-symbolic")
+        self.search_button.connect("clicked", self.on_search_button_clicked)
+        self.headerbar.pack_end(self.search_button)
+
         menu = Gio.Menu()
         for label, action in self.hamburger_actions:
             menu.append(label, f"app.{action.__name__}")
@@ -429,9 +382,30 @@ class WineCharmApp(Gtk.Application):
         self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_exe_clicked)
         self.vbox.append(self.open_button)
 
+        self.search_entry = Gtk.Entry()
+        self.search_entry.set_placeholder_text("Search...")
+        self.search_entry.connect("activate", self.on_search_entry_activated)
+        self.search_entry.connect("changed", self.on_search_entry_changed)
+
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self.on_search_entry_key_pressed)
+        self.search_entry.add_controller(key_controller)
+
+        self.search_entry_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.search_entry_box.set_halign(Gtk.Align.CENTER)
+        search_icon = Gtk.Image.new_from_icon_name("system-search-symbolic")
+        self.search_entry_box.append(search_icon)
+        self.search_entry_box.append(self.search_entry)
+        self.search_entry_box.set_hexpand(True)
+        self.search_entry.set_hexpand(True)
+
         self.main_frame = Gtk.Frame()
         self.main_frame.set_margin_top(5)
         self.vbox.append(self.main_frame)
+
+        self.listbox = Gtk.ListBox()
+        self.listbox.set_css_classes("listbox")
+        self.main_frame.set_child(self.listbox)
 
         self.window.present()
 
@@ -503,13 +477,11 @@ class WineCharmApp(Gtk.Application):
         finally:
             GLib.idle_add(self.hide_processing_spinner)
 
-
     def create_script_list(self):
         self.initial_listbox()
         scripts = self.find_python_scripts()
         if len(scripts) > 12:
             GLib.idle_add(self.switch_to_scrolled_window)
-
 
     def add_lnk_file_to_processed(self, wineprefix, lnk_file):
         found_lnk_files_path = wineprefix / "found_lnk_files.yaml"
@@ -521,6 +493,7 @@ class WineCharmApp(Gtk.Application):
         found_lnk_files.append(str(lnk_file))
         with open(found_lnk_files_path, 'w') as file:
             yaml.safe_dump(found_lnk_files, file)
+
     def find_lnk_files(self, wineprefix):
         drive_c = wineprefix / "drive_c"
         lnk_files = []
@@ -630,8 +603,6 @@ class WineCharmApp(Gtk.Application):
 
         self.add_or_update_script_row(yaml_file_path)
 
-
-
     def extract_yaml_info(self, script):
         if not script.exists():
             raise FileNotFoundError(f"Script file not found: {script}")
@@ -677,21 +648,6 @@ StartupNotify=true
 Terminal=false
 Categories=Game;Utility;
 """
-#       desktop_file_path = wineprefix / f"{progname}.desktop"
-#       
-#       with open(desktop_file_path, "w") as desktop_file:
-#           desktop_file.write(desktop_file_content)
-
-#       symlink_path = applicationsdir / f"{progname}.desktop"
-#       if symlink_path.exists() or symlink_path.is_symlink():
-#           symlink_path.unlink()
-#       symlink_path.symlink_to(desktop_file_path)
-
-#       if icon_path:
-#           icon_symlink_path = iconsdir / f"{icon_path.name}"
-#           if icon_symlink_path.exists() or symlink_path.is_symlink():
-#               icon_symlink_path.unlink(missing_ok=True)
-#           icon_symlink_path.symlink_to(icon_path)
 
     def add_or_update_script_row(self, script_path):
         row = self.listbox.get_first_child()
@@ -747,6 +703,25 @@ Categories=Game;Utility;
 
         about_dialog.present()
 
+    def load_about_content(self, file_path):
+        try:
+            with open(file_path, 'r') as file:
+                about_data = yaml.safe_load(file)
+                if not isinstance(about_data, dict):
+                    raise ValueError("YAML content is not a dictionary")
+                
+                max_key_length = max(len(key) for key in about_data.keys())
+                content = ""
+                for key, value in about_data.items():
+                    if key == "Website":
+                        value = f'<a href="{value}">{value}</a>'
+                    elif key in ["WineCharm_Prefix", "Wine_Prefix"]:
+                        value = f'<a href="file://{value}">{value}</a>'
+                    content += f"<tt><b>{key:<{max_key_length}}</b> : {value}</tt>\n"
+                return content
+        except Exception as e:
+            print(f"Error loading about content: {e}")
+            return "<b>Error loading about content.</b>"
 
     def on_settings_clicked(self, action, param):
         print("Settings action triggered")
@@ -794,7 +769,6 @@ Categories=Game;Utility;
 
         # Updating script list so that stop buttons become play buttons
         self.create_script_list()
-
 
     def on_help_clicked(self, action, param):
         print("Help action triggered")
@@ -870,7 +844,6 @@ Categories=Game;Utility;
         self.main_frame.set_child(vbox)
 
         self.listbox = Gtk.ListBox()
-        #self.listbox.set_margin_bottom(5)
         self.listbox.connect("row-selected", self.on_script_selected)
         self.listbox.set_css_classes("listbox")
         vbox.append(self.listbox)
@@ -898,7 +871,6 @@ Categories=Game;Utility;
         scrolled_window.set_vexpand(True)
 
         full_listbox = Gtk.ListBox()
-        #full_listbox.set_margin_bottom(5)
         full_listbox.connect("row-selected", self.on_script_selected)
         full_listbox.set_css_classes("full_listbox")
         scrolled_window.set_child(full_listbox)
@@ -994,8 +966,6 @@ Categories=Game;Utility;
             pgid = os.getpgid(proc.pid)
             
             print(f"Launched script with PID: {proc.pid}")
-            #print("Output of `ps -axu`:")
-            #print(subprocess.check_output(["ps", "-axu"]).decode())
 
             self.running_processes[script.stem] = {
                 "proc": proc,
@@ -1023,7 +993,6 @@ Categories=Game;Utility;
 
         except Exception as e:
             print(f"Error launching script: {e}")
-        
 
     def terminate_script(self, script):
         print(f"Terminating script: {script}")
@@ -1060,8 +1029,6 @@ Categories=Game;Utility;
                 print(f"No running process found for {script}")
         else:
             print(f"No running process found for {script}")
-
-        #self.create_script_list() # rizvan enable this but it will hammer the disk isn't it?
 
     def process_ended(self, script_stem):
         if script_stem in self.running_processes:
@@ -1138,7 +1105,6 @@ Categories=Game;Utility;
     def delete_setup_or_install_script(self, script, row):
         try:
             script.unlink()
-            #self.create_script_list()
         except Exception as e:
             print(f"Error deleting script: {e}")
 
@@ -1206,8 +1172,6 @@ Categories=Game;Utility;
                 print(f"Error loading default icon: {default_icon_path}")
                 return None
 
-
-
     def create_icon_title_widget(self, script):
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
 
@@ -1260,7 +1224,6 @@ Categories=Game;Utility;
         try:
             script.unlink()
             self.listbox.remove(row)
-            #self.create_script_list() #can we save one more
         except Exception as e:
             print(f"Error deleting script: {e}")
 
@@ -1361,7 +1324,6 @@ Categories=Game;Utility;
         self.disconnect_play_stop_handler(play_stop_button)
         self.play_stop_handlers[play_stop_button] = play_stop_button.connect("clicked", lambda btn: self.toggle_play_stop(script, play_stop_button, row))
 
-       
     def update_execute_button_icon(self, script):
         child = self.options_listbox.get_first_child()
         while child:
@@ -1421,7 +1383,6 @@ Categories=Game;Utility;
             yaml.safe_dump(data, file)
         dialog.close()
         print(f"Saved arguments for {script}: {args}")
-
 
     def on_options_row_selected(self, listbox, row):
         pass
