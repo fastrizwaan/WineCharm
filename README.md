@@ -3,7 +3,7 @@
 #### A charming Wine GUI - Play and Share!
 
 ### Logo
-![WineCharm Logo](https://raw.githubusercontent.com/fastrizwaan/WineCharm/main/io.github.fastrizwaan.WineCharm.svg) 
+![WineCharm About](https://github.com/fastrizwaan/WineCharm/releases/download/0.2/WineCharm_About.png) 
 
 ### New Window
 ![WineCharm New Window](https://github.com/fastrizwaan/WineCharm/releases/download/0.1/WineCharm-New.png)
