@@ -97,7 +97,7 @@ class WineCharmApp(Gtk.Application):
 
     def monitor_processes(self):
         while True:
-            time.sleep(5)  # Increase the interval to give some time buffer
+            time.sleep(3)  # Increase the interval to give some time buffer
             finished_processes = []
             
             # Create a copy of the dictionary keys
