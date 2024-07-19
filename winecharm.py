@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import gi
 import fnmatch
@@ -1508,22 +1508,34 @@ Categories=Game;Utility;
         if not wineprefix.exists():
             wineprefix.mkdir(parents=True, exist_ok=True)
 
-        command = [
-            "flatpak-spawn",
-            "--host",
-            "gnome-terminal",
-            "--wait",
-            "--",
-            "flatpak",
-            "--filesystem=host",
-            "--filesystem=~/.var/app",
-            "--command=bash",
-            "run",
-            "io.github.fastrizwaan.WineCharm",
-            "--norc",
-            "-c",
-            rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
-        ]
+        if shutil.which("flatpak-spawn"):
+            command = [
+                "flatpak-spawn",
+                "--host",
+                "gnome-terminal",
+                "--wait",
+                "--",
+                "flatpak",
+                "--filesystem=host",
+                "--filesystem=~/.var/app",
+                "--command=bash",
+                "run",
+                "io.github.fastrizwaan.WineCharm",
+                "--norc",
+                "-c",
+                rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
+            ]
+            
+        else:
+            command = [
+                "gnome-terminal",
+                "--wait",
+                "--",
+                "bash",
+                "--norc",
+                "-c",
+                rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
+            ]
         try:
             subprocess.Popen(command)
         except Exception as e:
