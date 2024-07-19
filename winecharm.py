@@ -26,7 +26,7 @@ email="fast.rizwaan@gmail.com"
 copyright="GNU General Public License (GPLv3+)"
 website="https://github.com/fastrizwaan/WineCharm"
 appname="WineCharm"
-version="0.2"
+version="0.3"
 
 # These needs to be dynamically updated:
 runner="" # which wine
@@ -447,7 +447,7 @@ class WineCharmApp(Gtk.Application):
 
         self.search_entry_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         search_icon = Gtk.Image.new_from_icon_name("system-search-symbolic")
-        self.search_entry_box.append(search_icon)
+#        self.search_entry_box.append(search_icon)
         self.search_entry_box.append(self.search_entry)
         self.search_entry_box.set_hexpand(True)
         self.search_entry.set_hexpand(True)
@@ -801,7 +801,7 @@ Categories=Game;Utility;
             transient_for=self.window,
             application_name="WineCharm",
             application_icon="io.github.fastrizwaan.WineCharm",
-            version="0.2",
+            version=f"{version}",
             copyright="GNU General Public License (GPLv3+)",
             comments="A Charming Wine GUI Application",
             website="https://github.com/fastrizwaan/WineCharm",
@@ -1339,14 +1339,7 @@ Categories=Game;Utility;
 
     def show_options_for_script(self, script, row):
         # Ensure the search button is toggled off and the search entry is cleared
-        if self.search_active:
-            self.search_button.set_active(False)
-            self.vbox.remove(self.search_entry_box)
-            self.vbox.prepend(self.open_button)
-            self.search_entry.set_text("")
-            self.search_active = False
-            self.filter_script_list("")  # Reset the list to show all scripts
-        
+        self.search_button.set_active(False)
         self.listbox.select_row(row)
         self.main_frame.set_child(None)
 
