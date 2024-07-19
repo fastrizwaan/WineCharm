@@ -998,8 +998,6 @@ Categories=Game;Utility;
             pgid = os.getpgid(proc.pid)
             
             print(f"Launched script with PID: {proc.pid}")
-            #print("Output of `ps -axu`:")
-            #print(subprocess.check_output(["ps", "-axu"]).decode())
 
             self.running_processes[script.stem] = {
                 "proc": proc,
@@ -1018,15 +1016,15 @@ Categories=Game;Utility;
                 GLib.idle_add(self.create_scripts_for_lnk_files, Path(wineprefix))
                 time.sleep(5)
                 GLib.idle_add(self.update_related_scripts_buttons, Path(wineprefix))
-                
+            
             threading.Thread(target=monitor_process).start()
 
-            play_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
-            play_stop_button.set_child(play_icon)
-            play_stop_button.set_tooltip_text("Stop")
+            # Use the new method here
+            self.update_running_script_buttons()
 
         except Exception as e:
             print(f"Error launching script: {e}")
+
         
 
     def terminate_script(self, script):
