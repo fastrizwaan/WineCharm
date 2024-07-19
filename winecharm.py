@@ -59,6 +59,7 @@ class WineCharmApp(Gtk.Application):
         self.running_processes = {}
         self.play_stop_handlers = {}
         self.options_listbox = None
+        self.search_active = False
 
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
@@ -395,6 +396,13 @@ class WineCharmApp(Gtk.Application):
         app_icon_box.append(app_icon)
         self.headerbar.pack_start(app_icon_box)
 
+        self.search_button = Gtk.ToggleButton()
+        search_icon = Gtk.Image.new_from_icon_name("system-search-symbolic")
+        self.search_button.set_child(search_icon)
+        self.search_button.connect("toggled", self.on_search_button_clicked)
+        self.search_button.add_css_class("flat")
+        self.headerbar.pack_start(self.search_button)
+
         self.menu_button = Gtk.MenuButton()
         menu_icon = Gtk.Image.new_from_icon_name("open-menu-symbolic")
         self.menu_button.set_child(menu_icon)
@@ -432,11 +440,74 @@ class WineCharmApp(Gtk.Application):
         self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_exe_clicked)
         self.vbox.append(self.open_button)
 
+        self.search_entry = Gtk.Entry()
+        self.search_entry.set_placeholder_text("Search...")
+        self.search_entry.connect("activate", self.on_search_entry_activated)
+        self.search_entry.connect("changed", self.on_search_entry_changed)
+
+        self.search_entry_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        search_icon = Gtk.Image.new_from_icon_name("system-search-symbolic")
+        self.search_entry_box.append(search_icon)
+        self.search_entry_box.append(self.search_entry)
+        self.search_entry_box.set_hexpand(True)
+        self.search_entry.set_hexpand(True)
+
         self.main_frame = Gtk.Frame()
         self.main_frame.set_margin_top(5)
         self.vbox.append(self.main_frame)
 
         self.window.present()
+
+        key_controller = Gtk.EventControllerKey()
+        key_controller.connect("key-pressed", self.on_key_pressed)
+        self.window.add_controller(key_controller)
+
+    def on_key_pressed(self, controller, keyval, keycode, state):
+        if keyval == Gdk.KEY_Escape:
+            self.search_button.set_active(False)
+
+    def on_search_button_clicked(self, button):
+        if self.search_active:
+            self.vbox.remove(self.search_entry_box)
+            self.vbox.prepend(self.open_button)
+            self.search_active = False
+            self.filter_script_list("")  # Reset the list to show all scripts
+        else:
+            self.vbox.remove(self.open_button)
+            self.vbox.prepend(self.search_entry_box)
+            self.search_entry.grab_focus()
+            self.search_active = True
+        self.update_running_script_buttons()
+             
+    def on_search_entry_activated(self, entry):
+        search_term = entry.get_text().lower()
+        self.filter_script_list(search_term)
+
+    def on_search_entry_changed(self, entry):
+        search_term = entry.get_text().lower()
+        self.filter_script_list(search_term)
+        self.update_running_script_buttons()
+
+    def filter_script_list(self, search_term):
+        scripts = self.find_python_scripts()
+        
+        # Remove all existing rows
+        child = self.listbox.get_first_child()
+        while child:
+            next_child = child.get_next_sibling()
+            self.listbox.remove(child)
+            child = next_child
+
+        # Add filtered scripts
+        filtered_scripts = [script for script in scripts if search_term in script.stem.lower()]
+
+        for script in filtered_scripts:
+            row = self.create_script_row(script)
+            self.listbox.append(row)
+            row.set_visible(True)
+        
+        self.reselect_previous_row()
+
 
     def on_open_exe_clicked(self, button):
         self.open_file_dialog()
@@ -839,6 +910,7 @@ Categories=Game;Utility;
         self.window.set_title("Wine Charm")
         self.headerbar.set_title_widget(None)
         self.menu_button.set_visible(True)
+        self.search_button.set_visible(True)  # Show the search button
         self.back_button.set_visible(False)
 
         if self.open_button.get_parent():
@@ -848,7 +920,6 @@ Categories=Game;Utility;
 
         self.embolden_new_scripts()
 
-        # Use the new method here
         self.update_running_script_buttons()
 
 
@@ -1267,6 +1338,15 @@ Categories=Game;Utility;
             print(f"Error deleting script: {e}")
 
     def show_options_for_script(self, script, row):
+        # Ensure the search button is toggled off and the search entry is cleared
+        if self.search_active:
+            self.search_button.set_active(False)
+            self.vbox.remove(self.search_entry_box)
+            self.vbox.prepend(self.open_button)
+            self.search_entry.set_text("")
+            self.search_active = False
+            self.filter_script_list("")  # Reset the list to show all scripts
+        
         self.listbox.select_row(row)
         self.main_frame.set_child(None)
 
@@ -1329,6 +1409,7 @@ Categories=Game;Utility;
 
         self.headerbar.set_title_widget(self.create_icon_title_widget(script))
         self.menu_button.set_visible(False)
+        self.search_button.set_visible(False)  # Hide the search button
 
         if self.back_button.get_parent():
             self.headerbar.remove(self.back_button)
