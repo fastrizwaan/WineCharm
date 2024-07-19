@@ -824,6 +824,16 @@ Categories=Game;Utility;
                     return Path(root) / file
         return None
 
+
+    def update_running_script_buttons(self):
+        for script_stem, process_info in self.running_processes.items():
+            row = self.find_row_by_script_stem(script_stem)
+            if row:
+                play_button = row.button_box.get_first_child()
+                play_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
+                play_button.set_child(play_icon)
+                play_button.set_tooltip_text("Stop")
+
     def on_back_button_clicked(self, button):
         self.create_script_list()
         self.window.set_title("Wine Charm")
@@ -838,13 +848,9 @@ Categories=Game;Utility;
 
         self.embolden_new_scripts()
 
-        for script_stem, process_info in self.running_processes.items():
-            row = self.find_row_by_script_stem(script_stem)
-            if row:
-                play_button = row.button_box.get_first_child()
-                play_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
-                play_button.set_child(play_icon)
-                play_button.set_tooltip_text("Stop")
+        # Use the new method here
+        self.update_running_script_buttons()
+
 
     def find_row_by_script_stem(self, script_stem):
         row = self.listbox.get_first_child()
