@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 import gi
-import fnmatch
 import threading
 import subprocess
 import os
-import time
 import shutil
 import shlex
 import hashlib
@@ -13,6 +11,9 @@ import signal
 import re
 import yaml
 from pathlib import Path
+import sys
+import socket
+import time
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
@@ -20,20 +21,20 @@ gi.require_version('Adw', '1')
 
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango
 
+SOCKET_FILE = "/tmp/winecharm_socket"
 
-author="Mohammed Asif Ali Rizvan"
-email="fast.rizwaan@gmail.com"
-copyright="GNU General Public License (GPLv3+)"
-website="https://github.com/fastrizwaan/WineCharm"
-appname="WineCharm"
-version="0.3"
+author = "Mohammed Asif Ali Rizvan"
+email = "fast.rizwaan@gmail.com"
+copyright = "GNU General Public License (GPLv3+)"
+website = "https://github.com/fastrizwaan/WineCharm"
+appname = "WineCharm"
+version = "0.3"
 
 # These needs to be dynamically updated:
-runner="" # which wine
-wine_version: "" # runner --version 
-template: "" # default: WineCharm-win64 ; #if not found in settings.yaml at winecharm directory add default_template
-arch: "" # default: win64 ; # #if not found in settings.yaml at winecharm directory add win64
-
+runner = ""  # which wine
+wine_version = ""  # runner --version 
+template = ""  # default: WineCharm-win64 ; #if not found in settings.yaml at winecharm directory add default_template
+arch = ""  # default: win64 ; # #if not found in settings.yaml at winecharm directory add win64
 
 winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
 prefixes_dir = winecharmdir / "Prefixes"
@@ -43,6 +44,7 @@ default_template = templates_dir / "WineCharm-win64"
 applicationsdir = Path(os.path.expanduser("~/.local/share/applications")).resolve()
 tempdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/tmp")).resolve()
 iconsdir = Path(os.path.expanduser("~/.local/share/icons")).resolve()
+
 
 class WineCharmApp(Gtk.Application):
     def __init__(self):
@@ -60,6 +62,7 @@ class WineCharmApp(Gtk.Application):
         self.play_stop_handlers = {}
         self.options_listbox = None
         self.search_active = False
+        self.command_line_file = None
 
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
@@ -71,7 +74,6 @@ class WineCharmApp(Gtk.Application):
             ("📖 About...", self.on_about_clicked),
             ("🚪 Quit...", self.quit_app)
         ]
-
 
         self.css_provider = Gtk.CssProvider()
         self.css_provider.load_from_data(b"""
@@ -112,11 +114,35 @@ class WineCharmApp(Gtk.Application):
         self.back_button.connect("clicked", self.on_back_button_clicked)
         self.open_button_handler_id = None
 
-        self.monitor_thread = threading.Thread(target=self.monitor_processes)
-        self.monitor_thread.daemon = True
-        self.monitor_thread.start()
+        self.start_socket_server()
 
+    def start_socket_server(self):
+        def server_thread():
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+                try:
+                    server.bind(SOCKET_FILE)
+                except OSError:
+                    os.remove(SOCKET_FILE)
+                    server.bind(SOCKET_FILE)
+                server.listen()
 
+                while True:
+                    conn, _ = server.accept()
+                    with conn:
+                        file_path = conn.recv(1024).decode()
+                        if file_path:
+                            GLib.idle_add(self.process_cli_file, file_path)
+
+        threading.Thread(target=server_thread, daemon=True).start()
+
+    def process_cli_file(self, file_path):
+        self.activate_window()
+        self.show_processing_spinner()
+        threading.Thread(target=self.process_file, args=(file_path,)).start()
+
+    def activate_window(self):
+        self.window.present()
+        self.window.set_focus(self.open_button)
 
     def set_dynamic_variables(self):
         global runner, wine_version, template, arch
@@ -187,6 +213,249 @@ class WineCharmApp(Gtk.Application):
         self.generate_about_yml()
         self.generate_settings_yml()
 
+        # Run the check_running_processes_and_update_buttons asynchronously
+        self.check_running_processes_and_update_buttons()
+
+        if self.command_line_file:
+            self.process_cli_file(self.command_line_file)
+
+    def check_running_processes_and_update_buttons(self):
+        def update_buttons():
+            try:
+                running_processes_output = subprocess.check_output(["pgrep", "-aif", r"\.exe"]).decode()
+                running_processes = running_processes_output.splitlines()
+
+                scripts =   self.find_python_scripts()
+                for script in scripts:
+                    try:
+                        exe_file, wineprefix, progname, script_args = self.extract_yaml_info(script)
+                        exe_name = Path(exe_file).stem[:15]
+
+                        is_running = any(exe_name in process for process in running_processes)
+
+                        if is_running:
+                            GLib.idle_add(self.update_script_button_state, script.stem)
+                    except Exception as e:
+                        print(f"Error processing script {script}: {e}")
+            except subprocess.CalledProcessError as e:
+                print(f"Error checking running processes: {e}")
+            
+        # Run the update_buttons function in a separate thread
+        threading.Thread(target=update_buttons).start()
+
+
+    def update_script_button_state(self, script_stem):
+        row = self.find_row_by_script_stem(script_stem)
+        if row:
+            play_button = row.button_box.get_first_child()
+            play_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
+            play_button.set_child(play_icon)
+            play_button.set_tooltip_text("Stop")
+
+            self.running_processes[script_stem] = {
+                "proc": None,
+                "pid": None,
+                "pgid": None,
+                "play_button": play_button,
+                "play_icon": play_icon,
+                "options_button": row.button_box.get_first_child(),
+                "gear_icon": Gtk.Image.new_from_icon_name("emblem-system-symbolic"),
+                "script": next((s for s in self.find_python_scripts() if s.stem == script_stem), None)
+            }
+
+    def process_cli_file(self, file_path):
+        self.activate_window()
+        self.show_processing_spinner()
+        threading.Thread(target=self.process_file, args=(file_path,)).start()
+
+    def activate_window(self):
+        self.window.present()
+        self.window.set_focus(self.open_button)
+
+    def set_dynamic_variables(self):
+        global runner, wine_version, template, arch
+        runner = subprocess.getoutput('which wine')
+        wine_version = subprocess.getoutput(f"{runner} --version")
+        template = "WineCharm-win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('template', "WineCharm-win64")
+        arch = "win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('arch', "win64")
+
+    def load_settings(self):
+        settings_file_path = winecharmdir / "settings.yml"
+        if settings_file_path.exists():
+            with open(settings_file_path, 'r') as settings_file:
+                return yaml.safe_load(settings_file)
+        return {}
+
+    def generate_about_yml(self):
+        about_file_path = winecharmdir / "About.yml"
+        if about_file_path.exists():
+            print(f"{about_file_path} already exists. Skipping generation.")
+            return
+
+        about_data = {
+            "Application": appname,
+            "Version": version,
+            "Copyright": copyright,
+            "Website": website,
+            "Author": author,
+            "E-mail": email,
+            "Wine_Runner": runner,
+            "Wine_Version": wine_version,
+            "Template": template,
+            "Wine_Arch": arch,
+            "WineZGUI_Prefix": str(winecharmdir),
+            "Wine_Prefix": str(default_template),
+            "Creation_Date": time.strftime("%a %b %d %I:%M:%S %p %Z %Y")
+        }
+
+        with open(about_file_path, 'w') as about_file:
+            yaml.dump(about_data, about_file, default_flow_style=False)
+        print(f"Generated {about_file_path}")
+
+    def generate_settings_yml(self):
+        settings_file_path = winecharmdir / "settings.yml"
+        if settings_file_path.exists():
+            print(f"{settings_file_path} already exists. Skipping generation.")
+            return
+
+        settings_data = {
+            "arch": arch,
+            "template": str(default_template),
+            "runner": runner
+        }
+
+        with open(settings_file_path, 'w') as settings_file:
+            yaml.dump(settings_data, settings_file, default_flow_style=False)
+        print(f"Generated {settings_file_path}")
+
+    def on_activate(self, app):
+        self.create_main_window()
+        self.create_script_list()
+        missing_programs = self.check_required_programs()
+        if missing_programs:
+            self.show_missing_programs_dialog(missing_programs)
+        else:
+            self.initialize_template(default_template)
+
+        self.set_dynamic_variables()
+        self.generate_about_yml()
+        self.generate_settings_yml()
+
+        # Run the check_running_processes_and_update_buttons asynchronously
+        self.check_running_processes_and_update_buttons()
+
+        if self.command_line_file:
+            self.process_cli_file(self.command_line_file)
+
+    def check_running_processes_and_update_buttons(self):
+        def update_buttons():
+            try:
+                running_processes_output = subprocess.check_output(["pgrep", "-aif", r"\.exe"]).decode()
+                running_processes = running_processes_output.splitlines()
+
+                scripts = self.find_python_scripts()
+                for script in scripts:
+                    try:
+                        exe_file, wineprefix, progname, script_args = self.extract_yaml_info(script)
+                        exe_name = Path(exe_file).stem[:15]
+                        
+                        is_running = any(exe_name in process for process in running_processes)
+                        
+                        if is_running:
+                            GLib.idle_add(self.update_script_button_state, script.stem)
+                    except Exception as e:
+                        print(f"Error processing script {script}: {e}")
+            except subprocess.CalledProcessError as e:
+                print(f"Error checking running processes: {e}")
+            
+            return False  # Return False to stop the idle_add loop
+
+        GLib.idle_add(update_buttons)
+
+    def update_script_button_state(self, script_stem):
+        row = self.find_row_by_script_stem(script_stem)
+        if row:
+            play_button = row.button_box.get_first_child()
+            play_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
+            play_button.set_child(play_icon)
+            play_button.set_tooltip_text("Stop")
+
+            self.running_processes[script_stem] = {
+                "proc": None,
+                "pid": None,
+                "pgid": None,
+                "play_button": play_button,
+                "play_icon": play_icon,
+                "options_button": row.button_box.get_first_child(),
+                "gear_icon": Gtk.Image.new_from_icon_name("emblem-system-symbolic"),
+                "script": next((s for s in self.find_python_scripts() if s.stem == script_stem), None)
+            }
+
+    def process_cli_file(self, file_path):
+        self.activate_window()
+        self.show_processing_spinner()
+        threading.Thread(target=self.process_file, args=(file_path,)).start()
+
+    def activate_window(self):
+        self.window.present()
+        self.window.set_focus(self.open_button)
+
+    def set_dynamic_variables(self):
+        global runner, wine_version, template, arch
+        runner = subprocess.getoutput('which wine')
+        wine_version = subprocess.getoutput(f"{runner} --version")
+        template = "WineCharm-win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('template', "WineCharm-win64")
+        arch = "win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('arch', "win64")
+
+    def load_settings(self):
+        settings_file_path = winecharmdir / "settings.yml"
+        if settings_file_path.exists():
+            with open(settings_file_path, 'r') as settings_file:
+                return yaml.safe_load(settings_file)
+        return {}
+
+    def generate_about_yml(self):
+        about_file_path = winecharmdir / "About.yml"
+        if about_file_path.exists():
+            print(f"{about_file_path} already exists. Skipping generation.")
+            return
+
+        about_data = {
+            "Application": appname,
+            "Version": version,
+            "Copyright": copyright,
+            "Website": website,
+            "Author": author,
+            "E-mail": email,
+            "Wine_Runner": runner,
+            "Wine_Version": wine_version,
+            "Template": template,
+            "Wine_Arch": arch,
+            "WineZGUI_Prefix": str(winecharmdir),
+            "Wine_Prefix": str(default_template),
+            "Creation_Date": time.strftime("%a %b %d %I:%M:%S %p %Z %Y")
+        }
+
+        with open(about_file_path, 'w') as about_file:
+            yaml.dump(about_data, about_file, default_flow_style=False)
+        print(f"Generated {about_file_path}")
+
+    def generate_settings_yml(self):
+        settings_file_path = winecharmdir / "settings.yml"
+        if settings_file_path.exists():
+            print(f"{settings_file_path} already exists. Skipping generation.")
+            return
+
+        settings_data = {
+            "arch": arch,
+            "template": str(default_template),
+            "runner": runner
+        }
+
+        with open(settings_file_path, 'w') as settings_file:
+            yaml.dump(settings_data, settings_file, default_flow_style=False)
+        print(f"Generated {settings_file_path}")
+
     def load_about_content(self, file_path):
         try:
             about_file_path = winecharmdir / file_path
@@ -208,51 +477,12 @@ class WineCharmApp(Gtk.Application):
             print(f"Error loading about content: {e}")
             return "<b>Error loading about content.</b>"
 
-
-        
-    def monitor_processes(self):
-        while True:
-            time.sleep(5)  # Increase the interval to give some time buffer
-            finished_processes = []
-            
-            # Create a copy of the dictionary keys
-            running_processes_keys = list(self.running_processes.keys())
-
-            for script_stem in running_processes_keys:
-                process_info = self.running_processes.get(script_stem)
-                if process_info is None:
-                    continue
-                
-                proc = process_info["proc"]
-                if proc and proc.poll() is not None:
-                    finished_processes.append(script_stem)
-                else:
-                    # Check with pgrep if process is still running
-                    pgid = process_info.get("pgid")
-                    exe_file = process_info.get("script").stem[:15]
-                    if pgid is not None:
-                        try:
-                            os.killpg(pgid, 0)
-                        except ProcessLookupError:
-                            finished_processes.append(script_stem)
-                    else:
-                        try:
-                            pgrep_output = subprocess.check_output(["pgrep", "-aif", exe_file]).decode()
-                            if not pgrep_output:
-                                finished_processes.append(script_stem)
-                        except subprocess.CalledProcessError:
-                            finished_processes.append(script_stem)
-
-            for script_stem in finished_processes:
-                GLib.idle_add(self.process_ended, script_stem)
-
-
     def initialize_template(self, template_dir):
         if not template_dir.exists():
             self.initializing_template = True
             if self.open_button_handler_id is not None:
                 self.open_button.disconnect(self.open_button_handler_id)
-            
+
             self.spinner = Gtk.Spinner()
             self.spinner.start()
             self.button_box.append(self.spinner)
@@ -333,7 +563,6 @@ class WineCharmApp(Gtk.Application):
 
         print("Template initialization completed and UI updated.")
 
-
     def check_required_programs(self):
         # Check if flatpak-spawn is available
         if shutil.which("flatpak-spawn"):
@@ -352,7 +581,6 @@ class WineCharmApp(Gtk.Application):
         ]
         missing_programs = [prog for prog in required_programs if not shutil.which(prog)]
         return missing_programs
-
 
     def show_missing_programs_dialog(self, missing_programs):
         dialog = Gtk.Dialog(transient_for=self.window, modal=True)
@@ -447,7 +675,6 @@ class WineCharmApp(Gtk.Application):
 
         self.search_entry_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         search_icon = Gtk.Image.new_from_icon_name("system-search-symbolic")
-#        self.search_entry_box.append(search_icon)
         self.search_entry_box.append(self.search_entry)
         self.search_entry_box.set_hexpand(True)
         self.search_entry.set_hexpand(True)
@@ -478,7 +705,7 @@ class WineCharmApp(Gtk.Application):
             self.search_entry.grab_focus()
             self.search_active = True
         self.update_running_script_buttons()
-             
+
     def on_search_entry_activated(self, entry):
         search_term = entry.get_text().lower()
         self.filter_script_list(search_term)
@@ -490,7 +717,7 @@ class WineCharmApp(Gtk.Application):
 
     def filter_script_list(self, search_term):
         scripts = self.find_python_scripts()
-        
+
         # Remove all existing rows
         child = self.listbox.get_first_child()
         while child:
@@ -505,9 +732,8 @@ class WineCharmApp(Gtk.Application):
             row = self.create_script_row(script)
             self.listbox.append(row)
             row.set_visible(True)
-        
-        self.reselect_previous_row()
 
+        self.reselect_previous_row()
 
     def on_open_exe_clicked(self, button):
         self.open_file_dialog()
@@ -577,13 +803,11 @@ class WineCharmApp(Gtk.Application):
         finally:
             GLib.idle_add(self.hide_processing_spinner)
 
-
     def create_script_list(self):
         self.initial_listbox()
         scripts = self.find_python_scripts()
         if len(scripts) > 12:
             GLib.idle_add(self.switch_to_scrolled_window)
-
 
     def add_lnk_file_to_processed(self, wineprefix, lnk_file):
         found_lnk_files_path = wineprefix / "found_lnk_files.yaml"
@@ -595,6 +819,7 @@ class WineCharmApp(Gtk.Application):
         found_lnk_files.append(str(lnk_file))
         with open(found_lnk_files_path, 'w') as file:
             yaml.safe_dump(found_lnk_files, file)
+
     def find_lnk_files(self, wineprefix):
         drive_c = wineprefix / "drive_c"
         lnk_files = []
@@ -704,14 +929,16 @@ class WineCharmApp(Gtk.Application):
 
         self.add_or_update_script_row(yaml_file_path)
 
-
-
     def extract_yaml_info(self, script):
         if not script.exists():
             raise FileNotFoundError(f"Script file not found: {script}")
         with open(script, 'r') as file:
-            data = yaml.safe_load(file)
-        return data['exe_file'], data['wineprefix'], data['progname'], data.get('args', '')
+            try:
+                data = yaml.safe_load(file)
+            except yaml.YAMLError as e:
+                print(f"Error loading YAML file {script}: {e}")
+                data = {}
+        return data.get('exe_file', ''), data.get('wineprefix', ''), data.get('progname', ''), data.get('args', '')
 
     def extract_icon(self, exe_file, wineprefix, exe_no_space, progname):
         icon_path = wineprefix / f"{progname.replace(' ', '_')}.png"
@@ -795,7 +1022,6 @@ Categories=Game;Utility;
                 row.label.set_markup(f"<b>{row.label.get_text()}</b>")
             row = row.get_next_sibling()
 
-
     def show_about_dialog(self, action=None, param=None):
         about_dialog = Adw.AboutWindow(
             transient_for=self.window,
@@ -805,17 +1031,11 @@ Categories=Game;Utility;
             copyright="GNU General Public License (GPLv3+)",
             comments="A Charming Wine GUI Application",
             website="https://github.com/fastrizwaan/WineCharm",
-            developers=["Mohammed Asif Ali Rizvan"],
+            developer_name="Mohammed Asif Ali Rizvan",
             license_type=Gtk.License.GPL_3_0,
             issue_url="https://github.com/fastrizwaan/WineCharm/issues"
         )
         about_dialog.present()
-
-
-
-
-
-
 
     def on_settings_clicked(self, action, param):
         print("Settings action triggered")
@@ -864,7 +1084,6 @@ Categories=Game;Utility;
         # Updating script list so that stop buttons become play buttons
         self.create_script_list()
 
-
     def on_help_clicked(self, action, param):
         print("Help action triggered")
 
@@ -880,7 +1099,7 @@ Categories=Game;Utility;
             depth = root[len(str(prefixes_dir)):].count(os.sep)
             if depth < 2:
                 for file in files:
-                    if file.endswith(".charm"):
+                    if file.endswith(".yml"):
                         scripts.append(Path(root) / file)
             else:
                 dirs[:] = []
@@ -894,7 +1113,6 @@ Categories=Game;Utility;
                 if file.lower() == exe_name.lower():
                     return Path(root) / file
         return None
-
 
     def update_running_script_buttons(self):
         for script_stem, process_info in self.running_processes.items():
@@ -920,9 +1138,8 @@ Categories=Game;Utility;
 
         self.embolden_new_scripts()
 
-        self.update_running_script_buttons()
-
-
+        self.check_running_processes_and_update_buttons()
+        
     def find_row_by_script_stem(self, script_stem):
         row = self.listbox.get_first_child()
         while row:
@@ -945,7 +1162,6 @@ Categories=Game;Utility;
         self.main_frame.set_child(vbox)
 
         self.listbox = Gtk.ListBox()
-        #self.listbox.set_margin_bottom(5)
         self.listbox.connect("row-selected", self.on_script_selected)
         self.listbox.set_css_classes("listbox")
         vbox.append(self.listbox)
@@ -973,7 +1189,6 @@ Categories=Game;Utility;
         scrolled_window.set_vexpand(True)
 
         full_listbox = Gtk.ListBox()
-        #full_listbox.set_margin_bottom(5)
         full_listbox.connect("row-selected", self.on_script_selected)
         full_listbox.set_css_classes("full_listbox")
         scrolled_window.set_child(full_listbox)
@@ -1067,7 +1282,7 @@ Categories=Game;Utility;
                 stderr=subprocess.DEVNULL
             )
             pgid = os.getpgid(proc.pid)
-            
+
             print(f"Launched script with PID: {proc.pid}")
 
             self.running_processes[script.stem] = {
@@ -1087,7 +1302,7 @@ Categories=Game;Utility;
                 GLib.idle_add(self.create_scripts_for_lnk_files, Path(wineprefix))
                 time.sleep(5)
                 GLib.idle_add(self.update_related_scripts_buttons, Path(wineprefix))
-            
+
             threading.Thread(target=monitor_process).start()
 
             # Use the new method here
@@ -1096,72 +1311,7 @@ Categories=Game;Utility;
         except Exception as e:
             print(f"Error launching script: {e}")
 
-        
 
-    def terminate_script(self, script):
-        print(f"Terminating script: {script}")
-        if script.stem in self.running_processes:
-            process_info = self.running_processes.pop(script.stem, None)
-            if process_info:
-                exe_file, wineprefix, _, _ = self.extract_yaml_info(script)
-                exe_name_upto_fifteen_chars = Path(exe_file).stem[:15]
-
-                try:
-                    pgrep_output = subprocess.check_output(["pgrep", "-ai", exe_name_upto_fifteen_chars]).decode()
-                    pids_to_kill = [line.split()[0] for line in pgrep_output.splitlines()]
-
-                    for pid in pids_to_kill:
-                        try:
-                            os.kill(int(pid), signal.SIGKILL)
-                            print(f"Terminated PID: {pid}")
-                        except ProcessLookupError:
-                            continue
-
-                    print(f"Terminated wine process for {script}")
-                    self.reset_buttons(
-                        process_info["play_button"],
-                        process_info["play_icon"],
-                        process_info["options_button"],
-                        process_info["gear_icon"],
-                        script
-                    )
-
-                    self.update_related_scripts_buttons(wineprefix)
-                except subprocess.CalledProcessError:
-                    print(f"No processes found for {exe_name_upto_fifteen_chars}")
-            else:
-                print(f"No running process found for {script}")
-        else:
-            print(f"No running process found for {script}")
-
-        #self.create_script_list() # rizvan enable this but it will hammer the disk isn't it?
-
-    def process_ended(self, script_stem):
-        if script_stem in self.running_processes:
-            process_info = self.running_processes.pop(script_stem)
-            play_button = process_info["play_button"]
-            play_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
-            play_button.set_child(play_icon)
-            play_button.set_tooltip_text("Play")
-
-            self.disconnect_play_stop_handler(play_button)
-            self.play_stop_handlers[play_button] = play_button.connect("clicked", lambda btn: self.toggle_play_stop(process_info["script"], play_button, self.find_row_by_script_stem(script_stem)))
-
-            if self.options_listbox:
-                for row in self.options_listbox:
-                    box = row.get_child()
-                    for widget in box:
-                        if isinstance(widget, Gtk.Button) and widget.get_tooltip_text() == "Run or stop the script":
-                            play_stop_button = widget
-                            play_stop_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-                            play_stop_button.set_tooltip_text("Run or stop the script")
-                            self.disconnect_play_stop_handler(play_stop_button)
-                            self.play_stop_handlers[play_stop_button] = play_stop_button.connect("clicked", lambda btn: self.toggle_play_stop(process_info["script"], play_stop_button, self.find_row_by_script_stem(script_stem)))
-                            break
-
-            exe_file, wineprefix, _, _ = self.extract_yaml_info(process_info["script"])
-
-            self.update_related_scripts_buttons(wineprefix)
 
     def update_related_scripts_buttons(self, wineprefix, script_stem_to_select=None):
         scripts = self.find_python_scripts()
@@ -1211,7 +1361,7 @@ Categories=Game;Utility;
     def delete_setup_or_install_script(self, script, row):
         try:
             script.unlink()
-            #self.create_script_list()
+            # self.create_script_list()
         except Exception as e:
             print(f"Error deleting script: {e}")
 
@@ -1279,8 +1429,6 @@ Categories=Game;Utility;
                 print(f"Error loading default icon: {default_icon_path}")
                 return None
 
-
-
     def create_icon_title_widget(self, script):
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
 
@@ -1315,7 +1463,7 @@ Categories=Game;Utility;
 
         script_name_contains_setup_or_install = "setup" in script.stem.lower() or "install" in script.stem.lower()
         script_prefix = script.parent
-        prefix_scripts = [f for f in script_prefix.iterdir() if f.suffix == '.charm']
+        prefix_scripts = [f for f in script_prefix.iterdir() if f.suffix == '.yml']
 
         if script_name_contains_setup_or_install and len(prefix_scripts) > 1:
             delete_button = Gtk.Button()
@@ -1333,7 +1481,7 @@ Categories=Game;Utility;
         try:
             script.unlink()
             self.listbox.remove(row)
-            #self.create_script_list() #can we save one more
+            # self.create_script_list() #can we save one more
         except Exception as e:
             print(f"Error deleting script: {e}")
 
@@ -1437,7 +1585,71 @@ Categories=Game;Utility;
         self.disconnect_play_stop_handler(play_stop_button)
         self.play_stop_handlers[play_stop_button] = play_stop_button.connect("clicked", lambda btn: self.toggle_play_stop(script, play_stop_button, row))
 
-       
+    def terminate_script(self, script):
+        print(f"Terminating script: {script}")
+        if script.stem in self.running_processes:
+            process_info = self.running_processes.pop(script.stem, None)
+            if process_info:
+                exe_file, wineprefix, _, _ = self.extract_yaml_info(script)
+                exe_name_upto_fifteen_chars = Path(exe_file).stem[:15]
+
+                try:
+                    pgrep_output = subprocess.check_output(["pgrep", "-ai", exe_name_upto_fifteen_chars]).decode()
+                    pids_to_kill = [line.split()[0] for line in pgrep_output.splitlines()]
+
+                    for pid in pids_to_kill:
+                        try:
+                            os.kill(int(pid), signal.SIGKILL)
+                            print(f"Terminated PID: {pid}")
+                        except ProcessLookupError:
+                            continue
+
+                    print(f"Terminated wine process for {script}")
+                    self.reset_buttons(
+                        process_info["play_button"],
+                        process_info["play_icon"],
+                        process_info["options_button"],
+                        process_info["gear_icon"],
+                        script
+                    )
+
+                    self.update_related_scripts_buttons(wineprefix)
+                except subprocess.CalledProcessError:
+                    print(f"No processes found for {exe_name_upto_fifteen_chars}")
+            else:
+                print(f"No running process found for {script}")
+        else:
+            print(f"No running process found for {script}")
+
+    def process_ended(self, script_stem):
+        if script_stem in self.running_processes:
+            process_info = self.running_processes.pop(script_stem)
+            play_button = process_info["play_button"]
+            play_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+            play_button.set_child(play_icon)
+            play_button.set_tooltip_text("Play")
+
+            self.disconnect_play_stop_handler(play_button)
+            self.play_stop_handlers[play_button] = play_button.connect("clicked", lambda btn: self.toggle_play_stop(process_info["script"], play_button, self.find_row_by_script_stem(script_stem)))
+
+            if self.options_listbox:
+                for row in self.options_listbox:
+                    box = row.get_child()
+                    for widget in box:
+                        if isinstance(widget, Gtk.Button) and widget.get_tooltip_text() == "Run or stop the script":
+                            play_stop_button = widget
+                            play_stop_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+                            play_stop_button.set_tooltip_text("Run or stop the script")
+                            self.disconnect_play_stop_handler(play_stop_button)
+                            self.play_stop_handlers[play_stop_button] = play_stop_button.connect("clicked", lambda btn: self.toggle_play_stop(process_info["script"], play_stop_button, self.find_row_by_script_stem(script_stem)))
+                            break
+
+            exe_file, wineprefix, _, _ = self.extract_yaml_info(process_info["script"])
+
+            self.update_related_scripts_buttons(wineprefix)
+            self.check_running_processes_and_update_buttons()
+
+
     def update_execute_button_icon(self, script):
         child = self.options_listbox.get_first_child()
         while child:
@@ -1460,14 +1672,14 @@ Categories=Game;Utility;
         dialog = Gtk.Dialog(transient_for=self.window, modal=True)
         dialog.set_title("Wine Arguments")
         dialog.set_default_size(300, 100)
-        
+
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         box.set_margin_top(10)
         box.set_margin_bottom(10)
         box.set_margin_start(10)
         box.set_margin_end(10)
         dialog.set_child(box)
-        
+
         label = Gtk.Label(label="Wine Arguments")
         box.append(label)
 
@@ -1478,11 +1690,11 @@ Categories=Game;Utility;
 
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         box.append(button_box)
-        
+
         save_button = Gtk.Button(label="Save")
         save_button.connect("clicked", lambda btn: self.save_wine_arguments(script, entry.get_text(), dialog))
         button_box.append(save_button)
-        
+
         cancel_button = Gtk.Button(label="Cancel")
         cancel_button.connect("clicked", lambda btn: dialog.close())
         button_box.append(cancel_button)
@@ -1497,7 +1709,6 @@ Categories=Game;Utility;
             yaml.safe_dump(data, file)
         dialog.close()
         print(f"Saved arguments for {script}: {args}")
-
 
     def on_options_row_selected(self, listbox, row):
         pass
@@ -1525,7 +1736,7 @@ Categories=Game;Utility;
                 "-c",
                 rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
             ]
-            
+
         else:
             command = [
                 "gnome-terminal",
@@ -1648,14 +1859,27 @@ Categories=Game;Utility;
         except Exception as e:
             print(f"Error installing dxvk and vkd3d: {e}")
 
-    def handle_sigint(self, signum, frame):
-        print("\n")
+    def handle_sigint(self, signal, frame):
         self.quit()
 
 def main():
+    # Check if another instance is running and send the CLI argument to it
+    if len(sys.argv) > 1:
+        file_path = sys.argv[1]
+        if os.path.exists(SOCKET_FILE):
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+                try:
+                    client.connect(SOCKET_FILE)
+                    client.sendall(file_path.encode())
+                    print(f"Sent file path to existing instance: {file_path}")
+                    return
+                except ConnectionRefusedError:
+                    print("No existing instance found, starting a new one.")
+    
+    # Start the WineCharm application
     app = WineCharmApp()
-    exit_status = app.run(None)
+    app.run(sys.argv)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
 

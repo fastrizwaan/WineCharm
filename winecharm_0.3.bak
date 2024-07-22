@@ -212,7 +212,7 @@ class WineCharmApp(Gtk.Application):
         
     def monitor_processes(self):
         while True:
-            time.sleep(5)  # Increase the interval to give some time buffer
+            time.sleep(3)  # Increase the interval to give some time buffer
             finished_processes = []
             
             # Create a copy of the dictionary keys
@@ -880,7 +880,7 @@ Categories=Game;Utility;
             depth = root[len(str(prefixes_dir)):].count(os.sep)
             if depth < 2:
                 for file in files:
-                    if file.endswith(".charm"):
+                    if file.endswith(".yml"):
                         scripts.append(Path(root) / file)
             else:
                 dirs[:] = []
@@ -1315,7 +1315,7 @@ Categories=Game;Utility;
 
         script_name_contains_setup_or_install = "setup" in script.stem.lower() or "install" in script.stem.lower()
         script_prefix = script.parent
-        prefix_scripts = [f for f in script_prefix.iterdir() if f.suffix == '.charm']
+        prefix_scripts = [f for f in script_prefix.iterdir() if f.suffix == '.yml']
 
         if script_name_contains_setup_or_install and len(prefix_scripts) > 1:
             delete_button = Gtk.Button()
