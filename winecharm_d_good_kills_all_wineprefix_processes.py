@@ -25,7 +25,7 @@ email = "fast.rizwaan@gmail.com"
 copyright = "GNU General Public License (GPLv3+)"
 website = "https://github.com/fastrizwaan/WineCharm"
 appname = "WineCharm"
-version = "0.4"
+version = "0.3"
 
 runner = ""
 wine_version = ""
