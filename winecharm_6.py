@@ -28,7 +28,7 @@ email = "fast.rizwaan@gmail.com"
 copyright = "GNU General Public License (GPLv3+)"
 website = "https://github.com/fastrizwaan/WineCharm"
 appname = "WineCharm"
-version = "0.5"
+version = "0.3"
 
 # These needs to be dynamically updated:
 runner = ""  # which wine
@@ -228,42 +228,6 @@ class WineCharmApp(Gtk.Application):
             yaml.dump(settings_data, settings_file, default_flow_style=False)
         print(f"Generated {settings_file_path}")
 
-    def monitor_processes(self):
-        while True:
-            time.sleep(3)  # Increase the interval to give some time buffer
-            finished_processes = []
-            
-            # Create a copy of the dictionary keys
-            running_processes_keys = list(self.running_processes.keys())
-
-            for script_stem in running_processes_keys:
-                process_info = self.running_processes.get(script_stem)
-                if process_info is None:
-                    continue
-                
-                proc = process_info["proc"]
-                if proc and proc.poll() is not None:
-                    finished_processes.append(script_stem)
-                else:
-                    # Check with pgrep if process is still running
-                    pgid = process_info.get("pgid")
-                    exe_file = process_info.get("script").stem[:15]
-                    if pgid is not None:
-                        try:
-                            os.killpg(pgid, 0)
-                        except ProcessLookupError:
-                            finished_processes.append(script_stem)
-                    else:
-                        try:
-                            pgrep_output = subprocess.check_output(["pgrep", "-aif", exe_file]).decode()
-                            if not pgrep_output:
-                                finished_processes.append(script_stem)
-                        except subprocess.CalledProcessError:
-                            finished_processes.append(script_stem)
-
-            for script_stem in finished_processes:
-                GLib.idle_add(self.process_ended, script_stem)
-
     def on_activate(self, app):
         self.create_main_window()
         self.create_script_list()
@@ -282,10 +246,6 @@ class WineCharmApp(Gtk.Application):
 
         if self.command_line_file:
             self.process_cli_file(self.command_line_file)
-
-        # Start the process monitor in a separate thread
-        threading.Thread(target=self.monitor_processes, daemon=True).start()
-
 
     def check_running_processes_and_update_buttons(self):
         def update_buttons():
