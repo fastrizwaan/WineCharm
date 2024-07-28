@@ -1342,11 +1342,23 @@ Categories=Game;Utility;
                     break
                 row = row.get_next_sibling()
 
+    def get_default_icon_path(self):
+        xdg_data_dirs = os.getenv("XDG_DATA_DIRS", "").split(":")
+        icon_relative_path = "icons/hicolor/128x128/apps/org.winehq.Wine.png"
+        
+        for data_dir in xdg_data_dirs:
+            icon_path = Path(data_dir) / icon_relative_path
+            if icon_path.exists():
+                return icon_path
+        
+        # Fallback icon path in case none of the paths in XDG_DATA_DIRS contain the icon
+        return Path("/app/share/icons/hicolor/128x128/apps/org.winehq.Wine.png")
+
     def load_icon(self, script):
         icon_name = script.stem + ".png"
         icon_dir = script.parent
         icon_path = icon_dir / icon_name
-        default_icon_path = "/app/share/icons/hicolor/128x128/apps/org.winehq.Wine.png"  # Updated default icon path
+        default_icon_path = self.get_default_icon_path()
 
         try:
             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(icon_path), 32, 32)
@@ -1354,12 +1366,13 @@ Categories=Game;Utility;
         except Exception:
             print(f"Icon not found: {icon_name}")
             try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(default_icon_path, 32, 32)
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(default_icon_path), 32, 32)
                 return Gdk.Texture.new_for_pixbuf(pixbuf)
             except Exception:
                 print(f"Error loading default icon: {default_icon_path}")
                 return None
-
+        
+        
     def create_icon_title_widget(self, script):
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
 
