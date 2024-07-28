@@ -1522,7 +1522,7 @@ Categories=Game;Utility;
                 exe_name_upto_fifteen_chars = Path(exe_file).stem[:15]
 
                 try:
-                    pgrep_output = subprocess.check_output(["pgrep", "-ai", exe_name_upto_fifteen_chars]).decode()
+                    pgrep_output = subprocess.check_output(["pgrep", "-aif", exe_name_upto_fifteen_chars]).decode()
                     pids_to_kill = [line.split()[0] for line in pgrep_output.splitlines()]
 
                     for pid in pids_to_kill:
