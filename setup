@@ -56,6 +56,7 @@ install_files() {
     install -Dm755 winecharm.py "$INSTALL_PATH/bin/winecharm"
     install -Dm644 io.github.fastrizwaan.WineCharm.svg "$INSTALL_PATH/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg"
     install -Dm755 io.github.fastrizwaan.WineCharm.desktop "$INSTALL_PATH/share/applications/io.github.fastrizwaan.WineCharm.desktop"
+    install -Dm644 org.winehq.Wine.png "$INSTALL_PATH/share/icons/hicolor/128x128/apps/org.winehq.Wine.png"
 
     echo "WineCharm installed successfully."
 }
@@ -66,6 +67,7 @@ uninstall_files() {
     rm -f "$INSTALL_PATH/bin/winecharm"
     rm -f "$INSTALL_PATH/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg"
     rm -f "$INSTALL_PATH/share/applications/io.github.fastrizwaan.WineCharm.desktop"
+    rm -f "$INSTALL_PATH/share/icons/hicolor/128x128/apps/org.winehq.Wine.png"
 
     echo "WineCharm uninstalled successfully."
 }
