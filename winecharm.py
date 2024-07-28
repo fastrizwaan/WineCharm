@@ -301,13 +301,15 @@ class WineCharmApp(Gtk.Application):
                     else:
                         try:
                             pgrep_output = subprocess.check_output(["pgrep", "-aif", exe_file]).decode()
-                            if not pgrep_output:
+                            if not pgrep_output or any(appname.lower() in line.lower() for line in pgrep_output.splitlines()):
                                 finished_processes.append(script_stem)
                         except subprocess.CalledProcessError:
                             finished_processes.append(script_stem)
 
             for script_stem in finished_processes:
                 GLib.idle_add(self.process_ended, script_stem)
+
+
 
     def check_running_processes_and_update_buttons(self):
         def update_buttons():
@@ -974,7 +976,7 @@ Categories=Game;Utility;
     def on_kill_all_clicked(self, action=None, param=None):
         try:
             # Get the PID of the WineCharm application
-            winecharm_pid_output = subprocess.check_output(["pgrep", "-aif", "winecharm"]).decode()
+            winecharm_pid_output = subprocess.check_output(["pgrep", "-aif", appname]).decode()
             winecharm_pid_lines = winecharm_pid_output.splitlines()
             winecharm_pids = [int(line.split()[0]) for line in winecharm_pid_lines]
 
@@ -1525,7 +1527,16 @@ Categories=Game;Utility;
                     pgrep_output = subprocess.check_output(["pgrep", "-aif", exe_name_upto_fifteen_chars]).decode()
                     pids_to_kill = [line.split()[0] for line in pgrep_output.splitlines()]
 
+                    # Get the PID of the WineCharm application
+                    winecharm_pid_output = subprocess.check_output(["pgrep", "-aif", appname]).decode()
+                    winecharm_pid_lines = winecharm_pid_output.splitlines()
+                    winecharm_pids = [int(line.split()[0]) for line in winecharm_pid_lines]
+
                     for pid in pids_to_kill:
+                        if int(pid) in winecharm_pids:
+                            print(f"Skipping termination of {appname} process with PID: {pid}")
+                            continue
+
                         try:
                             os.kill(int(pid), signal.SIGKILL)
                             print(f"Terminated PID: {pid}")
@@ -1548,6 +1559,7 @@ Categories=Game;Utility;
                 print(f"No running process found for {script}")
         else:
             print(f"No running process found for {script}")
+
 
     def process_ended(self, script_stem):
         if script_stem in self.running_processes:
