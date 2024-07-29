@@ -104,6 +104,9 @@ class WineCharmApp(Gtk.Application):
             .listbox-row {
                 min-height: 40px;
             }
+            .common-background {
+                background-color: @theme_base_color;
+            }
         """)
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(),
@@ -1091,12 +1094,15 @@ Categories=Game;Utility;
         vbox.set_margin_end(5)
         vbox.set_margin_top(5)
         vbox.set_margin_bottom(5)
+        vbox.add_css_class("common-background")  # Add CSS class here
+
         vbox.set_vexpand(True)
         self.main_frame.set_child(vbox)
 
         self.listbox = Gtk.ListBox()
         self.listbox.connect("row-selected", self.on_script_selected)
         self.listbox.set_css_classes("listbox")
+        self.listbox.add_css_class("common-background")
         vbox.append(self.listbox)
         self.listbox.set_visible(True)
 
