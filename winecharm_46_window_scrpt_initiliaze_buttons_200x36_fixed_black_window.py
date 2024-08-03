@@ -27,7 +27,7 @@ email = "fast.rizwaan@gmail.com"
 copyright = "GNU General Public License (GPLv3+)"
 website = "https://github.com/fastrizwaan/WineCharm"
 appname = "WineCharm"
-version = "0.7"
+version = "0.6"
 
 # These need to be dynamically updated:
 runner = ""  # which wine
@@ -62,9 +62,6 @@ class WineCharmApp(Gtk.Application):
         self.running_processes = {}
         self.play_stop_handlers = {}
         self.options_listbox = None
-        self.flowbox_state = None
-        self.launch_button = None  # Initialize launch_button
-
         self.search_active = False
         self.command_line_file = None
 
@@ -466,11 +463,9 @@ class WineCharmApp(Gtk.Application):
         self.window = Gtk.ApplicationWindow(application=self)
         self.window.set_title("Wine Charm")
         self.window.set_default_size(420, 560)
-        self.window.add_css_class("common-background")
-        
+
         self.headerbar = Gtk.HeaderBar()
         self.headerbar.set_show_title_buttons(True)
-        self.headerbar.add_css_class("flat")
         self.window.set_titlebar(self.headerbar)
 
         app_icon_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
@@ -507,7 +502,7 @@ class WineCharmApp(Gtk.Application):
         self.vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.vbox.set_margin_start(10)
         self.vbox.set_margin_end(10)
-        self.vbox.set_margin_top(5)
+        self.vbox.set_margin_top(10)
         self.vbox.set_margin_bottom(10)
         self.window.set_child(self.vbox)
 
@@ -563,45 +558,20 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_key_pressed(self, controller, keyval, keycode, state):
-        print(f"Key pressed: {keyval}, state: {state}")
-        if keyval == Gdk.KEY_f and (state & Gdk.ModifierType.CONTROL_MASK):
-            print("Ctrl+F detected")
-            if not self.search_active:
-                self.activate_search_mode()
-            else:
-                self.deactivate_search_mode()
-        elif keyval == Gdk.KEY_Escape:
-            if self.search_active:
-                print("Escape detected, deactivating search mode")
-                self.deactivate_search_mode()
-            elif not self.flowbox_state:
-                print("Escape detected, going back")
-                self.on_back_button_clicked(None)
-
-    def activate_search_mode(self):
-        print("Activating search mode")
-        if self.open_button.get_parent() == self.vbox:
-            self.vbox.remove(self.open_button)
-        if self.search_entry_box.get_parent() is None:
-            self.vbox.prepend(self.search_entry_box)
-        self.search_entry.grab_focus()
-        self.search_active = True
-
-    def deactivate_search_mode(self):
-        print("Deactivating search mode")
-        if self.search_entry_box.get_parent() == self.vbox:
-            self.vbox.remove(self.search_entry_box)
-        if self.open_button.get_parent() is None:
-            self.vbox.prepend(self.open_button)
-        self.search_active = False
-        self.filter_script_list("")  # Reset the list to show all scripts
+        if keyval == Gdk.KEY_Escape:
+            self.search_button.set_active(False)
 
     def on_search_button_clicked(self, button):
-        print("Search button clicked")
         if self.search_active:
-            self.deactivate_search_mode()
+            self.vbox.remove(self.search_entry_box)
+            self.vbox.prepend(self.open_button)
+            self.search_active = False
+            self.filter_script_list("")  # Reset the list to show all scripts
         else:
-            self.activate_search_mode()
+            self.vbox.remove(self.open_button)
+            self.vbox.prepend(self.search_entry_box)
+            self.search_entry.grab_focus()
+            self.search_active = True
 
     def on_search_entry_activated(self, entry):
         search_term = entry.get_text().lower()
@@ -635,7 +605,6 @@ class WineCharmApp(Gtk.Application):
             button = self.create_script_button(script)
             self.flowbox.append(button)
             button.set_visible(True)
-            
 
         self.reselect_previous_row()
 
@@ -999,7 +968,6 @@ Categories=Game;Utility;
             child = child.get_next_sibling()
 
     def on_back_button_clicked(self, button):
-        print("Back button clicked")
         self.create_script_list()
         self.window.set_title("Wine Charm")
         self.headerbar.set_title_widget(None)
@@ -1007,19 +975,16 @@ Categories=Game;Utility;
         self.search_button.set_visible(True)
         self.back_button.set_visible(False)
 
-        if self.open_button.get_parent() != self.vbox:
-            self.vbox.remove(self.open_button)
-        if self.open_button.get_parent() is None:
-            self.vbox.prepend(self.open_button)
+        if self.open_button.get_parent():
+            self.open_button.get_parent().remove(self.open_button)
+        self.vbox.prepend(self.open_button)
         self.open_button.set_visible(True)
 
+        # Ensure the main_frame doesn't already have a child before setting a new one
         if self.main_frame.get_child() != self.scrolled:
-            self.main_frame.set_child(None)
+            self.main_frame.set_child(None)  # Remove existing child if any
             self.main_frame.set_child(self.scrolled)
 
-        self.flowbox_state = True
-        self.activate_search_mode()
-        self.deactivate_search_mode()
 
 
     def show_about_dialog(self, action=None, param=None):
@@ -1215,7 +1180,6 @@ Categories=Game;Utility;
         button.connect("clicked", lambda btn: self.show_options_for_script(script, button))
 
         flowbox_child.set_child(button)
-        self.flowbox_state = True
         return flowbox_child
 
     def on_hover_button_clicked(self, event):
@@ -1383,7 +1347,7 @@ Categories=Game;Utility;
 
     def show_options_for_script(self, script, button):
         self.search_button.set_active(False)
-        self.flowbox_state = False
+
         scrolled_window = Gtk.ScrolledWindow()
         scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled_window.set_vexpand(True)
@@ -1442,10 +1406,6 @@ Categories=Game;Utility;
 
         self.update_execute_button_icon(script)
         self.selected_row = None
-        
-        key_controller = Gtk.EventControllerKey()
-        key_controller.connect("key-pressed", self.on_key_pressed)
-        self.window.add_controller(key_controller)
 
     def toggle_play_stop(self, script, play_stop_button, button):
         if script.stem in self.running_processes:
@@ -2135,188 +2095,6 @@ Categories=Game;Utility;
         data['exe_file'] = new_file_path
         with open(script, 'w') as file:
             yaml.safe_dump(data, file)
-
-
-    def show_options_for_script(self, script, button):
-        self.search_button.set_active(False)
-        self.flowbox_state = False
-        scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scrolled_window.set_vexpand(True)
-
-        options_flowbox = Gtk.FlowBox()
-        options_flowbox.set_valign(Gtk.Align.START)
-        options_flowbox.set_halign(Gtk.Align.FILL)
-        options_flowbox.set_max_children_per_line(4)
-        options_flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        options_flowbox.set_vexpand(True)
-        options_flowbox.set_hexpand(True)
-        scrolled_window.set_child(options_flowbox)
-
-        self.main_frame.set_child(scrolled_window)
-
-        options = [
-            ("Open Terminal", "utilities-terminal-symbolic", self.open_terminal, "Open a terminal in the script directory"),
-            ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d, "Install dxvk and vkd3d using winetricks"),
-            ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager, "Open the file manager in the script directory"),
-            ("Delete Wineprefix", "edit-delete-symbolic", self.show_delete_confirmation, "Delete the Wineprefix associated with the script"),
-            ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation, "Show confirmation for deleting the shortcut for the script"),
-            ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments, "Set Wine Arguments")
-        ]
-
-        for label, icon_name, callback, tooltip in options:
-            option_button = Gtk.Button()
-            option_button.set_size_request(200, 36)
-            option_button.add_css_class("flat")
-            option_button.add_css_class("normal-font")
-
-            option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-
-            option_button.set_child(option_hbox)
-
-            option_icon = Gtk.Image.new_from_icon_name(icon_name)
-            option_label = Gtk.Label(label=label)
-            option_label.set_tooltip_text(tooltip)
-            option_label.set_xalign(0)
-            option_label.set_hexpand(True)
-            option_label.set_ellipsize(Pango.EllipsizeMode.END)
-            option_hbox.append(option_icon)
-            option_hbox.append(option_label)
-
-            option_button.connect("clicked", lambda btn, cb=callback, sc=script: cb(sc, option_button, button))
-            options_flowbox.append(option_button)
-
-        self.headerbar.set_title_widget(self.create_icon_title_widget(script))
-        self.menu_button.set_visible(False)
-        self.search_button.set_visible(False)
-
-        if self.back_button.get_parent():
-            self.headerbar.remove(self.back_button)
-        self.headerbar.pack_start(self.back_button)
-        self.back_button.set_visible(True)
-        self.replace_open_button_with_launch(script, button)
-
-        self.update_execute_button_icon(script)
-        self.selected_row = None
-
-        key_controller = Gtk.EventControllerKey()
-        key_controller.connect("key-pressed", self.on_key_pressed)
-        self.window.add_controller(key_controller)
-
-    def on_back_button_clicked(self, button):
-        print("Back button clicked")
-        self.create_script_list()
-        self.window.set_title("Wine Charm")
-        self.headerbar.set_title_widget(None)
-        self.menu_button.set_visible(True)
-        self.search_button.set_visible(True)
-        self.back_button.set_visible(False)
-        self.restore_open_button()
-
-        if self.main_frame.get_child() != self.scrolled:
-            self.main_frame.set_child(None)
-            self.main_frame.set_child(self.scrolled)
-
-        self.flowbox_state = True
-        self.activate_search_mode()
-        self.deactivate_search_mode()
-
-    def replace_open_button_with_launch(self, script, button):
-        if self.open_button.get_parent() == self.vbox:
-            self.vbox.remove(self.open_button)
-
-        self.launch_button = Gtk.Button()
-        self.launch_button.set_size_request(-1, 36)
-        launch_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
-        
-        launch_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        launch_box.set_halign(Gtk.Align.CENTER)  # Center align the icon
-        launch_box.set_valign(Gtk.Align.CENTER)  # Center align vertically
-        launch_box.set_hexpand(True)
-        launch_box.set_vexpand(True)
-        launch_box.set_spacing(0)  # Remove any spacing
-        
-        launch_box.append(launch_icon)
-        
-        self.launch_button.set_child(launch_box)
-        self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(script, self.launch_button, button))
-        
-        self.vbox.prepend(self.launch_button)
-
-
-
-    def restore_open_button(self):
-        if self.launch_button and self.launch_button.get_parent() == self.vbox:
-            self.vbox.remove(self.launch_button)
-
-        if self.open_button.get_parent() is None:
-            self.vbox.prepend(self.open_button)
-
-    def monitor_processes(self):
-        while True:
-            time.sleep(3)  # Increase the interval to give some time buffer
-            finished_processes = []
-
-            # Create a copy of the dictionary keys
-            running_processes_keys = list(self.running_processes.keys())
-
-            for script_stem in running_processes_keys:
-                process_info = self.running_processes.get(script_stem)
-                if process_info is None:
-                    continue
-
-                proc = process_info["proc"]
-                if proc and proc.poll() is not None:
-                    finished_processes.append(script_stem)
-                else:
-                    # Check with pgrep if process is still running
-                    pgid = process_info.get("pgid")
-                    exe_file = process_info.get("script").stem[:15]
-                    if pgid is not None:
-                        try:
-                            os.killpg(pgid, 0)
-                        except ProcessLookupError:
-                            finished_processes.append(script_stem)
-                    else:
-                        try:
-                            pgrep_output = subprocess.check_output(["pgrep", "-aif", exe_file]).decode()
-                            if not pgrep_output or any(appname.lower() in line.lower() for line in pgrep_output.splitlines()):
-                                finished_processes.append(script_stem)
-                        except subprocess.CalledProcessError:
-                            finished_processes.append(script_stem)
-
-            for script_stem in finished_processes:
-                GLib.idle_add(self.process_ended, script_stem)
-
-            # Update toggle_play_stop button states
-            scripts = self.find_python_scripts()
-            for script in scripts:
-                button = self.find_button_by_script_stem(script.stem)
-                if button:
-                    self.update_execute_button_icon(script)
-
-    def update_execute_button_icon(self, script):
-        if self.launch_button:
-            if script.stem in self.running_processes:
-                launch_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
-                launch_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-                launch_box.set_halign(Gtk.Align.CENTER)  # Center align the icon
-                launch_box.set_valign(Gtk.Align.CENTER)  # Center align vertically
-                launch_box.set_spacing(0)  # Remove any spacing
-                launch_box.append(launch_icon)
-                self.launch_button.set_child(launch_box)
-                self.launch_button.set_tooltip_text("Stop")
-            else:
-                launch_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
-                launch_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-                launch_box.set_halign(Gtk.Align.CENTER)  # Center align the icon
-                launch_box.set_valign(Gtk.Align.CENTER)  # Center align vertically
-                launch_box.set_spacing(0)  # Remove any spacing
-                launch_box.append(launch_icon)
-                self.launch_button.set_child(launch_box)
-                self.launch_button.set_tooltip_text("Launch")
-
-
 
 
 def parse_args():
