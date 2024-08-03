@@ -109,6 +109,9 @@ class WineCharmApp(Gtk.Application):
                 min-height: 40px;
             }
             .common-background {
+                background-color: @theme_bg_color;
+            }
+            .flowbox-background {
                 background-color: @theme_base_color;
             }
             .new-script-button {
@@ -545,6 +548,7 @@ class WineCharmApp(Gtk.Application):
         self.scrolled.set_vexpand(True)
         self.scrolled.set_hexpand(True)
         self.main_frame.set_child(self.scrolled)
+        self.scrolled.add_css_class("flowbox-background")
 
         self.flowbox = Gtk.FlowBox()
         self.flowbox.set_valign(Gtk.Align.START)
