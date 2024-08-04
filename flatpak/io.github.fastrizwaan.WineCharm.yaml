@@ -51,7 +51,8 @@ finish-args:
   - --filesystem=~/.var/app/com.usebottles.bottles/data/bottles
   - --filesystem=~/.var/app/com.playonlinux.PlayOnLinux4/data/PlayOnLinux/wineprefix
   - --filesystem=~/.var/app/org.phoenicis.playonlinux/.Phoenicis/containers/wineprefix
-  
+  - --filesystem=~/.var/appapp/io.github.fastrizwaan.Wine/data/winezgui
+
 cleanup:
   - '*.a'
   - '*.la'

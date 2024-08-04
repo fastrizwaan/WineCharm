@@ -67,6 +67,7 @@ class WineCharmApp(Gtk.Application):
 
         self.search_active = False
         self.command_line_file = None
+        self.newly_created_scripts = []  # List to track newly created scripts
 
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
@@ -120,6 +121,10 @@ class WineCharmApp(Gtk.Application):
             .normal-font {  /* Add the CSS rule for the normal-font class */
             font-weight: normal;
             }
+            .bold-text {  /* Add the CSS rule for the normal-font class */
+            font-weight: bold;
+            }
+            
         """)
         Gtk.StyleContext.add_provider_for_display(
             Gdk.Display.get_default(),
@@ -894,7 +899,9 @@ class WineCharmApp(Gtk.Application):
         icon_path = self.extract_icon(exe_file, prefix_dir, exe_no_space, progname)
         self.create_desktop_entry(progname, yaml_file_path, icon_path, prefix_dir)
 
+        self.newly_created_scripts.append(yaml_file_path)  # Track newly created script
         self.add_or_update_script_button(yaml_file_path)
+
 
     def extract_yaml_info(self, script):
         if not script.exists():
@@ -972,11 +979,11 @@ Categories=Game;Utility;
             self.flowbox.remove(existing_button)
             self.running_processes.pop(script_stem, None)
 
-        button = self.create_script_button(script_path)
-        button.add_css_class("new-script-button")
+        button = self.create_script_button(script_path, is_new=True)  # Pass is_new=True to indicate this is a new script
         self.flowbox.insert(button, 0)
         self.flowbox.select_child(button)
         self.new_scripts.add(script_stem)
+
 
 
     def embolden_new_scripts(self):
@@ -1176,7 +1183,7 @@ Categories=Game;Utility;
 
         return hbox
         
-    def create_script_button(self, script):
+    def create_script_button(self, script, is_new=False):
         flowbox_child = Gtk.FlowBoxChild()
         flowbox_child.set_hexpand(True)  # Ensure the FlowBoxChild expands horizontally
         flowbox_child.set_halign(Gtk.Align.FILL)
@@ -1185,8 +1192,6 @@ Categories=Game;Utility;
         button.add_css_class("flat")
         button.add_css_class("normal-font")
         button.set_size_request(390, 36)
-
-       # button.set_halign(Gtk.Align.FILL)
 
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         hbox.set_hexpand(True)  # Ensure the hbox expands horizontally
@@ -1205,6 +1210,12 @@ Categories=Game;Utility;
         label.set_hexpand(True)  # Ensure the label expands horizontally
         label.set_halign(Gtk.Align.FILL)
         label.set_ellipsize(Pango.EllipsizeMode.END)
+        
+        if script in self.newly_created_scripts:
+            label.add_css_class("bold-text")  # Apply bold styling for new scripts
+        else:
+            label.add_css_class("normal-font")  # Apply normal styling for existing scripts
+
         hbox.append(label)
         label.set_visible(True)
 
@@ -1214,6 +1225,7 @@ Categories=Game;Utility;
         flowbox_child.set_child(button)
         self.flowbox_state = True
         return flowbox_child
+
 
 
 
