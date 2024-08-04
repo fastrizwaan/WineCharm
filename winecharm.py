@@ -665,19 +665,23 @@ class WineCharmApp(Gtk.Application):
                 child.set_label(message)
             child = child.get_next_sibling()
 
+
+    def set_open_button_icon_visible(self, visible):
+        box = self.open_button.get_child()
+        child = box.get_first_child()
+        while child:
+            if isinstance(child, Gtk.Image):
+                child.set_visible(visible)
+            child = child.get_next_sibling()
+
     def hide_processing_spinner(self):
         if self.spinner:
             self.spinner.stop()
             self.button_box.remove(self.spinner)
 
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(True)
-            elif isinstance(child, Gtk.Label):
-                child.set_label("Open")
-            child = child.get_next_sibling()
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)  # Restore the open-folder icon
+
 
     def process_file(self, file_path):
         try:
@@ -1840,14 +1844,9 @@ Categories=Game;Utility;
             self.button_box.remove(self.spinner)
             self.spinner = None
 
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(True)
-            elif isinstance(child, Gtk.Label):
-                child.set_label("Open")
-            child = child.get_next_sibling()
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)  # Restore the open-folder icon
+        self.search_button.set_sensitive(True)  # Enable the search button
 
         if self.open_button_handler_id is not None:
             self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_exe_clicked)
@@ -2015,7 +2014,9 @@ Categories=Game;Utility;
             self.button_box.append(self.spinner)
 
             self.set_open_button_label("Initializing...")
-
+            self.search_button.set_sensitive(False)  # Disable the search button
+            self.set_open_button_icon_visible(False)  # Hide the open-folder icon
+    
             template_dir.mkdir(parents=True, exist_ok=True)
 
             steps = [
