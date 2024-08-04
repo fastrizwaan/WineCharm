@@ -544,6 +544,9 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_key_pressed(self, controller, keyval, keycode, state):
+        if self.initializing_template:
+            return False  # Ignore key presses during initialization
+
         print(f"Key pressed: {keyval}, state: {state}")
         if keyval == Gdk.KEY_f and (state & Gdk.ModifierType.CONTROL_MASK):
             print("Ctrl+F detected")
@@ -558,6 +561,7 @@ class WineCharmApp(Gtk.Application):
             elif not self.flowbox_state:
                 print("Escape detected, going back")
                 self.on_back_button_clicked(None)
+        return True  # Ensure other key events are processed
 
     def activate_search_mode(self):
         print("Activating search mode")
@@ -673,6 +677,7 @@ class WineCharmApp(Gtk.Application):
             if isinstance(child, Gtk.Image):
                 child.set_visible(visible)
             child = child.get_next_sibling()
+
 
     def hide_processing_spinner(self):
         if self.spinner:
@@ -1837,28 +1842,6 @@ Categories=Game;Utility;
             self.window.set_visible(True)
             self.create_script_list()
 
-    def on_template_initialized(self):
-        self.initializing_template = False
-        if self.spinner:
-            self.spinner.stop()
-            self.button_box.remove(self.spinner)
-            self.spinner = None
-
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)  # Restore the open-folder icon
-        self.search_button.set_sensitive(True)  # Enable the search button
-
-        if self.open_button_handler_id is not None:
-            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_exe_clicked)
-
-        print("Template initialization completed and UI updated.")
-        self.show_initializing_step("Initialization Complete!")
-        GLib.idle_add(self.mark_step_as_done, "Initialization Complete!")
-
-        # Process the CLI file if provided after template initialization
-        if self.command_line_file:
-            self.process_cli_file(self.command_line_file)
-
 
     def process_reg_files(self, wineprefix):
         print(f"Starting to process .reg files in {wineprefix}")
@@ -2014,9 +1997,9 @@ Categories=Game;Utility;
             self.button_box.append(self.spinner)
 
             self.set_open_button_label("Initializing...")
-            self.search_button.set_sensitive(False)  # Disable the search button
             self.set_open_button_icon_visible(False)  # Hide the open-folder icon
-    
+            self.search_button.set_sensitive(False)  # Disable the search button
+
             template_dir.mkdir(parents=True, exist_ok=True)
 
             steps = [
@@ -2039,6 +2022,29 @@ Categories=Game;Utility;
                 GLib.idle_add(callback)
 
             threading.Thread(target=initialize).start()
+
+    def on_template_initialized(self):
+        self.initializing_template = False
+        if self.spinner:
+            self.spinner.stop()
+            self.button_box.remove(self.spinner)
+            self.spinner = None
+
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)  # Restore the open-folder icon
+        self.search_button.set_sensitive(True)  # Enable the search button
+
+        if self.open_button_handler_id is not None:
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_exe_clicked)
+
+        print("Template initialization completed and UI updated.")
+        self.show_initializing_step("Initialization Complete!")
+        GLib.idle_add(self.mark_step_as_done, "Initialization Complete!")
+
+        # Process the CLI file if provided after template initialization
+        if self.command_line_file:
+            self.process_cli_file(self.command_line_file)
+
 
     def show_initializing_step(self, step_text):
         button = Gtk.Button()
