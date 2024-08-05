@@ -1313,7 +1313,7 @@ Categories=Game;Utility;
             if script_wineprefix == str(wineprefix):
                 exe_name_upto_fifteen_chars = Path(script_exe_file).stem[:15]
                 try:
-                    pgrep_output = subprocess.check_output(["pgrep", "-ai", exe_name_upto_fifteen_chars]).decode()
+                    pgrep_output = subprocess.check_output(["pgrep", "-aif", exe_name_upto_fifteen_chars]).decode()
                     if pgrep_output:
                         button = self.find_button_by_script_stem(Path(script).stem)
                         if button:
@@ -1414,59 +1414,7 @@ Categories=Game;Utility;
         self.run_winetricks_script("vkd3d dxvk", wineprefix)
         self.create_script_list()
 
-    def show_delete_confirmation(self, script, option_button, button):
-        original_content = option_button.get_child()
 
-        delete_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        delete_hbox.set_margin_start(2)
-        delete_hbox.set_margin_end(2)
-        delete_hbox.set_margin_top(2)
-        delete_hbox.set_margin_bottom(2)
-
-        delete_label = Gtk.Label(label="Delete Wineprefix?")
-        delete_hbox.append(delete_label)
-
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        button_box.set_halign(Gtk.Align.END)
-        delete_hbox.append(button_box)
-
-        yes_button = Gtk.Button(label="Yes")
-        yes_button.add_css_class("destructive-action")
-        yes_button.connect("clicked", lambda btn: self.delete_wineprefix(script, original_content, option_button))
-        button_box.append(yes_button)
-
-        no_button = Gtk.Button(label="No")
-        no_button.connect("clicked", lambda btn: option_button.set_child(original_content))
-        button_box.append(no_button)
-
-        option_button.set_child(delete_hbox)
-
-    def show_delete_shortcut_confirmation(self, script, option_button, button):
-        original_content = option_button.get_child()
-
-        delete_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        delete_hbox.set_margin_start(2)
-        delete_hbox.set_margin_end(2)
-        delete_hbox.set_margin_top(2)
-        delete_hbox.set_margin_bottom(2)
-
-        delete_label = Gtk.Label(label="Delete Shortcut?")
-        delete_hbox.append(delete_label)
-
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        button_box.set_halign(Gtk.Align.END)
-        delete_hbox.append(button_box)
-
-        yes_button = Gtk.Button(label="Yes")
-        yes_button.add_css_class("destructive-action")
-        yes_button.connect("clicked", lambda btn: self.delete_shortcut(script, original_content, option_button))
-        button_box.append(yes_button)
-
-        no_button = Gtk.Button(label="No")
-        no_button.connect("clicked", lambda btn: option_button.set_child(original_content))
-        button_box.append(no_button)
-
-        option_button.set_child(delete_hbox)
 
     def show_wine_arguments(self, script, option_button, button):
         dialog = Gtk.Dialog(transient_for=self.window, modal=True)
@@ -1563,21 +1511,6 @@ Categories=Game;Utility;
 
             self.update_related_scripts_buttons(wineprefix)
 
-    def update_execute_button_icon(self, script):
-        if self.options_listbox:
-            for row in self.options_listbox:
-                box = row.get_child()
-                for widget in box:
-                    if isinstance(widget, Gtk.Button) and widget.get_tooltip_text() == "Run or stop the script":
-                        play_stop_button = widget
-                        if script.stem in self.running_processes:
-                            play_stop_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
-                            play_stop_button.set_tooltip_text("Stop")
-                        else:
-                            play_stop_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-                            play_stop_button.set_tooltip_text("Run or stop the script")
-
-
     def save_wine_arguments(self, script, args, dialog):
         with open(script, 'r') as file:
             data = yaml.safe_load(file)
@@ -1637,26 +1570,30 @@ Categories=Game;Utility;
         except Exception as e:
             print(f"Error opening file manager: {e}")
 
-    def delete_shortcut(self, script, original_content, button):
+
+    def show_delete_shortcut_confirmation(self, script, option_button, button):
+        self.show_delete_confirmation_buttons(script, delete_type="shortcut")
+
+    def delete_shortcut(self, script):
         try:
             script.unlink()
             print(f"Shortcut deleted: {script}")
-            button.set_child(original_content)
-            self.on_back_button_clicked(None)
+            self.on_back_button_clicked(None)  # Navigate back to the main window
         except Exception as e:
             print(f"Error deleting shortcut: {e}")
 
-    def delete_wineprefix(self, script, original_content, button):
+    def delete_wineprefix(self, script):
         wineprefix = Path(script).parent
         print(f"Deleting wineprefix: {wineprefix}")
 
         try:
             shutil.rmtree(wineprefix)
             print(f"Wineprefix deleted: {wineprefix}")
-            button.set_child(original_content)
-            self.on_back_button_clicked(None)
+            self.on_back_button_clicked(None)  # Navigate back to the main window
         except Exception as e:
             print(f"Error deleting wineprefix: {e}")
+
+
 
     def run_winetricks_script(self, winetricks_cmd, wineprefix):
         cmd = f"flatpak run --command=sh io.github.fastrizwaan.WineCharm -c 'WINEPREFIX={shlex.quote(str(wineprefix))} winetricks {winetricks_cmd}'"
@@ -2184,30 +2121,6 @@ Categories=Game;Utility;
         self.activate_search_mode()
         self.deactivate_search_mode()
 
-    def replace_open_button_with_launch(self, script, button):
-        if self.open_button.get_parent() == self.vbox:
-            self.vbox.remove(self.open_button)
-
-        self.launch_button = Gtk.Button()
-        self.launch_button.set_size_request(-1, 36)
-        launch_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
-        
-        launch_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        launch_box.set_halign(Gtk.Align.CENTER)  # Center align the icon
-        launch_box.set_valign(Gtk.Align.CENTER)  # Center align vertically
-        launch_box.set_hexpand(True)
-        launch_box.set_vexpand(True)
-        launch_box.set_spacing(0)  # Remove any spacing
-        
-        launch_box.append(launch_icon)
-        
-        self.launch_button.set_child(launch_box)
-        self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(script, self.launch_button, button))
-        
-        self.vbox.prepend(self.launch_button)
-
-
-
     def restore_open_button(self):
         if self.launch_button and self.launch_button.get_parent() == self.vbox:
             self.vbox.remove(self.launch_button)
@@ -2279,7 +2192,97 @@ Categories=Game;Utility;
                 self.launch_button.set_child(launch_box)
                 self.launch_button.set_tooltip_text("Launch")
 
+    def replace_open_button_with_launch(self, script, button):
+        if self.open_button.get_parent() == self.vbox:
+            self.vbox.remove(self.open_button)
 
+        self.selected_script = script
+        self.selected_button = button
+
+        self.launch_button = Gtk.Button()
+        self.launch_button.set_size_request(-1, 36)
+        launch_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+        
+        launch_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        launch_box.set_halign(Gtk.Align.CENTER)  # Center align the icon
+        launch_box.set_valign(Gtk.Align.CENTER)  # Center align vertically
+        launch_box.set_hexpand(True)
+        launch_box.set_vexpand(True)
+        launch_box.set_spacing(0)  # Remove any spacing
+        
+        launch_box.append(launch_icon)
+        
+        self.launch_button.set_child(launch_box)
+        self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(script, self.launch_button, button))
+        
+        self.vbox.prepend(self.launch_button)
+        self.launch_button.set_visible(True)
+        launch_icon.set_visible(True)
+
+    def restore_launch_button(self):
+        if self.launch_button and self.launch_button.get_parent() == self.vbox:
+            self.vbox.remove(self.launch_button)
+
+        self.launch_button = Gtk.Button()
+        self.launch_button.set_size_request(-1, 36)
+        launch_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+        
+        launch_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        launch_box.set_halign(Gtk.Align.CENTER)  # Center align the icon
+        launch_box.set_valign(Gtk.Align.CENTER)  # Center align vertically
+        launch_box.set_hexpand(True)
+        launch_box.set_vexpand(False)
+        launch_box.set_spacing(0)  # Remove any spacing
+        
+        launch_box.append(launch_icon)
+        
+        self.launch_button.set_child(launch_box)
+        self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(self.selected_script, self.launch_button, self.selected_button))
+        
+        self.vbox.prepend(self.launch_button)
+        self.launch_button.set_visible(True)
+        launch_icon.set_visible(True)
+
+
+
+    def show_delete_confirmation(self, script, option_button, button):
+        self.show_delete_confirmation_buttons(script, delete_type="wineprefix")
+        
+    def show_delete_confirmation_buttons(self, script, delete_type="wineprefix"):
+        # Create the delete confirmation button box
+        delete_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        delete_box.set_halign(Gtk.Align.CENTER)
+        
+        if delete_type == "wineprefix":
+            label = Gtk.Label(label="Delete Wineprefix? ")
+            yes_button = Gtk.Button(label="Yes")
+            yes_button.add_css_class("destructive-action")
+            yes_button.connect("clicked", lambda btn: self.delete_wineprefix(script))
+        else:
+            label = Gtk.Label(label="Delete Shortcut? ")
+            yes_button = Gtk.Button(label="Yes")
+            yes_button.add_css_class("destructive-action")
+            yes_button.connect("clicked", lambda btn: self.delete_shortcut(script))
+
+        no_button = Gtk.Button(label="No")
+        no_button.connect("clicked", lambda btn: self.restore_launch_button())
+
+        delete_box.append(label)
+        delete_box.append(yes_button)
+        delete_box.append(no_button)
+        
+        # Swap the launch button with the delete confirmation button box
+        self.swap_with_launch_button(delete_box)
+
+    def swap_with_launch_button(self, new_widget):
+        if self.launch_button and self.launch_button.get_parent() == self.vbox:
+            self.vbox.remove(self.launch_button)
+
+        self.vbox.prepend(new_widget)
+        new_widget.set_hexpand(True)
+        new_widget.set_vexpand(False)
+        self.launch_button = new_widget
+        self.launch_button.set_visible(True)  # Ensure the new widget and its children are visible
 
 
 def parse_args():
