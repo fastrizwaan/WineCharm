@@ -168,11 +168,7 @@ class WineCharmApp(Gtk.Application):
         # Perform any necessary cleanup actions here
         if SOCKET_FILE.exists():
             SOCKET_FILE.unlink()
-
-    def handle_sigint(self, signum, frame):
-        print("Received SIGINT. Cleaning up and exiting.")
-        self.quit()
-
+            
     def quit_app(self, action=None, param=None):
         self.quit()
 
@@ -1350,13 +1346,6 @@ Categories=Game;Utility;
     def select_button(self, button):
         self.flowbox.select_child(button)
 
-    def delete_setup_or_install_script(self, script, button):
-        try:
-            script.unlink()
-            # self.create_script_list()
-        except Exception as e:
-            print(f"Error deleting script: {e}")
-
     def create_button_box(self, script, button):
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         button_box.set_margin_end(0)
@@ -1520,8 +1509,6 @@ Categories=Game;Utility;
         dialog.close()
         print(f"Saved arguments for {script}: {args}")
 
-    def on_options_row_selected(self, listbox, row):
-        pass
 
     def open_terminal(self, script, *args):
         wineprefix = Path(script).parent
@@ -1699,23 +1686,6 @@ Categories=Game;Utility;
 
         return exe_files_found
 
-    def get_wine_username(self, wineprefix):
-        user_reg_path = os.path.join(wineprefix, "user.reg")
-        if not os.path.exists(user_reg_path):
-            print(f"File not found: {user_reg_path}")
-            return None
-        
-        print(f"Reading user.reg file from {user_reg_path}")
-        with open(user_reg_path, 'r') as file:
-            content = file.read()
-        
-        match = re.search(r'"USERNAME"="([^"]+)"', content, re.IGNORECASE)
-        if not match:
-            print("Unable to determine the USERNAME from user.reg.")
-            return None
-        
-        return match.group(1)
-
     def import_wine_directory(self, action, param):
         dialog = Gtk.FileDialog.new()
         dialog.set_title("Select Wine Directory")
@@ -1852,23 +1822,6 @@ Categories=Game;Utility;
                     print(f"Finished processing {file_path}")
 
         print(f"Completed processing .reg files in {wineprefix}")
-
-    def rename_user_directory(self, wineprefix, old_username):
-        print(f"Renaming user directory in {wineprefix}")
-        
-        current_username = os.getenv("USERNAME") or os.getenv("USER")
-        if not current_username:
-            print("Unable to determine the current username from the environment.")
-            return
-        
-        user_dir_old = os.path.join(wineprefix, "drive_c", "users", old_username)
-        user_dir_new = os.path.join(wineprefix, "drive_c", "users", current_username)
-        
-        if os.path.exists(user_dir_old):
-            os.rename(user_dir_old, user_dir_new)
-            print(f"Renamed user directory from {user_dir_old} to {user_dir_new}")
-        else:
-            print(f"User directory {user_dir_old} does not exist.")
 
     def set_open_button_label(self, text):
         box = self.open_button.get_child()
@@ -2127,49 +2080,6 @@ Categories=Game;Utility;
 
         if self.open_button.get_parent() is None:
             self.vbox.prepend(self.open_button)
-
-    def monitor_processes(self):
-        while True:
-            time.sleep(3)  # Increase the interval to give some time buffer
-            finished_processes = []
-
-            # Create a copy of the dictionary keys
-            running_processes_keys = list(self.running_processes.keys())
-
-            for script_stem in running_processes_keys:
-                process_info = self.running_processes.get(script_stem)
-                if process_info is None:
-                    continue
-
-                proc = process_info["proc"]
-                if proc and proc.poll() is not None:
-                    finished_processes.append(script_stem)
-                else:
-                    # Check with pgrep if process is still running
-                    pgid = process_info.get("pgid")
-                    exe_file = process_info.get("script").stem[:15]
-                    if pgid is not None:
-                        try:
-                            os.killpg(pgid, 0)
-                        except ProcessLookupError:
-                            finished_processes.append(script_stem)
-                    else:
-                        try:
-                            pgrep_output = subprocess.check_output(["pgrep", "-aif", exe_file]).decode()
-                            if not pgrep_output or any(appname.lower() in line.lower() for line in pgrep_output.splitlines()):
-                                finished_processes.append(script_stem)
-                        except subprocess.CalledProcessError:
-                            finished_processes.append(script_stem)
-
-            for script_stem in finished_processes:
-                GLib.idle_add(self.process_ended, script_stem)
-
-            # Update toggle_play_stop button states
-            scripts = self.find_python_scripts()
-            for script in scripts:
-                button = self.find_button_by_script_stem(script.stem)
-                if button:
-                    self.update_execute_button_icon(script)
 
     def update_execute_button_icon(self, script):
         if self.launch_button:
