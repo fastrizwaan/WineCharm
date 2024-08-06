@@ -2014,7 +2014,8 @@ Categories=Game;Utility;
             ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager, "Open the file manager in the script directory"),
             ("Delete Wineprefix", "edit-delete-symbolic", self.show_delete_confirmation, "Delete the Wineprefix associated with the script"),
             ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation, "Show confirmation for deleting the shortcut for the script"),
-            ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments, "Set Wine Arguments")
+            ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments, "Set Wine Arguments"),
+            ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_dialog, "Rename the shortcut")
         ]
 
         for label, icon_name, callback, tooltip in options:
@@ -2193,6 +2194,68 @@ Categories=Game;Utility;
         new_widget.set_vexpand(False)
         self.launch_button = new_widget
         self.launch_button.set_visible(True)  # Ensure the new widget and its children are visible
+
+    def show_rename_shortcut_dialog(self, script, option_button, button):
+        dialog = Gtk.Dialog(transient_for=self.window, modal=True)
+        dialog.set_title("Rename Shortcut")
+        dialog.set_default_size(300, 100)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_margin_top(10)
+        box.set_margin_bottom(10)
+        box.set_margin_start(10)
+        box.set_margin_end(10)
+        dialog.set_child(box)
+
+        label = Gtk.Label(label="New Shortcut Name")
+        box.append(label)
+
+        entry = Gtk.Entry()
+        _, _, progname, _ = self.extract_yaml_info(script)
+        entry.set_text(progname)
+        box.append(entry)
+
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        box.append(button_box)
+
+        save_button = Gtk.Button(label="Save")
+        save_button.connect("clicked", lambda btn: self.rename_shortcut(script, entry.get_text(), dialog))
+        button_box.append(save_button)
+
+        cancel_button = Gtk.Button(label="Cancel")
+        cancel_button.connect("clicked", lambda btn: dialog.close())
+        button_box.append(cancel_button)
+
+        dialog.present()
+
+    def rename_shortcut(self, script, new_name, dialog):
+        script_path = Path(script)
+        new_name = new_name.strip().replace(" ", "_")
+        new_script_path = script_path.with_name(f"{new_name}.charm")
+        old_icon_path = script_path.with_suffix(".png")
+        new_icon_path = new_script_path.with_suffix(".png")
+
+        if new_script_path.exists():
+            self.show_error_dialog("Error", "A shortcut with the new name already exists.")
+            return
+
+        with open(script_path, 'r') as file:
+            data = yaml.safe_load(file)
+        
+        data['progname'] = new_name.replace("_", " ")
+
+        with open(new_script_path, 'w') as file:
+            yaml.safe_dump(data, file)
+
+        script_path.unlink()
+        if old_icon_path.exists():
+            old_icon_path.rename(new_icon_path)
+        
+        dialog.close()
+        self.on_back_button_clicked(None)
+
+
+
 
 
 def parse_args():
