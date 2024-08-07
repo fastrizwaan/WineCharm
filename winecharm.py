@@ -519,6 +519,7 @@ class WineCharmApp(Gtk.Application):
 
         self.main_frame = Gtk.Frame()
         self.main_frame.set_margin_top(5)
+        
         self.vbox.append(self.main_frame)
 
         self.scrolled = Gtk.ScrolledWindow()  # Make scrolled an instance variable
@@ -2015,7 +2016,8 @@ Categories=Game;Utility;
             ("Delete Wineprefix", "edit-delete-symbolic", self.show_delete_confirmation, "Delete the Wineprefix associated with the script"),
             ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation, "Show confirmation for deleting the shortcut for the script"),
             ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments, "Set Wine Arguments"),
-            ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_dialog, "Rename the shortcut")
+            ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_dialog, "Rename the shortcut"),
+            ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog, "Change the icon for the shortcut")
         ]
 
         for label, icon_name, callback, tooltip in options:
@@ -2056,6 +2058,7 @@ Categories=Game;Utility;
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self.on_key_pressed)
         self.window.add_controller(key_controller)
+
 
     def on_back_button_clicked(self, button):
         print("Back button clicked")
@@ -2253,6 +2256,61 @@ Categories=Game;Utility;
         
         dialog.close()
         self.on_back_button_clicked(None)
+
+    def show_change_icon_dialog(self, script, option_button, button):
+        file_dialog = Gtk.FileDialog.new()
+        file_filter = Gtk.FileFilter()
+        file_filter.set_name("Image and Executable files")
+        file_filter.add_mime_type("image/png")
+        file_filter.add_mime_type("image/svg+xml")
+        file_filter.add_mime_type("application/x-ms-dos-executable")
+        file_filter.add_pattern("*.exe")
+        file_filter.add_pattern("*.msi")
+        
+        filter_model = Gio.ListStore.new(Gtk.FileFilter)
+        filter_model.append(file_filter)
+        file_dialog.set_filters(filter_model)
+
+        file_dialog.open(self.window, None, lambda dlg, res: self.on_change_icon_response(dlg, res, script))
+
+    def on_change_icon_response(self, dialog, result, script):
+        try:
+            file = dialog.open_finish(result)
+            if file:
+                file_path = file.get_path()
+                suffix = Path(file_path).suffix.lower()
+                if suffix in [".png", ".svg"]:
+                    self.change_icon(script, file_path)
+                elif suffix in [".exe", ".msi"]:
+                    self.extract_and_change_icon(script, file_path)
+                # Update the icon in the title bar
+                self.headerbar.set_title_widget(self.create_icon_title_widget(script))
+        except GLib.Error as e:
+            print(f"An error occurred: {e}")
+
+    def change_icon(self, script, new_icon_path):
+        script_path = Path(script)
+        icon_path = script_path.with_suffix(".png")
+        backup_icon_path = icon_path.with_suffix(".bak")
+
+        if icon_path.exists():
+            shutil.move(icon_path, backup_icon_path)
+
+        shutil.copy(new_icon_path, icon_path)
+        self.create_script_list()
+
+    def extract_and_change_icon(self, script, exe_path):
+        script_path = Path(script)
+        icon_path = script_path.with_suffix(".png")
+        backup_icon_path = icon_path.with_suffix(".bak")
+
+        if icon_path.exists():
+            shutil.move(icon_path, backup_icon_path)
+
+        extracted_icon_path = self.extract_icon(exe_path, script_path.parent, script_path.stem, script_path.stem)
+        if extracted_icon_path:
+            shutil.move(extracted_icon_path, icon_path)
+        self.create_script_list()
 
 
 
