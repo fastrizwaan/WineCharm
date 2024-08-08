@@ -1175,6 +1175,7 @@ Categories=Game;Utility;
         hbox.append(icon_image)
 
         label = Gtk.Label(label=f"<b>{script.stem.replace('_', ' ')}</b>")
+        label.set_ellipsize(Pango.EllipsizeMode.END)
         label.set_use_markup(True)
         hbox.append(label)
 
