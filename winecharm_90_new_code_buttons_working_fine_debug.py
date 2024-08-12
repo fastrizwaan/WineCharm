@@ -458,6 +458,8 @@ class WineCharmApp(Gtk.Application):
             self.window.set_visible(True)
         
     def on_back_button_clicked(self, button):
+        print("Back button clicked")
+
         # Restore the script list
         self.create_script_list()
         
@@ -651,6 +653,8 @@ class WineCharmApp(Gtk.Application):
                 script_key = self.generate_script_key(script)
 
                 matching_processes = [line for line in pgrep_output if exe_name in line]
+                #print(f"exe_name = {exe_name}")
+                #print(f"matching_processes = {matching_processes}")
 
                 if matching_processes:
                     for process in matching_processes:
@@ -659,6 +663,7 @@ class WineCharmApp(Gtk.Application):
 
                         if exe_name in command_line:
                             row = self.find_row_by_exe_name(exe_name)
+                            #print(f"Found {row} in matching process")
                             if row:
                                 current_running_processes[script_key] = {"row": row, "script": script, "exe_name": exe_name, "pid": pid}
 
@@ -669,6 +674,7 @@ class WineCharmApp(Gtk.Application):
 
                                 # Only update the launch button if it belongs to this script
                                 if self.launch_button and self.launch_button_script_key == script_key:
+                                    print(f"Setting play button after highlight in if {exe_name}:{pid} in command_line 77777")
                                     self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
                                     self.launch_button.set_tooltip_text("stop dude")
                 else:
@@ -678,6 +684,7 @@ class WineCharmApp(Gtk.Application):
 
         except subprocess.CalledProcessError as e:
             pass
+            #print(f"CalledProcessError in check_running_processes_and_update_buttons: {e}")
 
         return True  # Ensure this returns False to stop any unintended recursion
 
@@ -689,6 +696,7 @@ class WineCharmApp(Gtk.Application):
                 if row:
                     row.remove_css_class("highlighted")
                 if self.launch_button:
+                    print("Settings play button after highligh in cleanup_ended_processes 44444")
                     self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
                     self.launch_button.set_tooltip_text("Play")
                 del self.running_processes[script_key]
@@ -701,14 +709,20 @@ class WineCharmApp(Gtk.Application):
             if row:
                 row.remove_css_class("highlighted")
             if self.launch_button:
+                print("Settings play button after highlight in handle_no_processes_found 55555")
                 self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
                 self.launch_button.set_tooltip_text("Shifa Play")
                         # Process the lnk files after the process has ended
             script_path = process_info.get("script")
+            print(f"script_path: {script_path}")
             if script_path and script_path.exists():
                 wineprefix = self.extract_yaml_info(script_path)[1]
                 if wineprefix:
                     wineprefix_path = Path(wineprefix)  # Convert wineprefix to a Path object
+                    # Run the script creation in a background thread to avoid blocking the main process
+                    #self.create_scripts_for_lnk_files(wineprefix_path)
+                    print("Launching create_scripts_for_lnk_files...")
+                    #threading.Thread(target=self.create_scripts_for_lnk_files, args=(wineprefix_path,)).start()
                     self.create_scripts_for_lnk_files(wineprefix_path)
         self.running_processes.clear()
 
@@ -763,6 +777,7 @@ class WineCharmApp(Gtk.Application):
 
         product_output = self.run_command(" ".join(product_cmd))
         if product_output is None:
+            print(f"Error: Failed to retrieve product name for {exe_file}")
             productname = exe_no_space
         else:
             productname_match = re.search(r'Product Name\s+:\s+(.+)', product_output)
@@ -1374,6 +1389,7 @@ class WineCharmApp(Gtk.Application):
                 row.remove_css_class("highlighted")
 
             if self.launch_button:
+                print("Settings play button after highlight in process_ended 66666")
                 self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
                 self.launch_button.set_tooltip_text("Play")
 
@@ -1444,6 +1460,14 @@ class WineCharmApp(Gtk.Application):
             print(f"Desktop entry created: {desktop_file_path}")
         except Exception as e:
             print(f"Error creating desktop entry: {e}")
+
+
+
+
+
+######## Refine
+
+
 
 
 
