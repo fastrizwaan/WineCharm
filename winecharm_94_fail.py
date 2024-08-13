@@ -23,7 +23,7 @@ gi.require_version('Adw', '1')
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 
 
-version = "0.6.1"
+version = "0.6.2"
 # Constants
 winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
 prefixes_dir = winecharmdir / "Prefixes"
@@ -240,6 +240,179 @@ class WineCharmApp(Gtk.Application):
         self.create_script_list()
         self.check_running_processes_and_update_buttons()
 
+        # Adding missing programs dialog and default templates
+        missing_programs = self.check_required_programs()
+        if missing_programs:
+            self.show_missing_programs_dialog(missing_programs)
+        else:
+            if not default_template.exists():
+                self.initialize_template(default_template, self.on_template_initialized)
+            else:
+                # Template already exists, process the CLI file if provided
+                self.set_dynamic_variables()
+                if self.command_line_file:
+                    self.process_cli_file(self.command_line_file)
+
+    def initialize_template(self, template_dir, callback):
+        if not template_dir.exists():
+            self.initializing_template = True
+            if self.open_button_handler_id is not None:
+                self.open_button.disconnect(self.open_button_handler_id)
+
+            self.spinner = Gtk.Spinner()
+            self.spinner.start()
+            self.button_box.append(self.spinner)
+
+            self.set_open_button_label("Initializing...")
+            self.set_open_button_icon_visible(False)  # Hide the open-folder icon
+            self.search_button.set_sensitive(False)  # Disable the search button
+
+            template_dir.mkdir(parents=True, exist_ok=True)
+
+            steps = [
+                ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
+                ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+                ("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+                ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+                ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+                ("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
+                ("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
+            ]
+
+            def initialize():
+                for step_text, command in steps:
+                    GLib.idle_add(self.show_initializing_step, step_text)
+                    try:
+                        subprocess.run(command, shell=True, check=True)
+                        GLib.idle_add(self.mark_step_as_done, step_text)
+                    except subprocess.CalledProcessError as e:
+                        print(f"Error initializing template: {e}")
+                        break
+                GLib.idle_add(callback)
+
+            threading.Thread(target=initialize).start()
+
+    def on_template_initialized(self):
+        self.initializing_template = False
+        if self.spinner:
+            self.spinner.stop()
+            self.button_box.remove(self.spinner)
+            self.spinner = None
+
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)  # Restore the open-folder icon
+        self.search_button.set_sensitive(True)  # Enable the search button
+
+        if self.open_button_handler_id is not None:
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
+
+        print("Template initialization completed and UI updated.")
+        self.show_initializing_step("Initialization Complete!")
+        GLib.idle_add(self.mark_step_as_done, "Initialization Complete!")
+
+        # Process the CLI file if provided after template initialization
+        if self.command_line_file:
+            self.process_cli_file(self.command_line_file)
+
+    def set_open_button_label(self, text):
+        box = self.open_button.get_child()
+        child = box.get_first_child()
+        while child:
+            if isinstance(child, Gtk.Label):
+                child.set_label(text)
+            elif isinstance(child, Gtk.Image):
+                child.set_visible(False if text == "Initializing" else True)
+            child = child.get_next_sibling()
+            
+    def show_initializing_step(self, step_text):
+        button = Gtk.Button()
+        button.set_size_request(390, 36)
+        button.add_css_class("flat")
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        checkbox = Gtk.CheckButton()
+        label = Gtk.Label(label=step_text)
+        label.set_xalign(0)
+        hbox.append(checkbox)
+        hbox.append(label)
+        button.set_child(hbox)
+        button.checkbox = checkbox
+        button.label = label
+        self.flowbox.append(button)
+        button.set_visible(True)
+        self.flowbox.queue_draw()  # Ensure the flowbox redraws itself to show the new button
+
+    def mark_step_as_done(self, step_text):
+        child = self.flowbox.get_first_child()
+        while child:
+            button = child.get_child()
+            if button.label.get_text() == step_text:
+                button.checkbox.set_active(True)
+                button.add_css_class("normal-font")
+                break
+            child = child.get_next_sibling()
+        self.flowbox.queue_draw()  # Ensure the flowbox redraws itself to update the checkbox status
+
+    def check_required_programs(self):
+        # Check if flatpak-spawn is available
+        if shutil.which("flatpak-spawn"):
+            return []
+
+        # Check other required programs if flatpak-spawn is not available
+        required_programs = [
+            'exiftool',
+            'wine',
+            'winetricks',
+            'wrestool',
+            'icotool',
+            'pgrep',
+            'gnome-terminal',
+            'xdg-open'
+        ]
+        missing_programs = [prog for prog in required_programs if not shutil.which(prog)]
+        return missing_programs
+
+    def show_missing_programs_dialog(self, missing_programs):
+        dialog = Gtk.Dialog(transient_for=self.window, modal=True)
+        dialog.set_title("Missing Programs")
+        dialog.set_default_size(300, 200)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_margin_top(10)
+        box.set_margin_bottom(10)
+        box.set_margin_start(10)
+        box.set_margin_end(10)
+        dialog.set_child(box)
+
+        label = Gtk.Label(label="The following required programs are missing:")
+        box.append(label)
+
+        for prog in missing_programs:
+            prog_label = Gtk.Label(label=prog)
+            prog_label.set_halign(Gtk.Align.START)
+            box.append(prog_label)
+
+        close_button = Gtk.Button(label="Close")
+        close_button.connect("clicked", lambda w: dialog.close())
+        box.append(close_button)
+
+        dialog.present()
+
+                            
+    def set_dynamic_variables(self):
+        global runner, wine_version, template, arch
+        runner = subprocess.getoutput('which wine')
+        wine_version = subprocess.getoutput(f"{runner} --version")
+        template = "WineCharm-win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('template', "WineCharm-win64")
+        arch = "win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('arch', "win64")
+        
+    def set_open_button_icon_visible(self, visible):
+        box = self.open_button.get_child()
+        child = box.get_first_child()
+        while child:
+            if isinstance(child, Gtk.Image):
+                child.set_visible(visible)
+            child = child.get_next_sibling()
+ 
     def on_activate(self, app):
         self.window.present()
         focus_controller = Gtk.EventControllerFocus()
@@ -675,9 +848,13 @@ class WineCharmApp(Gtk.Application):
                                 # Only update the launch button if it belongs to this script
                                 if self.launch_button and self.launch_button_script_key == script_key:
                                     print(f"Setting play button after highlight in if {exe_name}:{pid} in command_line 77777")
-                                    self.update_script_button_state(script.stem)
-                                    self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
-                                    self.launch_button.set_tooltip_text("stop dude")
+                                    is_running = self.update_script_button_state(script.stem)
+                                    print("88888888888888888888888888")
+                                    print(is_running)
+                                    if is_running:
+                                        self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
+                                        self.launch_button.set_tooltip_text("stop dude")
+
                 else:
                     self.process_ended(script_key)
 
@@ -698,6 +875,7 @@ class WineCharmApp(Gtk.Application):
                     row.remove_css_class("highlighted")
                 if self.launch_button:
                     print("Settings play button after highligh in cleanup_ended_processes 44444")
+                    self.update_script_button_state(script.stem)
                     self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
                     self.launch_button.set_tooltip_text("Play")
                 del self.running_processes[script_key]
@@ -1010,7 +1188,8 @@ class WineCharmApp(Gtk.Application):
         self.replace_open_button_with_launch(script, row)
 
         # Call update_execute_button_icon only after options_listbox is set up
-        self.update_execute_button_icon(script)
+        
+        #self.update_execute_button_icon(script)
         self.selected_row = None
 
     def open_terminal(self, script, *args):
@@ -1476,13 +1655,247 @@ class WineCharmApp(Gtk.Application):
 
 ###################################################################################################
 
+    def check_running_processes_and_update_buttons(self):
+        if not self.monitoring_active:
+            self.stop_monitoring()
+            return False
+
+        try:
+            pgrep_output = subprocess.check_output(["pgrep", "-aif", r"\.exe"]).decode().splitlines()
+
+            current_running_processes = {}
+            for script in self.find_python_scripts():
+                exe_file, _, _, _ = self.extract_yaml_info(script)
+                exe_name = Path(exe_file).name
+                script_key = self.generate_script_key(script)
+
+                matching_processes = [line for line in pgrep_output if exe_name in line]
+
+                if matching_processes:
+                    current_running_processes[script_key] = {
+                        "row": self.find_row_by_script_key(script_key),
+                        "script": script,
+                        "exe_name": exe_name,
+                        "pid": int(matching_processes[0].split()[0])
+                    }
+
+                    if script_key not in self.running_processes:
+                        self.running_processes[script_key] = current_running_processes[script_key]
+
+                    self.update_script_button_state(script_key)
+                else:
+                    self.process_ended(script_key)
+
+            self.cleanup_ended_processes(current_running_processes)
+
+        except subprocess.CalledProcessError:
+            pass
+
+        return True  # Continue the monitoring cycle
+
+    def update_script_button_state(self, script_key):
+        row = self.find_row_by_script_key(script_key)
+        if row:
+            is_running = script_key in self.running_processes
+            play_icon = Gtk.Image.new_from_icon_name(
+                "media-playback-stop-symbolic" if is_running else "media-playback-start-symbolic"
+            )
+            
+            # Update the script row highlight
+            if is_running:
+                row.add_css_class("highlighted")
+            else:
+                row.remove_css_class("highlighted")
+
+            # Update the launch button if it exists
+            if self.launch_button and self.launch_button_script_key == script_key:
+                self.launch_button.set_child(play_icon)
+                self.launch_button.set_tooltip_text("Stop" if is_running else "Play")
+                
+            return is_running
+        return False
+
+    def show_options_for_script(self, script, row):
+        # Ensure the search button is toggled off and the search entry is cleared
+        self.search_button.set_active(False)
+        self.main_frame.set_child(None)
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled_window.set_vexpand(True)
+
+        options_flowbox = Gtk.FlowBox()
+        options_flowbox.set_valign(Gtk.Align.START)
+        options_flowbox.set_halign(Gtk.Align.FILL)
+        options_flowbox.set_max_children_per_line(4)
+        options_flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        options_flowbox.set_vexpand(True)
+        options_flowbox.set_hexpand(True)
+        scrolled_window.set_child(options_flowbox)
+
+        self.main_frame.set_child(scrolled_window)
+
+        # Initialize or replace self.options_listbox with the current options_flowbox
+        self.options_listbox = options_flowbox
+
+        # Replace the previous 'options' list with this simplified version
+        options = [
+            ("Open Terminal", "utilities-terminal-symbolic", self.open_terminal),
+            ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
+            ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager),
+            ("Delete Wineprefix", "edit-delete-symbolic", self.show_delete_confirmation),
+            ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation),
+            ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
+            ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
+            ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog)
+        ]
+
+        for label, icon_name, callback in options:
+            option_button = Gtk.Button()
+            option_button.set_size_request(390, 36)
+            option_button.add_css_class("flat")
+            option_button.add_css_class("normal-font")
+
+            option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+            option_button.set_child(option_hbox)
+
+            option_icon = Gtk.Image.new_from_icon_name(icon_name)
+            option_label = Gtk.Label(label=label)
+            option_label.set_xalign(0)
+            option_label.set_hexpand(True)
+            option_label.set_ellipsize(Pango.EllipsizeMode.END)
+            option_hbox.append(option_icon)
+            option_hbox.append(option_label)
+
+            # Simplified connect statement
+            options_flowbox.append(option_button)
+
+            option_button.connect(
+                "clicked",
+                lambda btn, cb=callback, sc=script, ob=option_button:
+                self.callback_wrapper(cb, sc, ob)
+            )
+
+        # Set the header bar title to the script's icon and name
+        self.headerbar.set_title_widget(self.create_icon_title_widget(script))
+        self.menu_button.set_visible(False)
+        self.search_button.set_visible(False)
+
+        # Ensure the back button is added and visible
+        if self.back_button.get_parent() is None:
+            self.headerbar.pack_start(self.back_button)
+        self.back_button.set_visible(True)
+
+        # Remove the "Open" button
+        self.open_button.set_visible(False)
+
+        # Replace the "Open" button with the "Launch" button
+        self.replace_open_button_with_launch(script, row)
+
+        # Generate script_key from the script object
+        script_key = self.generate_script_key(script)
+
+        # Call update_script_button_state using script_key
+        self.update_script_button_state(script_key)
+
+        self.selected_row = None
+
+    def process_ended(self, script_key):
+        if script_key in self.running_processes:
+            del self.running_processes[script_key]
+            self.update_script_button_state(script_key)
 
 
+    def find_row_by_script_key(self, script_key):
+        # Iterate over the script_buttons dictionary to find the row associated with the script_key
+        for button in self.script_buttons.values():
+            if hasattr(button, 'script_key') and button.script_key == script_key:
+                return button
+        return None
 
 
 ###################################################################################################
 
 
+
+
+    def start_socket_server(self):
+        def server_thread():
+            if SOCKET_FILE.exists():
+                SOCKET_FILE.unlink()
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+                server.bind(str(SOCKET_FILE))
+                server.listen()
+                while True:
+                    conn, _ = server.accept()
+                    with conn:
+                        message = conn.recv(1024).decode()
+                        if message:
+                            # Extract the current working directory and file path
+                            cwd, file_path = message.split("||")
+                            base_path = Path(cwd)
+                            pattern = file_path.split("/")[-1]
+                            directory = "/".join(file_path.split("/")[:-1])
+                            search_path = base_path / directory
+
+                            if not search_path.exists():
+                                print(f"Directory does not exist: {search_path}")
+                                continue
+
+                            abs_file_paths = list(search_path.glob(pattern))
+                            if abs_file_paths:
+                                for abs_file_path in abs_file_paths:
+                                    if abs_file_path.exists():
+                                        print(f"Resolved absolute file path: {abs_file_path}")
+                                        GLib.idle_add(self.process_cli_file, str(abs_file_path))
+                                    else:
+                                        print(f"File does not exist: {abs_file_path}")
+                            else:
+                                print(f"No files matched the pattern: {file_path}")
+
+        threading.Thread(target=server_thread, daemon=True).start()
+
+    def process_cli_file(self, file_path):
+        self.show_processing_spinner("Processing")
+        threading.Thread(target=self._process_cli_file, args=(file_path,)).start()
+
+    def _process_cli_file(self, file_path):
+        print(f"Processing CLI file: {file_path}")
+        abs_file_path = str(Path(file_path).resolve())
+        print(f"Resolved absolute CLI file path: {abs_file_path}")
+
+        try:
+            if not Path(abs_file_path).exists():
+                print(f"File does not exist: {abs_file_path}")
+                return
+            self.create_yaml_file(abs_file_path, None)
+            GLib.idle_add(self.create_script_list)
+        except Exception as e:
+            print(f"Error processing file: {e}")
+        finally:
+            GLib.idle_add(self.hide_processing_spinner)
+######################################
+def update_script_button_state(self, script_stem):
+    script_key = hashlib.sha256(script_stem.encode()).hexdigest()
+
+    row = self.find_row_by_script_stem(script_stem)
+    if row:
+        play_button = row.get_child()
+
+        # Check if the script is running
+        if script_key in self.running_processes:
+            play_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
+            play_button.set_child(play_icon)
+            play_button.set_tooltip_text("Stop")
+            row.add_css_class("highlighted")
+            return True  # Indicate that the script is running
+        else:
+            play_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+            play_button.set_child(play_icon)
+            play_button.set_tooltip_text("Play")
+            row.remove_css_class("highlighted")
+            return False  # Indicate that the script is not running
+
+    return None  # Indicate that the row was not found
 
 
 def parse_args():
@@ -1524,3 +1937,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

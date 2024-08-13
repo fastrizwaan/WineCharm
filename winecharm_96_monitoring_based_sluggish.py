@@ -20,10 +20,9 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
 
-from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
+from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango
 
-
-version = "0.6.1"
+version = "0.6.2"
 # Constants
 winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
 prefixes_dir = winecharmdir / "Prefixes"
@@ -37,17 +36,11 @@ do_not_kill = "bin/winecharm"
 
 SOCKET_FILE = winecharmdir / "winecharm_socket"
 
-
-
 # These need to be dynamically updated:
 runner = ""  # which wine
 wine_version = ""  # runner --version
 template = ""  # default: WineCharm-win64 ; #if not found in settings.yaml at winecharm directory add default_template
 arch = ""  # default: win64 ; # #if not found in settings.yaml at winecharm directory add win64
-
-
-
-
 
 class WineCharmApp(Gtk.Application):
     def __init__(self):
@@ -118,22 +111,17 @@ class WineCharmApp(Gtk.Application):
 
     def on_settings_clicked(self, action=None, param=None):
         print("Settings action triggered")
-        # You can add code here to open a settings window or dialog.
 
     def on_kill_all_clicked(self, action=None, param=None):
-
         try:
-            # Get the PID of the WineCharm application
             winecharm_pid_output = subprocess.check_output(["pgrep", "-aif", do_not_kill]).decode()
             winecharm_pid_lines = winecharm_pid_output.splitlines()
             winecharm_pids = [int(line.split()[0]) for line in winecharm_pid_lines]
 
             try:
-                # Get the list of all Wine exe processes
                 wine_exe_output = subprocess.check_output(["pgrep", "-aif", r"\.exe"]).decode()
                 wine_exe_lines = wine_exe_output.splitlines()
 
-                # Extract PIDs and reverse the list to kill child processes first
                 pids = []
                 for line in wine_exe_lines:
                     columns = line.split()
@@ -142,7 +130,6 @@ class WineCharmApp(Gtk.Application):
                         pids.append(pid)
                 pids.reverse()
 
-                # Kill the processes
                 for pid in pids:
                     try:
                         os.kill(pid, signal.SIGKILL)
@@ -157,16 +144,12 @@ class WineCharmApp(Gtk.Application):
         except subprocess.CalledProcessError as e:
             print(f"Error retrieving process list: {e}")
 
-        # Optionally, clear the running processes dictionary
         self.running_processes.clear()
-        
         self.check_running_processes_and_update_buttons()
-#        self.create_script_list()
         print("All Wine exe processes killed except PID 1 and WineCharm processes")
 
     def on_help_clicked(self, action=None, param=None):
         print("Help action triggered")
-        # You can add code here to show a help dialog or window.
 
     def on_about_clicked(self, action=None, param=None):
         about_dialog = Adw.AboutWindow(
@@ -187,25 +170,25 @@ class WineCharmApp(Gtk.Application):
         print("Quit action triggered")
         self.quit()
 
-    def update_script_button_state(self, script_stem):
-        script_key = hashlib.sha256(script_stem.encode()).hexdigest()
-
-        row = self.find_row_by_script_stem(script_stem)
+    def update_script_button_state(self, script_key):
+        row = self.find_row_by_script_key(script_key)
         if row:
-            play_button = row.get_child()
-            
-            # Check if the script is running
-            if script_key in self.running_processes:
-                play_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
-                self.launch_button.set_child(play_icon)
-                self.launch_button.set_tooltip_text("Stop")
+            is_running = script_key in self.running_processes
+            play_icon = Gtk.Image.new_from_icon_name(
+                "media-playback-stop-symbolic" if is_running else "media-playback-start-symbolic"
+            )
+
+            if is_running:
                 row.add_css_class("highlighted")
             else:
-                play_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
-                self.launch_button.set_child(play_icon)
-                self.launch_button.set_tooltip_text("Play")
                 row.remove_css_class("highlighted")
 
+            if self.launch_button and self.launch_button_script_key == script_key:
+                self.launch_button.set_child(play_icon)
+                self.launch_button.set_tooltip_text("Stop" if is_running else "Play")
+
+            return is_running
+        return False
 
     def load_icon(self, script):
         icon_name = script.stem + ".png"
@@ -232,13 +215,179 @@ class WineCharmApp(Gtk.Application):
             if icon_path.exists():
                 return icon_path
 
-        # Fallback icon path in case none of the paths in XDG_DATA_DIRS contain the icon
         return Path("/app/share/icons/hicolor/128x128/apps/org.winehq.Wine.png")
 
     def on_startup(self, app):
         self.create_main_window()
         self.create_script_list()
         self.check_running_processes_and_update_buttons()
+
+        missing_programs = self.check_required_programs()
+        if missing_programs:
+            self.show_missing_programs_dialog(missing_programs)
+        else:
+            if not default_template.exists():
+                self.initialize_template(default_template, self.on_template_initialized)
+            else:
+                self.set_dynamic_variables()
+                if self.command_line_file:
+                    self.process_cli_file(self.command_line_file)
+
+    def initialize_template(self, template_dir, callback):
+        if not template_dir.exists():
+            self.initializing_template = True
+            if self.open_button_handler_id is not None:
+                self.open_button.disconnect(self.open_button_handler_id)
+
+            self.spinner = Gtk.Spinner()
+            self.spinner.start()
+            self.button_box.append(self.spinner)
+
+            self.set_open_button_label("Initializing...")
+            self.set_open_button_icon_visible(False)  # Hide the open-folder icon
+            self.search_button.set_sensitive(False)  # Disable the search button
+
+            template_dir.mkdir(parents=True, exist_ok=True)
+
+            steps = [
+                ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
+                ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+                ("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+                ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+                ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+                #("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
+                #("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
+            ]
+
+            def initialize():
+                for step_text, command in steps:
+                    GLib.idle_add(self.show_initializing_step, step_text)
+                    try:
+                        subprocess.run(command, shell=True, check=True)
+                        GLib.idle_add(self.mark_step_as_done, step_text)
+                    except subprocess.CalledProcessError as e:
+                        print(f"Error initializing template: {e}")
+                        break
+                GLib.idle_add(callback)
+
+            threading.Thread(target=initialize).start()
+
+    def on_template_initialized(self):
+        self.initializing_template = False
+        if self.spinner:
+            self.spinner.stop()
+            self.button_box.remove(self.spinner)
+            self.spinner = None
+
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)  # Restore the open-folder icon
+        self.search_button.set_sensitive(True)  # Enable the search button
+
+        if self.open_button_handler_id is not None:
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
+
+        print("Template initialization completed and UI updated.")
+        self.show_initializing_step("Initialization Complete!")
+        GLib.idle_add(self.mark_step_as_done, "Initialization Complete!")
+
+        if self.command_line_file:
+            self.process_cli_file(self.command_line_file)
+
+    def set_open_button_label(self, text):
+        box = self.open_button.get_child()
+        child = box.get_first_child()
+        while child:
+            if isinstance(child, Gtk.Label):
+                child.set_label(text)
+            elif isinstance(child, Gtk.Image):
+                child.set_visible(False if text == "Initializing" else True)
+            child = child.get_next_sibling()
+
+    def show_initializing_step(self, step_text):
+        button = Gtk.Button()
+        button.set_size_request(390, 36)
+        button.add_css_class("flat")
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        checkbox = Gtk.CheckButton()
+        label = Gtk.Label(label=step_text)
+        label.set_xalign(0)
+        hbox.append(checkbox)
+        hbox.append(label)
+        button.set_child(hbox)
+        button.checkbox = checkbox
+        button.label = label
+        self.flowbox.append(button)
+        button.set_visible(True)
+        self.flowbox.queue_draw()  # Ensure the flowbox redraws itself to show the new button
+
+    def mark_step_as_done(self, step_text):
+        child = self.flowbox.get_first_child()
+        while child:
+            button = child.get_child()
+            if button.label.get_text() == step_text:
+                button.checkbox.set_active(True)
+                button.add_css_class("normal-font")
+                break
+            child = child.get_next_sibling()
+        self.flowbox.queue_draw()  # Ensure the flowbox redraws itself to update the checkbox status
+
+    def check_required_programs(self):
+        if shutil.which("flatpak-spawn"):
+            return []
+
+        required_programs = [
+            'exiftool',
+            'wine',
+            'winetricks',
+            'wrestool',
+            'icotool',
+            'pgrep',
+            'gnome-terminal',
+            'xdg-open'
+        ]
+        missing_programs = [prog for prog in required_programs if not shutil.which(prog)]
+        return missing_programs
+
+    def show_missing_programs_dialog(self, missing_programs):
+        dialog = Gtk.Dialog(transient_for=self.window, modal=True)
+        dialog.set_title("Missing Programs")
+        dialog.set_default_size(300, 200)
+
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_margin_top(10)
+        box.set_margin_bottom(10)
+        box.set_margin_start(10)
+        box.set_margin_end(10)
+        dialog.set_child(box)
+
+        label = Gtk.Label(label="The following required programs are missing:")
+        box.append(label)
+
+        for prog in missing_programs:
+            prog_label = Gtk.Label(label=prog)
+            prog_label.set_halign(Gtk.Align.START)
+            box.append(prog_label)
+
+        close_button = Gtk.Button(label="Close")
+        close_button.connect("clicked", lambda w: dialog.close())
+        box.append(close_button)
+
+        dialog.present()
+
+    def set_dynamic_variables(self):
+        global runner, wine_version, template, arch
+        runner = subprocess.getoutput('which wine')
+        wine_version = subprocess.getoutput(f"{runner} --version")
+        template = "WineCharm-win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('template', "WineCharm-win64")
+        arch = "win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('arch', "win64")
+
+    def set_open_button_icon_visible(self, visible):
+        box = self.open_button.get_child()
+        child = box.get_first_child()
+        while child:
+            if isinstance(child, Gtk.Image):
+                child.set_visible(visible)
+            child = child.get_next_sibling()
 
     def on_activate(self, app):
         self.window.present()
@@ -249,17 +398,20 @@ class WineCharmApp(Gtk.Application):
 
     def on_focus_in(self, controller):
         self.monitoring_active = True
-        self.start_monitoring()
-
-        # Recheck processes and update the UI
+        print("Switching to 1 seconds process monitoring")
+        self.start_monitoring(interval=5)  # Reset to 5 seconds when focused
         self.check_running_processes_and_update_buttons()
 
     def on_focus_out(self, controller):
-        self.monitoring_active = False
+        self.monitoring_active = True
+        print("Switching to 30 seconds process monitoring")
+        self.start_monitoring(interval=30)  # Increase to 30 seconds when out of focus
 
-    def start_monitoring(self):
-        if not hasattr(self, '_monitoring_id'):
-            self._monitoring_id = GLib.timeout_add_seconds(2, self.check_running_processes_and_update_buttons)
+    def start_monitoring(self, interval=2):
+        if hasattr(self, '_monitoring_id'):
+            GLib.source_remove(self._monitoring_id)
+        self._monitoring_id = GLib.timeout_add_seconds(interval, self.check_running_processes_and_update_buttons)
+
 
     def stop_monitoring(self):
         if hasattr(self, '_monitoring_id'):
@@ -279,7 +431,7 @@ class WineCharmApp(Gtk.Application):
         self.window.set_title("Wine Charm")
         self.window.set_default_size(420, 560)
         self.window.add_css_class("common-background")
-        
+
         self.headerbar = Gtk.HeaderBar()
         self.headerbar.set_show_title_buttons(True)
         self.headerbar.add_css_class("flat")
@@ -292,7 +444,6 @@ class WineCharmApp(Gtk.Application):
         app_icon_box.append(app_icon)
         self.headerbar.pack_start(app_icon_box)
 
-        # Back button
         self.back_button = Gtk.Button.new_from_icon_name("go-previous-symbolic")
         self.back_button.add_css_class("flat")
         self.back_button.set_visible(False)  # Hide it initially
@@ -356,15 +507,14 @@ class WineCharmApp(Gtk.Application):
 
         self.main_frame = Gtk.Frame()
         self.main_frame.set_margin_top(0)
-        
+
         self.vbox.append(self.main_frame)
 
-        self.scrolled = Gtk.ScrolledWindow()  # Make scrolled an instance variable
+        self.scrolled = Gtk.ScrolledWindow()
         self.scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         self.scrolled.set_vexpand(True)
         self.scrolled.set_hexpand(True)
         self.main_frame.set_child(self.scrolled)
-        #self.scrolled.add_css_class("flowbox-background")
 
         self.flowbox = Gtk.FlowBox()
         self.flowbox.set_valign(Gtk.Align.START)
@@ -382,7 +532,6 @@ class WineCharmApp(Gtk.Application):
         self.window.add_controller(key_controller)
 
         self.create_script_list()
-
 
     def create_menu_model(self):
         menu = Gio.Menu()
@@ -408,7 +557,6 @@ class WineCharmApp(Gtk.Application):
             self.vbox.prepend(self.search_entry_box)
             self.search_entry.grab_focus()
             self.search_active = True
-
 
     def on_search_entry_activated(self, entry):
         search_term = entry.get_text().lower()
@@ -450,43 +598,36 @@ class WineCharmApp(Gtk.Application):
             if file:
                 file_path = file.get_path()
                 self.show_processing_spinner("Processing...")
-                threading.Thread(target=self.process_file, args=(file_path,)).start()
+#                threading.Thread(target=self.process_file, args=(file_path,)).start()
+                self.process_file(file_path)
         except GLib.Error as e:
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                 print(f"An error occurred: {e}")
         finally:
             self.window.set_visible(True)
-        
+
     def on_back_button_clicked(self, button):
-        print("Back button clicked")
-
-        # Restore the script list
         self.create_script_list()
-        
 
-        # Reset the header bar title and visibility of buttons
         self.window.set_title("Wine Charm")
         self.headerbar.set_title_widget(None)
         self.menu_button.set_visible(True)
         self.search_button.set_visible(True)
         self.back_button.set_visible(False)
 
-        # Remove the "Launch" button if it exists
         if hasattr(self, 'launch_button') and self.launch_button.get_parent():
             self.vbox.remove(self.launch_button)
             self.launch_button = None
 
-        # Restore the "Open" button
         if not self.open_button.get_parent():
             self.vbox.prepend(self.open_button)
         self.open_button.set_visible(True)
 
-        # Ensure the correct child is set in the main_frame
         if self.main_frame.get_child() != self.scrolled:
             self.main_frame.set_child(self.scrolled)
 
         self.check_running_processes_and_update_buttons()
-        
+
     def restore_open_button(self):
         if not self.open_button.get_parent():
             self.vbox.prepend(self.open_button)
@@ -501,7 +642,8 @@ class WineCharmApp(Gtk.Application):
             row = self.create_script_row(script)
             if row:
                 self.flowbox.append(row)
-                self.script_buttons[script.stem] = row
+                script_key = self.generate_script_key(script)
+                self.script_buttons[script_key] = row
 
     def create_script_row(self, script):
         exe_file, _, _, _ = self.extract_yaml_info(script)
@@ -536,15 +678,17 @@ class WineCharmApp(Gtk.Application):
 
         button.connect("clicked", lambda btn: self.show_options_for_script(script, button))
 
-        # Store the button in the dictionary using exe_name as the key
-        self.script_buttons[exe_name] = button
+        script_key = self.generate_script_key(script)
+        button.script_key = script_key
 
         return button
 
     def find_row_by_script_stem(self, script_stem):
-        script_label = script_stem.replace('_', ' ')
-        return self.script_buttons.get(script_label)
+        script_key = hashlib.sha256(script_stem.encode()).hexdigest()
+        return self.find_row_by_script_key(script_key)
 
+    def find_row_by_script_key(self, script_key):
+        return self.script_buttons.get(script_key)
 
     def find_python_scripts(self):
         scripts = []
@@ -558,9 +702,77 @@ class WineCharmApp(Gtk.Application):
         return scripts
 
     def show_options_for_script(self, script, row):
-        self.main_frame.set_child(Gtk.Label(label=f"Options for {script.stem}"))
+        self.search_button.set_active(False)
+        self.main_frame.set_child(None)
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled_window.set_vexpand(True)
+
+        options_flowbox = Gtk.FlowBox()
+        options_flowbox.set_valign(Gtk.Align.START)
+        options_flowbox.set_halign(Gtk.Align.FILL)
+        options_flowbox.set_max_children_per_line(4)
+        options_flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        options_flowbox.set_vexpand(True)
+        options_flowbox.set_hexpand(True)
+        scrolled_window.set_child(options_flowbox)
+
+        self.main_frame.set_child(scrolled_window)
+
+        self.options_listbox = options_flowbox
+
+        options = [
+            ("Open Terminal", "utilities-terminal-symbolic", self.open_terminal),
+            ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
+            ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager),
+            ("Delete Wineprefix", "edit-delete-symbolic", self.show_delete_confirmation),
+            ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation),
+            ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
+            ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
+            ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog)
+        ]
+
+        for label, icon_name, callback in options:
+            option_button = Gtk.Button()
+            option_button.set_size_request(390, 36)
+            option_button.add_css_class("flat")
+            option_button.add_css_class("normal-font")
+
+            option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+            option_button.set_child(option_hbox)
+
+            option_icon = Gtk.Image.new_from_icon_name(icon_name)
+            option_label = Gtk.Label(label=label)
+            option_label.set_xalign(0)
+            option_label.set_hexpand(True)
+            option_label.set_ellipsize(Pango.EllipsizeMode.END)
+            option_hbox.append(option_icon)
+            option_hbox.append(option_label)
+
+            options_flowbox.append(option_button)
+
+            option_button.connect(
+                "clicked",
+                lambda btn, cb=callback, sc=script, ob=option_button:
+                self.callback_wrapper(cb, sc, ob)
+            )
+
+        self.headerbar.set_title_widget(self.create_icon_title_widget(script))
+        self.menu_button.set_visible(False)
+        self.search_button.set_visible(False)
+
+        if self.back_button.get_parent() is None:
+            self.headerbar.pack_start(self.back_button)
+        self.back_button.set_visible(True)
+
+        self.open_button.set_visible(False)
+
         self.replace_open_button_with_launch(script, row)
-        self.update_script_button_state(script.stem)
+
+        script_key = self.generate_script_key(script)
+        self.update_script_button_state(script_key)
+
+        self.selected_row = None
 
     def replace_open_button_with_launch(self, script, row):
         if self.open_button.get_parent():
@@ -581,7 +793,6 @@ class WineCharmApp(Gtk.Application):
         self.launch_button.set_child(launch_icon)
         self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(script, self.launch_button, row))
 
-        # Store the script_key associated with this launch button
         self.launch_button_script_key = script_key
 
         self.vbox.prepend(self.launch_button)
@@ -610,14 +821,14 @@ class WineCharmApp(Gtk.Application):
                 shell=True,
                 preexec_fn=os.setsid,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
             )
 
             script_key = self.generate_script_key(script)
             self.running_processes[script_key] = {"row": row, "script": script, "exe_name": exe_name, "pid": process.pid}
 
             play_stop_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
-            play_stop_button.set_tooltip_text("Stop from launch_script")
+            play_stop_button.set_tooltip_text("Stop")
             row.add_css_class("highlighted")
 
         except Exception as e:
@@ -637,13 +848,18 @@ class WineCharmApp(Gtk.Application):
             except Exception as e:
                 print(f"Error terminating script {script}: {e}")
 
-
     def check_running_processes_and_update_buttons(self):
         if not self.monitoring_active:
-                self.stop_monitoring()
-                return False
+            self.stop_monitoring()
+            return False
+
         try:
-            # Retrieve running processes
+            # Get the PIDs of WineCharm processes
+            winecharm_pid_output = subprocess.check_output(["pgrep", "-aif", do_not_kill]).decode()
+            winecharm_pid_lines = winecharm_pid_output.splitlines()
+            winecharm_pids = [int(line.split()[0]) for line in winecharm_pid_lines]
+
+            # Get the list of running .exe processes
             pgrep_output = subprocess.check_output(["pgrep", "-aif", r"\.exe"]).decode().splitlines()
 
             current_running_processes = {}
@@ -652,42 +868,32 @@ class WineCharmApp(Gtk.Application):
                 exe_name = Path(exe_file).name
                 script_key = self.generate_script_key(script)
 
-                matching_processes = [line for line in pgrep_output if exe_name in line]
-                #print(f"exe_name = {exe_name}")
-                #print(f"matching_processes = {matching_processes}")
+                matching_processes = [
+                    line for line in pgrep_output 
+                    if exe_name in line and int(line.split()[0]) not in winecharm_pids
+                ]
 
                 if matching_processes:
-                    for process in matching_processes:
-                        pid = int(process.split()[0])
-                        command_line = process.split(None, 1)[1]
+                    current_running_processes[script_key] = {
+                        "row": self.find_row_by_script_key(script_key),
+                        "script": script,
+                        "exe_name": exe_name,
+                        "pid": int(matching_processes[0].split()[0])
+                    }
 
-                        if exe_name in command_line:
-                            row = self.find_row_by_exe_name(exe_name)
-                            #print(f"Found {row} in matching process")
-                            if row:
-                                current_running_processes[script_key] = {"row": row, "script": script, "exe_name": exe_name, "pid": pid}
+                    if script_key not in self.running_processes:
+                        self.running_processes[script_key] = current_running_processes[script_key]
 
-                                if script_key not in self.running_processes:
-                                    self.running_processes[script_key] = current_running_processes[script_key]
-
-                                row.add_css_class("highlighted")
-
-                                # Only update the launch button if it belongs to this script
-                                if self.launch_button and self.launch_button_script_key == script_key:
-                                    print(f"Setting play button after highlight in if {exe_name}:{pid} in command_line 77777")
-                                    self.update_script_button_state(script.stem)
-                                    self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
-                                    self.launch_button.set_tooltip_text("stop dude")
+                    self.update_script_button_state(script_key)
                 else:
                     self.process_ended(script_key)
 
             self.cleanup_ended_processes(current_running_processes)
 
-        except subprocess.CalledProcessError as e:
+        except subprocess.CalledProcessError:
             pass
-            #print(f"CalledProcessError in check_running_processes_and_update_buttons: {e}")
 
-        return True  # Ensure this returns False to stop any unintended recursion
+        return True  # Continue the monitoring cycle
 
 
     def cleanup_ended_processes(self, current_running_processes):
@@ -696,36 +902,36 @@ class WineCharmApp(Gtk.Application):
                 row = process_info["row"]
                 if row:
                     row.remove_css_class("highlighted")
-                if self.launch_button:
-                    print("Settings play button after highligh in cleanup_ended_processes 44444")
+                if self.launch_button and self.launch_button_script_key == script_key:
                     self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
                     self.launch_button.set_tooltip_text("Play")
                 del self.running_processes[script_key]
 
         self.running_processes = current_running_processes
 
-    def handle_no_processes_found(self):
-        for script_key, process_info in self.running_processes.items():
-            row = process_info["row"]
+    def process_ended(self, script_key):
+        if script_key in self.running_processes:
+            process_info = self.running_processes[script_key]
+            row = process_info.get("row")
+            
             if row:
                 row.remove_css_class("highlighted")
-            if self.launch_button:
-                print("Settings play button after highlight in handle_no_processes_found 55555")
+
+            if self.launch_button and self.launch_button_script_key == script_key:
                 self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-                self.launch_button.set_tooltip_text("Shifa Play")
-                        # Process the lnk files after the process has ended
+                self.launch_button.set_tooltip_text("Play")
+
+            # Process the .lnk files after the process has ended
             script_path = process_info.get("script")
-            print(f"script_path: {script_path}")
             if script_path and script_path.exists():
                 wineprefix = self.extract_yaml_info(script_path)[1]
                 if wineprefix:
-                    wineprefix_path = Path(wineprefix)  # Convert wineprefix to a Path object
+                    wineprefix_path = Path(wineprefix)
                     # Run the script creation in a background thread to avoid blocking the main process
-                    #self.create_scripts_for_lnk_files(wineprefix_path)
-                    print("Launching create_scripts_for_lnk_files...")
-                    #threading.Thread(target=self.create_scripts_for_lnk_files, args=(wineprefix_path,)).start()
+#                    threading.Thread(target=self.create_scripts_for_lnk_files, args=(wineprefix_path,)).start()
                     self.create_scripts_for_lnk_files(wineprefix_path)
-        self.running_processes.clear()
+            del self.running_processes[script_key]
+
 
     def find_row_by_exe_name(self, exe_name):
         return self.script_buttons.get(exe_name)
@@ -748,7 +954,6 @@ class WineCharmApp(Gtk.Application):
             data.get('progname', ''), 
             data.get('args', '')
         )
-
 
     def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False):
         exe_file = Path(exe_path).resolve()
@@ -809,6 +1014,18 @@ class WineCharmApp(Gtk.Application):
         self.add_or_update_script_row(yaml_file_path)
         self.create_script_list()
 
+    def copy_template(self, prefix_dir):
+        try:
+            print(f"Copying default template to {prefix_dir}")
+            shutil.copytree(default_template, prefix_dir, symlinks=True)
+        except shutil.Error as e:
+            for src, dst, err in e.args[0]:
+                if not os.path.exists(dst):
+                    shutil.copy2(src, dst)
+                else:
+                    print(f"Skipping {src} -> {dst} due to error: {err}")
+        except Exception as e:
+            print(f"Error copying template: {e}")
 
     def add_or_update_script_row(self, script_path):
         script_name = script_path.stem.replace("_", " ")
@@ -856,6 +1073,44 @@ class WineCharmApp(Gtk.Application):
 
         return icon_path if icon_path.exists() else None
 
+    def create_desktop_entry(self, progname, script_path, icon_path, wineprefix):
+        return  # Do not create desktop entry
+
+        desktop_file_content = f"""[Desktop Entry]
+    Name={progname}
+    Type=Application
+    Exec=wine '{script_path}'
+    Icon={icon_path if icon_path else 'wine'}
+    Keywords=winecharm; game; {progname};
+    NoDisplay=false
+    StartupNotify=true
+    Terminal=false
+    Categories=Game;Utility;
+    """
+        desktop_file_path = wineprefix / f"{progname}.desktop"
+
+        try:
+            # Write the desktop entry to the specified path
+            with open(desktop_file_path, "w") as desktop_file:
+                desktop_file.write(desktop_file_content)
+
+            # Create a symlink to the desktop entry in the applications directory
+            symlink_path = applicationsdir / f"{progname}.desktop"
+            if symlink_path.exists() or symlink_path.is_symlink():
+                symlink_path.unlink()
+            symlink_path.symlink_to(desktop_file_path)
+
+            # Create a symlink to the icon in the icons directory if it exists
+            if icon_path:
+                icon_symlink_path = iconsdir / f"{icon_path.name}"
+                if icon_symlink_path.exists() or icon_symlink_path.is_symlink():
+                    icon_symlink_path.unlink(missing_ok=True)
+                icon_symlink_path.symlink_to(icon_path)
+
+            print(f"Desktop entry created: {desktop_file_path}")
+        except Exception as e:
+            print(f"Error creating desktop entry: {e}")
+
     def find_lnk_files(self, wineprefix):
         drive_c = wineprefix / "drive_c"
         lnk_files = []
@@ -894,9 +1149,9 @@ class WineCharmApp(Gtk.Application):
     def create_scripts_for_lnk_files(self, wineprefix):
         lnk_files = self.find_lnk_files(wineprefix)
         exe_files = self.extract_exe_files_from_lnk(lnk_files, wineprefix)
-        
+
         product_name_map = {}
-        
+
         for exe_file in exe_files:
             product_name = self.get_product_name(exe_file)
             if product_name:
@@ -905,7 +1160,7 @@ class WineCharmApp(Gtk.Application):
                 product_name_map[product_name].append(exe_file)
             else:
                 self.create_yaml_file(exe_file, wineprefix)
-        
+
         for product_name, exe_files in product_name_map.items():
             for exe_file in exe_files:
                 if len(exe_files) > 1:
@@ -929,89 +1184,8 @@ class WineCharmApp(Gtk.Application):
                     exe_path = self.find_exe_path(wineprefix, exe_name)
                     if exe_path and "unins" not in exe_path.stem.lower():
                         exe_files.append(exe_path)
-                        self.add_lnk_file_to_processed(wineprefix, lnk_file)  # Track the .lnk file, not the .exe file
+                        self.add_lnk_file_to_processed(wineprefix, lnk_file)
         return exe_files
-
-    def show_options_for_script(self, script, row):
-        # Ensure the search button is toggled off and the search entry is cleared
-        self.search_button.set_active(False)
-        self.main_frame.set_child(None)
-        #self.monitoring_active = True
-        scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scrolled_window.set_vexpand(True)
-
-        options_flowbox = Gtk.FlowBox()
-        options_flowbox.set_valign(Gtk.Align.START)
-        options_flowbox.set_halign(Gtk.Align.FILL)
-        options_flowbox.set_max_children_per_line(4)
-        options_flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        options_flowbox.set_vexpand(True)
-        options_flowbox.set_hexpand(True)
-        scrolled_window.set_child(options_flowbox)
-
-        self.main_frame.set_child(scrolled_window)
-
-        # Initialize or replace self.options_listbox with the current options_flowbox
-        self.options_listbox = options_flowbox
-
-        # Replace the previous 'options' list with this simplified version
-        options = [
-            ("Open Terminal", "utilities-terminal-symbolic", self.open_terminal),
-            ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
-            ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager),
-            ("Delete Wineprefix", "edit-delete-symbolic", self.show_delete_confirmation),
-            ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation),
-            ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
-            ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
-            ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog)
-        ]
-
-        for label, icon_name, callback in options:
-            option_button = Gtk.Button()
-            option_button.set_size_request(390, 36)
-            option_button.add_css_class("flat")
-            option_button.add_css_class("normal-font")
-
-            option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-            option_button.set_child(option_hbox)
-
-            option_icon = Gtk.Image.new_from_icon_name(icon_name)
-            option_label = Gtk.Label(label=label)
-            option_label.set_xalign(0)
-            option_label.set_hexpand(True)
-            option_label.set_ellipsize(Pango.EllipsizeMode.END)
-            option_hbox.append(option_icon)
-            option_hbox.append(option_label)
-
-            # Simplified connect statement
-            options_flowbox.append(option_button)
-
-            option_button.connect(
-                "clicked",
-                lambda btn, cb=callback, sc=script, ob=option_button:
-                self.callback_wrapper(cb, sc, ob)
-            )
-
-        # Set the header bar title to the script's icon and name
-        self.headerbar.set_title_widget(self.create_icon_title_widget(script))
-        self.menu_button.set_visible(False)
-        self.search_button.set_visible(False)
-
-        # Ensure the back button is added and visible
-        if self.back_button.get_parent() is None:
-            self.headerbar.pack_start(self.back_button)
-        self.back_button.set_visible(True)
-
-        # Remove the "Open" button
-        self.open_button.set_visible(False)
-
-        # Replace the "Open" button with the "Launch" button
-        self.replace_open_button_with_launch(script, row)
-
-        # Call update_execute_button_icon only after options_listbox is set up
-        self.update_execute_button_icon(script)
-        self.selected_row = None
 
     def open_terminal(self, script, *args):
         wineprefix = Path(script).parent
@@ -1103,7 +1277,6 @@ class WineCharmApp(Gtk.Application):
                     self.change_icon(script, file_path)
                 elif suffix in [".exe", ".msi"]:
                     self.extract_and_change_icon(script, file_path)
-                # Update the icon in the title bar
                 self.headerbar.set_title_widget(self.create_icon_title_widget(script))
         except GLib.Error as e:
             print(f"An error occurred: {e}")
@@ -1146,38 +1319,18 @@ class WineCharmApp(Gtk.Application):
         hbox.append(label)
 
         return hbox
-        
+
     def callback_wrapper(self, callback, script, button=None, *args):
-        # Check the method signature of the callback to determine what to pass
         callback_params = callback.__code__.co_varnames
 
-        # If both 'option_button' and 'button' are expected
         if 'option_button' in callback_params and 'button' in callback_params:
             return callback(script, button, button, *args)
-        # If only 'button' is expected
         elif 'button' in callback_params:
             return callback(script, button)
-        # If only 'option_button' is expected
         elif 'option_button' in callback_params:
             return callback(script, button)
-        # If neither 'button' nor 'option_button' is expected, just pass the script
         else:
             return callback(script)
-
-    def update_execute_button_icon(self, script):
-        for child in self.options_listbox:
-            box = child.get_child()
-            widget = box.get_first_child()
-            while widget:
-                if isinstance(widget, Gtk.Button) and widget.get_tooltip_text() == "Run or stop the script":
-                    play_stop_button = widget
-                    if script.stem in self.running_processes:
-                        play_stop_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
-                        play_stop_button.set_tooltip_text("Stop")
-                    else:
-                        play_stop_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-                        play_stop_button.set_tooltip_text("Run or stop the script")
-                widget = widget.get_next_sibling()
 
     def run_winetricks_script(self, script_name, wineprefix):
         command = f"WINEPREFIX={shlex.quote(str(wineprefix))} winetricks {script_name}"
@@ -1191,7 +1344,6 @@ class WineCharmApp(Gtk.Application):
         parent = button.get_parent()
 
         if isinstance(parent, Gtk.FlowBoxChild):
-            # Create the overlay and the confirmation box
             overlay = Gtk.Overlay()
 
             confirmation_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -1222,7 +1374,6 @@ class WineCharmApp(Gtk.Application):
         parent = button.get_parent()
 
         if isinstance(parent, Gtk.FlowBoxChild):
-            # Create the overlay and the entry box
             overlay = Gtk.Overlay()
 
             entry_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -1233,7 +1384,6 @@ class WineCharmApp(Gtk.Application):
             entry_label = Gtk.Label(label=prompt_text)
             entry_box.append(entry_label)
 
-            # Get the current name for renaming or arguments for pre-filling the entry
             if rename:
                 _, _, progname, _ = self.extract_yaml_info(script)
                 entry = Gtk.Entry()
@@ -1242,8 +1392,8 @@ class WineCharmApp(Gtk.Application):
                 exe_file, wineprefix, progname, script_args = self.extract_yaml_info(script)
                 entry = Gtk.Entry()
                 entry.set_text(script_args or "-opengl -SkipBuildPatchPrereq")
-            
-            entry.select_region(0, -1)  # Select all the text in the entry
+
+            entry.select_region(0, -1)
             entry.set_hexpand(True)
             entry_box.append(entry)
 
@@ -1264,12 +1414,76 @@ class WineCharmApp(Gtk.Application):
             overlay.set_child(entry_box)
             parent.set_child(overlay)
 
-            # Connect cancel and ok button actions
             cancel_button.connect("clicked", self.on_cancel_button_clicked, parent, button)
             if rename:
                 ok_button.connect("clicked", lambda btn: self.on_ok_rename_button_clicked(parent, button, entry, script))
             else:
                 ok_button.connect("clicked", lambda btn: self.on_ok_button_clicked(parent, button, entry, script))
+
+    def on_ok_rename_button_clicked(self, parent, original_button, entry, script):
+        new_name = entry.get_text().strip()
+
+        if not new_name:
+            print("Error: New name cannot be empty")
+            return
+
+        old_script_path = Path(script)
+        new_script_path = old_script_path.with_name(f"{new_name.replace(' ', '_')}.charm")
+
+        try:
+            # Rename the script file
+            old_script_path.rename(new_script_path)
+
+            # Optionally, you can update other related files or entries if needed
+            self.update_yaml_progname(new_script_path, new_name)
+
+            # Update the UI to reflect the new name
+            self.create_script_list()
+            parent.set_child(original_button)
+            original_button.set_sensitive(True)
+
+        except Exception as e:
+            print(f"Error renaming script: {e}")
+            parent.set_child(original_button)
+            original_button.set_sensitive(True)
+
+    def update_yaml_progname(self, script_path, new_progname):
+        # Load the existing YAML data
+        with open(script_path, 'r') as file:
+            data = yaml.safe_load(file)
+
+        # Update the progname in the YAML data
+        data['progname'] = new_progname
+
+        # Save the updated YAML data back to the file
+        with open(script_path, 'w') as file:
+            yaml.safe_dump(data, file)
+
+    def on_ok_button_clicked(self, parent, original_button, entry, script):
+        # Get the entered arguments
+        args = entry.get_text().strip()
+
+        # Update the YAML file with the new arguments
+        self.update_yaml_args(script, args)
+
+        # Restore the original button in the UI
+        parent.set_child(original_button)
+        original_button.set_sensitive(True)
+        
+        # Ensure the script list is updated after changes
+        self.create_script_list()
+
+    def update_yaml_args(self, script, args):
+        # Load the existing YAML data
+        with open(script, 'r') as file:
+            data = yaml.safe_load(file)
+
+        # Update the arguments in the YAML data
+        data['args'] = args
+
+        # Save the updated YAML data back to the file
+        with open(script, 'w') as file:
+            yaml.safe_dump(data, file)
 
     def show_processing_spinner(self, message="Processing..."):
         self.spinner = Gtk.Spinner()
@@ -1302,7 +1516,7 @@ class WineCharmApp(Gtk.Application):
     def process_file(self, file_path):
         try:
             abs_file_path = str(Path(file_path).resolve())
-            print(f"Resolved absolute file path: {abs_file_path}")  # Debugging output
+            print(f"Resolved absolute file path: {abs_file_path}")
 
             if not Path(abs_file_path).exists():
                 print(f"File does not exist: {abs_file_path}")
@@ -1318,31 +1532,26 @@ class WineCharmApp(Gtk.Application):
     def on_confirm_action(self, button, script, action_type, parent, original_button):
         try:
             if action_type == "wineprefix":
-                # Delete the wineprefix directory
                 wineprefix = Path(script).parent
                 if wineprefix.exists() and wineprefix.is_dir():
                     shutil.rmtree(wineprefix)
                     print(f"Deleted wineprefix: {wineprefix}")
-                    
+
             elif action_type == "shortcut":
-                # Delete the shortcut file
                 shortcut_file = script
                 if shortcut_file.exists() and shortcut_file.is_file():
                     os.remove(shortcut_file)
                     print(f"Deleted shortcut: {shortcut_file}")
-                    
+
         except Exception as e:
             print(f"Error during deletion: {e}")
         finally:
-            # Restore the original button
             parent.set_child(original_button)
             original_button.set_sensitive(True)
 
-            # Go back to the previous view
             self.on_back_button_clicked(None)
 
     def on_cancel_button_clicked(self, button, parent, original_button):
-        # Restore the original button as the child of the FlowBoxChild
         parent.set_child(original_button)
         original_button.set_sensitive(True)
 
@@ -1359,7 +1568,7 @@ class WineCharmApp(Gtk.Application):
         except subprocess.CalledProcessError as e:
             print(f"Error executing command: {e.stderr}")
             return None
-    
+
     def find_exe_path(self, wineprefix, exe_name):
         drive_c = Path(wineprefix) / "drive_c"
         for root, dirs, files in os.walk(drive_c):
@@ -1381,107 +1590,60 @@ class WineCharmApp(Gtk.Application):
             productname_match = re.search(r'Product Name\s+:\s+(.+)', product_output)
             return productname_match.group(1).strip() if productname_match else None
 
-    def process_ended(self, script_key):
-        process_info = self.running_processes.get(script_key)
+    def start_socket_server(self):
+        def server_thread():
+            if SOCKET_FILE.exists():
+                SOCKET_FILE.unlink()
+            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
+                server.bind(str(SOCKET_FILE))
+                server.listen()
+                while True:
+                    conn, _ = server.accept()
+                    with conn:
+                        message = conn.recv(1024).decode()
+                        if message:
+                            cwd, file_path = message.split("||")
+                            base_path = Path(cwd)
+                            pattern = file_path.split("/")[-1]
+                            directory = "/".join(file_path.split("/")[:-1])
+                            search_path = base_path / directory
 
-        if process_info:
-            row = process_info.get("row")
-            if row:
-                row.remove_css_class("highlighted")
+                            if not search_path.exists():
+                                print(f"Directory does not exist: {search_path}")
+                                continue
 
-            if self.launch_button:
-                print("Settings play button after highlight in process_ended 66666")
-                self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-                self.launch_button.set_tooltip_text("Play")
+                            abs_file_paths = list(search_path.glob(pattern))
+                            if abs_file_paths:
+                                for abs_file_path in abs_file_paths:
+                                    if abs_file_path.exists():
+                                        print(f"Resolved absolute file path: {abs_file_path}")
+                                        GLib.idle_add(self.process_cli_file, str(abs_file_path))
+                                    else:
+                                        print(f"File does not exist: {abs_file_path}")
+                            else:
+                                print(f"No files matched the pattern: {file_path}")
 
-            # Process the lnk files after the process has ended
-            script_path = process_info.get("script")
-            if script_path and script_path.exists():
-                wineprefix = self.extract_yaml_info(script_path)[1]
-                if wineprefix:
-                    wineprefix_path = Path(wineprefix)  # Convert wineprefix to a Path object
-                    # Run the script creation in a background thread to avoid blocking the main process
-                    #threading.Thread(target=self.create_scripts_for_lnk_files, args=(wineprefix_path,)).start()
-                    print("self.create_scripts_for_lnk_files(wineprefix_path) process_ended")
-                    self.create_scripts_for_lnk_files(wineprefix_path)
-            # Ensure no further process check is triggered
-            if script_key in self.running_processes:
-                del self.running_processes[script_key]
+        threading.Thread(target=server_thread, daemon=True).start()
 
+    def process_cli_file(self, file_path):
+        self.show_processing_spinner("Processing")
+        threading.Thread(target=self._process_cli_file, args=(file_path,)).start()
 
+    def _process_cli_file(self, file_path):
+        print(f"Processing CLI file: {file_path}")
+        abs_file_path = str(Path(file_path).resolve())
+        print(f"Resolved absolute CLI file path: {abs_file_path}")
 
-
-
-    def copy_template(self, prefix_dir):
         try:
-            print(f"Copying default template to {prefix_dir}")
-            shutil.copytree(default_template, prefix_dir, symlinks=True)
-        except shutil.Error as e:
-            for src, dst, err in e.args[0]:
-                if not os.path.exists(dst):
-                    shutil.copy2(src, dst)
-                else:
-                    print(f"Skipping {src} -> {dst} due to error: {err}")
+            if not Path(abs_file_path).exists():
+                print(f"File does not exist: {abs_file_path}")
+                return
+            self.create_yaml_file(abs_file_path, None)
+            GLib.idle_add(self.create_script_list)
         except Exception as e:
-            print(f"Error copying template: {e}")
-
-    def create_desktop_entry(self, progname, script_path, icon_path, wineprefix):
-        return; # do not create
-        desktop_file_content = f"""[Desktop Entry]
-    Name={progname}
-    Type=Application
-    Exec=wine '{script_path}'
-    Icon={icon_path if icon_path else 'wine'}
-    Keywords=winecharm; game; {progname};
-    NoDisplay=false
-    StartupNotify=true
-    Terminal=false
-    Categories=Game;Utility;
-    """
-        desktop_file_path = wineprefix / f"{progname}.desktop"
-        
-        try:
-            # Write the desktop entry to the specified path
-            with open(desktop_file_path, "w") as desktop_file:
-                desktop_file.write(desktop_file_content)
-
-            # Create a symlink to the desktop entry in the applications directory
-            symlink_path = applicationsdir / f"{progname}.desktop"
-            if symlink_path.exists() or symlink_path.is_symlink():
-                symlink_path.unlink()
-            symlink_path.symlink_to(desktop_file_path)
-
-            # Create a symlink to the icon in the icons directory if it exists
-            if icon_path:
-                icon_symlink_path = iconsdir / f"{icon_path.name}"
-                if icon_symlink_path.exists() or icon_symlink_path.is_symlink():
-                    icon_symlink_path.unlink(missing_ok=True)
-                icon_symlink_path.symlink_to(icon_path)
-
-            print(f"Desktop entry created: {desktop_file_path}")
-        except Exception as e:
-            print(f"Error creating desktop entry: {e}")
-
-
-
-
-
-######## Refine
-
-
-
-
-
-
-
-###################################################################################################
-
-
-
-
-
-###################################################################################################
-
+            print(f"Error processing file: {e}")
+        finally:
+            GLib.idle_add(self.hide_processing_spinner)
 
 
 
@@ -1490,6 +1652,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="WineCharm GUI application")
     parser.add_argument('file', nargs='?', help="Path to the .exe or .msi file")
     return parser.parse_args()
+
 
 def main():
     args = parse_args()
@@ -1501,7 +1664,6 @@ def main():
             try:
                 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
                     client.connect(str(SOCKET_FILE))
-                    # Send both the current working directory and the file path
                     message = f"{os.getcwd()}||{args.file}"
                     client.sendall(message.encode())
                     print(f"Sent file path to existing instance: {args.file}")
@@ -1513,7 +1675,6 @@ def main():
 
         app.command_line_file = args.file
 
-    # Ensure the socket server is started before the app runs
     app.start_socket_server()
 
     app.run(sys.argv)
@@ -1524,3 +1685,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
