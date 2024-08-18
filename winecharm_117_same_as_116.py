@@ -409,14 +409,14 @@ class WineCharmApp(Gtk.Application):
         self.window.add_controller(focus_controller)
 
     def on_focus_in(self, controller):
-        print("Focus In")
+        
         # Reset count
         self.count = 0
         
         # Delay before starting monitoring to prevent immediate lag
-#        GLib.timeout_add_seconds(2, self.start_monitoring)
+        GLib.timeout_add_seconds(2, self.start_monitoring)
+
         self.monitoring_active = True
-        self.start_monitoring()
 
         # Recheck processes and update the UI
         self.check_running_processes_and_update_buttons()
@@ -430,19 +430,27 @@ class WineCharmApp(Gtk.Application):
         self.monitoring_active = False
 
 
+    def delayed_start_monitoring(self):
+        # Start monitoring
+        self.start_monitoring()
+
+        # Recheck processes and update the UI
+        self.check_running_processes_and_update_buttons()
+
+        # Ensure any ended processes are cleaned up
+        current_running_processes = self.get_running_processes()
+        self.cleanup_ended_processes(current_running_processes)
+        
+        return False  # Ensure this is only run once
+
     def start_monitoring(self, delay=2):
         self.stop_monitoring()  # Ensure the old monitoring is stopped before starting a new one
         self._monitoring_id = GLib.timeout_add_seconds(delay, self.check_running_processes_and_update_buttons)
 
     def stop_monitoring(self):
-        if hasattr(self, '_monitoring_id') and self._monitoring_id is not None:
-            try:
-                if GLib.source_remove(self._monitoring_id):
-                    self._monitoring_id = None
-            except ValueError:
-                print(f"Warning: Attempted to remove a non-existent or already removed source ID {_monitoring_id}")
-                self._monitoring_id = None
-
+        if hasattr(self, '_monitoring_id'):
+            GLib.source_remove(self._monitoring_id)
+            del self._monitoring_id
 
     def handle_sigint(self, signum, frame):
         if SOCKET_FILE.exists():
@@ -852,6 +860,14 @@ class WineCharmApp(Gtk.Application):
             self.stop_monitoring()
             return False
 
+        #print("monitoring")
+        
+        # Introduce a delay before checking running processes and updating buttons
+        GLib.timeout_add_seconds(2, self._delayed_check_running_processes)
+
+        return True
+
+    def _delayed_check_running_processes(self):
         current_running_processes = self.get_running_processes()
         self.cleanup_ended_processes(current_running_processes)
 
@@ -861,9 +877,9 @@ class WineCharmApp(Gtk.Application):
         else:
             self.count += 1
             #print(f"Monitoring continues, count: {self.count}")
-            
 
-        return False
+        return False  # This ensures the delayed check runs only once
+
 
 
     def get_running_processes(self):
@@ -929,7 +945,8 @@ class WineCharmApp(Gtk.Application):
         print(current_running_processes)
         return current_running_processes
 
-        
+
+
     def update_ui_for_running_process(self, exe_name, row, current_running_processes):
         """
         Update the UI to reflect the state of a running process.
@@ -949,25 +966,37 @@ class WineCharmApp(Gtk.Application):
             self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
             self.launch_button.set_tooltip_text("Stop")
 
-
     def cleanup_ended_processes(self, current_running_processes):
-        if not self.monitoring_active:
-                self.stop_monitoring()
-                return False
+        processes_to_remove = []
+
         for exe_name, process_info in list(self.running_processes.items()):
             if exe_name not in current_running_processes:
                 row = process_info["row"]
                 if row:
+                    # Remove the highlight from the row
                     row.remove_css_class("highlighted")
-                if self.launch_button:
+                
+                if self.launch_button and self.launch_button_exe_name == exe_name:
+                    # Reset the launch button to its default state
                     self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
                     self.launch_button.set_tooltip_text("Play")
-                del self.running_processes[exe_name]
+                    self.launch_button_exe_name = None
+                
+                processes_to_remove.append(exe_name)
+
+        for exe_name in processes_to_remove:
+            del self.running_processes[exe_name]
 
         self.running_processes = current_running_processes
-            
-    def find_row_by_exe_name(self, exe_name):
-        return self.script_buttons.get(exe_name)
+
+        # If there are no running processes left, ensure the launch button and row are reset
+#        if not self.running_processes:
+#            print("self.check_running_processes_and_update_buttons()")
+#            self.check_running_processes_and_update_buttons()
+#            print("stop monitoring...")
+#            self.stop_monitoring()
+
+
             
     def find_row_by_exe_name(self, exe_name):
         return self.script_buttons.get(exe_name)
@@ -1177,7 +1206,7 @@ class WineCharmApp(Gtk.Application):
     def show_options_for_script(self, script, row):
         # Ensure the search button is toggled off and the search entry is cleared
         self.search_button.set_active(False)
-        #self.stop_monitoring() #
+        self.stop_monitoring() #
         self.main_frame.set_child(None)
         scrolled_window = Gtk.ScrolledWindow()
         scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
@@ -1755,11 +1784,6 @@ class WineCharmApp(Gtk.Application):
             print(f"Error processing file: {e}")
         finally:
             GLib.idle_add(self.hide_processing_spinner)
-
-
-
-
-
 
 
 def parse_args():

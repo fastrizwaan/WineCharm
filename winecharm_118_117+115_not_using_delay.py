@@ -414,9 +414,7 @@ class WineCharmApp(Gtk.Application):
         self.count = 0
         
         # Delay before starting monitoring to prevent immediate lag
-#        GLib.timeout_add_seconds(2, self.start_monitoring)
-        self.monitoring_active = True
-        self.start_monitoring()
+        GLib.timeout_add_seconds(2, self.start_monitoring)
 
         # Recheck processes and update the UI
         self.check_running_processes_and_update_buttons()
