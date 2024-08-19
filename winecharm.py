@@ -16,6 +16,8 @@ import socket
 import time
 import glob
 
+from datetime import datetime
+
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
@@ -1851,38 +1853,6 @@ class WineCharmApp(Gtk.Application):
         print("Spinner hidden.")
 
 
-    def on_open(self, app, files, *args):
-        # Ensure the application is fully initialized
-        print("1. on_open method called")
-        self.initialize_app()
-        print("2. self.initialize_app Complete")
-        self.window.present()
-        GLib.idle_add(self.window.present)
-        print("3. self.window.present() Complete")
-        
-        if default_template.exists():
-            print("Yes default_template.exists")
-        else:
-            print("No default_template.exists")
- 
-        if not default_template.exists():
-            self.initialize_template(default_template, self.on_template_initialized)  
-        self.show_processing_spinner()
-        if self.command_line_file:
-             self.show_processing_spinner()
-             self.process_cli_file(self.command_line_file)
-        
-        print("sleeping 5 seconds, no window :(")
-        time.sleep(5)    
-        
-        self.hide_processing_spinner()    
-        print("why is window showing up after all of methods are ended?")
-
-        return False  # Returning False to ensure this function doesn't run again
-
-
-#######################333
-
 
     def on_open(self, app, files, *args):
         # Ensure the application is fully initialized
@@ -1913,16 +1883,84 @@ class WineCharmApp(Gtk.Application):
         # Hide the spinner once processing is complete
         GLib.timeout_add_seconds(1, self.hide_processing_spinner)
 
-        print("why is window showing up after all methods are ended?")
         return False  # Returning False to ensure this function doesn't run again
 
+# bug, no exe and no templates, will copy incomolete template, so wait for template to initialize
+
+
+    def on_open(self, app, files, *args):
+        print("1. on_open method called")
+
+        # Ensure the window is created and shown first
+        if not hasattr(self, 'window') or not self.window:
+            self.create_main_window()
+
+        # Show the window immediately
+        self.window.present()
+        print("2. Window created and shown")
+
+        # Proceed with initialization in the background
+        GLib.idle_add(self.initialize_app)
+
+        # If the template needs to be initialized, handle that next
+        if not default_template.exists():
+            print("No default_template exists, initializing template.")
+            GLib.idle_add(self.initialize_template, default_template, self.on_template_initialized)
+        else:
+            GLib.idle_add(self.show_processing_spinner)
+            # If template exists, immediately process the CLI file if provided
+            if self.command_line_file:
+                GLib.idle_add(self.process_cli_file, self.command_line_file)
+
+        print("3. Finished on_open method")
+        GLib.timeout_add_seconds(1, self.hide_processing_spinner)
+
+
+    def on_template_initialized(self):
+        print("Template initialization complete.")
+        self.initializing_template = False
+        
+        # Ensure the spinner is stopped after initialization
+        self.hide_processing_spinner()
+        
+        # Write the current date and time to "initialized.txt"
+        initialized_file = default_template / "initialized.txt"
+        with open(initialized_file, "w") as f:
+            f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        
+        # Check if there's a CLI file to process after initialization
+        #if self.command_line_file:
+        #    self.process_cli_file(self.command_line_file)
+        #    self.command_line_file = None  # Reset after processing
+
+        # Update the UI now that the template is initialized
+        #self.window.present()
+
+
+    def copy_template(self, prefix_dir):
+
+        try:
+            initialized_file = default_template / "initialized.txt"
+
+            if not initialized_file.exists():
+                print(f"{initialized_file} does not exists, skipping template copy.")
+                return
+
+            print(f"Copying default template to {prefix_dir}")
+            shutil.copytree(default_template, prefix_dir, symlinks=True)
+        except shutil.Error as e:
+            for src, dst, err in e.args[0]:
+                if not os.path.exists(dst):
+                    shutil.copy2(src, dst)
+                else:
+                    print(f"Skipping {src} -> {dst} due to error: {err}")
+        except Exception as e:
+            print(f"Error copying template: {e}")
 
 
 
-
-
-
-
+#### spinner shown for initializing template, and separately for process_cli
+## Bug: no template + no exe will only show template initialization spinner, but no script is created.
 
 
 
