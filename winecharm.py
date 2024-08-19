@@ -864,7 +864,7 @@ class WineCharmApp(Gtk.Application):
 
         if not current_running_processes or self.count >= 3:
             self.stop_monitoring()
-            print("Monitoring stopped due to no processes or max count reached")
+            #print("Monitoring stopped due to no processes or max count reached")
         else:
             self.count += 1
             #print(f"Monitoring continues, count: {self.count}")
@@ -933,7 +933,7 @@ class WineCharmApp(Gtk.Application):
             # Reset count
             self.count = 0
 
-        print(current_running_processes)
+        #print(current_running_processes)
         return current_running_processes
 
         
@@ -1723,15 +1723,45 @@ class WineCharmApp(Gtk.Application):
 
         threading.Thread(target=server_thread, daemon=True).start()
 
+### waste?
+    def on_open(self, app, files, *args):
+        print("1. on_open method called")
 
+        # Ensure the window is created and shown first
+        if not hasattr(self, 'window') or not self.window:
+            self.create_main_window()
+
+        # Show the window immediately
+        self.window.present()
+        print("2. Window created and shown")
+
+        # Proceed with initialization in the background
+        GLib.idle_add(self.initialize_app)
+
+        # If the template needs to be initialized, handle that next
+        if not default_template.exists():
+            print("No default_template exists, initializing template.")
+            GLib.idle_add(self.initialize_template, default_template, self.on_template_initialized)
+        else:
+            GLib.idle_add(self.show_processing_spinner)
+            # If template exists, immediately process the CLI file if provided
+            print("- - -  - -  - - -  - - - - - ")
+            GLib.idle_add(self.show_processing_spinner)
+            if self.command_line_file:
+                GLib.idle_add(self.process_cli_file, self.command_line_file)
+
+        print("3. Finished on_open method")
+        GLib.timeout_add_seconds(1, self.hide_processing_spinner)
+#### /waste
 #-------------------------------
     def handle_cli_file(self, file_path):
         #self.on_activate()
         self.create_main_window()
         self.create_script_list()
+        print("11111111111111111111111")
+        self.show_processing_spinner("Processing...")
         try:
             if file_path:
-                #self.show_processing_spinner("Processing...")
                 threading.Thread(target=self.process_file, args=(file_path,)).start()
         except GLib.Error as e:
             print(f"An error occurred: {e}")
@@ -1869,17 +1899,24 @@ class WineCharmApp(Gtk.Application):
         # Check for template existence asynchronously
         if not default_template.exists():
             print("No default_template.exists")
+            self.hide_processing_spinner()
             GLib.idle_add(self.initialize_template, default_template, self.on_template_initialized)
+            print("44444444444444444444444444444444444444444444444")
+            GLib.idle_add(self.show_processing_spinner, "Initializing babau")
+
         else:
             print("Yes default_template.exists")
 
-        # Show the processing spinner immediately
-        GLib.idle_add(self.show_processing_spinner)
+            # Show the processing spinner immediately
+            print("3333333333333333333333333333333333333333333333")
+            GLib.idle_add(self.show_processing_spinner, "Process me babau")
 
         # Process the command-line file if provided
+        print("========")
         if self.command_line_file:
+            print("====process cli file====")
+            self.hide_processing_spinner()
             GLib.idle_add(self.process_cli_file, self.command_line_file)
-
         # Hide the spinner once processing is complete
         GLib.timeout_add_seconds(1, self.hide_processing_spinner)
 
@@ -1887,33 +1924,8 @@ class WineCharmApp(Gtk.Application):
 
 # bug, no exe and no templates, will copy incomolete template, so wait for template to initialize
 
+# Bug Remains template+exe initializing... not showing up
 
-    def on_open(self, app, files, *args):
-        print("1. on_open method called")
-
-        # Ensure the window is created and shown first
-        if not hasattr(self, 'window') or not self.window:
-            self.create_main_window()
-
-        # Show the window immediately
-        self.window.present()
-        print("2. Window created and shown")
-
-        # Proceed with initialization in the background
-        GLib.idle_add(self.initialize_app)
-
-        # If the template needs to be initialized, handle that next
-        if not default_template.exists():
-            print("No default_template exists, initializing template.")
-            GLib.idle_add(self.initialize_template, default_template, self.on_template_initialized)
-        else:
-            GLib.idle_add(self.show_processing_spinner)
-            # If template exists, immediately process the CLI file if provided
-            if self.command_line_file:
-                GLib.idle_add(self.process_cli_file, self.command_line_file)
-
-        print("3. Finished on_open method")
-        GLib.timeout_add_seconds(1, self.hide_processing_spinner)
 
 
     def on_template_initialized(self):
@@ -1929,23 +1941,25 @@ class WineCharmApp(Gtk.Application):
             f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         
         # Check if there's a CLI file to process after initialization
-        #if self.command_line_file:
-        #    self.process_cli_file(self.command_line_file)
-        #    self.command_line_file = None  # Reset after processing
-
+        if self.command_line_file:
+            print("Trying to process file inside on template initialized")
+            print("2222222222222222222222222222222222222222222222222222")
+            GLib.idle_add(self.show_processing_spinner)
+            self.process_cli_file(self.command_line_file)
+            self.command_line_file = None  # Reset after processing
+            GLib.timeout_add_seconds(1, self.hide_processing_spinner)
         # Update the UI now that the template is initialized
         #self.window.present()
 
 
     def copy_template(self, prefix_dir):
-
         try:
             initialized_file = default_template / "initialized.txt"
 
             if not initialized_file.exists():
                 print(f"{initialized_file} does not exists, skipping template copy.")
                 return
-
+            print("==========================================")
             print(f"Copying default template to {prefix_dir}")
             shutil.copytree(default_template, prefix_dir, symlinks=True)
         except shutil.Error as e:
