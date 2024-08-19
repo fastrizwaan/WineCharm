@@ -1783,9 +1783,6 @@ class WineCharmApp(Gtk.Application):
 
 #-------------------------------
     def handle_cli_file(self, file_path):
-        #self.on_activate()
-        self.create_main_window()
-        self.create_script_list()
         try:
             if file_path:
                 self.show_processing_spinner("Processing...")
@@ -1793,7 +1790,7 @@ class WineCharmApp(Gtk.Application):
         except GLib.Error as e:
             print(f"An error occurred: {e}")
         finally:
-            self.window.present()
+            self.window.set_visible(True)
 
     def on_open(self, app, files, *args):
         parsed_args = parse_args()
@@ -1817,207 +1814,16 @@ class WineCharmApp(Gtk.Application):
             child = child.get_next_sibling()
         
         
-    def on_open(self, app, files, *args):
-        parsed_args = parse_args()
-        
-        if not self.window:
-                self.on_startup(self)
-                self.on_activate(self)
-        self.set_dynamic_variables()
-        # Ensure the normal initialization process is followed
-        #self.on_startup(None)
-
-
-        if parsed_args.file:
-            # Simulate the file being opened as if it was through the file dialog
-            self.handle_cli_file(parsed_args.file)
-
-
-    def initialize_app(self):
-        if not hasattr(self, 'window') or not self.window:
-            # Call the startup code
-            self.create_main_window()
-            self.create_script_list()
-            self.check_running_processes_and_update_buttons()
-            
-            missing_programs = self.check_required_programs()
-            if missing_programs:
-                self.show_missing_programs_dialog(missing_programs)
-            else:
-                if not default_template.exists():
-                    self.initialize_template(default_template, self.on_template_initialized)
-                else:
-                    self.set_dynamic_variables()
-
-
-
-    def on_open(self, app, files, *args):
-        # Ensure the normal initialization process is followed
-        self.initialize_app()
-        
-        # Ensure dynamic variables are set
-        self.set_dynamic_variables()
-
-        parsed_args = parse_args()
-
-        if parsed_args.file:
-            # Simulate the file being opened as if it was through the file dialog
-            self.handle_cli_file(parsed_args.file)
-
-
-    def on_open(self, app, files, *args):
-        self.initialize_app()  # Ensure the application is fully initialized
-        
-        parsed_args = parse_args()
-
-        if parsed_args.file:
-            # Ensure any UI changes happen after initialization
-            self.handle_cli_file(parsed_args.file)
-
-
-    def _process_cli_file(self, file_path):
-        print(f"Processing CLI file: {file_path}")
-        abs_file_path = str(Path(file_path).resolve())
-        print(f"Resolved absolute CLI file path: {abs_file_path}")
-
-        try:
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-            self.create_yaml_file(abs_file_path, None)
-            self.create_script_list()
-        except Exception as e:
-            print(f"Error processing file: {e}")
-        finally:
-            self.hide_processing_spinner()
-            # Ensure that the application window remains open
-            self.window.present()  # This line brings the window to the front if it was minimized or hidden.
-
     def on_open(self, app, files, *args):
         parsed_args = parse_args()
 
         # Ensure the normal initialization process is followed
         self.on_startup(None)
-        self.on_activate(None)  # Explicitly call on_activate to show the window
+
 
         if parsed_args.file:
-            # Process the CLI file as if it was opened via the UI
-            self.process_cli_file(parsed_args.file)
-
-        # Present the window after processing
-        self.hide_processing_spinner()
-        self.window.present()
-
-
-    def hide_processing_spinner(self):
-        print("Hiding spinner...")  # Debug statement
-        if self.spinner and self.spinner.get_parent() == self.button_box:
-            self.spinner.stop()
-            self.button_box.remove(self.spinner)
-
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(True)
-            elif isinstance(child, Gtk.Label):
-                child.set_label("Open...")
-            child = child.get_next_sibling()
-
-        self.spinner = None  # Ensure the spinner is set to None
-        print("Spinner hidden.")  # Debug statement
-
-    def create_script_list(self):
-        # Check if the window is realized before making updates to the UI
-        if not self.window or not self.window.get_realized():
-            print("Window not realized yet. Deferring script list creation.")
-            GLib.idle_add(self.create_script_list)
-            return
-
-        # Proceed with UI updates if the window is realized
-        self.flowbox.remove_all()
-        self.script_buttons = {}
-
-        scripts = self.find_python_scripts()
-        for script in scripts:
-            row = self.create_script_row(script)
-            if row:
-                self.flowbox.append(row)
-                self.script_buttons[script.stem] = row
-
-        print("Script list created.")
-
-    def create_script_list(self):
-        # Use GLib.idle_add to ensure the removal happens when GTK is idle
-        self._clear_flowbox_and_add_scripts()
-
-    def _clear_flowbox_and_add_scripts(self):
-        # Clear the flowbox
-        self.flowbox.remove_all()
-
-        # Rebuild the script list
-        self.script_buttons = {}
-        scripts = self.find_python_scripts()
-
-        for script in scripts:
-            row = self.create_script_row(script)
-            if row:
-                self.flowbox.append(row)
-                self.script_buttons[script.stem] = row
-
-        print("Script list updated.")
-###############################
-    def hide_processing_spinner(self):
-        if self.spinner and self.spinner.get_parent() == self.button_box:
-            self.spinner.stop()
-            self.button_box.remove(self.spinner)
-            self.spinner = None  # Ensure the spinner is set to None
-
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(True)
-            elif isinstance(child, Gtk.Label):
-                child.set_label("Open...")
-            child = child.get_next_sibling()
-
-        print("Spinner hidden.")  # Debug statement to confirm execution
-
-    def process_cli_file(self, file_path):
-        self.show_processing_spinner("Processing...")
-        self._process_cli_file(file_path)
-        self.hide_processing_spinner()
-        
-    def _process_cli_file(self, file_path):
-        print(f"Processing CLI file: {file_path}")
-        abs_file_path = str(Path(file_path).resolve())
-        print(f"Resolved absolute CLI file path: {abs_file_path}")
-
-        try:
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-            self.create_yaml_file(abs_file_path, None)
-            GLib.idle_add(self.create_script_list)
-        except Exception as e:
-            print(f"Error processing file: {e}")
-        finally:
-            #GLib.idle_add(self.hide_processing_spinner)
-            GLib.idle_add(self.window.present)  # Bring the window to the front
-
-    def on_open(self, app, files, *args):
-        self.initialize_app()  # Ensure the application is fully initialized
-        
-        parsed_args = parse_args()
-
-        if parsed_args.file:
-            # Ensure any UI changes happen after initialization
-            self.process_cli_file(parsed_args.file)
-
-        # Present the window after processing
-        GLib.idle_add(self.window.present)
-
+            # Simulate the file being opened as if it was through the file dialog
+            self.handle_cli_file(parsed_args.file)
 
 
 def parse_args():

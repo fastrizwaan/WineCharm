@@ -248,13 +248,7 @@ class WineCharmApp(Gtk.Application):
                 self.set_dynamic_variables()
                 if self.command_line_file:
                     self.process_cli_file(self.command_line_file)
-#self.window.present()
-        focus_controller = Gtk.EventControllerFocus()
-        focus_controller.connect("enter", self.on_focus_in)
-        focus_controller.connect("leave", self.on_focus_out)
-        self.window.add_controller(focus_controller)
-        
-        
+
     def initialize_template(self, template_dir, callback):
         if not template_dir.exists():
             self.initializing_template = True
@@ -413,6 +407,10 @@ class WineCharmApp(Gtk.Application):
             
     def on_activate(self, app):
         self.window.present()
+        focus_controller = Gtk.EventControllerFocus()
+        focus_controller.connect("enter", self.on_focus_in)
+        focus_controller.connect("leave", self.on_focus_out)
+        self.window.add_controller(focus_controller)
 
     def on_focus_in(self, controller):
         print("Focus In")
@@ -556,7 +554,7 @@ class WineCharmApp(Gtk.Application):
         self.flowbox.set_hexpand(True)
         self.scrolled.set_child(self.flowbox)
 
-        #self.window.present()
+        self.window.present()
 
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self.on_key_pressed)
@@ -1772,6 +1770,18 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(self.hide_processing_spinner)
             #self.spinner = None
 
+    def on_file_dialog_response(self, dialog, result):
+        try:
+            file = dialog.open_finish(result)
+            if file:
+                file_path = file.get_path()
+                self.show_processing_spinner("Processing...")
+                threading.Thread(target=self.process_file, args=(file_path,)).start()
+        except GLib.Error as e:
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"An error occurred: {e}")
+        finally:
+            self.window.set_visible(True)
             
     def on_open(self, app, files, *args):
         # Parse the command line arguments
@@ -1781,139 +1791,12 @@ class WineCharmApp(Gtk.Application):
         if parsed_args.file:
             self.on_file_dialog_response(parsed_args.file)
 
-#-------------------------------
-    def handle_cli_file(self, file_path):
-        #self.on_activate()
-        self.create_main_window()
-        self.create_script_list()
-        try:
-            if file_path:
-                self.show_processing_spinner("Processing...")
-                threading.Thread(target=self.process_file, args=(file_path,)).start()
-        except GLib.Error as e:
-            print(f"An error occurred: {e}")
-        finally:
-            self.window.present()
-
-    def on_open(self, app, files, *args):
-        parsed_args = parse_args()
-
-        if parsed_args.file:
-            self.handle_cli_file(parsed_args.file)
-
-
     def hide_processing_spinner(self):
-        if self.spinner and self.spinner.get_parent() == self.button_box:
+        if self.spinner:
             self.spinner.stop()
-            self.button_box.remove(self.spinner)
-
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(True)
-            elif isinstance(child, Gtk.Label):
-                child.set_label("Open...")
-            child = child.get_next_sibling()
-        
-        
-    def on_open(self, app, files, *args):
-        parsed_args = parse_args()
-        
-        if not self.window:
-                self.on_startup(self)
-                self.on_activate(self)
-        self.set_dynamic_variables()
-        # Ensure the normal initialization process is followed
-        #self.on_startup(None)
-
-
-        if parsed_args.file:
-            # Simulate the file being opened as if it was through the file dialog
-            self.handle_cli_file(parsed_args.file)
-
-
-    def initialize_app(self):
-        if not hasattr(self, 'window') or not self.window:
-            # Call the startup code
-            self.create_main_window()
-            self.create_script_list()
-            self.check_running_processes_and_update_buttons()
-            
-            missing_programs = self.check_required_programs()
-            if missing_programs:
-                self.show_missing_programs_dialog(missing_programs)
-            else:
-                if not default_template.exists():
-                    self.initialize_template(default_template, self.on_template_initialized)
-                else:
-                    self.set_dynamic_variables()
-
-
-
-    def on_open(self, app, files, *args):
-        # Ensure the normal initialization process is followed
-        self.initialize_app()
-        
-        # Ensure dynamic variables are set
-        self.set_dynamic_variables()
-
-        parsed_args = parse_args()
-
-        if parsed_args.file:
-            # Simulate the file being opened as if it was through the file dialog
-            self.handle_cli_file(parsed_args.file)
-
-
-    def on_open(self, app, files, *args):
-        self.initialize_app()  # Ensure the application is fully initialized
-        
-        parsed_args = parse_args()
-
-        if parsed_args.file:
-            # Ensure any UI changes happen after initialization
-            self.handle_cli_file(parsed_args.file)
-
-
-    def _process_cli_file(self, file_path):
-        print(f"Processing CLI file: {file_path}")
-        abs_file_path = str(Path(file_path).resolve())
-        print(f"Resolved absolute CLI file path: {abs_file_path}")
-
-        try:
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-            self.create_yaml_file(abs_file_path, None)
-            self.create_script_list()
-        except Exception as e:
-            print(f"Error processing file: {e}")
-        finally:
-            self.hide_processing_spinner()
-            # Ensure that the application window remains open
-            self.window.present()  # This line brings the window to the front if it was minimized or hidden.
-
-    def on_open(self, app, files, *args):
-        parsed_args = parse_args()
-
-        # Ensure the normal initialization process is followed
-        self.on_startup(None)
-        self.on_activate(None)  # Explicitly call on_activate to show the window
-
-        if parsed_args.file:
-            # Process the CLI file as if it was opened via the UI
-            self.process_cli_file(parsed_args.file)
-
-        # Present the window after processing
-        self.hide_processing_spinner()
-        self.window.present()
-
-
-    def hide_processing_spinner(self):
-        print("Hiding spinner...")  # Debug statement
-        if self.spinner and self.spinner.get_parent() == self.button_box:
-            self.spinner.stop()
-            self.button_box.remove(self.spinner)
+            if self.spinner.get_parent() is self.button_box:
+                self.button_box.remove(self.spinner)
+            self.spinner = None
 
         box = self.open_button.get_child()
         child = box.get_first_child()
@@ -1924,17 +1807,12 @@ class WineCharmApp(Gtk.Application):
                 child.set_label("Open...")
             child = child.get_next_sibling()
 
-        self.spinner = None  # Ensure the spinner is set to None
-        print("Spinner hidden.")  # Debug statement
-
+############# good 
     def create_script_list(self):
-        # Check if the window is realized before making updates to the UI
-        if not self.window or not self.window.get_realized():
-            print("Window not realized yet. Deferring script list creation.")
-            GLib.idle_add(self.create_script_list)
-            return
+        # Use GLib.idle_add to ensure that this code runs after GTK completes its current layout
+        GLib.idle_add(self._populate_script_list)
 
-        # Proceed with UI updates if the window is realized
+    def _populate_script_list(self):
         self.flowbox.remove_all()
         self.script_buttons = {}
 
@@ -1945,78 +1823,78 @@ class WineCharmApp(Gtk.Application):
                 self.flowbox.append(row)
                 self.script_buttons[script.stem] = row
 
-        print("Script list created.")
+    def replace_open_button_with_launch(self, script, row):
+        if self.open_button.get_parent():
+            self.vbox.remove(self.open_button)
 
-    def create_script_list(self):
-        # Use GLib.idle_add to ensure the removal happens when GTK is idle
-        self._clear_flowbox_and_add_scripts()
+        # Remove the launch button from its current parent if it exists
+        if self.launch_button and self.launch_button.get_parent():
+            self.launch_button.get_parent().remove(self.launch_button)
 
-    def _clear_flowbox_and_add_scripts(self):
-        # Clear the flowbox
-        self.flowbox.remove_all()
+        self.launch_button = Gtk.Button()
+        self.launch_button.set_size_request(390, 36)
 
-        # Rebuild the script list
-        self.script_buttons = {}
-        scripts = self.find_python_scripts()
+        exe_file, _, _, _, _ = self.extract_yaml_info(script)
+        exe_name = Path(exe_file).name
 
-        for script in scripts:
-            row = self.create_script_row(script)
-            if row:
-                self.flowbox.append(row)
-                self.script_buttons[script.stem] = row
+        if exe_name in self.running_processes:
+            launch_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
+            self.launch_button.set_tooltip_text("Stop")
+        else:
+            launch_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+            self.launch_button.set_tooltip_text("Play")
 
-        print("Script list updated.")
-###############################
-    def hide_processing_spinner(self):
-        if self.spinner and self.spinner.get_parent() == self.button_box:
-            self.spinner.stop()
-            self.button_box.remove(self.spinner)
-            self.spinner = None  # Ensure the spinner is set to None
+        self.launch_button.set_child(launch_icon)
+        self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(script, self.launch_button, row))
 
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(True)
-            elif isinstance(child, Gtk.Label):
-                child.set_label("Open...")
-            child = child.get_next_sibling()
+        # Store the exe_name associated with this launch button
+        self.launch_button_exe_name = exe_name
 
-        print("Spinner hidden.")  # Debug statement to confirm execution
+        self.vbox.prepend(self.launch_button)
+        self.launch_button.set_visible(True)
 
-    def process_cli_file(self, file_path):
-        self.show_processing_spinner("Processing...")
-        self._process_cli_file(file_path)
-        self.hide_processing_spinner()
+
+    def create_script_row(self, script):
+        exe_file, _, _, _, _ = self.extract_yaml_info(script)
+        exe_name = Path(exe_file).name
+
+        button = Gtk.Button()
+        button.set_hexpand(True)
+        button.set_halign(Gtk.Align.FILL)
+        button.add_css_class("flat")
+        button.add_css_class("normal-font")
+        button.set_size_request(390, 36)
+
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         
-    def _process_cli_file(self, file_path):
-        print(f"Processing CLI file: {file_path}")
-        abs_file_path = str(Path(file_path).resolve())
-        print(f"Resolved absolute CLI file path: {abs_file_path}")
+        # Ensure the hbox doesn't already have a parent before setting it as a child
+        if hbox.get_parent() is None:
+            button.set_child(hbox)
 
-        try:
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-            self.create_yaml_file(abs_file_path, None)
-            GLib.idle_add(self.create_script_list)
-        except Exception as e:
-            print(f"Error processing file: {e}")
-        finally:
-            #GLib.idle_add(self.hide_processing_spinner)
-            GLib.idle_add(self.window.present)  # Bring the window to the front
+        icon = self.load_icon(script)
+        icon_image = Gtk.Image.new_from_paintable(icon)
+        icon_image.set_pixel_size(32)
+        hbox.append(icon_image)
 
-    def on_open(self, app, files, *args):
-        self.initialize_app()  # Ensure the application is fully initialized
-        
-        parsed_args = parse_args()
+        label_text = script.stem.replace("_", " ")
+        label = Gtk.Label(label=label_text)
+        label.set_xalign(0)
+        label.set_hexpand(True)
+        label.set_ellipsize(Pango.EllipsizeMode.END)
+        hbox.append(label)
 
-        if parsed_args.file:
-            # Ensure any UI changes happen after initialization
-            self.process_cli_file(parsed_args.file)
+        if script.stem in self.new_scripts:
+            label.set_markup(f"<b>{label.get_text()}</b>")
 
-        # Present the window after processing
-        GLib.idle_add(self.window.present)
+        button.label = label
+
+        button.connect("clicked", lambda btn: self.show_options_for_script(script, button))
+
+        # Store the button in the dictionary using exe_name as the key
+        self.script_buttons[exe_name] = button
+
+        return button
+
 
 
 

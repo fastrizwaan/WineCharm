@@ -1966,59 +1966,6 @@ class WineCharmApp(Gtk.Application):
                 self.script_buttons[script.stem] = row
 
         print("Script list updated.")
-###############################
-    def hide_processing_spinner(self):
-        if self.spinner and self.spinner.get_parent() == self.button_box:
-            self.spinner.stop()
-            self.button_box.remove(self.spinner)
-            self.spinner = None  # Ensure the spinner is set to None
-
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(True)
-            elif isinstance(child, Gtk.Label):
-                child.set_label("Open...")
-            child = child.get_next_sibling()
-
-        print("Spinner hidden.")  # Debug statement to confirm execution
-
-    def process_cli_file(self, file_path):
-        self.show_processing_spinner("Processing...")
-        self._process_cli_file(file_path)
-        self.hide_processing_spinner()
-        
-    def _process_cli_file(self, file_path):
-        print(f"Processing CLI file: {file_path}")
-        abs_file_path = str(Path(file_path).resolve())
-        print(f"Resolved absolute CLI file path: {abs_file_path}")
-
-        try:
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-            self.create_yaml_file(abs_file_path, None)
-            GLib.idle_add(self.create_script_list)
-        except Exception as e:
-            print(f"Error processing file: {e}")
-        finally:
-            #GLib.idle_add(self.hide_processing_spinner)
-            GLib.idle_add(self.window.present)  # Bring the window to the front
-
-    def on_open(self, app, files, *args):
-        self.initialize_app()  # Ensure the application is fully initialized
-        
-        parsed_args = parse_args()
-
-        if parsed_args.file:
-            # Ensure any UI changes happen after initialization
-            self.process_cli_file(parsed_args.file)
-
-        # Present the window after processing
-        GLib.idle_add(self.window.present)
-
-
 
 def parse_args():
     import argparse
