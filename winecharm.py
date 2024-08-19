@@ -246,8 +246,7 @@ class WineCharmApp(Gtk.Application):
                 self.initialize_template(default_template, self.on_template_initialized)
             else:
                 self.set_dynamic_variables()
-                if self.command_line_file:
-                    self.process_cli_file(self.command_line_file)
+
 #self.window.present()
         focus_controller = Gtk.EventControllerFocus()
         focus_controller.connect("enter", self.on_focus_in)
@@ -263,7 +262,7 @@ class WineCharmApp(Gtk.Application):
 
             self.spinner = Gtk.Spinner()
             self.spinner.start()
-            self.button_box.append(self.spinner)
+            self.open_button_box.append(self.spinner)
 
             self.set_open_button_label("Initializing...")
             self.set_open_button_icon_visible(False)  # Hide the open-folder icon
@@ -273,10 +272,10 @@ class WineCharmApp(Gtk.Application):
 
             steps = [
                 ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-                ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-                ("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
-                ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
-                ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+                #("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+                #("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+                #("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+                #("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
                 #("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
                 #("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
             ]
@@ -298,7 +297,7 @@ class WineCharmApp(Gtk.Application):
         self.initializing_template = False
         if self.spinner:
             self.spinner.stop()
-            self.button_box.remove(self.spinner)
+            self.open_button_box.remove(self.spinner)
             self.spinner = None
 
         self.set_open_button_label("Open")
@@ -510,16 +509,16 @@ class WineCharmApp(Gtk.Application):
         self.vbox.set_margin_bottom(10)
         self.window.set_child(self.vbox)
 
-        self.button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        self.button_box.set_halign(Gtk.Align.CENTER)
+        self.open_button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.open_button_box.set_halign(Gtk.Align.CENTER)
         open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
         open_label = Gtk.Label(label="Open")
 
-        self.button_box.append(open_icon)
-        self.button_box.append(open_label)
+        self.open_button_box.append(open_icon)
+        self.open_button_box.append(open_label)
 
         self.open_button = Gtk.Button()
-        self.open_button.set_child(self.button_box)
+        self.open_button.set_child(self.open_button_box)
         self.open_button.set_size_request(-1, 36)  # Set height to 36 pixels
         self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
         self.vbox.append(self.open_button)
@@ -1525,34 +1524,6 @@ class WineCharmApp(Gtk.Application):
             else:
                 ok_button.connect("clicked", lambda btn: self.on_ok_button_clicked(parent, button, entry, script))
 
-    def show_processing_spinner(self, message="Processing..."):
-        self.spinner = Gtk.Spinner()
-        self.spinner.start()
-        self.button_box.append(self.spinner)
-
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(False)
-            elif isinstance(child, Gtk.Label):
-                child.set_label(message)
-            child = child.get_next_sibling()
-
-    def hide_processing_spinner(self):
-        if self.spinner:
-            self.spinner.stop()
-            self.button_box.remove(self.spinner)
-
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(True)
-            elif isinstance(child, Gtk.Label):
-                child.set_label("Open...")
-            child = child.get_next_sibling()
-
     def process_file(self, file_path):
         try:
             print("process_file")
@@ -1750,36 +1721,6 @@ class WineCharmApp(Gtk.Application):
 
         threading.Thread(target=server_thread, daemon=True).start()
 
-    def process_cli_file(self, file_path):
-        self.show_processing_spinner("Processing")
-        threading.Thread(target=self._process_cli_file, args=(file_path,)).start()
-
-    def _process_cli_file(self, file_path):
-        print(f"Processing CLI file: {file_path}")
-        abs_file_path = str(Path(file_path).resolve())
-        print(f"Resolved absolute CLI file path: {abs_file_path}")
-
-        try:
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-            self.create_yaml_file(abs_file_path, None)
-            GLib.idle_add(self.create_script_list)
-        except Exception as e:
-        
-            print(f"Error processing file: {e}")
-        finally:
-            GLib.idle_add(self.hide_processing_spinner)
-            #self.spinner = None
-
-            
-    def on_open(self, app, files, *args):
-        # Parse the command line arguments
-        parsed_args = parse_args()
-
-        # Use the parsed file argument if provided
-        if parsed_args.file:
-            self.on_file_dialog_response(parsed_args.file)
 
 #-------------------------------
     def handle_cli_file(self, file_path):
@@ -1788,49 +1729,13 @@ class WineCharmApp(Gtk.Application):
         self.create_script_list()
         try:
             if file_path:
-                self.show_processing_spinner("Processing...")
+                #self.show_processing_spinner("Processing...")
                 threading.Thread(target=self.process_file, args=(file_path,)).start()
         except GLib.Error as e:
             print(f"An error occurred: {e}")
         finally:
             self.window.present()
 
-    def on_open(self, app, files, *args):
-        parsed_args = parse_args()
-
-        if parsed_args.file:
-            self.handle_cli_file(parsed_args.file)
-
-
-    def hide_processing_spinner(self):
-        if self.spinner and self.spinner.get_parent() == self.button_box:
-            self.spinner.stop()
-            self.button_box.remove(self.spinner)
-
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(True)
-            elif isinstance(child, Gtk.Label):
-                child.set_label("Open...")
-            child = child.get_next_sibling()
-        
-        
-    def on_open(self, app, files, *args):
-        parsed_args = parse_args()
-        
-        if not self.window:
-                self.on_startup(self)
-                self.on_activate(self)
-        self.set_dynamic_variables()
-        # Ensure the normal initialization process is followed
-        #self.on_startup(None)
-
-
-        if parsed_args.file:
-            # Simulate the file being opened as if it was through the file dialog
-            self.handle_cli_file(parsed_args.file)
 
 
     def initialize_app(self):
@@ -1849,83 +1754,6 @@ class WineCharmApp(Gtk.Application):
                 else:
                     self.set_dynamic_variables()
 
-
-
-    def on_open(self, app, files, *args):
-        # Ensure the normal initialization process is followed
-        self.initialize_app()
-        
-        # Ensure dynamic variables are set
-        self.set_dynamic_variables()
-
-        parsed_args = parse_args()
-
-        if parsed_args.file:
-            # Simulate the file being opened as if it was through the file dialog
-            self.handle_cli_file(parsed_args.file)
-
-
-    def on_open(self, app, files, *args):
-        self.initialize_app()  # Ensure the application is fully initialized
-        
-        parsed_args = parse_args()
-
-        if parsed_args.file:
-            # Ensure any UI changes happen after initialization
-            self.handle_cli_file(parsed_args.file)
-
-
-    def _process_cli_file(self, file_path):
-        print(f"Processing CLI file: {file_path}")
-        abs_file_path = str(Path(file_path).resolve())
-        print(f"Resolved absolute CLI file path: {abs_file_path}")
-
-        try:
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-            self.create_yaml_file(abs_file_path, None)
-            self.create_script_list()
-        except Exception as e:
-            print(f"Error processing file: {e}")
-        finally:
-            self.hide_processing_spinner()
-            # Ensure that the application window remains open
-            self.window.present()  # This line brings the window to the front if it was minimized or hidden.
-
-    def on_open(self, app, files, *args):
-        parsed_args = parse_args()
-
-        # Ensure the normal initialization process is followed
-        self.on_startup(None)
-        self.on_activate(None)  # Explicitly call on_activate to show the window
-
-        if parsed_args.file:
-            # Process the CLI file as if it was opened via the UI
-            self.process_cli_file(parsed_args.file)
-
-        # Present the window after processing
-        self.hide_processing_spinner()
-        self.window.present()
-
-
-    def hide_processing_spinner(self):
-        print("Hiding spinner...")  # Debug statement
-        if self.spinner and self.spinner.get_parent() == self.button_box:
-            self.spinner.stop()
-            self.button_box.remove(self.spinner)
-
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(True)
-            elif isinstance(child, Gtk.Label):
-                child.set_label("Open...")
-            child = child.get_next_sibling()
-
-        self.spinner = None  # Ensure the spinner is set to None
-        print("Spinner hidden.")  # Debug statement
 
     def create_script_list(self):
         # Check if the window is realized before making updates to the UI
@@ -1966,28 +1794,11 @@ class WineCharmApp(Gtk.Application):
                 self.script_buttons[script.stem] = row
 
         print("Script list updated.")
-###############################
-    def hide_processing_spinner(self):
-        if self.spinner and self.spinner.get_parent() == self.button_box:
-            self.spinner.stop()
-            self.button_box.remove(self.spinner)
-            self.spinner = None  # Ensure the spinner is set to None
-
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(True)
-            elif isinstance(child, Gtk.Label):
-                child.set_label("Open...")
-            child = child.get_next_sibling()
-
-        print("Spinner hidden.")  # Debug statement to confirm execution
 
     def process_cli_file(self, file_path):
-        self.show_processing_spinner("Processing...")
+        #self.show_processing_spinner("Processing...")
+        #threading.Thread(target=self._process_cli_file, args=(file_path,)).start()
         self._process_cli_file(file_path)
-        self.hide_processing_spinner()
         
     def _process_cli_file(self, file_path):
         print(f"Processing CLI file: {file_path}")
@@ -1999,24 +1810,122 @@ class WineCharmApp(Gtk.Application):
                 print(f"File does not exist: {abs_file_path}")
                 return
             self.create_yaml_file(abs_file_path, None)
-            GLib.idle_add(self.create_script_list)
+            #GLib.idle_add(self.create_script_list)
+            self.create_script_list()
         except Exception as e:
             print(f"Error processing file: {e}")
-        finally:
-            #GLib.idle_add(self.hide_processing_spinner)
-            GLib.idle_add(self.window.present)  # Bring the window to the front
+
+
+
+    def show_processing_spinner(self, message="Processing..."):
+        if not self.spinner:
+            self.spinner = Gtk.Spinner()
+            self.spinner.start()
+            self.open_button_box.append(self.spinner)
+
+            box = self.open_button.get_child()
+            child = box.get_first_child()
+            while child:
+                if isinstance(child, Gtk.Image):
+                    child.set_visible(False)
+                elif isinstance(child, Gtk.Label):
+                    child.set_label(message)
+                child = child.get_next_sibling()
+
+    def hide_processing_spinner(self):
+        print("hide_processing_spinner")
+        if self.spinner and self.spinner.get_parent() == self.open_button_box:
+            self.spinner.stop()
+            self.open_button_box.remove(self.spinner)
+            self.spinner = None  # Ensure the spinner is set to None
+            
+        box = self.open_button.get_child()
+        child = box.get_first_child()
+        while child:
+            if isinstance(child, Gtk.Image):
+                child.set_visible(True)
+            elif isinstance(child, Gtk.Label):
+                child.set_label("Open")
+            child = child.get_next_sibling()
+
+        print("Spinner hidden.")
+
 
     def on_open(self, app, files, *args):
-        self.initialize_app()  # Ensure the application is fully initialized
-        
-        parsed_args = parse_args()
-
-        if parsed_args.file:
-            # Ensure any UI changes happen after initialization
-            self.process_cli_file(parsed_args.file)
-
-        # Present the window after processing
+        # Ensure the application is fully initialized
+        print("1. on_open method called")
+        self.initialize_app()
+        print("2. self.initialize_app Complete")
+        self.window.present()
         GLib.idle_add(self.window.present)
+        print("3. self.window.present() Complete")
+        
+        if default_template.exists():
+            print("Yes default_template.exists")
+        else:
+            print("No default_template.exists")
+ 
+        if not default_template.exists():
+            self.initialize_template(default_template, self.on_template_initialized)  
+        self.show_processing_spinner()
+        if self.command_line_file:
+             self.show_processing_spinner()
+             self.process_cli_file(self.command_line_file)
+        
+        print("sleeping 5 seconds, no window :(")
+        time.sleep(5)    
+        
+        self.hide_processing_spinner()    
+        print("why is window showing up after all of methods are ended?")
+
+        return False  # Returning False to ensure this function doesn't run again
+
+
+#######################333
+
+
+    def on_open(self, app, files, *args):
+        # Ensure the application is fully initialized
+        print("1. on_open method called")
+        
+        # Initialize the application if it hasn't been already
+        GLib.idle_add(self.initialize_app)
+        print("2. self.initialize_app initiated")
+        
+        # Present the window as soon as possible
+        GLib.idle_add(self.window.present)
+        print("3. self.window.present() Complete")
+
+        # Check for template existence asynchronously
+        if not default_template.exists():
+            print("No default_template.exists")
+            GLib.idle_add(self.initialize_template, default_template, self.on_template_initialized)
+        else:
+            print("Yes default_template.exists")
+
+        # Show the processing spinner immediately
+        GLib.idle_add(self.show_processing_spinner)
+
+        # Process the command-line file if provided
+        if self.command_line_file:
+            GLib.idle_add(self.process_cli_file, self.command_line_file)
+
+        # Hide the spinner once processing is complete
+        GLib.timeout_add_seconds(1, self.hide_processing_spinner)
+
+        print("why is window showing up after all methods are ended?")
+        return False  # Returning False to ensure this function doesn't run again
+
+
+
+
+
+
+
+
+
+
+
 
 
 
