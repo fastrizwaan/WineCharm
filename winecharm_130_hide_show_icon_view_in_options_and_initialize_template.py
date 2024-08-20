@@ -253,10 +253,10 @@ class WineCharmApp(Gtk.Application):
 
             steps = [
                 ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-                #("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-                #("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
-                #("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
-                #("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+                ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+                ("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+                ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+                ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
                 #("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
                 #("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
             ]
@@ -285,7 +285,6 @@ class WineCharmApp(Gtk.Application):
         self.set_open_button_icon_visible(True)  # Restore the open-folder icon
         self.search_button.set_sensitive(True)  # Enable the search button
         self.view_toggle_button.set_sensitive(True)
-        
         if self.open_button_handler_id is not None:
             self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
 
@@ -632,6 +631,7 @@ class WineCharmApp(Gtk.Application):
         self.headerbar.set_title_widget(None)
         self.menu_button.set_visible(True)
         self.search_button.set_visible(True)
+        self.view_toggle_button.set_visible(True)
         self.back_button.set_visible(False)
 
         # Remove the "Launch" button if it exists
@@ -1184,6 +1184,7 @@ class WineCharmApp(Gtk.Application):
     def show_options_for_script(self, script, row):
         # Ensure the search button is toggled off and the search entry is cleared
         self.search_button.set_active(False)
+        self.view_toggle_button.set_active(False)
         #self.stop_monitoring() #
         self.main_frame.set_child(None)
         scrolled_window = Gtk.ScrolledWindow()
@@ -1246,7 +1247,8 @@ class WineCharmApp(Gtk.Application):
         self.headerbar.set_title_widget(self.create_icon_title_widget(script))
         self.menu_button.set_visible(False)
         self.search_button.set_visible(False)
-
+        self.view_toggle_button.set_visible(False)
+        
         # Ensure the back button is added and visible
         if self.back_button.get_parent() is None:
             self.headerbar.pack_start(self.back_button)
