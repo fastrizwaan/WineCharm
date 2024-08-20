@@ -21,6 +21,8 @@ finish-args:
   - --filesystem=~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm:create
     # Desktop shortcut runs wine script from host
   #- --talk-name=org.freedesktop.Flatpak
+  - --talk-name=org.freedesktop.Flatpak
+
   - --share=ipc
   - --share=network
   - --socket=pulseaudio
@@ -36,14 +38,15 @@ finish-args:
   - --talk-name=org.a11y.Bus
     # Most Games write to their own directories
 #- --filesystem=host
+  - --filesystem=host
   - --filesystem=xdg-desktop
   - --filesystem=xdg-documents
   - --filesystem=xdg-download
   - --filesystem=xdg-music
   - --filesystem=xdg-pictures
   - --filesystem=xdg-videos
-  - --filesystem=xdg-run/gvfsd
   - --filesystem=xdg-run/gvfs
+  - --filesystem=xdg-run/gvfsd
   # WineZGUI import wine prefix Needs access to copy games and runners from wine, bottles, playonlinux, lutris, heroic launcher data directories. 
   # Using :ro messes up the path to /run/... instead of ~/ breaking copying
   # flatpak bug with :ro breaks realpath.
