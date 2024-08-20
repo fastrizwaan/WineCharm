@@ -25,7 +25,7 @@ gi.require_version('Adw', '1')
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 
 
-version = "0.77.6"
+version = "0.77.8"
 # Constants
 winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
 prefixes_dir = winecharmdir / "Prefixes"
@@ -396,21 +396,17 @@ class WineCharmApp(Gtk.Application):
         self.window.present()
 
     def on_focus_in(self, controller):
+        if self.monitoring_active:
+            return  # Prevent multiple activations
+
         print("Focus In")
-        # Reset count
         self.count = 0
-        
-        # Delay before starting monitoring to prevent immediate lag
-#        GLib.timeout_add_seconds(2, self.start_monitoring)
         self.monitoring_active = True
         self.start_monitoring()
-
-        # Recheck processes and update the UI
         self.check_running_processes_and_update_buttons()
-
-        # Ensure any ended processes are cleaned up
         current_running_processes = self.get_running_processes()
         self.cleanup_ended_processes(current_running_processes)
+
 
 
     def on_focus_out(self, controller):
@@ -425,9 +421,10 @@ class WineCharmApp(Gtk.Application):
         if hasattr(self, '_monitoring_id') and self._monitoring_id is not None:
             try:
                 if GLib.source_remove(self._monitoring_id):
-                    self._monitoring_id = None
+                    print(f"Monitoring source {self._monitoring_id} removed.")
+                self._monitoring_id = None
             except ValueError:
-                print(f"Warning: Attempted to remove a non-existent or already removed source ID {_monitoring_id}")
+                print(f"Warning: Attempted to remove a non-existent or already removed source ID {self._monitoring_id}")
                 self._monitoring_id = None
 
 
