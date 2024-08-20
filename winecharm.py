@@ -104,7 +104,7 @@ class WineCharmApp(Gtk.Application):
                 min-height: 36px;
             }
             .highlighted {
-                background-color: rgba(111, 111, 111, 0.15); 
+                background-color: rgba(127, 127, 127, 0.15); 
             }
             .normal-font {  /* Add the CSS rule for the normal-font class */
             font-weight: normal;
