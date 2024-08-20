@@ -398,7 +398,7 @@ class WineCharmApp(Gtk.Application):
         if self.monitoring_active:
             return  # Prevent multiple activations
 
-        #print("Focus In")
+        print("Focus In")
         self.count = 0
         self.monitoring_active = True
         self.start_monitoring()
