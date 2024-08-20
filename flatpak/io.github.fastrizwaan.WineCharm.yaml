@@ -42,6 +42,8 @@ finish-args:
   - --filesystem=xdg-music
   - --filesystem=xdg-pictures
   - --filesystem=xdg-videos
+  - --filesystem=xdg-run/gvfsd
+  - --filesystem=xdg-run/gvfs
   # WineZGUI import wine prefix Needs access to copy games and runners from wine, bottles, playonlinux, lutris, heroic launcher data directories. 
   # Using :ro messes up the path to /run/... instead of ~/ breaking copying
   # flatpak bug with :ro breaks realpath.
