@@ -632,6 +632,7 @@ class WineCharmApp(Gtk.Application):
         self.headerbar.set_title_widget(None)
         self.menu_button.set_visible(True)
         self.search_button.set_visible(True)
+        self.view_toggle_button.set_visible(True)
         self.back_button.set_visible(False)
 
         # Remove the "Launch" button if it exists
@@ -1246,7 +1247,8 @@ class WineCharmApp(Gtk.Application):
         self.headerbar.set_title_widget(self.create_icon_title_widget(script))
         self.menu_button.set_visible(False)
         self.search_button.set_visible(False)
-
+        self.view_toggle_button.set_visible(False)
+        
         # Ensure the back button is added and visible
         if self.back_button.get_parent() is None:
             self.headerbar.pack_start(self.back_button)
@@ -1957,31 +1959,15 @@ class WineCharmApp(Gtk.Application):
         # Present the window as soon as possible
         GLib.idle_add(self.window.present)
         print("3. self.window.present() Complete")
-
-        # Check for template existence asynchronously
-        if not default_template.exists():
-            print("No default_template.exists")
-            self.hide_processing_spinner()
-            GLib.idle_add(self.initialize_template, default_template, self.on_template_initialized)
-            print("44444444444444444444444444444444444444444444444")
-            GLib.idle_add(self.show_processing_spinner, "Initializing babau")
-
-        else:
-            print("Yes default_template.exists")
-
-            # Show the processing spinner immediately
-            print("3333333333333333333333333333333333333333333333")
-            GLib.idle_add(self.show_processing_spinner, "Process me babau")
-
-        # Process the command-line file if provided
-        print("========")
-        if self.command_line_file:
-            print("====process cli file====")
-            self.hide_processing_spinner()
-            GLib.idle_add(self.process_cli_file, self.command_line_file)
-        # Hide the spinner once processing is complete
-        GLib.timeout_add_seconds(1, self.hide_processing_spinner)
-
+        
+        if default_template.exists() and self.command_line_file:
+            print("Trying to process file inside on template initialized")
+            print("999999999999999999999999999999999")
+            GLib.idle_add(self.show_processing_spinner)
+            self.process_cli_file(self.command_line_file)
+            self.command_line_file = None  # Reset after processing
+            GLib.timeout_add_seconds(1, self.hide_processing_spinner)
+            
         return False  # Returning False to ensure this function doesn't run again
 
 # bug, no exe and no templates, will copy incomolete template, so wait for template to initialize
