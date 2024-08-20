@@ -274,10 +274,10 @@ class WineCharmApp(Gtk.Application):
 
             steps = [
                 ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-                ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-                ("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
-                ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
-                ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+                #("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+                #("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+                #("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+                #("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
                 #("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
                 #("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
             ]
@@ -2196,6 +2196,54 @@ class WineCharmApp(Gtk.Application):
             self.flowbox.set_max_children_per_line(4)
         # Recreate the script list with the new view
         self.create_script_list()
+
+
+
+
+
+    def on_template_initialized(self):
+        print("Template initialization complete.")
+        self.initializing_template = False
+        
+        # Ensure the spinner is stopped after initialization
+        self.hide_processing_spinner()
+        
+        # Write the current date and time to "initialized.txt"
+        initialized_file = default_template / "initialized.txt"
+        with open(initialized_file, "w") as f:
+            f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)  # Restore the open-folder icon
+        self.search_button.set_sensitive(True)  # Enable the search button
+
+        if self.open_button_handler_id is not None:
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
+
+        print("Template initialization completed and UI updated.")
+        self.show_initializing_step("Initialization Complete!")
+        GLib.idle_add(self.mark_step_as_done, "Initialization Complete!")
+        GLib.timeout_add_seconds(5, self.create_script_list)
+        
+        
+        # Check if there's a CLI file to process after initialization
+        if self.command_line_file:
+            print("Trying to process file inside on template initialized")
+            print("2222222222222222222222222222222222222222222222222222")
+            GLib.idle_add(self.show_processing_spinner)
+            self.process_cli_file(self.command_line_file)
+            self.command_line_file = None  # Reset after processing
+            GLib.timeout_add_seconds(1, self.hide_processing_spinner)
+        # Update the UI now that the template is initialized
+        #self.window.present()
+
+
+
+
+
+
+
+
 
 
 
