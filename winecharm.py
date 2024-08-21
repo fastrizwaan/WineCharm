@@ -789,7 +789,7 @@ class WineCharmApp(Gtk.Application):
     def launch_script(self, script, play_stop_button, row):
         yaml_info = self.extract_yaml_info(script)
         exe_file = yaml_info['exe_file']
-        wineprefix = Path(yaml_info['wineprefix'])
+        wineprefix = Path(script).parent
         progname = yaml_info['progname']
         script_args = yaml_info['args']
         runner = yaml_info['runner'] or "wine"
@@ -798,8 +798,8 @@ class WineCharmApp(Gtk.Application):
 
         if winecharmdir not in Path(runner).parents:
             runner = "wine"
-
         command = f"cd {shlex.quote(str(Path(exe_file).parent))} && WINEPREFIX={shlex.quote(str(wineprefix))} {shlex.quote(runner)} {shlex.quote(str(exe_name))} {script_args}"
+        print(command)
         try:
             process = subprocess.Popen(
                 command,
@@ -965,10 +965,6 @@ class WineCharmApp(Gtk.Application):
 
         self.running_processes = current_running_processes
 
-            
-    def find_row_by_exe_name(self, exe_name):
-        return self.script_buttons.get(exe_name)
-            
     def find_row_by_exe_name(self, exe_name):
         return self.script_buttons.get(exe_name)
 
@@ -1035,7 +1031,6 @@ class WineCharmApp(Gtk.Application):
 
         yaml_data = {
             'exe_file': str(exe_file).replace(str(Path.home()), "~"),
-            'wineprefix': str(prefix_dir).replace(str(Path.home()), "~"),
             'progname': progname,
             'args': "",
             'sha256sum': sha256_hash.hexdigest(),
@@ -1303,7 +1298,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error opening terminal: {e}")
 
     def install_dxvk_vkd3d(self, script, button):
-        wineprefix = script.parent
+        wineprefix = Path(script).parent
         self.run_winetricks_script("vkd3d dxvk", wineprefix)
         self.create_script_list()
 
@@ -1668,7 +1663,7 @@ class WineCharmApp(Gtk.Application):
             script_path = process_info.get("script")
             if script_path and script_path.exists():
                 yaml_info = self.extract_yaml_info(script_path)
-                wineprefix = yaml_info.get('wineprefix')
+                wineprefix = Path(script).parent
                 if wineprefix:
                     wineprefix_path = Path(wineprefix)
                     self.create_scripts_for_lnk_files(wineprefix_path)
@@ -1791,17 +1786,8 @@ class WineCharmApp(Gtk.Application):
         # Proceed with initialization in the background
         GLib.idle_add(self.initialize_app)
 
-        # If the template needs to be initialized, handle that next
-        if not default_template.exists():
-            print("No default_template exists, initializing template.")
-            GLib.idle_add(self.initialize_template, default_template, self.on_template_initialized)
-        else:
-            GLib.idle_add(self.show_processing_spinner)
-            # If template exists, immediately process the CLI file if provided
-            print("- - -  - -  - - -  - - - - - ")
-            GLib.idle_add(self.show_processing_spinner)
-            if self.command_line_file:
-                GLib.idle_add(self.process_cli_file, self.command_line_file)
+        if self.command_line_file:
+            GLib.idle_add(self.process_cli_file, self.command_line_file)
 
         print("3. Finished on_open method")
         GLib.timeout_add_seconds(1, self.hide_processing_spinner)
@@ -1906,8 +1892,8 @@ class WineCharmApp(Gtk.Application):
                 print(f"File does not exist: {abs_file_path}")
                 return
             self.create_yaml_file(abs_file_path, None)
-            #GLib.idle_add(self.create_script_list)
-            self.create_script_list()
+            GLib.idle_add(self.create_script_list)
+            #self.create_script_list()
         except Exception as e:
             print(f"Error processing file: {e}")
 
@@ -1960,7 +1946,7 @@ class WineCharmApp(Gtk.Application):
         GLib.idle_add(self.window.present)
         print("3. self.window.present() Complete")
         
-        if default_template.exists() and self.command_line_file:
+        if  self.command_line_file:
             print("Trying to process file inside on template initialized")
             print("999999999999999999999999999999999")
             GLib.idle_add(self.show_processing_spinner)
@@ -2237,7 +2223,7 @@ class WineCharmApp(Gtk.Application):
 
 
 
-
+ 
 
     def on_template_initialized(self):
         print("Template initialization complete.")
@@ -2261,31 +2247,21 @@ class WineCharmApp(Gtk.Application):
 
         print("Template initialization completed and UI updated.")
         self.show_initializing_step("Initialization Complete!")
-        GLib.idle_add(self.mark_step_as_done, "Initialization Complete!")
-        GLib.timeout_add_seconds(5, self.create_script_list)
+        self.mark_step_as_done("Initialization Complete!")
+        self.hide_processing_spinner()
+        self.create_script_list()
         
         
         # Check if there's a CLI file to process after initialization
-        if self.command_line_file:
+        if  self.command_line_file:
             print("Trying to process file inside on template initialized")
-            print("2222222222222222222222222222222222222222222222222222")
+            print("999999999999999999999999999999999")
             GLib.idle_add(self.show_processing_spinner)
             self.process_cli_file(self.command_line_file)
             self.command_line_file = None  # Reset after processing
             GLib.timeout_add_seconds(1, self.hide_processing_spinner)
         # Update the UI now that the template is initialized
         #self.window.present()
-
-
-###########
-
-
-
-
-
-
-
-
 
 
 
