@@ -663,19 +663,21 @@ class WineCharmApp(Gtk.Application):
             if row:
                 self.flowbox.append(row)
                 yaml_info = self.extract_yaml_info(script)
-                exe_name = Path(yaml_info['exe_file']).name
+                script_key = yaml_info['sha256sum']
 
-                self.script_buttons[script.stem] = row
+                self.script_buttons[script_key] = row
 
                 # Check if the script is running
-                if exe_name in self.running_processes:
+                if script_key in self.running_processes:
                     row.add_css_class("highlighted")
                 else:
                     row.remove_css_class("highlighted")
 
+
     def create_script_row(self, script):
         yaml_info = self.extract_yaml_info(script)
         exe_name = Path(yaml_info['exe_file']).name
+        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
 
         button = Gtk.Button()
         button.set_hexpand(True)
@@ -685,7 +687,6 @@ class WineCharmApp(Gtk.Application):
 
         label_text = script.stem.replace("_", " ")
         label = Gtk.Label(label=label_text)
-        
         label.set_hexpand(True)
         label.set_ellipsize(Pango.EllipsizeMode.END)
 
@@ -698,7 +699,6 @@ class WineCharmApp(Gtk.Application):
         else:
             icon = self.load_icon_for_list(script)
             icon_image = Gtk.Image.new_from_paintable(icon)
-
             button.set_size_request(390, 36)
             hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
             icon_image.set_pixel_size(32)
@@ -715,10 +715,11 @@ class WineCharmApp(Gtk.Application):
 
         button.connect("clicked", lambda btn: self.show_options_for_script(script, button))
 
-        # Store the button in the dictionary using exe_name as the key
-        self.script_buttons[exe_name] = button
+        # Store the button in the dictionary using script_key as the key
+        self.script_buttons[script_key] = button
 
         return button
+
 
 
     def find_row_by_script_stem(self, script_stem):
@@ -745,9 +746,9 @@ class WineCharmApp(Gtk.Application):
         self.launch_button.set_size_request(390, 36)
 
         yaml_info = self.extract_yaml_info(script)
-        exe_name = Path(yaml_info['exe_file']).name
+        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
 
-        if exe_name in self.running_processes:
+        if script_key in self.running_processes:
             launch_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
             self.launch_button.set_tooltip_text("Stop")
         else:
@@ -757,11 +758,12 @@ class WineCharmApp(Gtk.Application):
         self.launch_button.set_child(launch_icon)
         self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(script, self.launch_button, row))
 
-        # Store the exe_name associated with this launch button
-        self.launch_button_exe_name = exe_name
+        # Store the script_key associated with this launch button
+        self.launch_button_exe_name = script_key
 
         self.vbox.prepend(self.launch_button)
         self.launch_button.set_visible(True)
+
 
 
     def set_play_stop_button_state(self, button, is_playing):
@@ -780,9 +782,9 @@ class WineCharmApp(Gtk.Application):
 
     def toggle_play_stop(self, script, play_stop_button, row):
         yaml_info = self.extract_yaml_info(script)
-        exe_name = Path(yaml_info['exe_file']).name
+        script_key = yaml_info['sha256sum']
 
-        if exe_name in self.running_processes:
+        if script_key in self.running_processes:
             self.terminate_script(script)
             self.set_play_stop_button_state(play_stop_button, False)
             self.update_row_highlight(row, False)
@@ -792,6 +794,7 @@ class WineCharmApp(Gtk.Application):
             self.update_row_highlight(row, True)
 
 
+
     def launch_script(self, script, play_stop_button, row):
         yaml_info = self.extract_yaml_info(script)
         exe_file = yaml_info['exe_file']
@@ -799,6 +802,7 @@ class WineCharmApp(Gtk.Application):
         progname = yaml_info['progname']
         script_args = yaml_info['args']
         runner = yaml_info['runner'] or "wine"
+        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
 
         exe_name = Path(exe_file).name
 
@@ -815,7 +819,12 @@ class WineCharmApp(Gtk.Application):
                 stderr=subprocess.DEVNULL
             )
 
-            self.running_processes[exe_name] = {"row": row, "script": script, "exe_name": exe_name, "pid": process.pid}
+            self.running_processes[script_key] = {
+                "row": row,
+                "script": script,
+                "exe_name": exe_name,
+                "pid": process.pid
+            }
 
             self.set_play_stop_button_state(play_stop_button, True)
             self.update_row_highlight(row, True)
@@ -823,28 +832,30 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error launching script: {e}")
 
+        print(self.running_processes)
 
 
     def terminate_script(self, script):
         yaml_info = self.extract_yaml_info(script)
-        exe_name = Path(yaml_info['exe_file']).name
+        script_key = yaml_info['sha256sum']
 
-        if exe_name in self.running_processes:
-            process_info = self.running_processes[exe_name]
+        if script_key in self.running_processes:
+            process_info = self.running_processes[script_key]
             pid = process_info.get("pid")
 
             try:
                 if pid:
                     print(f"Attempting to terminate PID: {pid}")
                     os.killpg(os.getpgid(pid), signal.SIGTERM)
-                    print(f"Terminated process {exe_name} with PID: {pid}")
-                del self.running_processes[exe_name]
+                    print(f"Terminated process {script_key} with PID: {pid}")
+                del self.running_processes[script_key]
 
                 row = process_info["row"]
                 self.update_row_highlight(row, False)
 
             except Exception as e:
-                print(f"Error terminating script {exe_name}: {e}")
+                print(f"Error terminating script {script_key}: {e}")
+
 
 
 
@@ -871,95 +882,88 @@ class WineCharmApp(Gtk.Application):
 
 
     def get_running_processes(self):
-        """
-        Retrieve and map currently running .exe processes to scripts.
-        Returns a dictionary of running processes with relevant details.
-        """
         current_running_processes = {}
 
         try:
-            # Retrieve running processes
             pgrep_output = subprocess.check_output(["pgrep", "-aif", "\\.exe"]).decode().splitlines()
-
-            winecharm_pids = []
-            wine_exe_pids = []
-
-            for line in pgrep_output:
-                pid = int(line.split()[0])
-                command = line.split(None, 1)[1]
-
-                if do_not_kill in command:
-                    winecharm_pids.append(pid)
-                elif ".exe" in command.lower() and pid != 1:  # Ensure PID 1 is not included
-                    wine_exe_pids.append((pid, command))
-
-            # Filter out the winecharm PIDs from the wine_exe_pids list
-            wine_exe_pids = [(pid, cmd) for pid, cmd in wine_exe_pids if not any(do_not_kill in c for c in cmd.split())]
+            print(f"pgrep output: {pgrep_output}")  # Debugging output
 
             for script in self.find_python_scripts():
                 yaml_info = self.extract_yaml_info(script)
+                script_key = yaml_info['sha256sum']
                 exe_name = Path(yaml_info['exe_file']).name
+                exe_full_path = str(Path(yaml_info['exe_file']).resolve())
 
+                # Improved matching: Check if the exe_full_path is in the command
                 matching_processes = [
-                    (pid, cmd) for pid, cmd in wine_exe_pids
-                    if exe_name in cmd
+                    (int(line.split()[0]), line.split(None, 1)[1]) for line in pgrep_output
+                    if exe_full_path in line or exe_name in line
                 ]
+
+                print(f"Matching processes for {script.stem}: {matching_processes}")  # Debugging output
 
                 if matching_processes:
                     for pid, cmd in matching_processes:
-                        row = self.find_row_by_exe_name(exe_name)
+                        # Debug to check the matched command
+                        print(f"Process matched for {script.stem}: PID={pid}, CMD={cmd}")
+
+                        row = self.script_buttons.get(script_key)
                         if row:
-                            current_running_processes[exe_name] = {
+                            print(f"Highlighting row for {script.stem}")  # Debugging output
+                            current_running_processes[script_key] = {
                                 "row": row,
                                 "script": script,
                                 "exe_name": exe_name,
                                 "pid": pid,
                                 "command": cmd
                             }
-
-                            # Update the UI for the running process
-                            self.update_ui_for_running_process(exe_name, row, current_running_processes)
+                            self.update_ui_for_running_process(script_key, row, current_running_processes)
                 else:
-                    self.process_ended(exe_name)
+                    self.process_ended(script_key)
 
         except subprocess.CalledProcessError:
-            # If pgrep returns a non-zero exit status, it means no processes were found
             pgrep_output = []
-            # Stop unnecessary monitoring of wine processes
             self.stop_monitoring()
-
-            # Reset count
             self.count = 0
 
         return current_running_processes
 
 
 
+
+
+
+
         
-    def update_ui_for_running_process(self, exe_name, row, current_running_processes):
+    def update_ui_for_running_process(self, script_key, row, current_running_processes):
         """
         Update the UI to reflect the state of a running process.
         
         Args:
-            exe_name (str): The name of the executable.
+            script_key (str): The sha256sum used as a unique identifier for the script.
             row (Gtk.Widget): The corresponding row widget in the UI.
             current_running_processes (dict): A dictionary containing details of the current running processes.
         """
-        if exe_name not in self.running_processes:
-            self.running_processes[exe_name] = current_running_processes[exe_name]
+        if script_key not in self.running_processes:
+            self.running_processes[script_key] = current_running_processes[script_key]
 
+        print(f"Adding highlight to row for script_key: {script_key}")  # Debugging output
         row.add_css_class("highlighted")
 
         # Only update the launch button if it belongs to this script
-        if self.launch_button and self.launch_button_exe_name == exe_name:
+        if self.launch_button and self.launch_button_exe_name == script_key:
             self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
             self.launch_button.set_tooltip_text("Stop")
 
 
+
+
+
     def cleanup_ended_processes(self, current_running_processes):
-        if not self.monitoring_active:
-            self.stop_monitoring()
-            return False
+        for script_key in list(self.running_processes.keys()):
+            if script_key not in current_running_processes:
+                self.process_ended(script_key)
+
 
         for exe_name in list(self.running_processes.keys()):
             if exe_name not in current_running_processes:
@@ -971,8 +975,9 @@ class WineCharmApp(Gtk.Application):
 
         self.running_processes = current_running_processes
 
-    def find_row_by_exe_name(self, exe_name):
-        return self.script_buttons.get(exe_name)
+    def find_row_by_script_key(self, script_key):
+        return self.script_buttons.get(script_key)
+
 
 
     def extract_yaml_info(self, script):
@@ -989,8 +994,10 @@ class WineCharmApp(Gtk.Application):
             'wineprefix': str(Path(data.get('wineprefix', '')).expanduser().resolve()), 
             'progname': data.get('progname', ''), 
             'args': data.get('args', ''),
-            'runner': data.get('runner', '')
+            'runner': data.get('runner', ''),
+            'sha256sum': data.get('sha256sum', '')
         }
+
 
 
 
@@ -1646,37 +1653,38 @@ class WineCharmApp(Gtk.Application):
             productname_match = re.search(r'Product Name\s+:\s+(.+)', product_output)
             return productname_match.group(1).strip() if productname_match else None
 
-    def process_ended(self, exe_name):
+    def process_ended(self, script_key):
         if not self.monitoring_active:
             self.stop_monitoring()
             return False
 
-        process_info = self.running_processes.get(exe_name)
+        process_info = self.running_processes.get(script_key)
 
         if process_info:
             row = process_info.get("row")
             if row:
                 row.remove_css_class("highlighted")
 
-            if self.launch_button and self.launch_button_exe_name == exe_name:
+            if self.launch_button and self.launch_button_exe_name == script_key:
                 self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
                 self.launch_button.set_tooltip_text("Play")
 
-            script_path = process_info.get("script")  # Corrected: using process_info to get the script
+            script_path = process_info.get("script")
             if script_path and script_path.exists():
                 yaml_info = self.extract_yaml_info(script_path)
-                wineprefix = Path(script_path).parent  # Corrected: using script_path instead of script
+                wineprefix = Path(script_path).parent
                 if wineprefix:
                     wineprefix_path = Path(wineprefix)
                     self.create_scripts_for_lnk_files(wineprefix_path)
 
             # Remove the process from the running processes
-            if exe_name in self.running_processes:
-                del self.running_processes[exe_name]
+            if script_key in self.running_processes:
+                del self.running_processes[script_key]
 
             # If there are no more running processes, reset all UI elements
             if not self.running_processes:
                 self.reset_all_ui_elements()
+
 
     def reset_all_ui_elements(self):
         # Reset any UI elements that should be updated when no processes are running
@@ -2099,10 +2107,82 @@ class WineCharmApp(Gtk.Application):
 
 
 ################### experiment with order
+    def get_wine_processes(self, wineprefix, exe_name):
+        try:
+            command = f"WINEPREFIX={shlex.quote(wineprefix)} winedbg --command 'info proc'"
+            winedbg_output = subprocess.check_output(command, shell=True).decode().splitlines()
+
+            processes = []
+            for line in winedbg_output:
+                # Print each line for debugging purposes
+                print(f"winedbg output line: {line}")
+
+                if line.strip() and 'executable' not in line:
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        try:
+                            pid = int(parts[0], 16)  # Convert hex PID to int
+                            current_exe_name = parts[-1].strip("'")
+                            if current_exe_name == exe_name:
+                                processes.append((pid, current_exe_name))
+                        except ValueError:
+                            print(f"Skipping line due to ValueError: {line}")
+                            continue  # Skip lines that don't have valid hexadecimal PIDs
+
+            return processes
+        except subprocess.CalledProcessError as e:
+            print(f"Error running winedbg: {e}")
+            return []
 
 
+    def get_running_processes(self):
+        current_running_processes = {}
 
+        try:
+            pgrep_output = subprocess.check_output(["pgrep", "-aif", "\\.exe"]).decode().splitlines()
+            print(f"pgrep output: {pgrep_output}")  # Debugging output
 
+            for script in self.find_python_scripts():
+                yaml_info = self.extract_yaml_info(script)
+                script_key = yaml_info['sha256sum']
+                exe_name = Path(yaml_info['exe_file']).name
+                wineprefix = str(Path(yaml_info['wineprefix']).resolve())
+
+                matching_processes = [
+                    (int(line.split()[0]), line.split(None, 1)[1]) for line in pgrep_output
+                    if exe_name in line
+                ]
+
+                print(f"Initial matching processes for {script.stem}: {matching_processes}")  # Debugging output
+
+                # If duplicates are found, refine using winedbg
+                if len(matching_processes) > 1:
+                    wine_processes = self.get_wine_processes(wineprefix, exe_name)  # Note the use of self.get_wine_processes
+                    print(f"Refined processes using winedbg for {script.stem}: {wine_processes}")  # Debugging output
+                    matching_processes = wine_processes
+
+                if matching_processes:
+                    for pid, cmd in matching_processes:
+                        row = self.script_buttons.get(script_key)
+                        if row:
+                            print(f"Highlighting row for {script.stem}")  # Debugging output
+                            current_running_processes[script_key] = {
+                                "row": row,
+                                "script": script,
+                                "exe_name": exe_name,
+                                "pid": pid,
+                                "command": cmd
+                            }
+                            self.update_ui_for_running_process(script_key, row, current_running_processes)
+                else:
+                    self.process_ended(script_key)
+
+        except subprocess.CalledProcessError:
+            pgrep_output = []
+            self.stop_monitoring()
+            self.count = 0
+
+        return current_running_processes
 
 def parse_args():
     import argparse
