@@ -1883,6 +1883,7 @@ class WineCharmApp(Gtk.Application):
     def process_cli_file(self, file_path):
         #self.show_processing_spinner("Processing...")
         #threading.Thread(target=self._process_cli_file, args=(file_path,)).start()
+        print (" - - - -  - - - - - - -  - - -- -  -process_cli_file")
         self._process_cli_file(file_path)
         
     def _process_cli_file(self, file_path):
@@ -2267,7 +2268,26 @@ class WineCharmApp(Gtk.Application):
         #self.window.present()
 
 
+################### experiment with order
+    def on_open(self, app, files, *args):
+        # Ensure the application is fully initialized
+        print("1. on_open method called")
+        
+        # Initialize the application if it hasn't been already
+        self.initialize_app()
+        print("2. self.initialize_app initiated")
+        
+        # Present the window as soon as possible
+        self.window.present()
+        print("3. self.window.present() Complete")
+        
+        if  self.command_line_file:
+            print("Trying to process file inside on template initialized")
 
+            GLib.idle_add(self.show_processing_spinner)
+            self.process_cli_file(self.command_line_file)
+            #self.command_line_file = None  # Reset after processing
+            #GLib.timeout_add_seconds(10, self.hide_processing_spinner)
 
 
 
