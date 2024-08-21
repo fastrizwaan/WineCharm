@@ -1660,10 +1660,10 @@ class WineCharmApp(Gtk.Application):
                 self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
                 self.launch_button.set_tooltip_text("Play")
 
-            script_path = process_info.get("script")
+            script_path = process_info.get("script")  # Corrected here
             if script_path and script_path.exists():
                 yaml_info = self.extract_yaml_info(script_path)
-                wineprefix = Path(script).parent
+                wineprefix = Path(script_path).parent  # Corrected here
                 if wineprefix:
                     wineprefix_path = Path(wineprefix)
                     self.create_scripts_for_lnk_files(wineprefix_path)
@@ -1675,6 +1675,7 @@ class WineCharmApp(Gtk.Application):
             # If there are no more running processes, reset all UI elements
             if not self.running_processes:
                 self.reset_all_ui_elements()
+
 
     def reset_all_ui_elements(self):
         # Reset any UI elements that should be updated when no processes are running
