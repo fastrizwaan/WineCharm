@@ -186,22 +186,6 @@ class WineCharmApp(Gtk.Application):
     def quit_app(self, action=None, param=None):
         self.quit()
 
-    def load_icon(self, script):
-        icon_name = script.stem + ".png"
-        icon_dir = script.parent
-        icon_path = icon_dir / icon_name
-        default_icon_path = self.get_default_icon_path()
-
-        try:
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(icon_path), 64, 64)
-            return Gdk.Texture.new_for_pixbuf(pixbuf)
-        except Exception:
-            try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(default_icon_path), 64, 64)
-                return Gdk.Texture.new_for_pixbuf(pixbuf)
-            except Exception:
-                return None
-
     def get_default_icon_path(self):
         xdg_data_dirs = os.getenv("XDG_DATA_DIRS", "").split(":")
         icon_relative_path = "icons/hicolor/128x128/apps/org.winehq.Wine.png"
@@ -275,12 +259,12 @@ class WineCharmApp(Gtk.Application):
             threading.Thread(target=initialize).start()
 
     def on_template_initialized(self):
+        print("Template initialization complete.")
         self.initializing_template = False
-        if self.spinner:
-            self.spinner.stop()
-            self.open_button_box.remove(self.spinner)
-            self.spinner = None
-
+        
+        # Ensure the spinner is stopped after initialization
+        self.hide_processing_spinner()
+        
         self.set_open_button_label("Open")
         self.set_open_button_icon_visible(True)  # Restore the open-folder icon
         self.search_button.set_sensitive(True)  # Enable the search button
@@ -291,10 +275,19 @@ class WineCharmApp(Gtk.Application):
 
         print("Template initialization completed and UI updated.")
         self.show_initializing_step("Initialization Complete!")
-        GLib.idle_add(self.mark_step_as_done, "Initialization Complete!")
-
-        if self.command_line_file:
+        self.mark_step_as_done("Initialization Complete!")
+        self.hide_processing_spinner()
+        self.create_script_list()
+        
+        
+        # Check if there's a CLI file to process after initialization
+        if  self.command_line_file:
+            print("Trying to process file inside on template initialized")
+            GLib.idle_add(self.show_processing_spinner)
             self.process_cli_file(self.command_line_file)
+            self.command_line_file = None  # Reset after processing
+            GLib.timeout_add_seconds(1, self.hide_processing_spinner)
+
 
     def set_open_button_label(self, text):
         box = self.open_button.get_child()
@@ -658,15 +651,27 @@ class WineCharmApp(Gtk.Application):
         self.open_button.set_visible(True)
 
     def create_script_list(self):
+        # Clear the flowbox
         self.flowbox.remove_all()
-        self.script_buttons = {}
 
+        # Rebuild the script list
+        self.script_buttons = {}
         scripts = self.find_python_scripts()
+
         for script in scripts:
             row = self.create_script_row(script)
             if row:
                 self.flowbox.append(row)
+                yaml_info = self.extract_yaml_info(script)
+                exe_name = Path(yaml_info['exe_file']).name
+
                 self.script_buttons[script.stem] = row
+
+                # Check if the script is running
+                if exe_name in self.running_processes:
+                    row.add_css_class("highlighted")
+                else:
+                    row.remove_css_class("highlighted")
 
     def create_script_row(self, script):
         yaml_info = self.extract_yaml_info(script)
@@ -1380,7 +1385,6 @@ class WineCharmApp(Gtk.Application):
             shutil.move(extracted_icon_path, icon_path)
         self.create_script_list()
 
-        
     def callback_wrapper(self, callback, script, button=None, *args):
         # Check the method signature of the callback to determine what to pass
         callback_params = callback.__code__.co_varnames
@@ -1504,7 +1508,6 @@ class WineCharmApp(Gtk.Application):
             else:
                 ok_button.connect("clicked", lambda btn: self.on_ok_button_clicked(entry.get_text().strip(), script))
 
-
     def on_ok_rename_button_clicked(self, new_name, script):
         script_path = Path(script)
         yaml_info = self.extract_yaml_info(script)
@@ -1541,8 +1544,6 @@ class WineCharmApp(Gtk.Application):
         
         # Go back to the previous view
         self.on_back_button_clicked(None)
-
-
 
     def on_ok_button_clicked(self, new_args, script):
         try:
@@ -1677,8 +1678,6 @@ class WineCharmApp(Gtk.Application):
             if not self.running_processes:
                 self.reset_all_ui_elements()
 
-
-
     def reset_all_ui_elements(self):
         # Reset any UI elements that should be updated when no processes are running
         for row in self.script_buttons.values():
@@ -1691,6 +1690,9 @@ class WineCharmApp(Gtk.Application):
 
     def copy_template(self, prefix_dir):
         try:
+            if self.initializing_template:
+                 print(f"Template is being initialized, skipping copy_template!!!!")
+                 return
             print(f"Copying default template to {prefix_dir}")
             shutil.copytree(default_template, prefix_dir, symlinks=True)
         except shutil.Error as e:
@@ -1808,56 +1810,6 @@ class WineCharmApp(Gtk.Application):
                 else:
                     self.set_dynamic_variables()
 
-
-    def create_script_list(self):
-        # Check if the window is realized before making updates to the UI
-        if not self.window or not self.window.get_realized():
-            print("Window not realized yet. Deferring script list creation.")
-            GLib.idle_add(self.create_script_list)
-            return
-
-        # Proceed with UI updates if the window is realized
-        self.flowbox.remove_all()
-        self.script_buttons = {}
-
-        scripts = self.find_python_scripts()
-        for script in scripts:
-            row = self.create_script_row(script)
-            if row:
-                self.flowbox.append(row)
-                self.script_buttons[script.stem] = row
-
-        print("Script list created.")
-
-    def create_script_list(self):
-        # Use GLib.idle_add to ensure the removal happens when GTK is idle
-        self._clear_flowbox_and_add_scripts()
-
-    def _clear_flowbox_and_add_scripts(self):
-        # Clear the flowbox
-        self.flowbox.remove_all()
-
-        # Rebuild the script list
-        self.script_buttons = {}
-        scripts = self.find_python_scripts()
-
-        for script in scripts:
-            row = self.create_script_row(script)
-            if row:
-                self.flowbox.append(row)
-                yaml_info = self.extract_yaml_info(script)
-                exe_name = Path(yaml_info['exe_file']).name
-
-                self.script_buttons[script.stem] = row
-
-                # Check if the script is running
-                if exe_name in self.running_processes:
-                    row.add_css_class("highlighted")
-                else:
-                    row.remove_css_class("highlighted")
-
-        #print("Script list updated.")
-
     def process_cli_file(self, file_path):
         print(f"Processing CLI file: {file_path}")
         abs_file_path = str(Path(file_path).resolve())
@@ -1877,8 +1829,6 @@ class WineCharmApp(Gtk.Application):
                 pass #keep showing spinner
             else:
                 GLib.timeout_add_seconds(1, self.hide_processing_spinner)
-
-
 
     def show_processing_spinner(self, message="Processing..."):
         if not self.spinner:
@@ -1913,77 +1863,23 @@ class WineCharmApp(Gtk.Application):
 
         print("Spinner hidden.")
 
-
-
     def on_open(self, app, files, *args):
         # Ensure the application is fully initialized
         print("1. on_open method called")
         
         # Initialize the application if it hasn't been already
-        GLib.idle_add(self.initialize_app)
+        self.initialize_app()
         print("2. self.initialize_app initiated")
         
         # Present the window as soon as possible
-        self.window.present()
+        GLib.idle_add(self.window.present)
         print("3. self.window.present() Complete")
         
         if  self.command_line_file:
             print("Trying to process file inside on template initialized")
-            print("999999999999999999999999999999999")
+
             GLib.idle_add(self.show_processing_spinner)
             self.process_cli_file(self.command_line_file)
-            self.command_line_file = None  # Reset after processing
-            GLib.timeout_add_seconds(1, self.hide_processing_spinner)
-            
-        return False  # Returning False to ensure this function doesn't run again
-
-# bug, no exe and no templates, will copy incomolete template, so wait for template to initialize
-
-# Bug Remains template+exe initializing... not showing up
-
-
-
-    def on_template_initialized(self):
-        print("Template initialization complete.")
-        self.initializing_template = False
-        
-        # Ensure the spinner is stopped after initialization
-        self.hide_processing_spinner()
-        
-        # Check if there's a CLI file to process after initialization
-        if self.command_line_file:
-            print("Trying to process file inside on template initialized")
-            print("2222222222222222222222222222222222222222222222222222")
-            GLib.idle_add(self.show_processing_spinner)
-            self.process_cli_file(self.command_line_file)
-            self.command_line_file = None  # Reset after processing
-            GLib.timeout_add_seconds(1, self.hide_processing_spinner)
-        # Update the UI now that the template is initialized
-        #self.window.present()
-
-
-    def copy_template(self, prefix_dir):
-        try:
-            if self.initializing_template:
-                 print(f"Template is being initialized, skipping copy_template!!!!")
-                 return
-                
-            print("==========================================")
-            print(f"Copying default template to {prefix_dir}")
-            shutil.copytree(default_template, prefix_dir, symlinks=True)
-        except shutil.Error as e:
-            for src, dst, err in e.args[0]:
-                if not os.path.exists(dst):
-                    shutil.copy2(src, dst)
-                else:
-                    print(f"Skipping {src} -> {dst} due to error: {err}")
-        except Exception as e:
-            print(f"Error copying template: {e}")
-
-
-
-#### spinner shown for initializing template, and separately for process_cli
-## Bug: no template + no exe will only show template initialization spinner, but no script is created.
 
     def load_icon(self, script):
         icon_name = script.stem + ".png"
@@ -2004,7 +1900,6 @@ class WineCharmApp(Gtk.Application):
                 return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
             except Exception:
                 return None
-
 
     def load_icon_for_list(self, script):
         icon_name = script.stem + ".png"
@@ -2200,60 +2095,10 @@ class WineCharmApp(Gtk.Application):
 
  
 
-    def on_template_initialized(self):
-        print("Template initialization complete.")
-        self.initializing_template = False
-        
-        # Ensure the spinner is stopped after initialization
-        self.hide_processing_spinner()
-        
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)  # Restore the open-folder icon
-        self.search_button.set_sensitive(True)  # Enable the search button
-        self.view_toggle_button.set_sensitive(True)
-        
-        if self.open_button_handler_id is not None:
-            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
 
-        print("Template initialization completed and UI updated.")
-        self.show_initializing_step("Initialization Complete!")
-        self.mark_step_as_done("Initialization Complete!")
-        self.hide_processing_spinner()
-        self.create_script_list()
-        
-        
-        # Check if there's a CLI file to process after initialization
-        if  self.command_line_file:
-            print("Trying to process file inside on template initialized")
-            print("999999999999999999999999999999999")
-            GLib.idle_add(self.show_processing_spinner)
-            self.process_cli_file(self.command_line_file)
-            self.command_line_file = None  # Reset after processing
-            GLib.timeout_add_seconds(1, self.hide_processing_spinner)
-        # Update the UI now that the template is initialized
-        #self.window.present()
 
 
 ################### experiment with order
-    def on_open(self, app, files, *args):
-        # Ensure the application is fully initialized
-        print("1. on_open method called")
-        
-        # Initialize the application if it hasn't been already
-        self.initialize_app()
-        print("2. self.initialize_app initiated")
-        
-        # Present the window as soon as possible
-        GLib.idle_add(self.window.present)
-        print("3. self.window.present() Complete")
-        
-        if  self.command_line_file:
-            print("Trying to process file inside on template initialized")
-
-            GLib.idle_add(self.show_processing_spinner)
-            self.process_cli_file(self.command_line_file)
-            #self.command_line_file = None  # Reset after processing
-            #GLib.timeout_add_seconds(10, self.hide_processing_spinner)
 
 
 
