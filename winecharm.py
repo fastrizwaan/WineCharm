@@ -1858,15 +1858,7 @@ class WineCharmApp(Gtk.Application):
 
         #print("Script list updated.")
 
-
-
     def process_cli_file(self, file_path):
-        #self.show_processing_spinner("Processing...")
-        #threading.Thread(target=self._process_cli_file, args=(file_path,)).start()
-        print (" - - - -  - - - - - - -  - - -- -  -process_cli_file")
-        self._process_cli_file(file_path)
-        
-    def _process_cli_file(self, file_path):
         print(f"Processing CLI file: {file_path}")
         abs_file_path = str(Path(file_path).resolve())
         print(f"Resolved absolute CLI file path: {abs_file_path}")
@@ -1880,6 +1872,11 @@ class WineCharmApp(Gtk.Application):
             #self.create_script_list()
         except Exception as e:
             print(f"Error processing file: {e}")
+        finally:
+            if self.initializing_template:
+                pass #keep showing spinner
+            else:
+                GLib.timeout_add_seconds(1, self.hide_processing_spinner)
 
 
 
@@ -2258,30 +2255,7 @@ class WineCharmApp(Gtk.Application):
             #self.command_line_file = None  # Reset after processing
             #GLib.timeout_add_seconds(10, self.hide_processing_spinner)
 
-    def process_cli_file(self, file_path):
-        #threading.Thread(target=self._process_cli_file, args=(file_path,)).start()
-        print (" - - - -  - - - - - - -  - - -- -  -process_cli_file")
-        self._process_cli_file(file_path)
-        
-    def _process_cli_file(self, file_path):
-        print(f"Processing CLI file: {file_path}")
-        abs_file_path = str(Path(file_path).resolve())
-        print(f"Resolved absolute CLI file path: {abs_file_path}")
 
-        try:
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-            self.create_yaml_file(abs_file_path, None)
-            GLib.idle_add(self.create_script_list)
-            #self.create_script_list()
-        except Exception as e:
-            print(f"Error processing file: {e}")
-        finally:
-            if self.initializing_template:
-                pass #keep showing spinner
-            else:
-                GLib.timeout_add_seconds(1, self.hide_processing_spinner)
 
 
 
