@@ -1774,27 +1774,7 @@ class WineCharmApp(Gtk.Application):
 
         threading.Thread(target=server_thread, daemon=True).start()
 
-### waste?
-    def on_open(self, app, files, *args):
-        print("1. on_open method called")
 
-        # Ensure the window is created and shown first
-        if not hasattr(self, 'window') or not self.window:
-            self.create_main_window()
-
-        # Show the window immediately
-        self.window.present()
-        print("2. Window created and shown")
-
-        # Proceed with initialization in the background
-        GLib.idle_add(self.initialize_app)
-
-        if self.command_line_file:
-            GLib.idle_add(self.process_cli_file, self.command_line_file)
-
-        print("3. Finished on_open method")
-        GLib.timeout_add_seconds(1, self.hide_processing_spinner)
-#### /waste
 #-------------------------------
     def handle_cli_file(self, file_path):
         #self.on_activate()
@@ -1808,7 +1788,7 @@ class WineCharmApp(Gtk.Application):
         except GLib.Error as e:
             print(f"An error occurred: {e}")
         finally:
-            self.window.present()
+            GLib.idle_add(self.window.present)
 
 
 
@@ -1947,7 +1927,7 @@ class WineCharmApp(Gtk.Application):
         print("2. self.initialize_app initiated")
         
         # Present the window as soon as possible
-        GLib.idle_add(self.window.present)
+        self.window.present()
         print("3. self.window.present() Complete")
         
         if  self.command_line_file:
@@ -1973,11 +1953,6 @@ class WineCharmApp(Gtk.Application):
         # Ensure the spinner is stopped after initialization
         self.hide_processing_spinner()
         
-        # Write the current date and time to "initialized.txt"
-        initialized_file = default_template / "initialized.txt"
-        with open(initialized_file, "w") as f:
-            f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        
         # Check if there's a CLI file to process after initialization
         if self.command_line_file:
             print("Trying to process file inside on template initialized")
@@ -1992,11 +1967,10 @@ class WineCharmApp(Gtk.Application):
 
     def copy_template(self, prefix_dir):
         try:
-            initialized_file = default_template / "initialized.txt"
-
-            if not initialized_file.exists():
-                print(f"{initialized_file} does not exists, skipping template copy.")
-                return
+            if self.initializing_template:
+                 print(f"Template is being initialized, skipping copy_template!!!!")
+                 return
+                
             print("==========================================")
             print(f"Copying default template to {prefix_dir}")
             shutil.copytree(default_template, prefix_dir, symlinks=True)
@@ -2236,11 +2210,6 @@ class WineCharmApp(Gtk.Application):
         # Ensure the spinner is stopped after initialization
         self.hide_processing_spinner()
         
-        # Write the current date and time to "initialized.txt"
-        initialized_file = default_template / "initialized.txt"
-        with open(initialized_file, "w") as f:
-            f.write(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        
         self.set_open_button_label("Open")
         self.set_open_button_icon_visible(True)  # Restore the open-folder icon
         self.search_button.set_sensitive(True)  # Enable the search button
@@ -2278,7 +2247,7 @@ class WineCharmApp(Gtk.Application):
         print("2. self.initialize_app initiated")
         
         # Present the window as soon as possible
-        self.window.present()
+        GLib.idle_add(self.window.present)
         print("3. self.window.present() Complete")
         
         if  self.command_line_file:
