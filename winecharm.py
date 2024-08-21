@@ -613,7 +613,8 @@ class WineCharmApp(Gtk.Application):
             if file:
                 file_path = file.get_path()
                 self.show_processing_spinner("Processing...")
-                threading.Thread(target=self.process_file, args=(file_path,)).start()
+                self.process_file(file_path)
+                
         except GLib.Error as e:
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                 print(f"An error occurred: {e}")
@@ -1803,7 +1804,7 @@ class WineCharmApp(Gtk.Application):
         self.show_processing_spinner("Processing...")
         try:
             if file_path:
-                threading.Thread(target=self.process_file, args=(file_path,)).start()
+                self.process_file(file_path)
         except GLib.Error as e:
             print(f"An error occurred: {e}")
         finally:
