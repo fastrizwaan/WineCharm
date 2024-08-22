@@ -1,0 +1,292 @@
+WINE REGISTRY Version 2
+;; All keys relative to REGISTRY\\User\\S-1-5-21-0-0-0-1000
+
+#arch=win64
+
+[Control Panel\\Accessibility\\AudioDescription] 1724317658
+#time=1daf472bc68cc66
+"Locale"=dword:00000000
+"On"="0"
+
+[Control Panel\\Accessibility\\Blind Access] 1724317658
+#time=1daf472bc68c342
+"On"="0"
+
+[Control Panel\\Accessibility\\Keyboard Preference] 1724317658
+#time=1daf472bc68b686
+"On"="1"
+
+[Control Panel\\Accessibility\\ShowSounds] 1724317658
+#time=1daf472bc68c57c
+"On"="0"
+
+[Control Panel\\Desktop] 1724317658
+#time=1daf472bc68c9c8
+"ActiveWndTrackTimeout"=dword:00000000
+"BlockSendInputResets"="0"
+"CaretWidth"=dword:00000001
+"ClickLockTime"=dword:000004b0
+"DoubleClickHeight"="4"
+"DoubleClickWidth"="4"
+"DragFullWindows"="0"
+"DragHeight"="4"
+"DragWidth"="4"
+"FocusBorderHeight"=dword:00000001
+"FocusBorderWidth"=dword:00000001
+"FontSmoothing"="2"
+"FontSmoothingGamma"=dword:00000000
+"FontSmoothingOrientation"=dword:00000001
+"FontSmoothingType"=dword:00000001
+"ForegroundFlashCount"=dword:00000003
+"ForegroundLockTimeout"=dword:00000000
+"IconTitleWrap"="1"
+"LowPowerActive"="0"
+"MenuShowDelay"="400"
+"UserPreferencesMask"=hex:30,00,00,80,12,00,00,00
+"Wallpaper"=""
+"WheelScrollChars"="3"
+"WheelScrollLines"="3"
+
+[Control Panel\\Desktop\\WindowMetrics] 1724317658
+#time=1daf472bc68c6bc
+"BorderWidth"="-15"
+"CaptionHeight"="-270"
+"CaptionWidth"="-270"
+"IconSpacing"="-1125"
+"IconTitleWrap"="1"
+"IconVerticalSpacing"="-1125"
+"MenuHeight"="-270"
+"MenuWidth"="-270"
+"PaddedBorderWidth"="0"
+"ScrollHeight"="-240"
+"ScrollWidth"="-240"
+"SmCaptionHeight"="-225"
+"SmCaptionWidth"="-225"
+
+[Control Panel\\International] 1724317658
+#time=1daf472bc600f5e
+"iCalendarType"="1"
+"iCountry"="1"
+"iCurrDigits"="2"
+"iCurrency"="0"
+"iDate"="0"
+"iDigits"="2"
+"iFirstDayOfWeek"="6"
+"iFirstWeekOfYear"="0"
+"iLZero"="1"
+"iMeasure"="1"
+"iNegCurr"="0"
+"iNegNumber"="1"
+"iPaperSize"="1"
+"iTime"="0"
+"iTimePrefix"="0"
+"iTLZero"="0"
+"Locale"="00000409"
+"LocaleName"="en-US"
+"NumShape"="1"
+"s1159"="AM"
+"s2359"="PM"
+"sCountry"="United States"
+"sCurrency"="$"
+"sDate"="/"
+"sDecimal"="."
+"sGrouping"="3;0"
+"sLanguage"="ENU"
+"sList"=","
+"sLongDate"="dddd, MMMM d, yyyy"
+"sMonDecimalSep"="."
+"sMonGrouping"="3;0"
+"sMonThousandSep"=","
+"sNativeDigits"="0123456789"
+"sNegativeSign"="-"
+"sPositiveSign"=""
+"sShortDate"="M/d/yyyy"
+"sShortTime"="h:mm tt"
+"sThousand"=","
+"sTime"=":"
+"sTimeFormat"="h:mm:ss tt"
+"sYearMonth"="MMMM yyyy"
+
+[Control Panel\\International\\Geo] 1724317658
+#time=1daf472bc601030
+"Name"="US"
+"Nation"="244"
+
+[Control Panel\\International\\\xd83c\xdf0e\xd83c\xdf0f\xd83c\xdf0d] 1724317658
+#time=1daf472bc600478
+"Currencies"="USD"
+
+[Control Panel\\Keyboard] 1724317658
+#time=1daf472bc68b758
+"KeyboardDelay"="1"
+"KeyboardSpeed"="31"
+
+[Control Panel\\Mouse] 1724317658
+#time=1daf472bc68c77a
+"ActiveWindowTracking"=dword:00000000
+"DoubleClickHeight"="4"
+"DoubleClickSpeed"="500"
+"DoubleClickWidth"="4"
+"MouseHoverHeight"="4"
+"MouseHoverTime"="400"
+"MouseHoverWidth"="4"
+"MouseSensitivity"="10"
+"MouseSpeed"="1"
+"MouseThreshold1"="6"
+"MouseThreshold2"="10"
+"SnapToDefaultButton"="0"
+"SwapMouseButtons"="0"
+
+[Control Panel\\Sound] 1724317658
+#time=1daf472bc689cdc
+"Beep"="Yes"
+
+[Environment] 1724317658
+#time=1daf472bc5d9e0e
+
+[Keyboard Layout\\Preload] 1724317658
+#time=1daf472bc689282
+"1"="00000409"
+
+[Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Folders] 1724317658
+#time=1daf472bc691036
+
+[Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\User Shell Folders] 1724317658
+#time=1daf472bc6910d6
+
+[Software\\Wine\\AppDefaults] 1724317658
+#time=1daf472bc6a14c2
+
+[Software\\Wine\\DllOverrides] 1724317658
+#time=1daf472bc69fbae
+
+[Software\\Wine\\Fonts] 1724317968
+#time=1daf4737561993c
+"Codepages"="1252,437"
+"LogPixels"=dword:00000060
+
+[Software\\Wine\\Fonts\\External Fonts] 1724317968
+#time=1daf47375621524
+"Caladea Bold (TrueType)"="Z:\\usr\\share\\fonts\\google-crosextra-caladea\\Caladea-Bold.ttf"
+"Caladea Bold Italic (TrueType)"="Z:\\usr\\share\\fonts\\google-crosextra-caladea\\Caladea-BoldItalic.ttf"
+"Caladea Italic (TrueType)"="Z:\\usr\\share\\fonts\\google-crosextra-caladea\\Caladea-Italic.ttf"
+"Caladea Regular (TrueType)"="Z:\\usr\\share\\fonts\\google-crosextra-caladea\\Caladea-Regular.ttf"
+"Cantarell Regular (TrueType)"="Z:\\usr\\share\\fonts\\cantarell\\Cantarell-VF.otf"
+"Carlito Bold (TrueType)"="Z:\\usr\\share\\fonts\\google-crosextra-carlito\\Carlito-Bold.ttf"
+"Carlito Bold Italic (TrueType)"="Z:\\usr\\share\\fonts\\google-crosextra-carlito\\Carlito-BoldItalic.ttf"
+"Carlito Italic (TrueType)"="Z:\\usr\\share\\fonts\\google-crosextra-carlito\\Carlito-Italic.ttf"
+"Carlito Regular (TrueType)"="Z:\\usr\\share\\fonts\\google-crosextra-carlito\\Carlito-Regular.ttf"
+"DejaVu Sans (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSans.ttf"
+"DejaVu Sans Bold (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSans-Bold.ttf"
+"DejaVu Sans Bold Oblique (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSans-BoldOblique.ttf"
+"DejaVu Sans Condensed (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSansCondensed.ttf"
+"DejaVu Sans Condensed Bold (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSansCondensed-Bold.ttf"
+"DejaVu Sans Condensed Bold Oblique (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSansCondensed-BoldOblique.ttf"
+"DejaVu Sans Condensed Oblique (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSansCondensed-Oblique.ttf"
+"DejaVu Sans ExtraLight (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSans-ExtraLight.ttf"
+"DejaVu Sans Mono (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSansMono.ttf"
+"DejaVu Sans Mono Bold (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSansMono-Bold.ttf"
+"DejaVu Sans Mono Bold Oblique (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSansMono-BoldOblique.ttf"
+"DejaVu Sans Mono Oblique (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSansMono-Oblique.ttf"
+"DejaVu Sans Oblique (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSans-Oblique.ttf"
+"DejaVu Serif (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSerif.ttf"
+"DejaVu Serif Bold (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSerif-Bold.ttf"
+"DejaVu Serif Bold Italic (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSerif-BoldItalic.ttf"
+"DejaVu Serif Condensed (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSerifCondensed.ttf"
+"DejaVu Serif Condensed Bold (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSerifCondensed-Bold.ttf"
+"DejaVu Serif Condensed Bold Italic (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSerifCondensed-BoldItalic.ttf"
+"DejaVu Serif Condensed Italic (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSerifCondensed-Italic.ttf"
+"DejaVu Serif Italic (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuSerif-Italic.ttf"
+"DejaVuMathTeXGyre-Regular (TrueType)"="Z:\\usr\\share\\fonts\\dejavu\\DejaVuMathTeXGyre.ttf"
+"FreeMono (TrueType)"="Z:\\usr\\share\\fonts\\gnu-free\\FreeMono.ttf"
+"FreeMono Bold (TrueType)"="Z:\\usr\\share\\fonts\\gnu-free\\FreeMonoBold.ttf"
+"FreeMono Bold Oblique (TrueType)"="Z:\\usr\\share\\fonts\\gnu-free\\FreeMonoBoldOblique.ttf"
+"FreeMono Oblique (TrueType)"="Z:\\usr\\share\\fonts\\gnu-free\\FreeMonoOblique.ttf"
+"FreeSans (TrueType)"="Z:\\usr\\share\\fonts\\gnu-free\\FreeSans.ttf"
+"FreeSans Bold (TrueType)"="Z:\\usr\\share\\fonts\\gnu-free\\FreeSansBold.ttf"
+"FreeSans Bold Oblique (TrueType)"="Z:\\usr\\share\\fonts\\gnu-free\\FreeSansBoldOblique.ttf"
+"FreeSans Oblique (TrueType)"="Z:\\usr\\share\\fonts\\gnu-free\\FreeSansOblique.ttf"
+"FreeSerif (TrueType)"="Z:\\usr\\share\\fonts\\gnu-free\\FreeSerif.ttf"
+"FreeSerif Bold (TrueType)"="Z:\\usr\\share\\fonts\\gnu-free\\FreeSerifBold.ttf"
+"FreeSerif Bold Italic (TrueType)"="Z:\\usr\\share\\fonts\\gnu-free\\FreeSerifBoldItalic.ttf"
+"FreeSerif Italic (TrueType)"="Z:\\usr\\share\\fonts\\gnu-free\\FreeSerifItalic.ttf"
+"Liberation Mono (TrueType)"="Z:\\usr\\share\\fonts\\liberation-fonts\\LiberationMono-Regular.ttf"
+"Liberation Mono Bold (TrueType)"="Z:\\usr\\share\\fonts\\liberation-fonts\\LiberationMono-Bold.ttf"
+"Liberation Mono Bold Italic (TrueType)"="Z:\\usr\\share\\fonts\\liberation-fonts\\LiberationMono-BoldItalic.ttf"
+"Liberation Mono Italic (TrueType)"="Z:\\usr\\share\\fonts\\liberation-fonts\\LiberationMono-Italic.ttf"
+"Liberation Sans (TrueType)"="Z:\\usr\\share\\fonts\\liberation-fonts\\LiberationSans-Regular.ttf"
+"Liberation Sans Bold (TrueType)"="Z:\\usr\\share\\fonts\\liberation-fonts\\LiberationSans-Bold.ttf"
+"Liberation Sans Bold Italic (TrueType)"="Z:\\usr\\share\\fonts\\liberation-fonts\\LiberationSans-BoldItalic.ttf"
+"Liberation Sans Italic (TrueType)"="Z:\\usr\\share\\fonts\\liberation-fonts\\LiberationSans-Italic.ttf"
+"Liberation Serif (TrueType)"="Z:\\usr\\share\\fonts\\liberation-fonts\\LiberationSerif-Regular.ttf"
+"Liberation Serif Bold (TrueType)"="Z:\\usr\\share\\fonts\\liberation-fonts\\LiberationSerif-Bold.ttf"
+"Liberation Serif Bold Italic (TrueType)"="Z:\\usr\\share\\fonts\\liberation-fonts\\LiberationSerif-BoldItalic.ttf"
+"Liberation Serif Italic (TrueType)"="Z:\\usr\\share\\fonts\\liberation-fonts\\LiberationSerif-Italic.ttf"
+"Marlett (TrueType)"="Z:\\app\\share\\wine\\fonts\\marlett.ttf"
+"Noto Color Emoji"="Z:\\usr\\share\\fonts\\noto-emoji\\NotoColorEmoji.ttf"
+"Source Code Pro (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-Regular.otf"
+"Source Code Pro Black (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-Black.otf"
+"Source Code Pro Black Italic (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-BlackIt.otf"
+"Source Code Pro Bold (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-Bold.otf"
+"Source Code Pro Bold Italic (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-BoldIt.otf"
+"Source Code Pro ExtraLight (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-ExtraLight.otf"
+"Source Code Pro ExtraLight Italic (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-ExtraLightIt.otf"
+"Source Code Pro Italic (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-It.otf"
+"Source Code Pro Light (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-Light.otf"
+"Source Code Pro Light Italic (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-LightIt.otf"
+"Source Code Pro Medium (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-Medium.otf"
+"Source Code Pro Medium Italic (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-MediumIt.otf"
+"Source Code Pro Semibold (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-Semibold.otf"
+"Source Code Pro Semibold Italic (TrueType)"="Z:\\usr\\share\\fonts\\adobe-source-code-pro-fonts\\SourceCodePro-SemiboldIt.otf"
+"Symbol (TrueType)"="Z:\\app\\share\\wine\\fonts\\symbol.ttf"
+"Tahoma (TrueType)"="Z:\\app\\share\\wine\\fonts\\tahoma.ttf"
+"Tahoma Bold (TrueType)"="Z:\\app\\share\\wine\\fonts\\tahomabd.ttf"
+"TeXGyreAdventor-Bold (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreadventor-bold.otf"
+"TeXGyreAdventor-BoldItalic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreadventor-bolditalic.otf"
+"TeXGyreAdventor-Italic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreadventor-italic.otf"
+"TeXGyreAdventor-Regular (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreadventor-regular.otf"
+"TeXGyreBonum-Bold (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrebonum-bold.otf"
+"TeXGyreBonum-BoldItalic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrebonum-bolditalic.otf"
+"TeXGyreBonum-Italic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrebonum-italic.otf"
+"TeXGyreBonum-Regular (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrebonum-regular.otf"
+"TeXGyreChorus-MediumItalic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrechorus-mediumitalic.otf"
+"TeXGyreCursor-Bold (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrecursor-bold.otf"
+"TeXGyreCursor-BoldItalic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrecursor-bolditalic.otf"
+"TeXGyreCursor-Italic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrecursor-italic.otf"
+"TeXGyreCursor-Regular (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrecursor-regular.otf"
+"TeXGyreHeros-Bold (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreheros-bold.otf"
+"TeXGyreHeros-BoldItalic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreheros-bolditalic.otf"
+"TeXGyreHeros-Italic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreheros-italic.otf"
+"TeXGyreHeros-Regular (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreheros-regular.otf"
+"TeXGyreHerosCondensed-Bold (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreheroscn-bold.otf"
+"TeXGyreHerosCondensed-BoldItalic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreheroscn-bolditalic.otf"
+"TeXGyreHerosCondensed-Italic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreheroscn-italic.otf"
+"TeXGyreHerosCondensed-Regular (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreheroscn-regular.otf"
+"TeXGyrePagella-Bold (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrepagella-bold.otf"
+"TeXGyrePagella-BoldItalic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrepagella-bolditalic.otf"
+"TeXGyrePagella-Italic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrepagella-italic.otf"
+"TeXGyrePagella-Regular (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyrepagella-regular.otf"
+"TeXGyreSchola-Bold (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreschola-bold.otf"
+"TeXGyreSchola-BoldItalic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreschola-bolditalic.otf"
+"TeXGyreSchola-Italic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreschola-italic.otf"
+"TeXGyreSchola-Regular (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyreschola-regular.otf"
+"TeXGyreTermes-Bold (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyretermes-bold.otf"
+"TeXGyreTermes-BoldItalic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyretermes-bolditalic.otf"
+"TeXGyreTermes-Italic (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyretermes-italic.otf"
+"TeXGyreTermes-Regular (TrueType)"="Z:\\usr\\share\\fonts\\tex-gyre\\texgyretermes-regular.otf"
+"Webdings (TrueType)"="Z:\\app\\share\\wine\\fonts\\webdings.ttf"
+"Wingdings (TrueType)"="Z:\\app\\share\\wine\\fonts\\wingding.ttf"
+
+[Volatile Environment] 1724317658
+#time=1daf472bc69db24
+"APPDATA"="C:\\users\\xouserhomexo\\AppData\\Roaming"
+"CLIENTNAME"="Console"
+"HOMEDRIVE"="C:"
+"HOMEPATH"="\\users\\xouserhomexo"
+"HOMESHARE"=""
+"LOCALAPPDATA"="C:\\users\\xouserhomexo\\AppData\\Local"
+"LOGONSERVER"="\\\\FEDORA"
+"SESSIONNAME"="Console"
+"USERDOMAIN"="FEDORA"
+"USERNAME"="xouserhomexo"
+"USERPROFILE"="C:\\users\\xouserhomexo"
