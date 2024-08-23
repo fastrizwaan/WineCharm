@@ -15,6 +15,7 @@ import sys
 import socket
 import time
 import glob
+import fnmatch
 
 from datetime import datetime
 
@@ -83,6 +84,7 @@ class WineCharmApp(Gtk.Application):
         self.hamburger_actions = [
             ("🛠️ Settings...", self.on_settings_clicked),
             ("☠️ Kill all...", self.on_kill_all_clicked),
+            ("📂 Import Wine Directory", self.on_import_wine_directory_clicked),
             ("❓ Help...", self.on_help_clicked),
             ("📖 About...", self.on_about_clicked),
             ("🚪 Quit...", self.quit_app)
@@ -1792,23 +1794,6 @@ class WineCharmApp(Gtk.Application):
 
         threading.Thread(target=server_thread, daemon=True).start()
 
-
-    def handle_cli_file(self, file_path):
-        #self.on_activate()
-        self.create_main_window()
-        self.create_script_list()
-        print("11111111111111111111111")
-        self.show_processing_spinner("Processing...")
-        try:
-            if file_path:
-                self.process_file(file_path)
-        except GLib.Error as e:
-            print(f"An error occurred: {e}")
-        finally:
-            GLib.idle_add(self.window.present)
-
-
-
     def initialize_app(self):
         if not hasattr(self, 'window') or not self.window:
             # Call the startup code
@@ -1987,6 +1972,204 @@ class WineCharmApp(Gtk.Application):
         # Recreate the script list with the new view
         self.create_script_list()
 
+# import wine directory
+    def on_import_wine_directory_clicked(self, action, param):
+        dialog = Gtk.FileChooserDialog(
+            title="Select Wine Directory",
+            action=Gtk.FileChooserAction.SELECT_FOLDER,
+            transient_for=self.window,
+            modal=True
+        )
+        dialog.add_buttons(
+            "Cancel", Gtk.ResponseType.CANCEL,
+            "Open", Gtk.ResponseType.OK
+        )
+        dialog.connect("response", self.on_import_directory_response)
+        dialog.present()
+        print("FileChooserDialog presented for importing Wine directory.")
+
+
+    def on_import_directory_response(self, dialog, response):
+        if response == Gtk.ResponseType.OK:
+            file = dialog.get_file()
+            if file:
+                directory = file.get_path()
+                print(f"Selected directory: {directory}")
+                if directory and (Path(directory) / "system.reg").exists():
+                    print(f"Valid Wine directory selected: {directory}")
+                    self.show_processing_spinner(f"Importing {Path(directory).name}")
+                    self.disable_open_button()
+
+                    dest_dir = prefixes_dir / Path(directory).name
+                    print(f"Copying Wine directory to: {dest_dir}")
+                    threading.Thread(target=self.copy_wine_directory, args=(directory, dest_dir)).start()
+                else:
+                    print(f"Invalid directory selected: {directory}")
+                    self.show_error_dialog("Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
+        dialog.destroy()
+        print("FileChooserDialog destroyed.")
+
+    def copy_wine_directory(self, src, dst):
+        try:
+            self.custom_copytree(src, dst)
+            print(f"Successfully copied Wine directory to {dst}")
+            
+            self.process_reg_files(dst)
+            
+            print(f"Creating scripts for .lnk files in {dst}")
+            self.create_scripts_for_lnk_files(dst)
+            print(f"Scripts created for .lnk files in {dst}")
+
+            print(f"Creating scripts for .exe files in {dst}")
+            self.create_scripts_for_exe_files(dst)
+            print(f"Scripts created for .exe files in {dst}")
+
+            GLib.idle_add(self.create_script_list)
+        finally:
+            GLib.idle_add(self.enable_open_button)
+            GLib.idle_add(self.hide_processing_spinner)
+            print("Completed importing Wine directory process.")
+
+    def create_scripts_for_exe_files(self, wineprefix):
+        exe_files = self.find_exe_files(wineprefix)
+        for exe_file in exe_files:
+            self.create_yaml_file(exe_file, wineprefix, use_exe_name=True)
+
+    def find_exe_files(self, wineprefix):
+        drive_c = Path(wineprefix) / "drive_c"
+        exclude_patterns = [
+            "windows", "dw20.exe", "BsSndRpt*.exe", "Rar.exe", "tdu2k.exe",
+            "python.exe", "pythonw.exe", "zsync.exe", "zsyncmake.exe", "RarExtInstaller.exe",
+            "UnRAR.exe", "wmplayer.exe", "iexplore.exe", "LendaModTool.exe", "netfx*.exe",
+            "wordpad.exe", "quickSFV*.exe", "UnityCrashHand*.exe", "CrashReportClient.exe",
+            "installericon.exe", "dwtrig*.exe", "ffmpeg*.exe", "ffprobe*.exe", "dx*setup.exe",
+            "*vshost.exe", "*mgcb.exe", "cls-lolz*.exe", "cls-srep*.exe", "directx*.exe",
+            "UnrealCEFSubProc*.exe", "UE4PrereqSetup*.exe", "dotnet*.exe", "oalinst.exe",
+            "*redist*.exe", "7z*.exe", "unins*.exe"
+        ]
+        
+        exe_files_found = []
+
+        for root, dirs, files in os.walk(drive_c):
+            dirs[:] = [d for d in dirs if not fnmatch.fnmatch(d, "windows")]
+            for file in files:
+                file_path = Path(root) / file
+                if any(fnmatch.fnmatch(file, pattern) for pattern in exclude_patterns):
+                    continue
+                if file_path.suffix.lower() == ".exe" and file_path.is_file():
+                    exe_files_found.append(file_path)
+
+        return exe_files_found
+
+    def process_reg_files(self, wineprefix):
+        print(f"Starting to process .reg files in {wineprefix}")
+        
+        # Get current username from the environment
+        current_username = os.getenv("USERNAME") or os.getenv("USER")
+        if not current_username:
+            print("Unable to determine the current username from the environment.")
+            return
+        print(f"Current username: {current_username}")
+
+        # Read the USERNAME from user.reg
+        user_reg_path = os.path.join(wineprefix, "user.reg")
+        if not os.path.exists(user_reg_path):
+            print(f"File not found: {user_reg_path}")
+            return
+        
+        print(f"Reading user.reg file from {user_reg_path}")
+        with open(user_reg_path, 'r') as file:
+            content = file.read()
+        
+        match = re.search(r'"USERNAME"="([^"]+)"', content, re.IGNORECASE)
+        if not match:
+            print("Unable to determine the USERNAME from user.reg.")
+            return
+        
+        wine_username = match.group(1)
+        print(f"Found USERNAME in user.reg: {wine_username}")
+
+        # Define replacements
+        replacements = {
+            f"\\\\users\\\\{wine_username}": f"\\\\users\\\\{current_username}",
+            f"\\\\home\\\\{wine_username}": f"\\\\home\\\\{current_username}",
+            f'"USERNAME"="{wine_username}"': f'"USERNAME"="{current_username}"'
+        }
+        print("Defined replacements:")
+        for old, new in replacements.items():
+            print(f"  {old} -> {new}")
+
+        # Process all .reg files in the wineprefix
+        for root, dirs, files in os.walk(wineprefix):
+            for file in files:
+                if file.endswith(".reg"):
+                    file_path = os.path.join(root, file)
+                    print(f"Processing {file_path}")
+                    
+                    with open(file_path, 'r') as reg_file:
+                        reg_content = reg_file.read()
+                    
+                    for old, new in replacements.items():
+                        if old in reg_content:
+                            reg_content = reg_content.replace(old, new)
+                            print(f"Replaced {old} with {new} in {file_path}")
+                        else:
+                            print(f"No instances of {old} found in {file_path}")
+
+                    with open(file_path, 'w') as reg_file:
+                        reg_file.write(reg_content)
+                    print(f"Finished processing {file_path}")
+
+        print(f"Completed processing .reg files in {wineprefix}")
+
+    def custom_copytree(self, src, dst):
+        os.makedirs(dst, exist_ok=True)
+        for item in os.listdir(src):
+            s = os.path.join(src, item)
+            d = os.path.join(dst, item)
+            if os.path.islink(s):
+                linkto = os.readlink(s)
+                os.symlink(linkto, d)
+            elif os.path.isdir(s):
+                self.custom_copytree(s, d)
+            else:
+                shutil.copy2(s, d)
+                
+    def show_error_dialog(self, title, message):
+        dialog = Gtk.Window(transient_for=self.window, modal=True, title=title)
+        dialog.set_default_size(300, 100)
+        dialog.set_deletable(True)
+
+        content_area = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        content_area.set_margin_start(10)
+        content_area.set_margin_end(10)
+        content_area.set_margin_top(10)
+        content_area.set_margin_bottom(10)
+        dialog.set_child(content_area)
+
+        label = Gtk.Label(label=message)
+        content_area.append(label)
+
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        button_box.set_halign(Gtk.Align.END)
+        content_area.append(button_box)
+
+        close_button = Gtk.Button(label="Close")
+        close_button.connect("clicked", lambda btn: dialog.destroy())
+        button_box.append(close_button)
+
+        dialog.present()
+
+    def disable_open_button(self):
+        if self.open_button:
+            self.open_button.set_sensitive(False)
+        print("Open button disabled.")
+
+    def enable_open_button(self):
+        if self.open_button:
+            self.open_button.set_sensitive(True)
+        print("Open button enabled.")
+        
 def parse_args():
     import argparse
     parser = argparse.ArgumentParser(description="WineCharm GUI application")
