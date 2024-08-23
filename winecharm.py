@@ -23,7 +23,7 @@ gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
 
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
-
+#qfrom concurrent.futures import ThreadPoolExecutor
 
 version = "0.77.9"
 # Constants
@@ -39,16 +39,11 @@ do_not_kill = "bin/winecharm"
 
 SOCKET_FILE = winecharmdir / "winecharm_socket"
 
-
-
 # These need to be dynamically updated:
 runner = ""  # which wine
 wine_version = ""  # runner --version
 template = ""  # default: WineCharm-win64 ; #if not found in settings.yaml at winecharm directory add default_template
 arch = ""  # default: win64 ; # #if not found in settings.yaml at winecharm directory add win64
-
-
-
 
 
 class WineCharmApp(Gtk.Application):
@@ -162,8 +157,6 @@ class WineCharmApp(Gtk.Application):
         self.running_processes.clear()
         self.create_script_list()
 
-
-
     def on_help_clicked(self, action=None, param=None):
         print("Help action triggered")
         # You can add code here to show a help dialog or window.
@@ -237,10 +230,10 @@ class WineCharmApp(Gtk.Application):
 
             steps = [
                 ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-                #("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-                #("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
-                #("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
-                #("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+                ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+                ("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+                ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+                ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
                 #("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
                 #("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
             ]
@@ -377,6 +370,13 @@ class WineCharmApp(Gtk.Application):
         template = "WineCharm-win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('template', "WineCharm-win64")
         arch = "win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('arch', "win64")
 
+    def load_settings(self):
+        settings_file_path = winecharmdir / "settings.yml"
+        if settings_file_path.exists():
+            with open(settings_file_path, 'r') as settings_file:
+                return yaml.safe_load(settings_file)
+        return {}
+        
     def set_open_button_icon_visible(self, visible):
         box = self.open_button.get_child()
         child = box.get_first_child()
@@ -400,11 +400,8 @@ class WineCharmApp(Gtk.Application):
         current_running_processes = self.get_running_processes()
         self.cleanup_ended_processes(current_running_processes)
 
-
-
     def on_focus_out(self, controller):
         self.monitoring_active = False
-
 
     def start_monitoring(self, delay=2):
         self.stop_monitoring()  # Ensure the old monitoring is stopped before starting a new one
@@ -419,7 +416,6 @@ class WineCharmApp(Gtk.Application):
             except ValueError:
                 #print(f"Warning: Attempted to remove a non-existent or already removed source ID {self._monitoring_id}")
                 self._monitoring_id = None
-
 
     def handle_sigint(self, signum, frame):
         if SOCKET_FILE.exists():
@@ -451,12 +447,23 @@ class WineCharmApp(Gtk.Application):
         self.back_button.connect("clicked", self.on_back_button_clicked)
         self.headerbar.pack_start(self.back_button)
 
+        # Search button
         self.search_button = Gtk.ToggleButton()
         search_icon = Gtk.Image.new_from_icon_name("system-search-symbolic")
         self.search_button.set_child(search_icon)
         self.search_button.connect("toggled", self.on_search_button_clicked)
         self.search_button.add_css_class("flat")
         self.headerbar.pack_start(self.search_button)
+
+        # Icon/List view toggle button
+        self.view_toggle_button = Gtk.ToggleButton()
+        icon_view_icon = Gtk.Image.new_from_icon_name("view-grid-symbolic")
+        list_view_icon = Gtk.Image.new_from_icon_name("view-list-symbolic")
+        self.view_toggle_button.set_child(icon_view_icon if self.icon_view else list_view_icon)
+        self.view_toggle_button.add_css_class("flat")
+        self.view_toggle_button.set_tooltip_text("Toggle Icon/List View")
+        self.view_toggle_button.connect("toggled", self.on_view_toggle_button_clicked)
+        self.headerbar.pack_start(self.view_toggle_button)
 
         self.menu_button = Gtk.MenuButton()
         menu_icon = Gtk.Image.new_from_icon_name("open-menu-symbolic")
@@ -516,29 +523,24 @@ class WineCharmApp(Gtk.Application):
         self.scrolled.set_vexpand(True)
         self.scrolled.set_hexpand(True)
         self.main_frame.set_child(self.scrolled)
-        #self.scrolled.add_css_class("flowbox-background")
 
         self.flowbox = Gtk.FlowBox()
         self.flowbox.set_valign(Gtk.Align.START)
         self.flowbox.set_halign(Gtk.Align.FILL)
-        # 
+        
         if self.icon_view:
             self.flowbox.set_max_children_per_line(8)
         else:
             self.flowbox.set_max_children_per_line(4)
-        self.flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        #self.flowbox.set_vexpand(True)
-        #self.flowbox.set_hexpand(True)
-        self.scrolled.set_child(self.flowbox)
 
-        #self.window.present()
+        self.flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.scrolled.set_child(self.flowbox)
 
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self.on_key_pressed)
         self.window.add_controller(key_controller)
 
         self.create_script_list()
-
 
     def create_menu_model(self):
         menu = Gio.Menu()
@@ -673,7 +675,6 @@ class WineCharmApp(Gtk.Application):
                 else:
                     row.remove_css_class("highlighted")
 
-
     def create_script_row(self, script):
         yaml_info = self.extract_yaml_info(script)
         exe_name = Path(yaml_info['exe_file']).name
@@ -782,18 +783,16 @@ class WineCharmApp(Gtk.Application):
 
     def toggle_play_stop(self, script, play_stop_button, row):
         yaml_info = self.extract_yaml_info(script)
-        script_key = yaml_info['sha256sum']
+        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
 
         if script_key in self.running_processes:
-            self.terminate_script(script)
+            self.terminate_script(script_key)  # Pass script_key instead of the entire script path
             self.set_play_stop_button_state(play_stop_button, False)
             self.update_row_highlight(row, False)
         else:
             self.launch_script(script, play_stop_button, row)
             self.set_play_stop_button_state(play_stop_button, True)
             self.update_row_highlight(row, True)
-
-
 
     def launch_script(self, script, play_stop_button, row):
         yaml_info = self.extract_yaml_info(script)
@@ -856,8 +855,23 @@ class WineCharmApp(Gtk.Application):
             except Exception as e:
                 print(f"Error terminating script {script_key}: {e}")
 
+    def terminate_script(self, script_key):
+        if script_key in self.running_processes:
+            process_info = self.running_processes[script_key]
+            pid = process_info.get("pid")
 
+            try:
+                if pid:
+                    print(f"Attempting to terminate PID: {pid}")
+                    os.killpg(os.getpgid(pid), signal.SIGKILL)
+                    print(f"Terminated process {script_key} with PID: {pid}")
+                del self.running_processes[script_key]
 
+                row = process_info["row"]
+                self.update_row_highlight(row, False)
+
+            except Exception as e:
+                print(f"Error terminating script {script_key}: {e}")
 
 
 
@@ -885,6 +899,7 @@ class WineCharmApp(Gtk.Application):
         current_running_processes = {}
 
         try:
+            # Get all running .exe processes with their command lines
             pgrep_output = subprocess.check_output(["pgrep", "-aif", "\\.exe"]).decode().splitlines()
             print(f"pgrep output: {pgrep_output}")  # Debugging output
 
@@ -892,24 +907,28 @@ class WineCharmApp(Gtk.Application):
                 yaml_info = self.extract_yaml_info(script)
                 script_key = yaml_info['sha256sum']
                 exe_name = Path(yaml_info['exe_file']).name
-                exe_full_path = str(Path(yaml_info['exe_file']).resolve())
+                unix_exe_dir_name = Path(yaml_info['exe_file']).parent.name  # Get the parent directory name
 
-                # Improved matching: Check if the exe_full_path is in the command
+                # Find processes that match the exe_name and the parent directory name first
                 matching_processes = [
                     (int(line.split()[0]), line.split(None, 1)[1]) for line in pgrep_output
-                    if exe_full_path in line or exe_name in line
+                    if exe_name in line and unix_exe_dir_name in line
                 ]
 
-                print(f"Matching processes for {script.stem}: {matching_processes}")  # Debugging output
+                # If no matches found with directory name, fall back to exe_name only
+                if not matching_processes:
+                    matching_processes = [
+                        (int(line.split()[0]), line.split(None, 1)[1]) for line in pgrep_output
+                        if exe_name in line
+                    ]
+
+                print(f"Processes with exe_name and directory name match for {script.stem}: {matching_processes}")  # Debugging output
 
                 if matching_processes:
                     for pid, cmd in matching_processes:
-                        # Debug to check the matched command
-                        print(f"Process matched for {script.stem}: PID={pid}, CMD={cmd}")
-
                         row = self.script_buttons.get(script_key)
                         if row:
-                            print(f"Highlighting row for {script.stem}")  # Debugging output
+                            print(f"Highlighting row for {script.stem} with PID {pid}")  # Debugging output
                             current_running_processes[script_key] = {
                                 "row": row,
                                 "script": script,
@@ -917,7 +936,11 @@ class WineCharmApp(Gtk.Application):
                                 "pid": pid,
                                 "command": cmd
                             }
+                            # Update the UI elements
                             self.update_ui_for_running_process(script_key, row, current_running_processes)
+                            if self.launch_button:
+                                self.set_play_stop_button_state(self.launch_button, True)
+                            self.update_row_highlight(row, True)
                 else:
                     self.process_ended(script_key)
 
@@ -927,12 +950,6 @@ class WineCharmApp(Gtk.Application):
             self.count = 0
 
         return current_running_processes
-
-
-
-
-
-
 
         
     def update_ui_for_running_process(self, script_key, row, current_running_processes):
@@ -955,10 +972,6 @@ class WineCharmApp(Gtk.Application):
             self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
             self.launch_button.set_tooltip_text("Stop")
 
-
-
-
-
     def cleanup_ended_processes(self, current_running_processes):
         for script_key in list(self.running_processes.keys()):
             if script_key not in current_running_processes:
@@ -978,8 +991,6 @@ class WineCharmApp(Gtk.Application):
     def find_row_by_script_key(self, script_key):
         return self.script_buttons.get(script_key)
 
-
-
     def extract_yaml_info(self, script):
         if not script.exists():
             raise FileNotFoundError(f"Script file not found: {script}")
@@ -997,9 +1008,6 @@ class WineCharmApp(Gtk.Application):
             'runner': data.get('runner', ''),
             'sha256sum': data.get('sha256sum', '')
         }
-
-
-
 
     def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False):
         exe_file = Path(exe_path).resolve()
@@ -1785,7 +1793,6 @@ class WineCharmApp(Gtk.Application):
         threading.Thread(target=server_thread, daemon=True).start()
 
 
-#-------------------------------
     def handle_cli_file(self, file_path):
         #self.on_activate()
         self.create_main_window()
@@ -1928,6 +1935,7 @@ class WineCharmApp(Gtk.Application):
                 return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
             except Exception:
                 return None
+                
     def load_icon_for_title(self, script):
         icon_name = script.stem + ".png"
         icon_dir = script.parent
@@ -1964,126 +1972,6 @@ class WineCharmApp(Gtk.Application):
 
         return hbox
 
-    def create_main_window(self):
-        self.window = Gtk.ApplicationWindow(application=self)
-        self.window.set_title("Wine Charm")
-        self.window.set_default_size(420, 560)
-        self.window.add_css_class("common-background")
-        
-        self.headerbar = Gtk.HeaderBar()
-        self.headerbar.set_show_title_buttons(True)
-        self.headerbar.add_css_class("flat")
-        self.window.set_titlebar(self.headerbar)
-
-        app_icon_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
-        app_icon_box.set_margin_start(10)
-        app_icon = Gtk.Image.new_from_icon_name("io.github.fastrizwaan.WineCharm")
-        app_icon.set_pixel_size(18)  # Set icon size to 18
-        app_icon_box.append(app_icon)
-        self.headerbar.pack_start(app_icon_box)
-
-        # Back button
-        self.back_button = Gtk.Button.new_from_icon_name("go-previous-symbolic")
-        self.back_button.add_css_class("flat")
-        self.back_button.set_visible(False)  # Hide it initially
-        self.back_button.connect("clicked", self.on_back_button_clicked)
-        self.headerbar.pack_start(self.back_button)
-
-        # Search button
-        self.search_button = Gtk.ToggleButton()
-        search_icon = Gtk.Image.new_from_icon_name("system-search-symbolic")
-        self.search_button.set_child(search_icon)
-        self.search_button.connect("toggled", self.on_search_button_clicked)
-        self.search_button.add_css_class("flat")
-        self.headerbar.pack_start(self.search_button)
-
-        # Icon/List view toggle button
-        self.view_toggle_button = Gtk.ToggleButton()
-        icon_view_icon = Gtk.Image.new_from_icon_name("view-grid-symbolic")
-        list_view_icon = Gtk.Image.new_from_icon_name("view-list-symbolic")
-        self.view_toggle_button.set_child(icon_view_icon if self.icon_view else list_view_icon)
-        self.view_toggle_button.add_css_class("flat")
-        self.view_toggle_button.set_tooltip_text("Toggle Icon/List View")
-        self.view_toggle_button.connect("toggled", self.on_view_toggle_button_clicked)
-        self.headerbar.pack_start(self.view_toggle_button)
-
-        self.menu_button = Gtk.MenuButton()
-        menu_icon = Gtk.Image.new_from_icon_name("open-menu-symbolic")
-        self.menu_button.set_child(menu_icon)
-        self.menu_button.add_css_class("flat")
-        self.menu_button.set_tooltip_text("Menu")
-        self.headerbar.pack_end(self.menu_button)
-
-        menu = Gio.Menu()
-        for label, action in self.hamburger_actions:
-            menu.append(label, f"app.{action.__name__}")
-            action_item = Gio.SimpleAction.new(action.__name__, None)
-            action_item.connect("activate", action)
-            self.add_action(action_item)
-
-        self.menu_button.set_menu_model(menu)
-
-        self.vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        self.vbox.set_margin_start(10)
-        self.vbox.set_margin_end(10)
-        self.vbox.set_margin_top(3)
-        self.vbox.set_margin_bottom(10)
-        self.window.set_child(self.vbox)
-
-        self.open_button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        self.open_button_box.set_halign(Gtk.Align.CENTER)
-        open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
-        open_label = Gtk.Label(label="Open")
-
-        self.open_button_box.append(open_icon)
-        self.open_button_box.append(open_label)
-
-        self.open_button = Gtk.Button()
-        self.open_button.set_child(self.open_button_box)
-        self.open_button.set_size_request(-1, 36)  # Set height to 36 pixels
-        self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
-        self.vbox.append(self.open_button)
-
-        self.search_entry = Gtk.Entry()
-        self.search_entry.set_placeholder_text("Search")
-        self.search_entry.connect("activate", self.on_search_entry_activated)
-        self.search_entry.connect("changed", self.on_search_entry_changed)
-
-        self.search_entry_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        search_icon = Gtk.Image.new_from_icon_name("system-search-symbolic")
-        self.search_entry_box.append(self.search_entry)
-        self.search_entry_box.set_hexpand(True)
-        self.search_entry.set_hexpand(True)
-
-        self.main_frame = Gtk.Frame()
-        self.main_frame.set_margin_top(0)
-        
-        self.vbox.append(self.main_frame)
-
-        self.scrolled = Gtk.ScrolledWindow()  # Make scrolled an instance variable
-        self.scrolled.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        self.scrolled.set_vexpand(True)
-        self.scrolled.set_hexpand(True)
-        self.main_frame.set_child(self.scrolled)
-
-        self.flowbox = Gtk.FlowBox()
-        self.flowbox.set_valign(Gtk.Align.START)
-        self.flowbox.set_halign(Gtk.Align.FILL)
-        
-        if self.icon_view:
-            self.flowbox.set_max_children_per_line(8)
-        else:
-            self.flowbox.set_max_children_per_line(4)
-
-        self.flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        self.scrolled.set_child(self.flowbox)
-
-        key_controller = Gtk.EventControllerKey()
-        key_controller.connect("key-pressed", self.on_key_pressed)
-        self.window.add_controller(key_controller)
-
-        self.create_script_list()
-
     def on_view_toggle_button_clicked(self, button):
         self.icon_view = button.get_active()
 
@@ -2098,91 +1986,6 @@ class WineCharmApp(Gtk.Application):
             self.flowbox.set_max_children_per_line(4)
         # Recreate the script list with the new view
         self.create_script_list()
-
-
-
- 
-
-
-
-
-################### experiment with order
-    def get_wine_processes(self, wineprefix, exe_name):
-        try:
-            command = f"WINEPREFIX={shlex.quote(wineprefix)} winedbg --command 'info proc'"
-            winedbg_output = subprocess.check_output(command, shell=True).decode().splitlines()
-
-            processes = []
-            for line in winedbg_output:
-                # Print each line for debugging purposes
-                print(f"winedbg output line: {line}")
-
-                if line.strip() and 'executable' not in line:
-                    parts = line.split()
-                    if len(parts) >= 3:
-                        try:
-                            pid = int(parts[0], 16)  # Convert hex PID to int
-                            current_exe_name = parts[-1].strip("'")
-                            if current_exe_name == exe_name:
-                                processes.append((pid, current_exe_name))
-                        except ValueError:
-                            print(f"Skipping line due to ValueError: {line}")
-                            continue  # Skip lines that don't have valid hexadecimal PIDs
-
-            return processes
-        except subprocess.CalledProcessError as e:
-            print(f"Error running winedbg: {e}")
-            return []
-
-
-    def get_running_processes(self):
-        current_running_processes = {}
-
-        try:
-            pgrep_output = subprocess.check_output(["pgrep", "-aif", "\\.exe"]).decode().splitlines()
-            print(f"pgrep output: {pgrep_output}")  # Debugging output
-
-            for script in self.find_python_scripts():
-                yaml_info = self.extract_yaml_info(script)
-                script_key = yaml_info['sha256sum']
-                exe_name = Path(yaml_info['exe_file']).name
-                wineprefix = str(Path(yaml_info['wineprefix']).resolve())
-
-                matching_processes = [
-                    (int(line.split()[0]), line.split(None, 1)[1]) for line in pgrep_output
-                    if exe_name in line
-                ]
-
-                print(f"Initial matching processes for {script.stem}: {matching_processes}")  # Debugging output
-
-                # If duplicates are found, refine using winedbg
-                if len(matching_processes) > 1:
-                    wine_processes = self.get_wine_processes(wineprefix, exe_name)  # Note the use of self.get_wine_processes
-                    print(f"Refined processes using winedbg for {script.stem}: {wine_processes}")  # Debugging output
-                    matching_processes = wine_processes
-
-                if matching_processes:
-                    for pid, cmd in matching_processes:
-                        row = self.script_buttons.get(script_key)
-                        if row:
-                            print(f"Highlighting row for {script.stem}")  # Debugging output
-                            current_running_processes[script_key] = {
-                                "row": row,
-                                "script": script,
-                                "exe_name": exe_name,
-                                "pid": pid,
-                                "command": cmd
-                            }
-                            self.update_ui_for_running_process(script_key, row, current_running_processes)
-                else:
-                    self.process_ended(script_key)
-
-        except subprocess.CalledProcessError:
-            pgrep_output = []
-            self.stop_monitoring()
-            self.count = 0
-
-        return current_running_processes
 
 def parse_args():
     import argparse
