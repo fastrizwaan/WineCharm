@@ -804,36 +804,57 @@ class WineCharmApp(Gtk.Application):
         script_args = yaml_info['args']
         runner = yaml_info['runner'] or "wine"
         script_key = yaml_info['sha256sum']  # Use sha256sum as the key
-
+        env_vars = yaml_info.get('env_vars', '')  # Ensure env_vars is initialized if missing
+        wine_debug = yaml_info.get('wine_debug')
         exe_name = Path(exe_file).name
 
         if winecharmdir not in Path(runner).parents:
             runner = "wine"
-        command = f"cd {shlex.quote(str(Path(exe_file).parent))} && WINEPREFIX={shlex.quote(str(wineprefix))} {shlex.quote(runner)} {shlex.quote(str(exe_name))} {script_args}"
+
+        # Define the log file path based on script name
+        log_file_path = wineprefix / f"{script.stem}.log"
+        print(f"Logging stderr to {log_file_path}")
+
+        # Handle the special case where wine_debug is "disabled"
+        if wine_debug == "disabled":
+            wine_debug = "WINEDEBUG=-all DXVK_LOG_LEVEL=none"
+
+        # Quote paths and command parts to prevent issues with spaces
+        exe_parent = shlex.quote(str(Path(exe_file).parent))
+        wineprefix = shlex.quote(str(wineprefix))
+        runner = shlex.quote(runner)
+        exe_name = shlex.quote(str(exe_name))
+       # print("--------------------")
+       # print(wine_debug)
+        # Build the command string
+        command = f"cd {exe_parent} && {wine_debug} {env_vars} WINEPREFIX={wineprefix} {runner} {exe_name} {script_args}"
         print(command)
+
         try:
-            process = subprocess.Popen(
-                command,
-                shell=True,
-                preexec_fn=os.setsid,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
-            )
+            with open(log_file_path, 'w') as log_file:
+                process = subprocess.Popen(
+                    command,
+                    shell=True,
+                    preexec_fn=os.setsid,
+                    stdout=subprocess.DEVNULL,
+                    stderr=log_file  # Redirect stderr to the log file
+                )
 
-            self.running_processes[script_key] = {
-                "row": row,
-                "script": script,
-                "exe_name": exe_name,
-                "pid": process.pid
-            }
+                self.running_processes[script_key] = {
+                    "row": row,
+                    "script": script,
+                    "exe_name": exe_name,
+                    "pid": process.pid
+                }
 
-            self.set_play_stop_button_state(play_stop_button, True)
-            self.update_row_highlight(row, True)
+                self.set_play_stop_button_state(play_stop_button, True)
+                self.update_row_highlight(row, True)
 
         except Exception as e:
             print(f"Error launching script: {e}")
 
         print(self.running_processes)
+
 
 
     def terminate_script(self, script):
@@ -1002,14 +1023,17 @@ class WineCharmApp(Gtk.Application):
             except yaml.YAMLError as e:
                 print(f"Error loading YAML file {script}: {e}")
                 data = {}
-        return {
+        yaml_info = {
             'exe_file': str(Path(data.get('exe_file', '')).expanduser().resolve()), 
             'wineprefix': str(Path(data.get('wineprefix', '')).expanduser().resolve()), 
             'progname': data.get('progname', ''), 
             'args': data.get('args', ''),
             'runner': data.get('runner', ''),
-            'sha256sum': data.get('sha256sum', '')
+            'sha256sum': data.get('sha256sum', ''),
+            'wine_debug': data.get('wine_debug', '')  # Ensure wine_debug is captured
         }
+        return yaml_info
+
 
     def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False):
         exe_file = Path(exe_path).resolve()
@@ -1057,7 +1081,9 @@ class WineCharmApp(Gtk.Application):
             'progname': progname,
             'args': "",
             'sha256sum': sha256_hash.hexdigest(),
-            'runner': ""
+            'runner': "",
+            'wine_debug': "WINEDEBUG=fixme-all DXVK_LOG_LEVEL=none",  # Set a default or allow it to be empty
+            'env_vars': ""  # Initialize with an empty string or set a default if necessary
         }
         
         yaml_file_path = prefix_dir / f"{progname.replace(' ', '_')}.charm"
@@ -1092,9 +1118,9 @@ class WineCharmApp(Gtk.Application):
 
     def extract_icon(self, exe_file, wineprefix, exe_no_space, progname):
         icon_path = wineprefix / f"{progname.replace(' ', '_')}.png"
-        print(f"------ {wineprefix}")
+        #print(f"------ {wineprefix}")
         ico_path = self.tempdir / f"{exe_no_space}.ico"
-        print(f"-----{ico_path}")
+       # print(f"-----{ico_path}")
         try:
             self.tempdir.mkdir(parents=True, exist_ok=True)
 
@@ -1203,7 +1229,6 @@ class WineCharmApp(Gtk.Application):
     def show_options_for_script(self, script, row):
         # Ensure the search button is toggled off and the search entry is cleared
         self.search_button.set_active(False)
-        #self.stop_monitoring() #
         self.main_frame.set_child(None)
         scrolled_window = Gtk.ScrolledWindow()
         scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
@@ -1223,7 +1248,7 @@ class WineCharmApp(Gtk.Application):
         # Initialize or replace self.options_listbox with the current options_flowbox
         self.options_listbox = options_flowbox
 
-        # Replace the previous 'options' list with this simplified version
+        # Options list
         options = [
             ("Open Terminal", "utilities-terminal-symbolic", self.open_terminal),
             ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
@@ -1232,7 +1257,8 @@ class WineCharmApp(Gtk.Application):
             ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation),
             ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
             ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
-            ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog)
+            ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog),
+            ("Show log", "document-open-symbolic", self.show_log_file)
         ]
 
         for label, icon_name, callback in options:
@@ -1252,9 +1278,14 @@ class WineCharmApp(Gtk.Application):
             option_hbox.append(option_icon)
             option_hbox.append(option_label)
 
-            # Simplified connect statement
             options_flowbox.append(option_button)
 
+            # Enable or disable the "Show log" button based on log file existence and size
+            if label == "Show log":
+                log_file_path = Path(script.parent) / f"{script.stem}.log"
+                if not log_file_path.exists() or log_file_path.stat().st_size == 0:
+                    option_button.set_sensitive(False)
+            
             option_button.connect(
                 "clicked",
                 lambda btn, cb=callback, sc=script, ob=option_button:
@@ -1267,20 +1298,27 @@ class WineCharmApp(Gtk.Application):
         self.search_button.set_visible(False)
         self.view_toggle_button.set_visible(False)
         
-        # Ensure the back button is added and visible
         if self.back_button.get_parent() is None:
             self.headerbar.pack_start(self.back_button)
         self.back_button.set_visible(True)
 
-        # Remove the "Open" button
         self.open_button.set_visible(False)
-
-        # Replace the "Open" button with the "Launch" button
         self.replace_open_button_with_launch(script, row)
-
-        # Call update_execute_button_icon only after options_listbox is set up
         self.update_execute_button_icon(script)
         self.selected_row = None
+
+    def show_log_file(self, script, *args):
+        log_file_path = Path(script.parent) / f"{script.stem}.log"
+        if log_file_path.exists() and log_file_path.stat().st_size > 0:
+            try:
+                subprocess.run(["xdg-open", str(log_file_path)], check=True)
+            except subprocess.CalledProcessError as e:
+                print(f"Error opening log file: {e}")
+
+        
+
+
+
 
     def open_terminal(self, script, *args):
         wineprefix = Path(script).parent
