@@ -583,9 +583,18 @@ class WineCharmApp(Gtk.Application):
         scripts = self.find_python_scripts()
         self.flowbox.remove_all()
         filtered_scripts = [script for script in scripts if search_term in script.stem.lower()]
+
         for script in filtered_scripts:
             row = self.create_script_row(script)
             self.flowbox.append(row)
+
+            # Check if the script is currently running and highlight it
+            yaml_info = self.extract_yaml_info(script)
+            script_key = yaml_info['sha256sum']
+            if script_key in self.running_processes:
+                self.update_ui_for_running_process(script_key, row, self.running_processes)
+
+
 
     def on_open_button_clicked(self, button):
         self.open_file_dialog()
@@ -908,15 +917,19 @@ class WineCharmApp(Gtk.Application):
         current_running_processes = self.get_running_processes()
         self.cleanup_ended_processes(current_running_processes)
 
+        # Highlight running processes in the current (possibly filtered) view
+        for script_key, process_info in self.running_processes.items():
+            row = process_info["row"]
+            if row and row.get_parent():  # Check if the row is currently displayed in the flowbox
+                self.update_ui_for_running_process(script_key, row, self.running_processes)
+
         if not current_running_processes or self.count >= 5:
             self.stop_monitoring()
-            #print("Monitoring stopped due to no processes or max count reached")
         else:
             self.count += 1
-            #print(f"Monitoring continues, count: {self.count}")
-            
 
         return False
+
 
 
     def get_running_processes(self):
@@ -1261,6 +1274,7 @@ class WineCharmApp(Gtk.Application):
 
         # Options list
         options = [
+            ("Show log", "document-open-symbolic", self.show_log_file),
             ("Open Terminal", "utilities-terminal-symbolic", self.open_terminal),
             ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
             ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager),
@@ -1268,8 +1282,7 @@ class WineCharmApp(Gtk.Application):
             ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation),
             ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
             ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
-            ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog),
-            ("Show log", "document-open-symbolic", self.show_log_file)
+            ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog)
         ]
 
         for label, icon_name, callback in options:
