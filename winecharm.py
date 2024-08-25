@@ -921,6 +921,13 @@ class WineCharmApp(Gtk.Application):
 
     def get_running_processes(self):
         current_running_processes = {}
+        exe_name_count = {}
+
+        # First, count occurrences of each exe_name
+        for script in self.find_python_scripts():
+            yaml_info = self.extract_yaml_info(script)
+            exe_name = Path(yaml_info['exe_file']).name
+            exe_name_count[exe_name] = exe_name_count.get(exe_name, 0) + 1
 
         try:
             # Get all running .exe processes with their command lines
@@ -933,20 +940,22 @@ class WineCharmApp(Gtk.Application):
                 exe_name = Path(yaml_info['exe_file']).name
                 unix_exe_dir_name = Path(yaml_info['exe_file']).parent.name  # Get the parent directory name
 
-                # Find processes that match the exe_name and the parent directory name first
-                matching_processes = [
-                    (int(line.split()[0]), line.split(None, 1)[1]) for line in pgrep_output
-                    if exe_name in line and unix_exe_dir_name in line
-                ]
+                # Check if exe_name has duplicates
+                is_duplicate = exe_name_count[exe_name] > 1
 
-                # If no matches found with directory name, fall back to exe_name only
-                if not matching_processes:
+                # Find processes that match the exe_name (and the parent directory name if duplicates exist)
+                if is_duplicate:
+                    matching_processes = [
+                        (int(line.split()[0]), line.split(None, 1)[1]) for line in pgrep_output
+                        if exe_name in line and unix_exe_dir_name in line
+                    ]
+                else:
                     matching_processes = [
                         (int(line.split()[0]), line.split(None, 1)[1]) for line in pgrep_output
                         if exe_name in line
                     ]
 
-                print(f"Processes with exe_name and directory name match for {script.stem}: {matching_processes}")  # Debugging output
+                print(f"Processes matching {exe_name} (duplicate={is_duplicate}) for {script.stem}: {matching_processes}")  # Debugging output
 
                 if matching_processes:
                     for pid, cmd in matching_processes:
@@ -974,6 +983,7 @@ class WineCharmApp(Gtk.Application):
             self.count = 0
 
         return current_running_processes
+
 
         
     def update_ui_for_running_process(self, script_key, row, current_running_processes):
