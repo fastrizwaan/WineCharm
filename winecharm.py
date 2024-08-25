@@ -1094,7 +1094,7 @@ class WineCharmApp(Gtk.Application):
             productname = productname_match.group(1).strip() if productname_match else exe_no_space
 
         if use_exe_name or "setup" in exe_name.lower() or "install" in exe_name.lower():
-            progname = exe_name
+            progname = productname + ' ' + 'Setup'
         elif use_exe_name or "setup" in productname.lower() or "install" in productname.lower():
             progname = productname
         else:
