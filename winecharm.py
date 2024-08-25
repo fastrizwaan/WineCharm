@@ -31,6 +31,7 @@ version = "0.77.9"
 winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
 prefixes_dir = winecharmdir / "Prefixes"
 templates_dir = winecharmdir / "Templates"
+runners_dir = winecharmdir / "Runners"
 default_template = templates_dir / "WineCharm-win64"
 
 applicationsdir = Path(os.path.expanduser("~/.local/share/applications")).resolve()
@@ -1321,7 +1322,28 @@ class WineCharmApp(Gtk.Application):
 
 
     def open_terminal(self, script, *args):
+        yaml_info = self.extract_yaml_info(script)
+        exe_file = yaml_info['exe_file']
         wineprefix = Path(script).parent
+        progname = yaml_info['progname']
+        script_args = yaml_info['args']
+        runner = yaml_info['runner'] or "wine"
+        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
+        env_vars = yaml_info.get('env_vars', '')  # Ensure env_vars is initialized if missing
+        wine_debug = yaml_info.get('wine_debug')
+        exe_name = Path(exe_file).name
+        wineprefix = Path(script).parent
+
+        # If the runner is empty or None, fallback to "wine"
+        #runner = runner or "wine"
+        
+        #if winecharmdir not in Path(runner).parents:
+        #    runner = "wine"
+            
+        runner_dir = Path(runner).parent
+        print(" - - - - - runner_dir - - - - - ")
+        print(runner)
+        print(runner_dir)
         print(f"Opening terminal for {wineprefix}")
         if not wineprefix.exists():
             wineprefix.mkdir(parents=True, exist_ok=True)
@@ -1341,7 +1363,7 @@ class WineCharmApp(Gtk.Application):
                 "io.github.fastrizwaan.WineCharm",
                 "--norc",
                 "-c",
-                rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
+                rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
             ]
         else:
             command = [
@@ -1351,7 +1373,7 @@ class WineCharmApp(Gtk.Application):
                 "bash",
                 "--norc",
                 "-c",
-                rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
+                rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
             ]
         try:
             subprocess.Popen(command)
