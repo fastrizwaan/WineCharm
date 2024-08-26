@@ -945,7 +945,10 @@ class WineCharmApp(Gtk.Application):
         try:
             # Get all running .exe processes with their command lines
             pgrep_output = subprocess.check_output(["pgrep", "-aif", "\\.exe"]).decode().splitlines()
-            print(f"pgrep output: {pgrep_output}")  # Debugging output
+
+            # Filter out any processes that match `do_not_kill`
+            pgrep_output = [line for line in pgrep_output if do_not_kill not in line]
+            print(f"Filtered pgrep output: {pgrep_output}")  # Debugging output
 
             for script in self.find_python_scripts():
                 yaml_info = self.extract_yaml_info(script)
@@ -960,12 +963,12 @@ class WineCharmApp(Gtk.Application):
                 if is_duplicate:
                     matching_processes = [
                         (int(line.split()[0]), line.split(None, 1)[1]) for line in pgrep_output
-                        if exe_name in line and unix_exe_dir_name in line
+                        if exe_name in line and unix_exe_dir_name in line and int(line.split()[0]) != 1
                     ]
                 else:
                     matching_processes = [
                         (int(line.split()[0]), line.split(None, 1)[1]) for line in pgrep_output
-                        if exe_name in line
+                        if exe_name in line and int(line.split()[0]) != 1
                     ]
 
                 print(f"Processes matching {exe_name} (duplicate={is_duplicate}) for {script.stem}: {matching_processes}")  # Debugging output
@@ -996,6 +999,7 @@ class WineCharmApp(Gtk.Application):
             self.count = 0
 
         return current_running_processes
+
 
 
         
