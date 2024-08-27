@@ -75,7 +75,7 @@ class WineCharmApp(Gtk.Application):
         self.monitoring_active = True  # Flag to control monitoring
         self.scripts = []  # Or use a list of script objects if applicable
         self.count = 0
-        self.focus_event_timer_id = None        
+        self.focus_event_timer_id = None   
         tempdir.mkdir(parents=True, exist_ok=True)
         self.tempdir = tempdir
         self.icon_view = False
@@ -83,6 +83,12 @@ class WineCharmApp(Gtk.Application):
         signal.signal(signal.SIGINT, self.handle_sigint)
         self.script_buttons = {}
         self.current_clicked_row = None  # Initialize current clicked row
+
+        self.launch_button = Gtk.Button.new_from_icon_name("media-playback-start-symbolic")
+        self.launch_button.add_css_class("overlay-button")
+        self.launch_button.set_tooltip_text("Play")
+        self.launch_button.set_visible(False)  # Initially hidden
+        self.launch_button_exe_name = None 
         self.hamburger_actions = [
             ("🛠️ Settings...", self.on_settings_clicked),
             ("☠️ Kill all...", self.on_kill_all_clicked),
@@ -91,6 +97,7 @@ class WineCharmApp(Gtk.Application):
             ("📖 About...", self.on_about_clicked),
             ("🚪 Quit...", self.quit_app)
         ]
+
 
         self.css_provider = Gtk.CssProvider()
         self.css_provider.load_from_data(b"""
@@ -281,7 +288,7 @@ class WineCharmApp(Gtk.Application):
         if  self.command_line_file:
             print("Trying to process file inside on template initialized")
             GLib.idle_add(self.show_processing_spinner)
-            self.process_cli_file(self.command_line_file)
+            self.process_file(self.command_line_file)
             self.command_line_file = None  # Reset after processing
             GLib.timeout_add_seconds(1, self.hide_processing_spinner)
 
@@ -620,11 +627,10 @@ class WineCharmApp(Gtk.Application):
             file = dialog.open_finish(result)
             if file:
                 file_path = file.get_path()
-                print("- - - - - - - - - - - - - -self.show_processing_spinner")
                 self.show_processing_spinner("Processing...")
                 
                 # Use GLib.idle_add to delay the file processing and allow the UI to update
-                threading.Thread(target=self.process_cli_file, args=(file_path,)).start()
+                threading.Thread(target=self.process_file, args=(file_path,)).start()
                 
         except GLib.Error as e:
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
@@ -800,7 +806,7 @@ class WineCharmApp(Gtk.Application):
             self.show_buttons(play_button, options_button)
 
         # Retrieve the script key associated with this button
-#        script_key = None
+        script_key = None
         for key, row in self.script_buttons.items():
             if row == button.get_parent():  # Assuming row is the parent of the button
                 script_key = key
@@ -811,7 +817,6 @@ class WineCharmApp(Gtk.Application):
             self.set_play_stop_button_state(play_button, True)  # Set to "Stop" if running
         else:
             self.set_play_stop_button_state(play_button, False)  # Reset to "Play" otherwise
-
 
     def find_row_by_script_stem(self, script_stem):
         script_label = script_stem.replace('_', ' ')
@@ -943,19 +948,39 @@ class WineCharmApp(Gtk.Application):
 
         print(self.running_processes)
 
+
+
+    def terminate_script(self, script):
+        yaml_info = self.extract_yaml_info(script)
+        script_key = yaml_info['sha256sum']
+
+        if script_key in self.running_processes:
+            process_info = self.running_processes[script_key]
+            pid = process_info.get("pid")
+
+            try:
+                if pid:
+                    print(f"Attempting to terminate PID: {pid}")
+                    os.killpg(os.getpgid(pid), signal.SIGTERM)
+                    print(f"Terminated process {script_key} with PID: {pid}")
+                del self.running_processes[script_key]
+
+                row = process_info["row"]
+                self.update_row_highlight(row, False)
+
+            except Exception as e:
+                print(f"Error terminating script {script_key}: {e}")
+
     def terminate_script(self, script_key):
         if script_key in self.running_processes:
             process_info = self.running_processes[script_key]
             pid = process_info.get("pid")
 
             try:
-                if pid and self.is_process_running(pid):
+                if pid:
                     print(f"Attempting to terminate PID: {pid}")
                     os.killpg(os.getpgid(pid), signal.SIGKILL)
                     print(f"Terminated process {script_key} with PID: {pid}")
-                else:
-                    print(f"Process with PID {pid} is no longer running.")
-                    
                 del self.running_processes[script_key]
 
                 row = process_info["row"]
@@ -965,13 +990,6 @@ class WineCharmApp(Gtk.Application):
                 print(f"Error terminating script {script_key}: {e}")
 
 
-    def is_process_running(self, pid):
-        """Check if a process with the given PID is running."""
-        try:
-            os.kill(pid, 0)
-            return True
-        except OSError:
-            return False
 
 
     def check_running_processes_and_update_buttons(self):
@@ -1093,16 +1111,19 @@ class WineCharmApp(Gtk.Application):
             if script_key not in current_running_processes:
                 self.process_ended(script_key)
 
-
-        for exe_name in list(self.running_processes.keys()):
-            if exe_name not in current_running_processes:
-                self.process_ended(exe_name)
-
-        # If no more processes are running, reset all UI elements
+        # If there are no running processes, reset all play buttons to the "Play" state
         if not current_running_processes:
-            self.reset_all_ui_elements()
-
-        self.running_processes = current_running_processes
+            for script_key, row in self.script_buttons.items():
+                overlay = row.get_parent()  # Get the overlay containing the button
+                if overlay and isinstance(overlay, Gtk.Overlay):
+                    # Find the play button within the overlay
+                    overlay_children = overlay.get_children()
+                    for child in overlay_children:
+                        if isinstance(child, Gtk.Box):
+                            for box_child in child.get_children():
+                                if isinstance(box_child, Gtk.Button):
+                                    # Reset the play button to the "Play" state
+                                    self.set_play_stop_button_state(box_child, False)
 
     def find_row_by_script_key(self, script_key):
         return self.script_buttons.get(script_key)
@@ -1729,22 +1750,24 @@ class WineCharmApp(Gtk.Application):
             
 
     def process_file(self, file_path):
-        try:
-            print("process_file")
-            abs_file_path = str(Path(file_path).resolve())
-            print(f"Resolved absolute file path: {abs_file_path}")  # Debugging output
+        print(f"Processing CLI file: {file_path}")
+        abs_file_path = str(Path(file_path).resolve())
+        print(f"Resolved absolute CLI file path: {abs_file_path}")
 
+        try:
             if not Path(abs_file_path).exists():
                 print(f"File does not exist: {abs_file_path}")
                 return
-
             self.create_yaml_file(abs_file_path, None)
-            self.create_script_list()
+            #GLib.idle_add(self.create_script_list)
+            #self.create_script_list()
         except Exception as e:
             print(f"Error processing file: {e}")
         finally:
-            print("hide_processing_spinner")
-            GLib.idle_add(self.hide_processing_spinner)
+            if self.initializing_template:
+                pass #keep showing spinner
+            else:
+                GLib.timeout_add_seconds(1, self.hide_processing_spinner)
 
     def on_confirm_action(self, button, script, action_type, parent, original_button):
         try:
@@ -1813,6 +1836,10 @@ class WineCharmApp(Gtk.Application):
             return productname_match.group(1).strip() if productname_match else None
 
     def process_ended(self, script_key):
+        if not self.monitoring_active:
+            self.stop_monitoring()
+            return False
+
         process_info = self.running_processes.get(script_key)
 
         if process_info:
@@ -1840,16 +1867,16 @@ class WineCharmApp(Gtk.Application):
                     wineprefix_path = Path(wineprefix)
                     self.create_scripts_for_lnk_files(wineprefix_path)
 
-
             # Remove the process from the running processes
             if script_key in self.running_processes:
                 del self.running_processes[script_key]
 
             # If there are no more running processes, reset all UI elements
             if not self.running_processes:
-               self.reset_all_ui_elements()
-           
-            
+                self.reset_all_ui_elements()
+
+
+
     def reset_all_ui_elements(self):
         # Reset any UI elements that should be updated when no processes are running
         for row in self.script_buttons.values():
@@ -1940,7 +1967,7 @@ class WineCharmApp(Gtk.Application):
                                 for abs_file_path in abs_file_paths:
                                     if abs_file_path.exists():
                                         print(f"Resolved absolute file path: {abs_file_path}")
-                                        GLib.idle_add(self.process_cli_file, str(abs_file_path))
+                                        GLib.idle_add(self.process_file, str(abs_file_path))
                                     else:
                                         print(f"File does not exist: {abs_file_path}")
                             else:
@@ -1963,26 +1990,6 @@ class WineCharmApp(Gtk.Application):
                     self.initialize_template(default_template, self.on_template_initialized)
                 else:
                     self.set_dynamic_variables()
-
-    def process_cli_file(self, file_path):
-        print(f"Processing CLI file: {file_path}")
-        abs_file_path = str(Path(file_path).resolve())
-        print(f"Resolved absolute CLI file path: {abs_file_path}")
-
-        try:
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-            self.create_yaml_file(abs_file_path, None)
-            #GLib.idle_add(self.create_script_list)
-            #self.create_script_list()
-        except Exception as e:
-            print(f"Error processing file: {e}")
-        finally:
-            if self.initializing_template:
-                pass #keep showing spinner
-            else:
-                GLib.timeout_add_seconds(1, self.hide_processing_spinner)
 
     def show_processing_spinner(self, message="Processing..."):
         if not self.spinner:
@@ -2033,7 +2040,7 @@ class WineCharmApp(Gtk.Application):
             print("Trying to process file inside on template initialized")
 
             GLib.idle_add(self.show_processing_spinner)
-            self.process_cli_file(self.command_line_file)
+            self.process_file(self.command_line_file)
 
     def load_icon(self, script):
         icon_name = script.stem + ".png"
