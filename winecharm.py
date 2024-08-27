@@ -26,7 +26,7 @@ gi.require_version('Adw', '1')
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 #qfrom concurrent.futures import ThreadPoolExecutor
 
-version = "0.7"
+version = "0.8"
 # Constants
 winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
 prefixes_dir = winecharmdir / "Prefixes"
@@ -280,7 +280,7 @@ class WineCharmApp(Gtk.Application):
         if  self.command_line_file:
             print("Trying to process file inside on template initialized")
             GLib.idle_add(self.show_processing_spinner)
-            self.process_cli_file(self.command_line_file)
+            self.process_file(self.command_line_file)
             self.command_line_file = None  # Reset after processing
             GLib.timeout_add_seconds(1, self.hide_processing_spinner)
 
@@ -613,18 +613,17 @@ class WineCharmApp(Gtk.Application):
         file_filter.add_pattern("*.exe")
         file_filter.add_pattern("*.msi")
         return file_filter
-     
+
     def on_file_dialog_response(self, dialog, result):
         try:
             file = dialog.open_finish(result)
             if file:
                 file_path = file.get_path()
-                GLib.timeout_add_seconds(1, self.process_file, file_path)
-                GLib.idle_add(self.show_processing_spinner)
-                print("- - - - - - - - - - - - - -self.show_processing_spinner")
+                self.show_processing_spinner("Processing...")
                 
                 # Use GLib.idle_add to delay the file processing and allow the UI to update
-
+                threading.Thread(target=self.process_file, args=(file_path,)).start()
+                
         except GLib.Error as e:
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                 print(f"An error occurred: {e}")
@@ -1126,27 +1125,24 @@ class WineCharmApp(Gtk.Application):
         self.create_desktop_entry(progname, yaml_file_path, icon_path, prefix_dir)
 
         self.add_or_update_script_row(yaml_file_path)
-        self.create_script_list()
+        
+        
+        #self.create_script_list()
 
 
 
     def add_or_update_script_row(self, script_path):
         script_name = script_path.stem.replace("_", " ")
-        existing_row = None
 
-        for row in self.flowbox:
-            box = row.get_child()
-            if box:
-                label_widget = box.get_first_child().get_next_sibling()
-                if label_widget and label_widget.get_text() == script_name:
-                    existing_row = row
-                    break
+        # Clear the existing rows
+        self.flowbox.remove_all()
 
-        if existing_row:
-            self.flowbox.remove(existing_row)
+        # Recreate the script list
+        self.create_script_list()
 
-        new_row = self.create_script_row(script_path)
-        self.flowbox.insert(new_row, 0)
+        # No need to call show(), as widgets are visible by default in GTK 4
+
+
 
     def extract_icon(self, exe_file, wineprefix, exe_no_space, progname):
         icon_path = wineprefix / f"{progname.replace(' ', '_')}.png"
@@ -1671,22 +1667,24 @@ class WineCharmApp(Gtk.Application):
             
 
     def process_file(self, file_path):
-        try:
-            print("process_file")
-            abs_file_path = str(Path(file_path).resolve())
-            print(f"Resolved absolute file path: {abs_file_path}")  # Debugging output
+        print(f"Processing CLI file: {file_path}")
+        abs_file_path = str(Path(file_path).resolve())
+        print(f"Resolved absolute CLI file path: {abs_file_path}")
 
+        try:
             if not Path(abs_file_path).exists():
                 print(f"File does not exist: {abs_file_path}")
                 return
-
             self.create_yaml_file(abs_file_path, None)
-            self.create_script_list()
+            #GLib.idle_add(self.create_script_list)
+            #self.create_script_list()
         except Exception as e:
             print(f"Error processing file: {e}")
         finally:
-            print("hide_processing_spinner")
-            GLib.idle_add(self.hide_processing_spinner)
+            if self.initializing_template:
+                pass #keep showing spinner
+            else:
+                GLib.timeout_add_seconds(1, self.hide_processing_spinner)
 
     def on_confirm_action(self, button, script, action_type, parent, original_button):
         try:
@@ -1877,7 +1875,7 @@ class WineCharmApp(Gtk.Application):
                                 for abs_file_path in abs_file_paths:
                                     if abs_file_path.exists():
                                         print(f"Resolved absolute file path: {abs_file_path}")
-                                        GLib.idle_add(self.process_cli_file, str(abs_file_path))
+                                        GLib.idle_add(self.process_file, str(abs_file_path))
                                     else:
                                         print(f"File does not exist: {abs_file_path}")
                             else:
@@ -1900,26 +1898,6 @@ class WineCharmApp(Gtk.Application):
                     self.initialize_template(default_template, self.on_template_initialized)
                 else:
                     self.set_dynamic_variables()
-
-    def process_cli_file(self, file_path):
-        print(f"Processing CLI file: {file_path}")
-        abs_file_path = str(Path(file_path).resolve())
-        print(f"Resolved absolute CLI file path: {abs_file_path}")
-
-        try:
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-            self.create_yaml_file(abs_file_path, None)
-            GLib.idle_add(self.create_script_list)
-            #self.create_script_list()
-        except Exception as e:
-            print(f"Error processing file: {e}")
-        finally:
-            if self.initializing_template:
-                pass #keep showing spinner
-            else:
-                GLib.timeout_add_seconds(1, self.hide_processing_spinner)
 
     def show_processing_spinner(self, message="Processing..."):
         if not self.spinner:
@@ -1970,7 +1948,7 @@ class WineCharmApp(Gtk.Application):
             print("Trying to process file inside on template initialized")
 
             GLib.idle_add(self.show_processing_spinner)
-            self.process_cli_file(self.command_line_file)
+            self.process_file(self.command_line_file)
 
     def load_icon(self, script):
         icon_name = script.stem + ".png"
