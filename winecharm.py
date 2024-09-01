@@ -1821,7 +1821,7 @@ class WineCharmApp(Gtk.Application):
                 row.remove_css_class("highlighted")
 
             # Ensure the overlay buttons are hidden when the process ends
-            if self.current_clicked_row and self.current_clicked_row[0] == row:
+            if self.current_clicked_row:
                 play_button, options_button = self.current_clicked_row[1], self.current_clicked_row[2]
                 self.hide_buttons(play_button, options_button)
                 self.set_play_stop_button_state(play_button, False)  # Reset the play button to "Play"
