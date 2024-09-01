@@ -708,12 +708,19 @@ class WineCharmApp(Gtk.Application):
         label.set_hexpand(True)
         label.set_ellipsize(Pango.EllipsizeMode.END)
 
+        # Create an overlay to add play and options buttons
+        overlay = Gtk.Overlay()
+        overlay.set_child(button)
+
+
         if self.icon_view:
             icon = self.load_icon(script)
             icon_image = Gtk.Image.new_from_paintable(icon)
             button.set_size_request(64, 64)
             hbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             icon_image.set_pixel_size(64)
+            # Create a box to hold both buttons
+            buttons_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         else:
             icon = self.load_icon_for_list(script)
             icon_image = Gtk.Image.new_from_paintable(icon)
@@ -721,6 +728,8 @@ class WineCharmApp(Gtk.Application):
             hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
             icon_image.set_pixel_size(32)
             label.set_xalign(0)
+            # Create a box to hold both buttons
+            buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
 
         button.set_child(hbox)
         hbox.append(icon_image)
@@ -731,12 +740,6 @@ class WineCharmApp(Gtk.Application):
 
         button.label = label
 
-        # Create an overlay to add play and options buttons
-        overlay = Gtk.Overlay()
-        overlay.set_child(button)
-
-        # Create a box to hold both buttons
-        buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         buttons_box.set_margin_end(6)  # Adjust this value to prevent overlapping
 
         # Play button
