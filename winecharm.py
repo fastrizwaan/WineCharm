@@ -1085,11 +1085,7 @@ class WineCharmApp(Gtk.Application):
             self.update_row_highlight(row, False)
             
             
-        if row.has_css_class("highlighted"):
-            print("check_running_processes_and_update_buttons: REMOVING HIGHLIGHT")        
-            #self.update_row_highlight(row, False)
-
-        else:
+        if not row.has_css_class("highlighted"):
             print("check_running_processes_and_update_buttons: highlighting")
             #self.update_row_highlight(row, False)
             self.update_row_highlight(row, True)
