@@ -401,8 +401,8 @@ class WineCharmApp(Gtk.Application):
         self.monitoring_active = True
         self.start_monitoring()
         self.check_running_processes_and_update_buttons()
-        current_running_processes = self.get_running_processes()
-        self.cleanup_ended_processes(current_running_processes)
+        #current_running_processes = self.get_running_processes()
+        #self.cleanup_ended_processes(current_running_processes)
 
     def on_focus_out(self, controller):
         self.monitoring_active = False
@@ -879,11 +879,19 @@ class WineCharmApp(Gtk.Application):
             self.terminate_script(script_key)  # Pass script_key instead of the entire script path
             self.set_play_stop_button_state(play_stop_button, False)
             self.update_row_highlight(row, False)
+
+            # Ensure the overlay buttons are hidden when the process ends
+            if self.current_clicked_row:
+                play_button, options_button = self.current_clicked_row[1], self.current_clicked_row[2]
+                self.hide_buttons(play_button, options_button)
+                self.set_play_stop_button_state(play_button, False)  # Reset the play button to "Play"
+                self.current_clicked_row = None
         else:
             self.launch_script(script, play_stop_button, row)
             self.set_play_stop_button_state(play_stop_button, True)
             #self.update_row_highlight(row, True)
 
+                
     def launch_script(self, script, play_stop_button, row):
         yaml_info = self.extract_yaml_info(script)
         exe_file = yaml_info['exe_file']
@@ -1859,7 +1867,7 @@ class WineCharmApp(Gtk.Application):
 
             # If there are no more running processes, reset all UI elements
             if not self.running_processes:
-               self.reset_all_ui_elements()
+                self.reset_all_ui_elements()
            
             
     def reset_all_ui_elements(self):
