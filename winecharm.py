@@ -26,7 +26,7 @@ gi.require_version('Adw', '1')
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 #qfrom concurrent.futures import ThreadPoolExecutor
 
-version = "0.8"
+version = "0.9"
 # Constants
 winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
 prefixes_dir = winecharmdir / "Prefixes"
@@ -882,7 +882,7 @@ class WineCharmApp(Gtk.Application):
         else:
             self.launch_script(script, play_stop_button, row)
             self.set_play_stop_button_state(play_stop_button, True)
-            self.update_row_highlight(row, True)
+            #self.update_row_highlight(row, True)
 
     def launch_script(self, script, play_stop_button, row):
         yaml_info = self.extract_yaml_info(script)
@@ -936,7 +936,7 @@ class WineCharmApp(Gtk.Application):
                 }
 
                 self.set_play_stop_button_state(play_stop_button, True)
-                self.update_row_highlight(row, True)
+                #self.update_row_highlight(row, True)
 
         except Exception as e:
             print(f"Error launching script: {e}")
@@ -1013,7 +1013,7 @@ class WineCharmApp(Gtk.Application):
 
             # Filter out any processes that match `do_not_kill`
             pgrep_output = [line for line in pgrep_output if do_not_kill not in line]
-            print(f"Filtered pgrep output: {pgrep_output}")  # Debugging output
+            #print(f"Filtered pgrep output: {pgrep_output}")  # Debugging output
 
             for script in self.find_python_scripts():
                 yaml_info = self.extract_yaml_info(script)
@@ -1036,13 +1036,13 @@ class WineCharmApp(Gtk.Application):
                         if exe_name in line and int(line.split()[0]) != 1
                     ]
 
-                print(f"Processes matching {exe_name} (duplicate={is_duplicate}) for {script.stem}: {matching_processes}")  # Debugging output
+               # print(f"Processes matching {exe_name} (duplicate={is_duplicate}) for {script.stem}: {matching_processes}")  # Debugging output
 
                 if matching_processes:
                     for pid, cmd in matching_processes:
                         row = self.script_buttons.get(script_key)
                         if row:
-                            print(f"Highlighting row for {script.stem} with PID {pid}")  # Debugging output
+                            #print(f"Highlighting row for {script.stem} with PID {pid}")  # Debugging output
                             current_running_processes[script_key] = {
                                 "row": row,
                                 "script": script,
@@ -1051,10 +1051,12 @@ class WineCharmApp(Gtk.Application):
                                 "command": cmd
                             }
                             # Update the UI elements
-                            self.update_ui_for_running_process(script_key, row, current_running_processes)
+                            #self.update_ui_for_running_process(script_key, row, current_running_processes)
                             if self.launch_button:
                                 self.set_play_stop_button_state(self.launch_button, True)
-                            self.update_row_highlight(row, True)
+                        else:
+                            print("setting False highlight...")
+                            self.update_row_highlight(row, False)
                 else:
                     self.process_ended(script_key)
 
@@ -1078,11 +1080,23 @@ class WineCharmApp(Gtk.Application):
             current_running_processes (dict): A dictionary containing details of the current running processes.
         """
         if script_key not in self.running_processes:
+            print(f"REMOVNG HIGHLIGHT to row for script_key: {script_key}")  # Debugging output
             self.running_processes[script_key] = current_running_processes[script_key]
+            self.update_row_highlight(row, False)
+            
+            
+        if row.has_css_class("highlighted"):
+            print("check_running_processes_and_update_buttons: REMOVING HIGHLIGHT")        
+            #self.update_row_highlight(row, False)
 
-        print(f"Adding highlight to row for script_key: {script_key}")  # Debugging output
-        row.add_css_class("highlighted")
-
+        else:
+            print("check_running_processes_and_update_buttons: highlighting")
+            #self.update_row_highlight(row, False)
+            self.update_row_highlight(row, True)
+            #row.add_css_class("highlighted")
+#        else:
+#            self.update_row_highlight(row, False)
+                
         # Only update the launch button if it belongs to this script
         if self.launch_button and self.launch_button_exe_name == script_key:
             self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
@@ -1822,11 +1836,13 @@ class WineCharmApp(Gtk.Application):
 
             # Ensure the overlay buttons are hidden when the process ends
             if self.current_clicked_row:
-                play_button, options_button = self.current_clicked_row[1], self.current_clicked_row[2]
+                button, play_button, options_button = self.current_clicked_row[0], self.current_clicked_row[1], self.current_clicked_row[2]
+
                 self.hide_buttons(play_button, options_button)
                 self.set_play_stop_button_state(play_button, False)  # Reset the play button to "Play"
                 self.current_clicked_row = None
-
+                button.remove_css_class("highlighted")
+                
             # Check if self.launch_button is not None before modifying it
             if self.launch_button and getattr(self, 'launch_button_exe_name', None) == script_key:
                 self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
