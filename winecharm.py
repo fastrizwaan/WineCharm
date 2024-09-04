@@ -1022,7 +1022,7 @@ class WineCharmApp(Gtk.Application):
             # Get all running .exe processes with their command lines
             pgrep_output = subprocess.check_output(["pgrep", "-aif", "\\.exe"]).decode().splitlines()
 
-            # Filter out any processes that match `do_not_kill`
+            # Filter out any processes that match do_not_kill
             pgrep_output = [line for line in pgrep_output if do_not_kill not in line]
             #print(f"Filtered pgrep output: {pgrep_output}")  # Debugging output
 
@@ -1154,12 +1154,14 @@ class WineCharmApp(Gtk.Application):
         exe_name = exe_file.stem
         exe_no_space = exe_name.replace(" ", "_")
 
+        # Calculate SHA256 hash
         sha256_hash = hashlib.sha256()
         with open(exe_file, "rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
         sha256sum = sha256_hash.hexdigest()[:10]
 
+        # Handle prefix directory
         if prefix_dir is None:
             prefix_dir = prefixes_dir / f"{exe_no_space}-{sha256sum}"
             if not prefix_dir.exists():
@@ -1167,29 +1169,35 @@ class WineCharmApp(Gtk.Application):
                     self.copy_template(prefix_dir)
                 else:
                     prefix_dir.mkdir(parents=True, exist_ok=True)
-                    print(f"Created prefix directory: {prefix_dir}")
+                    #print(f"Created prefix directory: {prefix_dir}")
 
         wineprefix_name = prefix_dir.name
 
+        # Extract product name using exiftool
         product_cmd = [
             'exiftool', shlex.quote(str(exe_file))
         ]
-
         product_output = self.run_command(" ".join(product_cmd))
         if product_output is None:
-            print(f"Error: Failed to retrieve product name for {exe_file}")
+            #print(f"Error: Failed to retrieve product name for {exe_file}")
             productname = exe_no_space
         else:
             productname_match = re.search(r'Product Name\s+:\s+(.+)', product_output)
             productname = productname_match.group(1).strip() if productname_match else exe_no_space
 
-        if use_exe_name or "setup" in exe_name.lower() or "install" in exe_name.lower():
-            progname = productname + ' ' + 'Setup'
-        elif use_exe_name or "setup" in productname.lower() or "install" in productname.lower():
-            progname = productname
+        # Determine program name based on use_exe_name flag
+        if use_exe_name:
+            progname = exe_name  # Use exe_name if flag is set
         else:
-            progname = productname if productname and not any(char.isdigit() for char in productname) and productname.isascii() else exe_no_space
+            # Default progname logic with fallback to exe_no_space
+            if "setup" in exe_name.lower() or "install" in exe_name.lower():
+                progname = productname + ' Setup'
+            elif "setup" in productname.lower() or "install" in productname.lower():
+                progname = productname
+            else:
+                progname = productname if productname and not any(char.isdigit() for char in productname) and productname.isascii() else exe_no_space
 
+        # Prepare YAML data
         yaml_data = {
             'exe_file': str(exe_file).replace(str(Path.home()), "~"),
             'progname': progname,
@@ -1200,15 +1208,19 @@ class WineCharmApp(Gtk.Application):
             'env_vars': ""  # Initialize with an empty string or set a default if necessary
         }
         
-        yaml_file_path = prefix_dir / f"{progname.replace(' ', '_')}.charm"
+        # Create YAML file with proper naming
+        yaml_file_path = prefix_dir / f"{exe_no_space if use_exe_name else progname.replace(' ', '_')}.charm"
         with open(yaml_file_path, 'w') as yaml_file:
             yaml.dump(yaml_data, yaml_file)
 
+
+        # Extract icon and create desktop entry
         icon_path = self.extract_icon(exe_file, prefix_dir, exe_no_space, progname)
         self.create_desktop_entry(progname, yaml_file_path, icon_path, prefix_dir)
 
-        self.add_or_update_script_row(yaml_file_path)
-        
+        # Add or update script row in UI if multi files are being created.
+        GLib.idle_add(self.add_or_update_script_row, yaml_file_path)
+
         
         #self.create_script_list()
 
@@ -1298,25 +1310,33 @@ class WineCharmApp(Gtk.Application):
 
     def create_scripts_for_lnk_files(self, wineprefix):
         lnk_files = self.find_lnk_files(wineprefix)
+        
         exe_files = self.extract_exe_files_from_lnk(lnk_files, wineprefix)
         
-        product_name_map = {}
+        product_name_map = {}  # Key: product_name, Value: list of exe_files
         
         for exe_file in exe_files:
-            product_name = self.get_product_name(exe_file)
-            if product_name:
-                if product_name not in product_name_map:
-                    product_name_map[product_name] = []
-                product_name_map[product_name].append(exe_file)
-            else:
-                self.create_yaml_file(exe_file, wineprefix)
+            exe_name = exe_file.stem  # Extract the name of the executable
+            product_name = self.get_product_name(exe_file) or exe_name  # Use exe_name if no product name is found
+            
+            if product_name not in product_name_map:
+                product_name_map[product_name] = []
+            
+            product_name_map[product_name].append(exe_file)  # Group exe files under the same product_name
         
+        # Create YAML files based on the product_name_map
         for product_name, exe_files in product_name_map.items():
-            for exe_file in exe_files:
-                if len(exe_files) > 1:
+            
+            if len(exe_files) > 1:
+                # Multiple exe files with the same product_name, use exe_name for differentiation
+                for exe_file in exe_files:
                     self.create_yaml_file(exe_file, wineprefix, use_exe_name=True)
-                else:
-                    self.create_yaml_file(exe_file, wineprefix, use_exe_name=False)
+            else:
+                # Only one exe file, use the product_name for the YAML file
+                self.create_yaml_file(exe_files[0], wineprefix, use_exe_name=False)
+
+
+
 
     def extract_exe_files_from_lnk(self, lnk_files, wineprefix):
         exe_files = []
@@ -2384,4 +2404,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
