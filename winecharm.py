@@ -1329,6 +1329,12 @@ class WineCharmApp(Gtk.Application):
                     continue
                 target_dos_name_match = re.search(r'Target File DOS Name\s+:\s+(.+)', target_output)
                 target_dos_name = target_dos_name_match.group(1).strip() if target_dos_name_match else None
+                
+                # Skip if the target DOS name is not an .exe file
+                if target_dos_name and not target_dos_name.lower().endswith('.exe'):
+                    print(f"Skipping non-exe target: {target_dos_name}")
+                    continue
+                    
                 if target_dos_name:
                     exe_name = target_dos_name.strip()
                     exe_path = self.find_exe_path(wineprefix, exe_name)
@@ -1458,23 +1464,16 @@ class WineCharmApp(Gtk.Application):
         if not wineprefix.exists():
             wineprefix.mkdir(parents=True, exist_ok=True)
 
-        if shutil.which("flfatpak-spawn"):
+        if shutil.which("flatpak-spawn"):
+
             command = [
-                "flatpak-spawn",
-                "--host",
-                "gnome-terminal",
-                "--wait",
-                "--",
-                "flatpak",
-                "--filesystem=host",
-                "--filesystem=~/.var/app",
-                "--command=bash",
-                "run",
-                "io.github.fastrizwaan.WineCharm",
+                "wcterm",
+                "bash",
                 "--norc",
                 "-c",
                 rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
             ]
+            print(command)
         else:
             command = [
                 "gnome-terminal",

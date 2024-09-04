@@ -215,16 +215,29 @@ modules:
           type: pypi
           name: PyYAML
           packagetype: bdist_wheel
-        
+
+  - name: vte
+    sources:
+      - type: git
+        url: https://gitlab.gnome.org/GNOME/vte.git/
+        commit: 3f66edbf598129bafde3baa91ccfb345056418c3
+    buildsystem: meson
+#    config-opts:
+      #- -Dgtk3=false
+      #- -Dgtk4=true
+               
   - name: WineCharm
     buildsystem: simple
     build-commands:
       - install -Dm755 winecharm.py /app/bin/winecharm
+      - install -Dm755 wcterm.py    /app/bin/wcterm
       - install -Dm644 io.github.fastrizwaan.WineCharm.svg /app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg
       - install -Dm755 io.github.fastrizwaan.WineCharm.desktop /app/share/applications/io.github.fastrizwaan.WineCharm.desktop
     sources:
       - type: file
         path: winecharm.py
+      - type: file
+        path: wcterm.py
       - type: file
         path: io.github.fastrizwaan.WineCharm.svg
       - type: file
