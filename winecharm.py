@@ -803,7 +803,7 @@ class WineCharmApp(Gtk.Application):
             self.show_buttons(play_button, options_button)
 
         # Retrieve the script key associated with this button
-#        script_key = None
+        script_key = None
         for key, row in self.script_buttons.items():
             if row == button.get_parent():  # Assuming row is the parent of the button
                 script_key = key
