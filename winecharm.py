@@ -401,8 +401,8 @@ class WineCharmApp(Gtk.Application):
         self.monitoring_active = True
         self.start_monitoring()
         self.check_running_processes_and_update_buttons()
-        #current_running_processes = self.get_running_processes()
-        #self.cleanup_ended_processes(current_running_processes)
+        current_running_processes = self.get_running_processes()
+        self.cleanup_ended_processes(current_running_processes)
 
     def on_focus_out(self, controller):
         self.monitoring_active = False
