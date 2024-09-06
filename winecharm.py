@@ -762,7 +762,7 @@ class WineCharmApp(Gtk.Application):
         buttons_box.set_valign(Gtk.Align.CENTER)
 
         # Store the button in the dictionary using script_key as the key
-        self.script_buttons[script_key] = button
+        #self.script_buttons[script_key] = button
 
         # Connect play button to the toggle_play_stop method
         play_button.connect("clicked", lambda btn: self.toggle_play_stop(script, play_button, button))
