@@ -949,18 +949,90 @@ class WineCharmApp(Gtk.Application):
                 self.set_play_stop_button_state(play_stop_button, True)
                 self.update_row_highlight(row, True)
                 
-                child_pid = self.get_child_pid(script_key, exe_name, wineprefix)
-                print("==========")
-                print(child_pid)
-                if child_pid:
-                    if child_pid not in self.running_processes[script_key]["pids"]:
-                        self.running_processes[script_key]["pids"].append(child_pid)
+                #child_pid = self.get_child_pid(script_key, exe_name, wineprefix)
+                #print("==========")
+                #print(child_pid)
+                #if child_pid:
+                #    if child_pid not in self.running_processes[script_key]["pids"]:
+                #        self.running_processes[script_key]["pids"].append(child_pid)
         
-                
+                # Schedule get_child_pid to run after 2 seconds without blocking UI
+                GLib.timeout_add_seconds(0.01, self.get_child_pid_async, script_key, exe_name, wineprefix)
+
         except Exception as e:
             print(f"Error launching script: {e}")
 
         print(self.running_processes)
+
+    def get_child_pid_async(self, script_key, exe_name, wineprefix):
+        # Run get_child_pid in a separate thread
+        exe_name = exe_name.strip("'")
+        def run_get_child_pid():
+            try:
+                # Strip any unwanted single quotes from exe_name
+                print(f"Looking for child process of: {exe_name}")
+
+                # Command to get the process information using winedbg
+                winedbg_command = f"WINEPREFIX={wineprefix} winedbg --command 'info proc'"
+                winedbg_output = subprocess.check_output(winedbg_command, shell=True, text=True).strip()
+
+                print("-----------------------------------------------")
+                print(f"Executed command: {winedbg_command}")
+                print(f"winedbg output:\n{winedbg_output}")
+                print('===============================================')
+
+                # Search for the exe_name in the winedbg output using grep
+                grep_exe_name = exe_name
+                winedbg_command_with_grep = (
+                    f"WINEPREFIX={wineprefix} winedbg --command 'info proc' | "
+                    f"grep -A1 \"{grep_exe_name}\" | grep -v 'grep' | grep '_' | "
+                    f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
+                    f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
+                    f"grep -v 'svchost.exe'   | grep -v 'plugplay.exe' | grep -v 'winedevice.exe' | "
+                    f"tail -n1 | cut -f2- -d '_' | tr \"'\" ' '"
+                )
+
+                # Get the relevant process line from winedbg output
+                winedbg_output_filtered = subprocess.check_output(winedbg_command_with_grep, shell=True, text=True).strip()
+                print(f"Filtered winedbg output: {winedbg_output_filtered}")
+
+                # Use ps to find the child process PID
+                pgrep_command = (
+                    f"ps -ax --format pid,command | grep \"{winedbg_output_filtered}\" | "
+                    f"grep -v 'grep' | sed 's/^ *//g' | cut -f1 -d ' '"
+                )
+                pgrep_output = subprocess.check_output(pgrep_command, shell=True, text=True).strip()
+
+                # Split multiple PIDs if any, and take the first one
+                child_pid = pgrep_output.splitlines()[0] if pgrep_output else None
+
+                if child_pid:
+                    print(f"Found child PID: {child_pid}")
+                    # Ensure the UI update is performed in the main thread
+                    GLib.idle_add(self.add_child_pid_to_running_processes, script_key, int(child_pid))
+                else:
+                    print(f"No child process found for {exe_name}")
+
+            except subprocess.CalledProcessError as e:
+                print(f"Error executing command: {e}")
+            except ValueError as e:
+                print(f"Value error: {e}")
+
+        # Start the background thread
+        threading.Thread(target=run_get_child_pid, daemon=True).start()
+
+        # Returning False so GLib.timeout_add_seconds doesn't repeat
+        return False
+
+
+    def add_child_pid_to_running_processes(self, script_key, child_pid):
+        # Add the child PID to the running_processes
+        if script_key in self.running_processes:
+            if child_pid not in self.running_processes[script_key]["pids"]:
+                self.running_processes[script_key]["pids"].append(child_pid)
+            print(f"Added child PID {child_pid} to {script_key}")
+        else:
+            print(f"Script key {script_key} not found in running processes.")
 
     def get_child_pid(self, script_key, exe_name, wineprefix):
         try:
@@ -1160,11 +1232,13 @@ class WineCharmApp(Gtk.Application):
 #        else:
 #            self.update_row_highlight(row, False)
             # Ensure the overlay buttons are hidden when the process ends
-        if self.current_clicked_row:
-            play_button, options_button = self.current_clicked_row[1], self.current_clicked_row[2]
-            #self.hide_buttons(play_button, options_button)
-            self.set_play_stop_button_state(play_button, True)  # Reset the play button to "Play"
-#            self.current_clicked_row = None
+
+#        # not updating button state from monitoring
+#        if self.current_clicked_row:
+#            play_button, options_button = self.current_clicked_row[1], self.current_clicked_row[2]
+#            #self.hide_buttons(play_button, options_button)
+#            self.set_play_stop_button_state(play_button, True)  # Reset the play button to "Play"
+##            self.current_clicked_row = None
                             
         # Only update the launch button if it belongs to this script
         if self.launch_button and self.launch_button_exe_name == script_key:
