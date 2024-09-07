@@ -104,6 +104,10 @@ class WineCharmApp(Gtk.Application):
             .highlighted {
                 background-color: rgba(127, 127, 127, 0.15); 
             }
+            .blue {
+                background-color: rgba(53, 132, 228, 0.25);
+                font-weight: bold;
+            }
             .normal-font {  /* Add the CSS rule for the normal-font class */
             font-weight: normal;
             }
@@ -684,6 +688,7 @@ class WineCharmApp(Gtk.Application):
                     row.add_css_class("highlighted")
                 else:
                     row.remove_css_class("highlighted")
+                    row.remove_css_class("blue")
 
     def create_script_row(self, script):
         yaml_info = self.extract_yaml_info(script)
@@ -782,15 +787,15 @@ class WineCharmApp(Gtk.Application):
         if self.current_clicked_row:
             prev_button, prev_play_button, prev_options_button = self.current_clicked_row
             self.hide_buttons(prev_play_button, prev_options_button)
-            prev_button.remove_css_class("highlighted")
+            prev_button.remove_css_class("blue")
 
         # Toggle the highlight class
         if self.current_clicked_row == (button, play_button, options_button):
             self.current_clicked_row = None
-            button.remove_css_class("highlighted")
+            button.remove_css_class("blue")
         else:
             self.current_clicked_row = (button, play_button, options_button)
-            button.add_css_class("highlighted")
+            button.add_css_class("blue")
             self.show_buttons(play_button, options_button)
 
         # Retrieve the script key associated with this button
@@ -860,6 +865,7 @@ class WineCharmApp(Gtk.Application):
             row.add_css_class("highlighted")
         else:
             row.remove_css_class("highlighted")
+            row.remove_css_class("blue")
 
     def toggle_play_stop(self, script, play_stop_button, row):
         yaml_info = self.extract_yaml_info(script)
@@ -1968,6 +1974,7 @@ class WineCharmApp(Gtk.Application):
             row = process_info.get("row")
             if row:
                 row.remove_css_class("highlighted")
+                row.remove_css_class("blue")
 
             # Ensure the overlay buttons are hidden when the process ends
             if self.current_clicked_row:
@@ -1977,6 +1984,7 @@ class WineCharmApp(Gtk.Application):
                 self.set_play_stop_button_state(play_button, False)  # Reset the play button to "Play"
                 self.current_clicked_row = None
                 button.remove_css_class("highlighted")
+                button.remove_css_class("blue")
                 
             # Check if self.launch_button is not None before modifying it
             if self.launch_button and getattr(self, 'launch_button_exe_name', None) == script_key:
@@ -2005,6 +2013,7 @@ class WineCharmApp(Gtk.Application):
         # Reset any UI elements that should be updated when no processes are running
         for row in self.script_buttons.values():
             row.remove_css_class("highlighted")
+            row.remove_css_class("blue")
         
         if self.launch_button:
             self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
