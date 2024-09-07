@@ -810,7 +810,7 @@ class WineCharmApp(Gtk.Application):
                 break
 
         # Ensure the overlay buttons are hidden when the process ends
-        if script_key and script_key in self.running_processes:
+        if script_key in self.running_processes:
             self.set_play_stop_button_state(play_button, True)  # Set to "Stop" if running
         else:
             self.set_play_stop_button_state(play_button, False)  # Reset to "Play" otherwise
@@ -943,30 +943,82 @@ class WineCharmApp(Gtk.Application):
                     "row": row,
                     "script": script,
                     "exe_name": exe_name,
-                    "pid": process.pid
+                    "pids": [process.pid]
                 }
 
                 self.set_play_stop_button_state(play_stop_button, True)
-                #self.update_row_highlight(row, True)
-
+                self.update_row_highlight(row, True)
+                
+                child_pid = self.get_child_pid(script_key, exe_name, wineprefix)
+                print("==========")
+                print(child_pid)
+                if child_pid:
+                    if child_pid not in self.running_processes[script_key]["pids"]:
+                        self.running_processes[script_key]["pids"].append(child_pid)
+        
+                
         except Exception as e:
             print(f"Error launching script: {e}")
 
         print(self.running_processes)
 
+    def get_child_pid(self, script_key, exe_name, wineprefix):
+        try:
+            # Run winedbg to get the process tree and filter for the exe_name
+            print(exe_name)
+            exe_name = exe_name.strip("'")
+            #grep_exe_name = re.escape(exe_name)
+            grep_exe_name = exe_name.strip("'")
+            print(grep_exe_name)
+            winedbg_command = f"WINEPREFIX={wineprefix} winedbg --command 'info proc'"
+            winedbg_output = subprocess.check_output(winedbg_command, shell=True, text=True).strip()
+            #print("-----------------------------------------------")
+            #print(f"output: {winedbg_output}")
+            #print('===============================================')
+#            winedbg_command = f"WINEPREFIX={wineprefix} winedbg --command \"info proc\" | grep -A1 \"{exe_name}\" | grep -v 'grep' | tail -n1 | sed 's/ *//g' | cut -f2- -d '_' | tr \"'\" ' '"
+            #winedbg_command = f"WINEPREFIX={wineprefix} winedbg --command \"info proc\" | grep -A1 \"{grep_exe_name}\" | grep -v 'grep' | grep '_' | tail -n1 | cut -f2- -d '_' | tr \"'\" ' '"
+            # Using this
+            winedbg_command = f"WINEPREFIX={wineprefix} winedbg --command \"info proc\" | grep -A1 \"{grep_exe_name}\" | grep -v 'grep' | grep '_' | tail -n1 | cut -f2- -d '_' | tr \"'\" ' '"
+
+            winedbg_output = subprocess.check_output(winedbg_command, shell=True, text=True).strip()
+            print("-----------------------------------------------")
+            print(winedbg_command)
+            print(f"output: {winedbg_output}")
+            pgrep_command = f"ps -ax --format pid,command |grep \"{winedbg_output}\" | grep -v 'grep' | sed 's/^ *//g' | cut -f1 -d ' '"
+            print(pgrep_command)
+            pgrep_output = subprocess.check_output(pgrep_command, shell=True, text=True).strip()
+
+            # Split multiple PIDs and get the first one
+            child_pid = pgrep_output.splitlines()[0] if pgrep_output else None
+
+            if child_pid:
+                print(f"child_pid: {child_pid}")
+                return int(child_pid)
+            else:
+                print(f"No child process found for {exe_name}")
+                return None
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error: {e}")
+            return None
+        except ValueError as e:
+            print(f"ValueError: {e}")
+            return None
+
     def terminate_script(self, script_key):
         if script_key in self.running_processes:
             process_info = self.running_processes[script_key]
-            pid = process_info.get("pid")
+            pids = process_info.get("pids", [])
 
             try:
-                if pid and self.is_process_running(pid):
-                    print(f"Attempting to terminate PID: {pid}")
-                    os.killpg(os.getpgid(pid), signal.SIGKILL)
-                    print(f"Terminated process {script_key} with PID: {pid}")
-                else:
-                    print(f"Process with PID {pid} is no longer running.")
-                    
+                for pid in pids:
+                    if self.is_process_running(pid):
+                        print(f"Attempting to terminate PID: {pid}")
+                        os.killpg(os.getpgid(pid), signal.SIGKILL)
+                        print(f"Terminated process {script_key} with PID: {pid}")
+                    else:
+                        print(f"Process with PID {pid} is no longer running.")
+
                 del self.running_processes[script_key]
 
                 row = process_info["row"]
@@ -1024,7 +1076,6 @@ class WineCharmApp(Gtk.Application):
 
             # Filter out any processes that match do_not_kill
             pgrep_output = [line for line in pgrep_output if do_not_kill not in line]
-            #print(f"Filtered pgrep output: {pgrep_output}")  # Debugging output
 
             for script in self.find_python_scripts():
                 yaml_info = self.extract_yaml_info(script)
@@ -1047,26 +1098,24 @@ class WineCharmApp(Gtk.Application):
                         if exe_name in line and int(line.split()[0]) != 1
                     ]
 
-               # print(f"Processes matching {exe_name} (duplicate={is_duplicate}) for {script.stem}: {matching_processes}")  # Debugging output
-
                 if matching_processes:
                     for pid, cmd in matching_processes:
                         row = self.script_buttons.get(script_key)
                         if row:
-                            #print(f"Highlighting row for {script.stem} with PID {pid}")  # Debugging output
-                            current_running_processes[script_key] = {
-                                "row": row,
-                                "script": script,
-                                "exe_name": exe_name,
-                                "pid": pid,
-                                "command": cmd
-                            }
-                            # Update the UI elements
-                            #self.update_ui_for_running_process(script_key, row, current_running_processes)
+                            if script_key not in current_running_processes:
+                                current_running_processes[script_key] = {
+                                    "row": row,
+                                    "script": script,
+                                    "exe_name": exe_name,
+                                    "pids": [],
+                                    "command": cmd
+                                }
+                            if pid not in current_running_processes[script_key]["pids"]:
+                                current_running_processes[script_key]["pids"].append(pid)
+                                
                             if self.launch_button:
                                 self.set_play_stop_button_state(self.launch_button, True)
                         else:
-                            print("setting False highlight...")
                             self.update_row_highlight(row, False)
                 else:
                     self.process_ended(script_key)
@@ -1076,7 +1125,14 @@ class WineCharmApp(Gtk.Application):
             self.stop_monitoring()
             self.count = 0
 
-        return current_running_processes
+        # Merge the new current_running_processes dictionary with the existing self.running_processes dictionary
+        for script_key, process_info in current_running_processes.items():
+            if script_key in self.running_processes:
+                self.running_processes[script_key]["pids"].extend(process_info["pids"])
+            else:
+                self.running_processes[script_key] = process_info
+
+        return self.running_processes
 
 
 
@@ -1103,7 +1159,13 @@ class WineCharmApp(Gtk.Application):
             #row.add_css_class("highlighted")
 #        else:
 #            self.update_row_highlight(row, False)
-                
+            # Ensure the overlay buttons are hidden when the process ends
+        if self.current_clicked_row:
+            play_button, options_button = self.current_clicked_row[1], self.current_clicked_row[2]
+            #self.hide_buttons(play_button, options_button)
+            self.set_play_stop_button_state(play_button, True)  # Reset the play button to "Play"
+#            self.current_clicked_row = None
+                            
         # Only update the launch button if it belongs to this script
         if self.launch_button and self.launch_button_exe_name == script_key:
             self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
