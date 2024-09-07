@@ -104,6 +104,10 @@ class WineCharmApp(Gtk.Application):
             .highlighted {
                 background-color: rgba(127, 127, 127, 0.15); 
             }
+            .red {
+                background-color: rgba(228, 0, 0, 0.25);
+                font-weight: bold;
+            }
             .blue {
                 background-color: rgba(53, 132, 228, 0.25);
                 font-weight: bold;
@@ -915,6 +919,16 @@ class WineCharmApp(Gtk.Application):
         wineprefix = shlex.quote(str(wineprefix))
         runner = shlex.quote(runner)
         exe_name = shlex.quote(str(exe_name))
+
+        # Check if the exe_file exists
+        if not Path(exe_file).exists():
+            # Update the play_stop_button in the main GTK thread
+            GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
+            GLib.idle_add(play_stop_button.set_tooltip_text, "Exe Not Found")
+            play_stop_button.add_css_class("red")
+            return
+        else:
+            play_stop_button.remove_css_class("red")
 
         command = f"cd {exe_parent} && {wine_debug} {env_vars} WINEPREFIX={wineprefix} {runner} {exe_name} {script_args}"
         print(command)
