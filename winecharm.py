@@ -1116,7 +1116,7 @@ class WineCharmApp(Gtk.Application):
                 wineprefix = Path(script).parent
                 exe_name_quoted = shlex.quote(str(exe_name))
                 wineprefix = shlex.quote(str(wineprefix))
-                unix_exe_dir_name = shlex.quote(str(unix_exe_dir_name))
+
 
                 # Check if exe_name has duplicates
                 is_duplicate = exe_name_count[exe_name] > 1
