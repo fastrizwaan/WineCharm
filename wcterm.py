@@ -27,6 +27,7 @@ class WCTerm(object):
         self._terminal.set_scroll_on_output(False)
 
         self._terminal.connect("child-exited", self._child_exited_cb)
+        self._terminal.connect("button-press-event", self._on_right_click)  # Add right-click handler
 
         # Add the terminal to the scrolled window
         scrolled_window.add(self._terminal)
@@ -45,7 +46,7 @@ class WCTerm(object):
             command = ['/bin/bash']  # Default to bash if no command is provided
         else:
             # Run the command inside a shell to handle complex commands like "ls; read"
-            command = ['/bin/bash', '-c', command]
+            command = ['/bin/bash', '-c', command + '; read']
             
         self._terminal.spawn_async(
             Vte.PtyFlags.DEFAULT,
@@ -62,6 +63,33 @@ class WCTerm(object):
 
     def _child_exited_cb(self, term, status, user_data=None):
         Gtk.main_quit()
+
+    def _on_right_click(self, widget, event):
+        if event.button == 3:  # Right-click event
+            self._show_context_menu(event)
+
+    def _show_context_menu(self, event):
+        menu = Gtk.Menu()
+
+        # Create Copy option
+        copy_item = Gtk.MenuItem(label="Copy")
+        copy_item.connect("activate", self._on_copy)
+        menu.append(copy_item)
+
+        # Create Paste option
+        paste_item = Gtk.MenuItem(label="Paste")
+        paste_item.connect("activate", self._on_paste)
+        menu.append(paste_item)
+
+        menu.show_all()
+        menu.popup_at_pointer(event)
+
+    def _on_copy(self, widget):
+        # Use copy_clipboard_format with Vte.Format.TEXT to copy selected text
+        self._terminal.copy_clipboard_format(Vte.Format.TEXT)
+
+    def _on_paste(self, widget):
+        self._terminal.paste_clipboard()
 
     def start(self):
         Gtk.main()
