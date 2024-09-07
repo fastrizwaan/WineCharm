@@ -960,21 +960,42 @@ class WineCharmApp(Gtk.Application):
     def get_child_pid_async(self, script_key, exe_name, wineprefix):
         # Run get_child_pid in a separate thread
 
-        # Strip any unwanted single quotes from exe_name
         grep_exe_name = exe_name.strip("'")
-        
+
+        # Store exe_name and exe_parent mapped by script_key to handle parent directory matching
+        exe_name_info = {}
+
+        for script in self.find_python_scripts():
+            yaml_info = self.extract_yaml_info(script)
+            exe_name_from_script = Path(yaml_info['exe_file']).name
+            exe_parent = Path(yaml_info['exe_file']).parent.name
+            script_key_from_script = yaml_info['sha256sum']
+
+            # Store the exe_parent mapped by script_key
+            exe_name_info[script_key_from_script] = {
+                'exe_name': exe_name_from_script,
+                'exe_parent': exe_parent
+            }
+
+            print(f"""
+            script_key_from_script: {script_key_from_script}
+            exe_name_from_script: {exe_name_from_script}
+            exe_file: {yaml_info['exe_file']}
+            exe_parent: {exe_parent}
+            """)
+
         def run_get_child_pid():
             try:
-                #print(f"Looking for child process of: {exe_name}")
+                print(f"Looking for child processes of: {exe_name}")
 
                 # Command to get the process information using winedbg
                 winedbg_command = f"WINEPREFIX={wineprefix} winedbg --command 'info proc'"
                 winedbg_output = subprocess.check_output(winedbg_command, shell=True, text=True).strip()
 
-               # print("-----------------------------------------------")
-               # print(f"Executed command: {winedbg_command}")
-               # print(f"winedbg output:\n{winedbg_output}")
-                #print('===============================================')
+                print("-----------------------------------------------")
+                print(f"Executed command: {winedbg_command}")
+                print(f"winedbg output:\n{winedbg_output}")
+                print('===============================================')
 
                 # Search for the exe_name in the winedbg output using grep
                 winedbg_command_with_grep = (
@@ -988,21 +1009,32 @@ class WineCharmApp(Gtk.Application):
 
                 # Get the relevant process line from winedbg output
                 winedbg_output_filtered = subprocess.check_output(winedbg_command_with_grep, shell=True, text=True).strip().splitlines()
-                #print(f"Filtered winedbg output: {winedbg_output_filtered}")
+                print(f"Filtered winedbg output: {winedbg_output_filtered}")
 
+                # Retrieve the exe_parent from the info
+                exe_parent = exe_name_info.get(script_key, {}).get('exe_parent')
                 child_pids = set()
 
                 for filtered_exe in winedbg_output_filtered:
                     filtered_exe = filtered_exe.strip()
-                    # Use ps to find the child process PID
+
+                    # pgrep command to find matching processes with exe_parent
+                    #escaped_exe_parent_name = re.escape(exe_parent)
+                    cleaned_exe_parent_name = exe_parent.replace(r'[', '\[')
+                    cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r']', '\]')
+                    #cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r'(', '\(')
+                    #cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r')', '\)')
+                    #cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r'{', '\{')
+                    #cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r'}', '\}')
                     pgrep_command = (
-                        f"ps -ax --format pid,command | grep \"{filtered_exe.strip()}\" | "
-                        f"grep -v 'grep' | sed 's/^ *//g' | cut -f1 -d ' '"
+                        f"ps -ax --format pid,command | grep \"{filtered_exe}\" | "
+                        f"grep \"{cleaned_exe_parent_name}\" | grep -v 'grep' | sed 's/^ *//g' | cut -f1 -d ' '"
                     )
-                    #print(f"Running pgrep command: {pgrep_command}")
+
+                    print(f"Running pgrep command: {pgrep_command}")
                     pgrep_output = subprocess.check_output(pgrep_command, shell=True, text=True).strip()
 
-                    # Add all found PIDs to the child_pids list
+                    # Add all found PIDs to the child_pids set (to avoid duplicates)
                     child_pids.update(pgrep_output.splitlines())
 
                 # If we found child PIDs, pass them to the UI update
@@ -1011,7 +1043,6 @@ class WineCharmApp(Gtk.Application):
                     GLib.idle_add(self.add_child_pids_to_running_processes, script_key, child_pids)
                 else:
                     print(f"No child process found for {exe_name}")
-
 
             except subprocess.CalledProcessError as e:
                 print(f"Error executing command: {e}")
@@ -1023,6 +1054,11 @@ class WineCharmApp(Gtk.Application):
 
         # Returning False so GLib.timeout_add_seconds doesn't repeat
         return False
+
+
+
+
+
 
     def add_child_pids_to_running_processes(self, script_key, child_pids):
         # Add the child PIDs to the running_processes dictionary
