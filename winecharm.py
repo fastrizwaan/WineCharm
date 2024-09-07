@@ -26,7 +26,7 @@ gi.require_version('Adw', '1')
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 #qfrom concurrent.futures import ThreadPoolExecutor
 
-version = "0.9"
+version = "0.91"
 # Constants
 winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
 prefixes_dir = winecharmdir / "Prefixes"
@@ -209,13 +209,11 @@ class WineCharmApp(Gtk.Application):
             else:
                 self.set_dynamic_variables()
 
-#self.window.present()
         focus_controller = Gtk.EventControllerFocus()
         focus_controller.connect("enter", self.on_focus_in)
         focus_controller.connect("leave", self.on_focus_out)
         self.window.add_controller(focus_controller)
-        
-        
+
     def initialize_template(self, template_dir, callback):
         if not template_dir.exists():
             self.initializing_template = True
@@ -571,7 +569,6 @@ class WineCharmApp(Gtk.Application):
             self.search_entry.grab_focus()
             self.search_active = True
 
-
     def on_search_entry_activated(self, entry):
         search_term = entry.get_text().lower()
         self.filter_script_list(search_term)
@@ -594,8 +591,6 @@ class WineCharmApp(Gtk.Application):
             script_key = yaml_info['sha256sum']
             if script_key in self.running_processes:
                 self.update_ui_for_running_process(script_key, row, self.running_processes)
-
-
 
     def on_open_button_clicked(self, button):
         self.open_file_dialog()
@@ -632,13 +627,11 @@ class WineCharmApp(Gtk.Application):
         finally:
             self.window.set_visible(True)
 
-        
     def on_back_button_clicked(self, button):
         #print("Back button clicked")
 
         # Restore the script list
         self.create_script_list()
-        
 
         # Reset the header bar title and visibility of buttons
         self.window.set_title("Wine Charm")
@@ -712,7 +705,6 @@ class WineCharmApp(Gtk.Application):
         overlay = Gtk.Overlay()
         overlay.set_child(button)
 
-
         if self.icon_view:
             icon = self.load_icon(script)
             icon_image = Gtk.Image.new_from_paintable(icon)
@@ -775,7 +767,6 @@ class WineCharmApp(Gtk.Application):
 
         return overlay
 
-
     def show_buttons(self, play_button, options_button):
         play_button.set_visible(True)
         options_button.set_visible(True)
@@ -815,11 +806,9 @@ class WineCharmApp(Gtk.Application):
         else:
             self.set_play_stop_button_state(play_button, False)  # Reset to "Play" otherwise
 
-
     def find_row_by_script_stem(self, script_stem):
         script_label = script_stem.replace('_', ' ')
         return self.script_buttons.get(script_label)
-
 
     def find_python_scripts(self):
         scripts = []
@@ -858,8 +847,6 @@ class WineCharmApp(Gtk.Application):
         self.vbox.prepend(self.launch_button)
         self.launch_button.set_visible(True)
 
-
-
     def set_play_stop_button_state(self, button, is_playing):
         if is_playing:
             button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
@@ -894,7 +881,6 @@ class WineCharmApp(Gtk.Application):
             self.set_play_stop_button_state(play_stop_button, True)
             #self.update_row_highlight(row, True)
 
-                
     def launch_script(self, script, play_stop_button, row):
         yaml_info = self.extract_yaml_info(script)
         exe_file = yaml_info['exe_file']
@@ -923,9 +909,7 @@ class WineCharmApp(Gtk.Application):
         wineprefix = shlex.quote(str(wineprefix))
         runner = shlex.quote(runner)
         exe_name = shlex.quote(str(exe_name))
-       # print("--------------------")
-       # print(wine_debug)
-        # Build the command string
+
         command = f"cd {exe_parent} && {wine_debug} {env_vars} WINEPREFIX={wineprefix} {runner} {exe_name} {script_args}"
         print(command)
 
@@ -977,13 +961,6 @@ class WineCharmApp(Gtk.Application):
                 'exe_parent': exe_parent
             }
 
-            print(f"""
-            script_key_from_script: {script_key_from_script}
-            exe_name_from_script: {exe_name_from_script}
-            exe_file: {yaml_info['exe_file']}
-            exe_parent: {exe_parent}
-            """)
-
         def run_get_child_pid():
             try:
                 print(f"Looking for child processes of: {exe_name}")
@@ -992,10 +969,10 @@ class WineCharmApp(Gtk.Application):
                 winedbg_command = f"WINEPREFIX={wineprefix} winedbg --command 'info proc'"
                 winedbg_output = subprocess.check_output(winedbg_command, shell=True, text=True).strip()
 
-                print("-----------------------------------------------")
-                print(f"Executed command: {winedbg_command}")
-                print(f"winedbg output:\n{winedbg_output}")
-                print('===============================================')
+                #print("-----------------------------------------------")
+                #print(f"Executed command: {winedbg_command}")
+                #print(f"winedbg output:\n{winedbg_output}")
+                #print('===============================================')
 
                 # Search for the exe_name in the winedbg output using grep
                 winedbg_command_with_grep = (
@@ -1019,13 +996,9 @@ class WineCharmApp(Gtk.Application):
                     filtered_exe = filtered_exe.strip()
 
                     # pgrep command to find matching processes with exe_parent
-                    #escaped_exe_parent_name = re.escape(exe_parent)
                     cleaned_exe_parent_name = exe_parent.replace(r'[', '\[')
                     cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r']', '\]')
-                    #cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r'(', '\(')
-                    #cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r')', '\)')
-                    #cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r'{', '\{')
-                    #cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r'}', '\}')
+
                     pgrep_command = (
                         f"ps -ax --format pid,command | grep \"{filtered_exe}\" | "
                         f"grep \"{cleaned_exe_parent_name}\" | grep -v 'grep' | sed 's/^ *//g' | cut -f1 -d ' '"
@@ -1054,11 +1027,6 @@ class WineCharmApp(Gtk.Application):
 
         # Returning False so GLib.timeout_add_seconds doesn't repeat
         return False
-
-
-
-
-
 
     def add_child_pids_to_running_processes(self, script_key, child_pids):
         # Add the child PIDs to the running_processes dictionary
