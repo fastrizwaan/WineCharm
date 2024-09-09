@@ -26,7 +26,7 @@ gi.require_version('Adw', '1')
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 #qfrom concurrent.futures import ThreadPoolExecutor
 
-version = "0.91"
+version = "0.92"
 # Constants
 winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
 prefixes_dir = winecharmdir / "Prefixes"
