@@ -1408,7 +1408,7 @@ class WineCharmApp(Gtk.Application):
         # Create YAML file with proper naming
         yaml_file_path = prefix_dir / f"{exe_no_space if use_exe_name else progname.replace(' ', '_')}.charm"
         with open(yaml_file_path, 'w') as yaml_file:
-            yaml.dump(yaml_data, yaml_file)
+            yaml.dump(yaml_data, yaml_file, default_flow_style=False, width=1000) 
 
 
         # Extract icon and create desktop entry
@@ -1495,7 +1495,7 @@ class WineCharmApp(Gtk.Application):
             found_lnk_files.append(filename)
 
         with open(found_lnk_files_path, 'w') as file:
-            yaml.dump(found_lnk_files, file, default_flow_style=False)
+            yaml.dump(found_lnk_files, file, default_flow_style=False, width=1000)
 
     def is_lnk_file_processed(self, wineprefix, lnk_file):
         found_lnk_files_path = wineprefix / "found_lnk_files.yaml"
@@ -1925,7 +1925,7 @@ class WineCharmApp(Gtk.Application):
         try:
             # Write the updated info back to the YAML file
             with open(script_path, 'w') as file:
-                yaml.dump(yaml_info, file)
+                yaml.dump(yaml_info, file, default_flow_style=False, width=1000)
             
             # Rename the icon file if it exists
             icon_path = script_path.parent / old_icon_name
@@ -1956,7 +1956,7 @@ class WineCharmApp(Gtk.Application):
             
             # Write the updated info back to the YAML file
             with open(script, 'w') as file:
-                yaml.dump(script_info, file)
+                yaml.dump(script_info, file, default_flow_style=False, width=1000)
             
             # Update the UI or whatever is necessary
             self.create_script_list()
