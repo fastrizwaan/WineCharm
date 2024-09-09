@@ -954,7 +954,7 @@ class WineCharmApp(Gtk.Application):
                 
                 self.update_row_highlight(row, True)
                 
-                GLib.timeout_add_seconds(0.01, self.get_child_pid_async, script_key, exe_name, wineprefix)
+                GLib.timeout_add_seconds(5, self.get_child_pid_async, script_key, exe_name, wineprefix)
 
         except Exception as e:
             print(f"Error launching script: {e}")
@@ -963,7 +963,34 @@ class WineCharmApp(Gtk.Application):
 
     def get_child_pid_async(self, script_key, exe_name, wineprefix):
         # Run get_child_pid in a separate thread
+        if script_key not in self.running_processes:
+            print("Process already ended, nothing to get child PID for")
+            return False
+            
+        process_info = self.running_processes[script_key]
+        pid = process_info.get('pid')
+        #xe_name = process_info.get('exe_name')
+        script = process_info.get('script')
+        wineprefix = Path(process_info['script']).parent
+        yaml_info = self.extract_yaml_info(script)
+        script_key = yaml_info['sha256sum']
+        exe_name = Path(yaml_info['exe_file']).name
+        unix_exe_dir_name = Path(yaml_info['exe_file']).parent.name  # Get the parent directory name
+        print(yaml_info)
+        # Quote paths and command parts to prevent issues with spaces
+        wineprefix = Path(script).parent
+        exe_name_quoted = shlex.quote(str(exe_name))
+        wineprefix = shlex.quote(str(wineprefix))
 
+        
+        runner =  yaml_info['runner']
+        print(runner)
+        runner_dir = Path(runner).parent
+
+    #rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
+        # Use wineprefix along with winedbg to accurately target the process
+        #refined_processes = self.get_wine_processes(wineprefix, exe_name)
+        #command = f"export PATH={shlex.quote(str(runner_dir))}:$PATH; echo $PATH; which wineserver; WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k"
         grep_exe_name = exe_name.strip("'")
 
         # Store exe_name and exe_parent mapped by script_key to handle parent directory matching
@@ -986,8 +1013,8 @@ class WineCharmApp(Gtk.Application):
                 print(f"Looking for child processes of: {exe_name}")
 
                 # Command to get the process information using winedbg
-                winedbg_command = f"WINEPREFIX={wineprefix} winedbg --command 'info proc'"
-                winedbg_output = subprocess.check_output(winedbg_command, shell=True, text=True).strip()
+                #winedbg_command = f"WINEPREFIX={wineprefix} winedbg --command 'info proc'"
+                #winedbg_output = subprocess.check_output(winedbg_command, shell=True, text=True).strip()
 
                 #print("-----------------------------------------------")
                 #print(f"Executed command: {winedbg_command}")
@@ -996,6 +1023,7 @@ class WineCharmApp(Gtk.Application):
 
                 # Search for the exe_name in the winedbg output using grep
                 winedbg_command_with_grep = (
+                    f"export PATH={shlex.quote(str(runner_dir))}:$PATH; echo $PATH;"
                     f"WINEPREFIX={wineprefix} winedbg --command 'info proc' | "
                     f"grep -A9 '{grep_exe_name}' | grep -v 'grep' | grep '_' | "
                     f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
@@ -1016,8 +1044,8 @@ class WineCharmApp(Gtk.Application):
                     filtered_exe = filtered_exe.strip()
 
                     # pgrep command to find matching processes with exe_parent
-                    cleaned_exe_parent_name = exe_parent.replace(r'[', '\[')
-                    cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r']', '\]')
+                    cleaned_exe_parent_name = exe_parent.replace(r'[', '\\[')
+                    cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r']', '\\]')
 
                     pgrep_command = (
                         f"ps -ax --format pid,command | grep \"{filtered_exe}\" | "
@@ -1060,7 +1088,40 @@ class WineCharmApp(Gtk.Application):
             print(f"Script key {script_key} not found in running processes.")
                         
     def terminate_script(self, script_key):
+        process_info = self.running_processes[script_key]
+        pid = process_info.get('pid')
+        #xe_name = process_info.get('exe_name')
+        script = process_info.get('script')
+        wineprefix = Path(process_info['script']).parent
+        yaml_info = self.extract_yaml_info(script)
+        script_key = yaml_info['sha256sum']
+        exe_name = Path(yaml_info['exe_file']).name
+        unix_exe_dir_name = Path(yaml_info['exe_file']).parent.name  # Get the parent directory name
+        print(yaml_info)
+        # Quote paths and command parts to prevent issues with spaces
+        wineprefix = Path(script).parent
+        exe_name_quoted = shlex.quote(str(exe_name))
+        wineprefix = shlex.quote(str(wineprefix))
+
+        
+        runner =  yaml_info['runner']
+        print(runner)
+        runner_dir = Path(runner).parent
+
+    #rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
+        # Use wineprefix along with winedbg to accurately target the process
+        #refined_processes = self.get_wine_processes(wineprefix, exe_name)
+        command = f"export PATH={shlex.quote(str(runner_dir))}:$PATH; echo $PATH; which wineserver; WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k"
+        try:
+            subprocess.run(command, shell=True, check=True)
+            print(f"Successfully ran {pid} in {wineprefix}")
+            del self.running_processes[script_key]
+        except subprocess.CalledProcessError as e:
+            print(f"Error running winetricks script: {e}")
+            
+            
         if script_key in self.running_processes:
+        
             process_info = self.running_processes[script_key]
             pids = process_info.get("pids", [])
 
@@ -1164,7 +1225,7 @@ class WineCharmApp(Gtk.Application):
                         #print("+++++++++++++++++++++++++++++++++++++++++++++++")
                         #print(script_key, exe_name, wineprefix)
                         # Fetch and update child PIDs asynchronously
-                        GLib.timeout_add_seconds(0.01, self.get_child_pid_async, script_key, exe_name_quoted, wineprefix)
+                        #GLib.timeout_add_seconds(0.01, self.get_child_pid_async, script_key, exe_name_quoted, wineprefix)
                         if row:
                             if script_key not in current_running_processes:
                                 current_running_processes[script_key] = {
