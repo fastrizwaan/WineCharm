@@ -906,23 +906,26 @@ class WineCharmApp(Gtk.Application):
         if winecharmdir not in Path(runner).parents:
             runner = "wine"
 
-        # Define the log file path based on script name
+        # Check if any process with the same wineprefix is already running
+        self.launching_another_from_same_prefix = False
+        for process_info in self.running_processes.values():
+            if Path(process_info['wineprefix']) == wineprefix:
+                self.launching_another_from_same_prefix = True
+                print(f"Process already running in {wineprefix}. Preventing premature termination.")
+
+        # Proceed with launching the new script process
         log_file_path = wineprefix / f"{script.stem}.log"
         print(f"Logging stderr to {log_file_path}")
 
-        # Handle the special case where wine_debug is "disabled"
         if wine_debug == "disabled":
             wine_debug = "WINEDEBUG=-all DXVK_LOG_LEVEL=none"
 
-        # Quote paths and command parts to prevent issues with spaces
         exe_parent = shlex.quote(str(Path(exe_file).parent))
         wineprefix = shlex.quote(str(wineprefix))
         runner = shlex.quote(runner)
         exe_name = shlex.quote(str(exe_name))
 
-        # Check if the exe_file exists
         if not Path(exe_file).exists():
-            # Update the play_stop_button in the main GTK thread
             GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
             GLib.idle_add(play_stop_button.set_tooltip_text, "Exe Not Found")
             play_stop_button.add_css_class("red")
@@ -947,13 +950,12 @@ class WineCharmApp(Gtk.Application):
                     "row": row,
                     "script": script,
                     "exe_name": exe_name,
-                    "pids": [process.pid]
+                    "pids": [process.pid],
+                    "wineprefix": wineprefix
                 }
 
                 self.set_play_stop_button_state(play_stop_button, True)
-                
                 self.update_row_highlight(row, True)
-                
                 GLib.timeout_add_seconds(5, self.get_child_pid_async, script_key, exe_name, wineprefix)
 
         except Exception as e:
@@ -965,6 +967,7 @@ class WineCharmApp(Gtk.Application):
         # Run get_child_pid in a separate thread
         if script_key not in self.running_processes:
             print("Process already ended, nothing to get child PID for")
+            self.launching_another_from_same_prefix = False
             return False
             
         process_info = self.running_processes[script_key]
@@ -1072,9 +1075,13 @@ class WineCharmApp(Gtk.Application):
 
         # Start the background thread
         threading.Thread(target=run_get_child_pid, daemon=True).start()
-
+    
+        # After completing the task, reset the flag
+        self.launching_another_from_same_prefix = False
+        print(f"Finished retrieving child PIDs. Reset launching_another_from_same_prefix to {self.launching_another_from_same_prefix}")
         # Returning False so GLib.timeout_add_seconds doesn't repeat
         return False
+
 
     def add_child_pids_to_running_processes(self, script_key, child_pids):
         # Add the child PIDs to the running_processes dictionary
@@ -1088,59 +1095,58 @@ class WineCharmApp(Gtk.Application):
             print(f"Script key {script_key} not found in running processes.")
                         
     def terminate_script(self, script_key):
-        process_info = self.running_processes[script_key]
-        pid = process_info.get('pid')
-        #xe_name = process_info.get('exe_name')
+        # Get process info for the script using the script_key
+        process_info = self.running_processes.get(script_key)
+        
+        if not process_info:
+            print(f"No running process found for script_key: {script_key}")
+            return
+
+        # Get the wineprefix, runner, and PIDs associated with the script
         script = process_info.get('script')
-        wineprefix = Path(process_info['script']).parent
         yaml_info = self.extract_yaml_info(script)
-        script_key = yaml_info['sha256sum']
-        exe_name = Path(yaml_info['exe_file']).name
-        unix_exe_dir_name = Path(yaml_info['exe_file']).parent.name  # Get the parent directory name
-        print(yaml_info)
-        # Quote paths and command parts to prevent issues with spaces
+        
+        # Extract wineprefix and runner
         wineprefix = Path(script).parent
-        exe_name_quoted = shlex.quote(str(exe_name))
-        wineprefix = shlex.quote(str(wineprefix))
+        runner = yaml_info.get("runner", "wine")  # Default to 'wine' if runner is not provided
 
-        
-        runner =  yaml_info['runner']
-        print(runner)
-        runner_dir = Path(runner).parent
+        pids = process_info.get("pids", [])
+        print(f"Terminating script {script_key} with wineprefix {wineprefix}, runner {runner}, and PIDs: {pids}")
 
-    #rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
-        # Use wineprefix along with winedbg to accurately target the process
-        #refined_processes = self.get_wine_processes(wineprefix, exe_name)
-        command = f"export PATH={shlex.quote(str(runner_dir))}:$PATH; echo $PATH; which wineserver; WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k"
+
+
         try:
-            subprocess.run(command, shell=True, check=True)
-            print(f"Successfully ran {pid} in {wineprefix}")
-            del self.running_processes[script_key]
-        except subprocess.CalledProcessError as e:
-            print(f"Error running winetricks script: {e}")
-            
-            
-        if script_key in self.running_processes:
-        
-            process_info = self.running_processes[script_key]
-            pids = process_info.get("pids", [])
+            # If there is only one PID, use wineserver -k to kill the entire wineprefix
+            if len(pids) == 1 and not self.launching_another_from_same_prefix:
+                runner_dir = Path(runner).parent
+                command = f"export PATH={shlex.quote(str(runner_dir))}:$PATH; WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k"
+                print("=================")
+                print(f"Running command: {command}")
+                subprocess.run(command, shell=True, check=True)
+                print(f"Successfully killed all processes in wineprefix {wineprefix} using wineserver -k")
 
-            try:
+            # If there are multiple PIDs, kill each process individually
+            elif len(pids) > 1 or self.launching_another_from_same_prefix:
                 for pid in pids:
                     if self.is_process_running(pid):
-                        #print(f"Attempting to terminate PID: {pid}")
-                        os.killpg(os.getpgid(pid), signal.SIGKILL)
-                        #print(f"Terminated process {script_key} with PID: {pid}")
+                        try:
+                            os.killpg(os.getpgid(pid), signal.SIGKILL)
+                            print(f"Successfully terminated process {pid} for script {script_key}")
+                        except ProcessLookupError:
+                            print(f"Process with PID {pid} not found, may have already exited.")
+                        except PermissionError:
+                            print(f"Permission denied to kill process with PID {pid}.")
                     else:
                         print(f"Process with PID {pid} is no longer running.")
 
-                del self.running_processes[script_key]
+            # Remove the script from running_processes after termination
+            del self.running_processes[script_key]
+            self.update_row_highlight(process_info['row'], False)
 
-                row = process_info["row"]
-                self.update_row_highlight(row, False)
+        except Exception as e:
+            print(f"Error terminating script {script_key}: {e}")
 
-            except Exception as e:
-                print(f"Error terminating script {script_key}: {e}")
+        print(f"Termination complete for script {script_key}")
 
 
     def is_process_running(self, pid):
@@ -1233,7 +1239,8 @@ class WineCharmApp(Gtk.Application):
                                     "script": script,
                                     "exe_name": exe_name,
                                     "pids": [],
-                                    "command": cmd
+                                    "command": cmd,
+                                    "wineprefix" : wineprefix
                                 }
                             if pid not in current_running_processes[script_key]["pids"]:
                                 current_running_processes[script_key]["pids"].append(pid)
