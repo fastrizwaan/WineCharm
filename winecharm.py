@@ -1307,20 +1307,15 @@ class WineCharmApp(Gtk.Application):
             self.launch_button.set_tooltip_text("Stop")
 
     def cleanup_ended_processes(self, current_running_processes):
+
         for script_key in list(self.running_processes.keys()):
             if script_key not in current_running_processes:
                 self.process_ended(script_key)
 
-
-        for exe_name in list(self.running_processes.keys()):
-            if exe_name not in current_running_processes:
-                self.process_ended(exe_name)
-
-        # If no more processes are running, reset all UI elements
         if not current_running_processes:
             self.reset_all_ui_elements()
 
-        self.running_processes = current_running_processes
+        #self.running_processes = current_running_processes
 
     def find_row_by_script_key(self, script_key):
         return self.script_buttons.get(script_key)
@@ -2050,6 +2045,7 @@ class WineCharmApp(Gtk.Application):
             return productname_match.group(1).strip() if productname_match else None
 
     def process_ended(self, script_key):
+        
         process_info = self.running_processes.get(script_key)
 
         if process_info:
