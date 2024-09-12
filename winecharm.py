@@ -2311,11 +2311,23 @@ class WineCharmApp(Gtk.Application):
         GLib.idle_add(self.window.present)
         print("3. self.window.present() Complete")
         
-        if  self.command_line_file:
-            print("Trying to process file inside on template initialized")
+        # Check if the command_line_file exists and is either .exe or .msi
+        if self.command_line_file:
+            print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+            print(self.command_line_file)
+            
+            file_extension = Path(self.command_line_file).suffix.lower()
+            if file_extension in ['.exe', '.msi']:
+                print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
+                print("Trying to process file inside on template initialized")
 
-            GLib.idle_add(self.show_processing_spinner)
-            self.process_cli_file(self.command_line_file)
+                GLib.idle_add(self.show_processing_spinner)
+                self.process_cli_file(self.command_line_file)
+            else:
+                print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
+                self.show_error_dialog("Invalid File Type", "Only .exe and .msi files are supported.")
+                self.command_line_file = None
+                return False
 
     def load_icon(self, script):
         icon_name = script.stem + ".png"
@@ -2623,7 +2635,14 @@ def main():
             try:
                 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
                     client.connect(str(SOCKET_FILE))
+                    file_extension = Path(args.file).suffix.lower()
+                    if not file_extension in ['.exe', '.msi']:
+                         print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
+                         return
+                         
                     message = f"{os.getcwd()}||{args.file}"
+                    print("-=-=-=-=-=-=-=-")
+                    print(message)
                     client.sendall(message.encode())
                     print(f"Sent file path to existing instance: {args.file}")
                 return
