@@ -903,8 +903,9 @@ class WineCharmApp(Gtk.Application):
         wine_debug = yaml_info.get('wine_debug')
         exe_name = Path(exe_file).name
 
-        if winecharmdir not in Path(runner).parents:
-            runner = "wine"
+        ## If runner not inside winecharm directory then use system runner
+        #if winecharmdir not in Path(runner).parents:
+        #    runner = "wine"
 
         # Check if any process with the same wineprefix is already running
         self.launching_another_from_same_prefix = False
@@ -1667,7 +1668,7 @@ class WineCharmApp(Gtk.Application):
         
         #if winecharmdir not in Path(runner).parents:
         #    runner = "wine"
-            
+
         runner_dir = Path(runner).parent
         print(" - - - - - runner_dir - - - - - ")
         print(runner)
