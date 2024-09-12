@@ -1333,9 +1333,9 @@ class WineCharmApp(Gtk.Application):
         yaml_info = {
             'exe_file': str(Path(data.get('exe_file', '')).expanduser().resolve()), 
             'wineprefix': str(Path(data.get('wineprefix', '')).expanduser().resolve()), 
+            'runner':  str(Path(data.get('runner', '')).expanduser().resolve()),
             'progname': data.get('progname', ''), 
             'args': data.get('args', ''),
-            'runner': data.get('runner', ''),
             'sha256sum': data.get('sha256sum', ''),
             'wine_debug': data.get('wine_debug', '')  # Ensure wine_debug is captured
         }
@@ -1393,6 +1393,7 @@ class WineCharmApp(Gtk.Application):
         # Prepare YAML data
         yaml_data = {
             'exe_file': str(exe_file).replace(str(Path.home()), "~"),
+
             'progname': progname,
             'args': "",
             'sha256sum': sha256_hash.hexdigest(),
@@ -1400,7 +1401,7 @@ class WineCharmApp(Gtk.Application):
             'wine_debug': "WINEDEBUG=fixme-all DXVK_LOG_LEVEL=none",  # Set a default or allow it to be empty
             'env_vars': ""  # Initialize with an empty string or set a default if necessary
         }
-        
+            #'wineprefix': str(prefix_dir).replace(str(Path.home()), "~"),        
         # Create YAML file with proper naming
         yaml_file_path = prefix_dir / f"{exe_no_space if use_exe_name else progname.replace(' ', '_')}.charm"
         with open(yaml_file_path, 'w') as yaml_file:
@@ -1584,6 +1585,7 @@ class WineCharmApp(Gtk.Application):
             ("Open Terminal", "utilities-terminal-symbolic", self.open_terminal),
             ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
             ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager),
+            ("Edit Script File", "text-editor-symbolic", self.open_script_file),
             ("Delete Wineprefix", "edit-delete-symbolic", self.show_delete_confirmation),
             ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation),
             ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
@@ -1716,6 +1718,14 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error opening file manager: {e}")
 
+    def open_script_file(self, script, *args):
+        wineprefix = Path(script).parent
+        print(f"Opening file manager for {wineprefix}")
+        command = ["xdg-open", str(script)]
+        try:
+            subprocess.Popen(command)
+        except Exception as e:
+            print(f"Error opening file manager: {e}")
     def show_delete_confirmation(self, script, button):
         self.replace_button_with_overlay(script, "Delete Wineprefix?", "wineprefix", button)
 
