@@ -624,6 +624,7 @@ class WineCharmApp(Gtk.Application):
             if file:
                 file_path = file.get_path()
                 print("- - - - - - - - - - - - - -self.show_processing_spinner")
+                self.monitoring_active = False
                 self.show_processing_spinner("Processing...")
                 
                 # Use GLib.idle_add to delay the file processing and allow the UI to update
@@ -634,6 +635,7 @@ class WineCharmApp(Gtk.Application):
                 print(f"An error occurred: {e}")
         finally:
             self.window.set_visible(True)
+            self.monitoring_active = True
 
     def on_back_button_clicked(self, button):
         #print("Back button clicked")
@@ -798,6 +800,13 @@ class WineCharmApp(Gtk.Application):
         # Event handler for button click
         button.connect("clicked", lambda *args: self.on_script_row_clicked(button, play_button, options_button))
 
+        # Only highlight if the script is actively running, not just based on name
+        if script_key in self.running_processes:
+            button.add_css_class("highlight")  # This should happen only if the process is running
+        else:
+            button.remove_css_class("highlighted")
+            button.remove_css_class("blue")
+            
         return overlay
 
     def show_buttons(self, play_button, options_button):
