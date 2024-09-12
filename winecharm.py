@@ -26,7 +26,7 @@ gi.require_version('Adw', '1')
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 #qfrom concurrent.futures import ThreadPoolExecutor
 
-version = "0.93"
+version = "0.94"
 # Constants
 winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
 prefixes_dir = winecharmdir / "Prefixes"
@@ -693,6 +693,24 @@ class WineCharmApp(Gtk.Application):
                 else:
                     row.remove_css_class("highlighted")
                     row.remove_css_class("blue")
+                    
+    def wrap_text_at_20_chars(self, text):
+        if len(text) < 20:
+            return text
+
+        # Find the position of the first space or hyphen after 21 characters
+        wrap_pos = -1
+        for i in range(12, len(text)):
+            if text[i] in [' ', '-']:
+                wrap_pos = i
+                break
+
+        # If no space or hyphen is found, wrap at 21 chars
+        if wrap_pos == -1:
+            wrap_pos = 20
+
+        # Insert newline at the found position
+        return text[:wrap_pos] + "\n" + text[wrap_pos:]
 
     def create_script_row(self, script):
         yaml_info = self.extract_yaml_info(script)
@@ -706,9 +724,8 @@ class WineCharmApp(Gtk.Application):
         button.add_css_class("normal-font")
 
         label_text = script.stem.replace("_", " ")
-        label = Gtk.Label(label=label_text)
-        label.set_hexpand(True)
-        label.set_ellipsize(Pango.EllipsizeMode.END)
+
+    
 
         # Create an overlay to add play and options buttons
         overlay = Gtk.Overlay()
@@ -722,16 +739,23 @@ class WineCharmApp(Gtk.Application):
             icon_image.set_pixel_size(64)
             # Create a box to hold both buttons
             buttons_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            # Apply the wrapping logic
+            label_text = self.wrap_text_at_20_chars(label_text)
+            label = Gtk.Label(label=label_text)
+
         else:
             icon = self.load_icon_for_list(script)
             icon_image = Gtk.Image.new_from_paintable(icon)
             button.set_size_request(390, 36)
             hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
             icon_image.set_pixel_size(32)
-            label.set_xalign(0)
             # Create a box to hold both buttons
             buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-
+            label = Gtk.Label(label=label_text)
+            label.set_xalign(0)
+            
+        label.set_hexpand(True)
+        label.set_ellipsize(Pango.EllipsizeMode.END)
         button.set_child(hbox)
         hbox.append(icon_image)
         hbox.append(label)
@@ -1333,7 +1357,7 @@ class WineCharmApp(Gtk.Application):
         yaml_info = {
             'exe_file': str(Path(data.get('exe_file', '')).expanduser().resolve()), 
             'wineprefix': str(Path(data.get('wineprefix', '')).expanduser().resolve()), 
-            'runner':  str(Path(data.get('runner', '')).expanduser().resolve()),
+            'runner':  data.get('runner', ''),
             'progname': data.get('progname', ''), 
             'args': data.get('args', ''),
             'sha256sum': data.get('sha256sum', ''),
@@ -1415,7 +1439,7 @@ class WineCharmApp(Gtk.Application):
         # Add or update script row in UI if multi files are being created.
         GLib.idle_add(self.add_or_update_script_row, yaml_file_path)
 
-        
+        self.new_scripts.add(yaml_file_path.stem)
         #self.create_script_list()
 
 
