@@ -2608,6 +2608,20 @@ class WineCharmApp(Gtk.Application):
 
         dialog.present()
 
+
+    def show_error_dialog(self, title, message):
+        # Create Adw.MessageDialog
+        dialog = Adw.MessageDialog.new(self.window)
+        dialog.set_heading(title)
+        dialog.set_body(message)
+
+        # Add a close button
+        dialog.add_response("close", "Close")
+        dialog.set_default_response("close")
+        dialog.connect("response", lambda d, r: d.destroy())
+
+        dialog.present()
+        
     def disable_open_button(self):
         if self.open_button:
             self.open_button.set_sensitive(False)
