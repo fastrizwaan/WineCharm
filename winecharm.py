@@ -1793,13 +1793,14 @@ class WineCharmApp(Gtk.Application):
         filter_tar_zst = Gtk.FileFilter()
         filter_tar_zst.set_name("Compressed Backup Files (*.tar.zst)")
         filter_tar_zst.add_pattern("*.tar.zst")
-        dialog.set_filter(filter_tar_zst)
+        dialog.add_filter(filter_tar_zst)  # Updated method to add the filter
 
         def on_response(dialog, response):
             if response == Gtk.ResponseType.OK:
+                # Use `get_file()` to get the selected file in GTK 4, but handle it differently
                 selected_file = dialog.get_file()
-                if selected_file is not None:
-                    file_path = selected_file.get_path()
+                if selected_file:
+                    file_path = selected_file.get_path()  # Correctly use `get_path()` method from the file object
                     print(f"Selected file: {file_path}")
                     
                     # Start a thread for the extraction process to avoid freezing the UI
@@ -1808,7 +1809,7 @@ class WineCharmApp(Gtk.Application):
             dialog.close()
 
         dialog.connect("response", on_response)
-        dialog.present()
+        dialog.show()
 
     def perform_restore(self, file_path):
         # Perform the extraction in a separate thread
