@@ -51,6 +51,7 @@ arch = ""  # default: win64 ; # #if not found in settings.yaml at winecharm dire
 class WineCharmApp(Gtk.Application):
     def __init__(self):
         super().__init__(application_id='io.github.fastrizwaan.WineCharm', flags=Gio.ApplicationFlags.HANDLES_OPEN)
+        self.window = None  # Initialize window as None
         Adw.init()
         self.connect("activate", self.on_activate)
         self.connect("startup", self.on_startup)
@@ -216,6 +217,10 @@ class WineCharmApp(Gtk.Application):
                 self.initialize_template(default_template, self.on_template_initialized)
             else:
                 self.set_dynamic_variables()
+                # Process the command-line file if the template already exists
+                if self.command_line_file:
+                    print("Template exists. Processing command-line file after UI initialization.")
+                    self.process_cli_file_later(self.command_line_file)
 
         focus_controller = Gtk.EventControllerFocus()
         focus_controller.connect("enter", self.on_focus_in)
@@ -269,8 +274,8 @@ class WineCharmApp(Gtk.Application):
         self.hide_processing_spinner()
         
         self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)  # Restore the open-folder icon
-        self.search_button.set_sensitive(True)  # Enable the search button
+        self.set_open_button_icon_visible(True)
+        self.search_button.set_sensitive(True)
         self.view_toggle_button.set_sensitive(True)
         
         if self.open_button_handler_id is not None:
@@ -282,15 +287,17 @@ class WineCharmApp(Gtk.Application):
         self.hide_processing_spinner()
         self.create_script_list()
         
-        
-        # Check if there's a CLI file to process after initialization
-        if  self.command_line_file:
-            print("Trying to process file inside on template initialized")
-            GLib.idle_add(self.show_processing_spinner)
-            self.process_cli_file(self.command_line_file)
+        # Check if there's a command-line file to process after initialization
+        if self.command_line_file:
+            print("Processing command-line file after template initialization")
+            self.process_cli_file_later(self.command_line_file)
             self.command_line_file = None  # Reset after processing
-            GLib.timeout_add_seconds(1, self.hide_processing_spinner)
 
+
+    def process_cli_file_later(self, file_path):
+        # Use GLib.idle_add to ensure this runs after the main loop starts
+        GLib.idle_add(self.show_processing_spinner)
+        GLib.idle_add(self.process_cli_file, file_path)
 
     def set_open_button_label(self, text):
         box = self.open_button.get_child()
@@ -395,7 +402,9 @@ class WineCharmApp(Gtk.Application):
                 child.set_visible(visible)
             child = child.get_next_sibling()
             
-    def on_activate(self, app):
+    def on_activate(self, *args):
+        if not self.window:
+            self.window = Adw.ApplicationWindow(application=self)
         self.window.present()
 
     def on_focus_in(self, controller):
@@ -626,16 +635,40 @@ class WineCharmApp(Gtk.Application):
                 print("- - - - - - - - - - - - - -self.show_processing_spinner")
                 self.monitoring_active = False
                 self.show_processing_spinner("Processing...")
-                
-                # Use GLib.idle_add to delay the file processing and allow the UI to update
-                threading.Thread(target=self.process_cli_file, args=(file_path,)).start()
-                
+
+                # Start a background thread to process the file
+                threading.Thread(target=self.process_cli_file_in_thread, args=(file_path,)).start()
+
         except GLib.Error as e:
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                 print(f"An error occurred: {e}")
         finally:
             self.window.set_visible(True)
             self.monitoring_active = True
+
+    def process_cli_file_in_thread(self, file_path):
+        try:
+            print(f"Processing CLI file in thread: {file_path}")
+            abs_file_path = str(Path(file_path).resolve())
+            print(f"Resolved absolute CLI file path: {abs_file_path}")
+
+            if not Path(abs_file_path).exists():
+                print(f"File does not exist: {abs_file_path}")
+                return
+
+            # Perform the heavy processing here
+            self.create_yaml_file(abs_file_path, None)
+
+            # Schedule GUI updates in the main thread
+            #GLib.idle_add(self.update_gui_after_file_processing, abs_file_path)
+
+        except Exception as e:
+            print(f"Error processing file in background: {e}")
+        finally:
+            if self.initializing_template:
+                pass  # Keep showing spinner
+            else:
+                GLib.idle_add(self.hide_processing_spinner)
 
     def on_back_button_clicked(self, button):
         #print("Back button clicked")
@@ -1449,7 +1482,7 @@ class WineCharmApp(Gtk.Application):
         GLib.idle_add(self.add_or_update_script_row, yaml_file_path)
 
         self.new_scripts.add(yaml_file_path.stem)
-        #self.create_script_list()
+
 
 
 
@@ -1592,6 +1625,10 @@ class WineCharmApp(Gtk.Application):
 
 
     def show_info_dialog(self, title, message):
+        if self.window is None:
+            print(f"Cannot show dialog: window is not available.")
+            return
+        
         dialog = Adw.MessageDialog.new(self.window)
         dialog.set_heading(title)
         dialog.set_body(message)
@@ -1696,11 +1733,12 @@ class WineCharmApp(Gtk.Application):
             self.create_backup_archive(wineprefix, backup_path)
 
             # Notify the user that the backup is complete
-            GLib.idle_add(self.show_info_dialog, "Backup Complete", f"Backup saved to {backup_path}")
+            GLib.timeout_add_seconds(1, self.show_info_dialog, "Backup Complete", f"Backup saved to {backup_path}")
 
         except Exception as e:
             print(f"Error during backup: {e}")
-            GLib.idle_add(self.show_error_dialog, "Backup Failed", str(e))
+            GLib.idle_add(self.show_info_dialog, "Backup Failed", str(e))
+            
 
         finally:
             # Step 5: Re-apply the `process_reg_files` changes
@@ -2408,15 +2446,15 @@ class WineCharmApp(Gtk.Application):
                 print(f"File does not exist: {abs_file_path}")
                 return
             self.create_yaml_file(abs_file_path, None)
-            #GLib.idle_add(self.create_script_list)
-            #self.create_script_list()
+            self.create_script_list()
         except Exception as e:
             print(f"Error processing file: {e}")
         finally:
             if self.initializing_template:
-                pass #keep showing spinner
+                pass  # Keep showing spinner
             else:
                 GLib.timeout_add_seconds(1, self.hide_processing_spinner)
+
 
     def show_processing_spinner(self, message="Processing..."):
         if not self.spinner:
@@ -2477,7 +2515,8 @@ class WineCharmApp(Gtk.Application):
                 self.process_cli_file(self.command_line_file)
             else:
                 print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
-                self.show_error_dialog("Invalid File Type", "Only .exe and .msi files are supported.")
+               # self.show_info_dialog("Invalid File Type", "Only .exe and .msi files are supported.")
+                GLib.timeout_add_seconds(1, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
                 self.command_line_file = None
                 return False
 
@@ -2605,7 +2644,8 @@ class WineCharmApp(Gtk.Application):
                     threading.Thread(target=self.copy_wine_directory, args=(directory, dest_dir)).start()
                 else:
                     print(f"Invalid directory selected: {directory}")
-                    self.show_error_dialog("Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
+                    #self.show_info_dialog("Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
+                    GLib.timeout_add_seconds(1, self.show_info_dialog, "Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
         dialog.destroy()
         print("FileChooserDialog destroyed.")
 
@@ -2735,45 +2775,6 @@ class WineCharmApp(Gtk.Application):
             else:
                 shutil.copy2(s, d)
                 
-    def show_error_dialog(self, title, message):
-        dialog = Gtk.Window(transient_for=self.window, modal=True, title=title)
-        dialog.set_default_size(300, 100)
-        dialog.set_deletable(True)
-
-        content_area = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        content_area.set_margin_start(10)
-        content_area.set_margin_end(10)
-        content_area.set_margin_top(10)
-        content_area.set_margin_bottom(10)
-        dialog.set_child(content_area)
-
-        label = Gtk.Label(label=message)
-        content_area.append(label)
-
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        button_box.set_halign(Gtk.Align.END)
-        content_area.append(button_box)
-
-        close_button = Gtk.Button(label="Close")
-        close_button.connect("clicked", lambda btn: dialog.destroy())
-        button_box.append(close_button)
-
-        dialog.present()
-
-
-    def show_error_dialog(self, title, message):
-        # Create Adw.MessageDialog
-        dialog = Adw.MessageDialog.new(self.window)
-        dialog.set_heading(title)
-        dialog.set_body(message)
-
-        # Add a close button
-        dialog.add_response("close", "Close")
-        dialog.set_default_response("close")
-        dialog.connect("response", lambda d, r: d.destroy())
-
-        dialog.present()
-        
     def disable_open_button(self):
         if self.open_button:
             self.open_button.set_sensitive(False)
@@ -2804,6 +2805,7 @@ def main():
                     file_extension = Path(args.file).suffix.lower()
                     if not file_extension in ['.exe', '.msi']:
                          print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
+                         app.show_info_dialog("RIZVAN Invalid file type: {file_extension}", "Only .exe or .msi files are allowed.")
                          return
                          
                     message = f"{os.getcwd()}||{args.file}"
