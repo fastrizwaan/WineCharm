@@ -1590,6 +1590,157 @@ class WineCharmApp(Gtk.Application):
                         self.add_lnk_file_to_processed(wineprefix, lnk_file)  # Track the .lnk file, not the .exe file
         return exe_files
 
+
+    def show_info_dialog(self, title, message):
+        dialog = Adw.MessageDialog.new(self.window)
+        dialog.set_heading(title)
+        dialog.set_body(message)
+        dialog.add_response("ok", "OK")
+        dialog.set_default_response("ok")
+        dialog.connect("response", lambda d, r: d.destroy())
+        dialog.present()
+
+    def create_backup_archive(self, wineprefix, backup_path):
+        # Prepare the tar command
+        tar_command = [
+            'tar',
+            '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
+            '-cf', backup_path,
+            '-C', str(wineprefix.parent),
+            wineprefix.name
+        ]
+
+        print(f"Running backup command: {' '.join(tar_command)}")
+
+        # Execute the tar command
+        result = subprocess.run(tar_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        if result.returncode != 0:
+            raise Exception(f"Backup failed: {result.stderr}")
+
+        print(f"Backup archive created at {backup_path}")
+
+
+
+
+    def reverse_process_reg_files(self, wineprefix):
+        print(f"Starting to process .reg files in {wineprefix}")
+        
+        # Get current username from the environment
+        current_username = os.getenv("USERNAME") or os.getenv("USER")
+        if not current_username:
+            print("Unable to determine the current username from the environment.")
+            return
+        print(f"Current username: {current_username}")
+
+        # Read the USERNAME from user.reg
+        user_reg_path = os.path.join(wineprefix, "user.reg")
+        if not os.path.exists(user_reg_path):
+            print(f"File not found: {user_reg_path}")
+            return
+        
+        print(f"Reading user.reg file from {user_reg_path}")
+        with open(user_reg_path, 'r') as file:
+            content = file.read()
+        
+        match = re.search(r'"USERNAME"="([^"]+)"', content, re.IGNORECASE)
+        if not match:
+            print("Unable to determine the USERNAME from user.reg.")
+            return
+        
+        wine_username = match.group(1)
+        print(f"Found USERNAME in user.reg: {wine_username}")
+
+        # Define replacements
+        replacements = {
+            f"\\\\users\\\\{current_username}": f"\\\\users\\\\%USERNAME%",
+            f"\\\\home\\\\{current_username}": f"\\\\home\\\\%USERNAME%",
+            f'"USERNAME"="{current_username}"': f'"USERNAME"="%USERNAME%"'
+        }
+        print("Defined replacements:")
+        for old, new in replacements.items():
+            print(f"  {old} -> {new}")
+
+        # Process all .reg files in the wineprefix
+        for root, dirs, files in os.walk(wineprefix):
+            for file in files:
+                if file.endswith(".reg"):
+                    file_path = os.path.join(root, file)
+                    print(f"Processing {file_path}")
+                    
+                    with open(file_path, 'r') as reg_file:
+                        reg_content = reg_file.read()
+                    
+                    for old, new in replacements.items():
+                        if old in reg_content:
+                            reg_content = reg_content.replace(old, new)
+                            print(f"Replaced {old} with {new} in {file_path}")
+                        else:
+                            print(f"No instances of {old} found in {file_path}")
+
+                    with open(file_path, 'w') as reg_file:
+                        reg_file.write(reg_content)
+                    print(f"Finished processing {file_path}")
+
+        print(f"Completed processing .reg files in {wineprefix}")
+
+
+    def backup_prefix(self, script, backup_path):
+        wineprefix = Path(script).parent
+
+        try:
+            # Step 3: Reverse `process_reg_files` changes
+            self.reverse_process_reg_files(wineprefix)
+
+            # Step 4: Create the backup archive using `tar` with `zstd` compression
+            self.create_backup_archive(wineprefix, backup_path)
+
+            # Notify the user that the backup is complete
+            GLib.idle_add(self.show_info_dialog, "Backup Complete", f"Backup saved to {backup_path}")
+
+        except Exception as e:
+            print(f"Error during backup: {e}")
+            GLib.idle_add(self.show_error_dialog, "Backup Failed", str(e))
+
+        finally:
+            # Step 5: Re-apply the `process_reg_files` changes
+            self.process_reg_files(wineprefix)
+
+
+    def on_backup_dialog_response(self, dialog, response, script):
+        if response == Gtk.ResponseType.OK:
+            backup_file = dialog.get_file()
+            if backup_file:
+                backup_path = backup_file.get_path()
+                print(f"Backup will be saved to: {backup_path}")
+                # Proceed to backup
+                threading.Thread(target=self.backup_prefix, args=(script, backup_path)).start()
+        dialog.destroy()
+
+    def show_backup_prefix_dialog(self, script, button):
+        # Step 1: Suggest the backup file name
+        default_backup_name = f"{script.stem} prefix backup.tar.zst"
+
+        # Create a dialog to get the backup file name and target directory
+        dialog = Gtk.FileChooserDialog(
+            title="Select Backup Location",
+            action=Gtk.FileChooserAction.SAVE,
+            transient_for=self.window,
+            modal=True
+        )
+        dialog.add_buttons(
+            "Cancel", Gtk.ResponseType.CANCEL,
+            "Save", Gtk.ResponseType.OK
+        )
+
+        # Set the default backup file name
+        dialog.set_current_name(default_backup_name)
+
+        # Show the dialog and connect the response handler
+        dialog.connect("response", self.on_backup_dialog_response, script)
+        dialog.present()
+
+
     def show_options_for_script(self, script, row):
         # Ensure the search button is toggled off and the search entry is cleared
         self.search_button.set_active(False)
@@ -1623,7 +1774,8 @@ class WineCharmApp(Gtk.Application):
             ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation),
             ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
             ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
-            ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog)
+            ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog),
+            ("Backup Prefix", "document-save-symbolic", self.show_backup_prefix_dialog),  # New option
         ]
 
         for label, icon_name, callback in options:
