@@ -1783,8 +1783,8 @@ class WineCharmApp(Gtk.Application):
         # Step 1: Show open file dialog to select a .tar.zst file
         dialog = Gtk.FileChooserDialog(
             title="Select Backup File",
-            transient_for=self.window,  # Use transient_for instead of parent
-            modal=True,  # Modal window
+            transient_for=self.window,
+            modal=True,
             action=Gtk.FileChooserAction.OPEN
         )
         dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Open", Gtk.ResponseType.OK)
@@ -1793,52 +1793,54 @@ class WineCharmApp(Gtk.Application):
         filter_tar_zst = Gtk.FileFilter()
         filter_tar_zst.set_name("Compressed Backup Files (*.tar.zst)")
         filter_tar_zst.add_pattern("*.tar.zst")
-        dialog.set_filter(filter_tar_zst)  # GTK 4 compatible method
+        dialog.set_filter(filter_tar_zst)
 
         def on_response(dialog, response):
             if response == Gtk.ResponseType.OK:
-                selected_file = dialog.get_file()  # Get Gio.File object
+                selected_file = dialog.get_file()
                 if selected_file is not None:
-                    file_path = selected_file.get_path()  # Get the actual file path
+                    file_path = selected_file.get_path()
                     print(f"Selected file: {file_path}")
-
-                    # Step 2: Extract the prefix name from the .tar.zst file
-                    try:
-                        extracted_prefix_name = subprocess.check_output(
-                            ['tar', '-tf', file_path ],
-                            universal_newlines=True
-                        ).splitlines()[0].split('/')[0]
-                        print(extracted_prefix_name)
-                        extracted_prefix_dir = Path(prefixes_dir) / extracted_prefix_name
-
-                        print(f"Extracted prefix name: {extracted_prefix_name}")
-                        print(f"Extracting to: {extracted_prefix_dir}")
-
-                        # Step 3: Extract the archive to prefixes_dir
-                        subprocess.run(
-                            ['tar', '-I', 'zstd -T0', '-xf', file_path, '-C', prefixes_dir],
-                            check=True
-                        )
-
-                        # Step 4: Process the extracted registry files
-                        self.process_reg_files(extracted_prefix_dir)
-
-                        # Step 5: Update the script list
-                        self.create_script_list()
-
-                        # Step 6: Show a dialog confirming the extraction is complete
-                        self.show_info_dialog("Restore Complete", f"Backup extracted to {extracted_prefix_dir}")
-
-                    except Exception as e:
-                        print(f"Error extracting backup: {e}")
-                        self.show_info_dialog("Error", f"Failed to restore backup: {str(e)}")
+                    
+                    # Start a thread for the extraction process to avoid freezing the UI
+                    threading.Thread(target=self.perform_restore, args=(file_path,)).start()
 
             dialog.close()
 
-        # Connect to the response signal
         dialog.connect("response", on_response)
-        dialog.present()  # Show the dialog
+        dialog.present()
 
+    def perform_restore(self, file_path):
+        # Perform the extraction in a separate thread
+        try:
+            # Step 2: Extract the prefix name from the .tar.zst file
+            extracted_prefix_name = subprocess.check_output(
+                ['tar', '-tf', file_path],
+                universal_newlines=True
+            ).splitlines()[0].split('/')[0]
+            extracted_prefix_dir = Path(prefixes_dir) / extracted_prefix_name
+
+            print(f"Extracted prefix name: {extracted_prefix_name}")
+            print(f"Extracting to: {extracted_prefix_dir}")
+
+            # Step 3: Extract the archive to prefixes_dir
+            subprocess.run(
+                ['tar', '-I', 'zstd -T0', '-xf', file_path, '-C', prefixes_dir],
+                check=True
+            )
+
+            # Step 4: Process the extracted registry files
+            self.process_reg_files(extracted_prefix_dir)
+
+            # Step 5: Update the script list
+            GLib.idle_add(self.create_script_list)  # Schedule to run in the main thread
+
+            # Step 6: Show a dialog confirming the extraction is complete
+            GLib.idle_add(self.show_info_dialog, "Restore Complete", f"Backup extracted to {extracted_prefix_dir}")
+
+        except Exception as e:
+            print(f"Error extracting backup: {e}")
+            GLib.idle_add(self.show_info_dialog, "Error", f"Failed to restore backup: {str(e)}")
 
 
 
