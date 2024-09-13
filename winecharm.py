@@ -2453,8 +2453,16 @@ class WineCharmApp(Gtk.Application):
 
     def start_socket_server(self):
         def server_thread():
+            socket_dir = SOCKET_FILE.parent
+
+            # Ensure the directory for the socket file exists
+            if not socket_dir.exists():
+                os.makedirs(socket_dir, exist_ok=True)
+
+            # Remove existing socket file if it exists
             if SOCKET_FILE.exists():
                 SOCKET_FILE.unlink()
+            
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
                 server.bind(str(SOCKET_FILE))
                 server.listen()
