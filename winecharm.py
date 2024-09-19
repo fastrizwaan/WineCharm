@@ -77,7 +77,7 @@ class WineCharmApp(Gtk.Application):
         self.scripts = []  # Or use a list of script objects if applicable
         self.count = 0
         self.focus_event_timer_id = None        
-        tempdir.mkdir(parents=True, exist_ok=True)
+        self.create_required_directories() # Create Required Directories
         self.tempdir = tempdir
         self.icon_view = False
         # Register the SIGINT signal handler
@@ -128,6 +128,31 @@ class WineCharmApp(Gtk.Application):
         self.back_button = Gtk.Button.new_from_icon_name("go-previous-symbolic")
         self.back_button.connect("clicked", self.on_back_button_clicked)
         self.open_button_handler_id = None
+
+    def ensure_directory_exists(self, directory):
+        directory = Path(directory)  # Ensure it's a Path object
+        if not directory.exists():
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+                print(f"Created directory: {directory}")
+            except Exception as e:
+                print(f"Error creating directory {directory}: {e}")
+        else:
+            print(f"Directory already exists: {directory}")
+
+    def create_required_directories(self):
+        winecharm_data_dir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data")).resolve()
+        tempdir =  winecharm_data_dir / "tmp"
+        winecharmdir = winecharm_data_dir / "winecharm"
+        prefixes_dir = winecharmdir / "Prefixes"
+        templates_dir = winecharmdir / "Templates"
+        runners_dir = winecharmdir / "Runners"
+
+        directories = [winecharmdir, prefixes_dir, templates_dir, runners_dir, tempdir]
+
+        for directory in directories:
+            self.ensure_directory_exists(directory)
+
 
     def on_settings_clicked(self, action=None, param=None):
         print("Settings action triggered")
@@ -229,43 +254,43 @@ class WineCharmApp(Gtk.Application):
         self.window.add_controller(focus_controller)
 
     def initialize_template(self, template_dir, callback):
-        if not template_dir.exists():
-            self.initializing_template = True
-            if self.open_button_handler_id is not None:
-                self.open_button.disconnect(self.open_button_handler_id)
+        self.create_required_directories()
+        self.initializing_template = True
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
 
-            self.spinner = Gtk.Spinner()
-            self.spinner.start()
-            self.open_button_box.append(self.spinner)
+        self.spinner = Gtk.Spinner()
+        self.spinner.start()
+        self.open_button_box.append(self.spinner)
 
-            self.set_open_button_label("Initializing...")
-            self.set_open_button_icon_visible(False)  # Hide the open-folder icon
-            self.search_button.set_sensitive(False)  # Disable the search button
-            self.view_toggle_button.set_sensitive(False)
-            template_dir.mkdir(parents=True, exist_ok=True)
+        self.set_open_button_label("Initializing...")
+        self.set_open_button_icon_visible(False)  # Hide the open-folder icon
+        self.search_button.set_sensitive(False)  # Disable the search button
+        self.view_toggle_button.set_sensitive(False)
+        self.ensure_directory_exists(template_dir)
 
-            steps = [
-                ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-                ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-                ("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
-                ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
-                ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
-                #("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
-                #("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
-            ]
+        steps = [
+            ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
+            ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+            ("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+            ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+            ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+            #("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
+            #("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
+        ]
 
-            def initialize():
-                for step_text, command in steps:
-                    GLib.idle_add(self.show_initializing_step, step_text)
-                    try:
-                        subprocess.run(command, shell=True, check=True)
-                        GLib.idle_add(self.mark_step_as_done, step_text)
-                    except subprocess.CalledProcessError as e:
-                        print(f"Error initializing template: {e}")
-                        break
-                GLib.idle_add(callback)
+        def initialize():
+            for step_text, command in steps:
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    subprocess.run(command, shell=True, check=True)
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except subprocess.CalledProcessError as e:
+                    print(f"Error initializing template: {e}")
+                    break
+            GLib.idle_add(callback)
 
-            threading.Thread(target=initialize).start()
+        threading.Thread(target=initialize).start()
 
     def on_template_initialized(self):
         print("Template initialization complete.")
@@ -997,6 +1022,7 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
             GLib.idle_add(play_stop_button.set_tooltip_text, "Exe Not Found")
             play_stop_button.add_css_class("red")
+            self.show_info_dialog("Exe Not found", str(Path(exe_file)))
             return
         else:
             play_stop_button.remove_css_class("red")
@@ -1410,6 +1436,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False):
+        self.create_required_directories()
         exe_file = Path(exe_path).resolve()
         exe_name = exe_file.stem
         exe_no_space = exe_name.replace(" ", "_")
@@ -1428,8 +1455,7 @@ class WineCharmApp(Gtk.Application):
                 if default_template.exists():
                     self.copy_template(prefix_dir)
                 else:
-                    prefix_dir.mkdir(parents=True, exist_ok=True)
-                    #print(f"Created prefix directory: {prefix_dir}")
+                    self.ensure_directory_exists(prefix_dir)
 
         wineprefix_name = prefix_dir.name
 
@@ -1501,13 +1527,12 @@ class WineCharmApp(Gtk.Application):
 
 
     def extract_icon(self, exe_file, wineprefix, exe_no_space, progname):
+        self.create_required_directories()
         icon_path = wineprefix / f"{progname.replace(' ', '_')}.png"
         #print(f"------ {wineprefix}")
         ico_path = self.tempdir / f"{exe_no_space}.ico"
        # print(f"-----{ico_path}")
         try:
-            self.tempdir.mkdir(parents=True, exist_ok=True)
-
             bash_cmd = f"""
             wrestool -x -t 14 {shlex.quote(str(exe_file))} > {shlex.quote(str(ico_path))} 2>/dev/null
             icotool -x {shlex.quote(str(ico_path))} -o {shlex.quote(str(self.tempdir))} 2>/dev/null
@@ -1781,6 +1806,8 @@ class WineCharmApp(Gtk.Application):
 
     def restore_from_backup(self, action=None, param=None):
         # Step 1: Show open file dialog to select a .tar.zst file
+        self.ensure_directory_exists(prefixes_dir)
+
         dialog = Gtk.FileChooserDialog(
             title="Select Backup File",
             transient_for=self.window,
@@ -1936,11 +1963,6 @@ class WineCharmApp(Gtk.Application):
             except subprocess.CalledProcessError as e:
                 print(f"Error opening log file: {e}")
 
-        
-
-
-
-
     def open_terminal(self, script, *args):
         yaml_info = self.extract_yaml_info(script)
         exe_file = yaml_info['exe_file']
@@ -1965,8 +1987,8 @@ class WineCharmApp(Gtk.Application):
         print(runner)
         print(runner_dir)
         print(f"Opening terminal for {wineprefix}")
-        if not wineprefix.exists():
-            wineprefix.mkdir(parents=True, exist_ok=True)
+
+        self.ensure_directory_exists(wineprefix)
 
         if shutil.which("flatpak-spawn"):
 
@@ -2456,8 +2478,7 @@ class WineCharmApp(Gtk.Application):
             socket_dir = SOCKET_FILE.parent
 
             # Ensure the directory for the socket file exists
-            if not socket_dir.exists():
-                os.makedirs(socket_dir, exist_ok=True)
+            self.ensure_directory_exists(socket_dir)
 
             # Remove existing socket file if it exists
             if SOCKET_FILE.exists():
@@ -2837,7 +2858,7 @@ class WineCharmApp(Gtk.Application):
         print(f"Completed processing .reg files in {wineprefix}")
 
     def custom_copytree(self, src, dst):
-        os.makedirs(dst, exist_ok=True)
+        self.ensure_directory_exists(dst)
         for item in os.listdir(src):
             s = os.path.join(src, item)
             d = os.path.join(dst, item)
