@@ -1806,7 +1806,7 @@ class WineCharmApp(Gtk.Application):
 
     def restore_from_backup(self, action=None, param=None):
         # Step 1: Show open file dialog to select a .tar.zst file
-        self.ensure_directory_exists(prefixes_dir)
+        self.create_required_directories()
 
         dialog = Gtk.FileChooserDialog(
             title="Select Backup File",
@@ -2478,7 +2478,7 @@ class WineCharmApp(Gtk.Application):
             socket_dir = SOCKET_FILE.parent
 
             # Ensure the directory for the socket file exists
-            self.ensure_directory_exists(socket_dir)
+            self.create_required_directories()
 
             # Remove existing socket file if it exists
             if SOCKET_FILE.exists():
