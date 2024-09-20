@@ -1272,7 +1272,7 @@ class WineCharmApp(Gtk.Application):
                 for pid in pids:
                     if self.is_process_running(pid):
                         try:
-                            os.killpg(os.getpgid(pid), signal.SIGKILL)
+                            os.kill(pid, signal.SIGKILL)
                             print(f"Successfully terminated process {pid} for script {script_key}")
                         except ProcessLookupError:
                             print(f"Process with PID {pid} not found, may have already exited.")
