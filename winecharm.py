@@ -755,7 +755,8 @@ class WineCharmApp(Gtk.Application):
                     row.remove_css_class("highlighted")
                     row.remove_css_class("blue")
                     
-    def wrap_text_at_20_chars(self, text):
+    def wrap_text_at_20_chars(self):
+        text="Speedpro Installer Setup"
         if len(text) < 20:
             return text
 
@@ -763,15 +764,54 @@ class WineCharmApp(Gtk.Application):
         wrap_pos = -1
         for i in range(12, len(text)):
             if text[i] in [' ', '-']:
-                wrap_pos = i
+                wrap_pos = i + 1
                 break
 
         # If no space or hyphen is found, wrap at 21 chars
         if wrap_pos == -1:
-            wrap_pos = 20
+            wrap_pos = 21
 
         # Insert newline at the found position
-        return text[:wrap_pos] + "\n" + text[wrap_pos:]
+        # text[start with 21 chars] + "\n" + text[middle 21 chars] + "\n" + text[end 21 chars] 
+        return text[:wrap_pos] + "\n" + text[wrap_pos:] + "\n" + text[wrap_pos]
+
+
+    def wrap_text_at_20_chars(self, text):
+        if len(text) <= 20:
+            # If text is already short enough, assign it all to label1
+            label1 = text
+            label2 = ""
+            label3 = ""
+            return label1, label2, label3
+
+        # Find the position of the first space or hyphen for the first split
+        wrap_pos1 = -1
+        for i in range(12, min(21, len(text))):  # Wrap at or before 20 characters
+            if text[i] in [' ', '-']:
+                wrap_pos1 = i + 1
+                break
+        if wrap_pos1 == -1:
+            wrap_pos1 = 21  # Default wrap at 21 if no space or hyphen found
+
+        # Find the position of the second split for the next 20 chars
+        wrap_pos2 = -1
+        for i in range(wrap_pos1 + 12, min(wrap_pos1 + 21, len(text))):
+            if text[i] in [' ', '-']:
+                wrap_pos2 = i + 1
+                break
+        if wrap_pos2 == -1:
+            wrap_pos2 = min(wrap_pos1 + 21, len(text))
+
+        # Split the text into three parts
+        label1 = text[:wrap_pos1].strip()
+        label2 = text[wrap_pos1:wrap_pos2].strip()
+        label3 = text[wrap_pos2:].strip()
+
+        # If label3 is longer than 18 characters, truncate and add '...'
+        if len(label3) > 18:
+            label3 = label3[:18] + "..."
+            
+        return label1, label2, label3
 
     def create_script_row(self, script):
         yaml_info = self.extract_yaml_info(script)
@@ -793,7 +833,7 @@ class WineCharmApp(Gtk.Application):
         overlay.set_child(button)
 
         if self.icon_view:
-            icon = self.load_icon(script)
+            icon = self.load_icon(script, 64, 64)
             icon_image = Gtk.Image.new_from_paintable(icon)
             button.set_size_request(64, 64)
             hbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
@@ -801,11 +841,14 @@ class WineCharmApp(Gtk.Application):
             # Create a box to hold both buttons
             buttons_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
             # Apply the wrapping logic
-            label_text = self.wrap_text_at_20_chars(label_text)
-            label = Gtk.Label(label=label_text)
-
+            label1, label2, label3 = self.wrap_text_at_20_chars(label_text)
+            label = Gtk.Label(label=label1)
+            if label2:
+                label2 = Gtk.Label(label=label2)
+            if label3:
+                label3 = Gtk.Label(label=label3)
         else:
-            icon = self.load_icon_for_list(script)
+            icon = self.load_icon(script, 32, 32)
             icon_image = Gtk.Image.new_from_paintable(icon)
             button.set_size_request(390, 36)
             hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
@@ -814,12 +857,17 @@ class WineCharmApp(Gtk.Application):
             buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
             label = Gtk.Label(label=label_text)
             label.set_xalign(0)
-            
+            label2 = Gtk.Label(label="")
+            label3 = Gtk.Label(label="")
         label.set_hexpand(True)
         label.set_ellipsize(Pango.EllipsizeMode.END)
         button.set_child(hbox)
         hbox.append(icon_image)
         hbox.append(label)
+        if label2:
+            hbox.append(label2)
+        if label3:
+           hbox.append(label3)
 
         if script.stem in self.new_scripts:
             label.set_markup(f"<b>{label.get_text()}</b>")
@@ -2615,7 +2663,7 @@ class WineCharmApp(Gtk.Application):
                 self.command_line_file = None
                 return False
 
-    def load_icon(self, script):
+    def load_icon(self, script, x, y):
         icon_name = script.stem + ".png"
         icon_dir = script.parent
         icon_path = icon_dir / icon_name
@@ -2625,60 +2673,22 @@ class WineCharmApp(Gtk.Application):
             # Load the icon at a higher resolution
             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(icon_path), 128, 128)
             # Scale down to the desired size
-            scaled_pixbuf = pixbuf.scale_simple(64, 64, GdkPixbuf.InterpType.BILINEAR)
+            scaled_pixbuf = pixbuf.scale_simple(x, y, GdkPixbuf.InterpType.BILINEAR)
             return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
         except Exception:
             try:
                 pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(default_icon_path), 128, 128)
-                scaled_pixbuf = pixbuf.scale_simple(64, 64, GdkPixbuf.InterpType.BILINEAR)
+                scaled_pixbuf = pixbuf.scale_simple(x, y, GdkPixbuf.InterpType.BILINEAR)
                 return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
             except Exception:
                 return None
 
-    def load_icon_for_list(self, script):
-        icon_name = script.stem + ".png"
-        icon_dir = script.parent
-        icon_path = icon_dir / icon_name
-        default_icon_path = self.get_default_icon_path()
 
-        try:
-            # Load the icon at a higher resolution
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(icon_path), 128, 128)
-            # Scale down to the desired size
-            scaled_pixbuf = pixbuf.scale_simple(32, 32, GdkPixbuf.InterpType.BILINEAR)
-            return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
-        except Exception:
-            try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(default_icon_path), 128, 128)
-                scaled_pixbuf = pixbuf.scale_simple(32, 32, GdkPixbuf.InterpType.BILINEAR)
-                return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
-            except Exception:
-                return None
                 
-    def load_icon_for_title(self, script):
-        icon_name = script.stem + ".png"
-        icon_dir = script.parent
-        icon_path = icon_dir / icon_name
-        default_icon_path = self.get_default_icon_path()
-
-        try:
-            # Load the icon at a higher resolution
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(icon_path), 128, 128)
-            # Scale down to the desired size
-            scaled_pixbuf = pixbuf.scale_simple(24, 24, GdkPixbuf.InterpType.BILINEAR)
-            return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
-        except Exception:
-            try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(default_icon_path), 128, 128)
-                scaled_pixbuf = pixbuf.scale_simple(24, 24, GdkPixbuf.InterpType.BILINEAR)
-                return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
-            except Exception:
-                return None
-
     def create_icon_title_widget(self, script):
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
 
-        icon = self.load_icon_for_title(script)
+        icon = self.load_icon(script, 24, 24)
         if icon:
             icon_image = Gtk.Image.new_from_paintable(icon)
             icon_image.set_pixel_size(24)
@@ -2706,6 +2716,9 @@ class WineCharmApp(Gtk.Application):
         # Recreate the script list with the new view
         self.create_script_list()
 
+    def on_import_wine_directory_clicked(self):
+        pass
+    
 # import wine directory
     def on_import_wine_directory_clicked(self, action, param):
         dialog = Gtk.FileChooserDialog(
@@ -2879,7 +2892,7 @@ class WineCharmApp(Gtk.Application):
         if self.open_button:
             self.open_button.set_sensitive(True)
         print("Open button enabled.")
-        
+                
 def parse_args():
     import argparse
     parser = argparse.ArgumentParser(description="WineCharm GUI application")
