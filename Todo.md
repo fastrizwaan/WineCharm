@@ -1,4 +1,4 @@
-- [ ] Create all base directories Templates, Prefixes, Runners
+- [x] Create all base directories Templates, Prefixes, Runners
 
 
 Refactoring winecharm
