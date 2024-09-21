@@ -2895,124 +2895,6 @@ class WineCharmApp(Gtk.Application):
        
        
 #####################
-
-    def check_running_processes_and_update_buttons(self):
-        if not self.monitoring_active:
-            self.stop_monitoring()
-            return False
-
-        current_running_processes = self.get_running_processes()
-        self.cleanup_ended_processes(current_running_processes)
-
-        # Highlight running processes in the current (possibly filtered) view
-        for script_key, process_info in self.running_processes.items():
-            row_info = self.script_buttons.get(script_key)  # Ensure we are accessing the correct structure
-            if row_info:
-                row = row_info.get("row")  # Extract the row from the dictionary
-                if row and row.get_parent():  # Check if the row is currently displayed in the flowbox
-                    self.update_ui_for_running_process(script_key, row, self.running_processes)
-
-        if not current_running_processes or self.count >= 5:
-            self.stop_monitoring()
-        else:
-            self.count += 1
-
-        return False
-
-    def on_focus_in(self, controller):
-        if self.monitoring_active:
-            return  # Prevent multiple activations
-
-        #print("Focus In")
-        self.count = 0
-        self.monitoring_active = True
-        self.start_monitoring()
-        self.check_running_processes_and_update_buttons()
-        current_running_processes = self.get_running_processes()
-        self.cleanup_ended_processes(current_running_processes)
-
-
-    def show_buttons(self, play_button, options_button):
-        play_button.set_visible(True)
-        options_button.set_visible(True)
-
-    def hide_buttons(self, play_button, options_button):
-        if play_button is not None:
-            play_button.set_visible(False)
-        if options_button is not None:
-            options_button.set_visible(False)
-
-    def on_script_row_clicked(self, button, play_button, options_button):
-        # Clear previous overlays
-        if self.current_clicked_row:
-            prev_button, prev_play_button, prev_options_button = self.current_clicked_row
-            self.hide_buttons(prev_play_button, prev_options_button)
-            prev_button.remove_css_class("blue")
-
-        # Toggle the highlight class
-        if self.current_clicked_row == (button, play_button, options_button):
-            self.current_clicked_row = None
-            button.remove_css_class("blue")
-        else:
-            self.current_clicked_row = (button, play_button, options_button)
-            button.add_css_class("blue")
-            self.show_buttons(play_button, options_button)
-
-        # Retrieve the script key associated with this button
-        script_key = None
-        for key, row in self.script_buttons.items():
-            if row == button.get_parent():  # Assuming row is the parent of the button
-                script_key = key
-                break
-
-        # Ensure the overlay buttons are hidden when the process ends
-        if script_key in self.running_processes:
-            self.set_play_stop_button_state(play_button, True)  # Set to "Stop" if running
-        else:
-            self.set_play_stop_button_state(play_button, False)  # Reset to "Play" otherwise    def show_buttons(self, play_button, options_button):
-        play_button.set_visible(True)
-        options_button.set_visible(True)
-
-    def hide_buttons(self, play_button, options_button):
-        if play_button is not None:
-            play_button.set_visible(False)
-        if options_button is not None:
-            options_button.set_visible(False)
-
-    def on_script_row_clicked(self, button, play_button, options_button):
-        # Clear previous overlays
-        if self.current_clicked_row:
-            prev_button, prev_play_button, prev_options_button = self.current_clicked_row
-            self.hide_buttons(prev_play_button, prev_options_button)
-            prev_button.remove_css_class("blue")
-
-        # Toggle the highlight class
-        if self.current_clicked_row == (button, play_button, options_button):
-            self.current_clicked_row = None
-            button.remove_css_class("blue")
-        else:
-            self.current_clicked_row = (button, play_button, options_button)
-            button.add_css_class("blue")
-            self.show_buttons(play_button, options_button)
-
-        # Retrieve the script key associated with this button
-        script_key = None
-        for key, info in self.script_buttons.items():
-            if info['row'] == button.get_parent():  # Assuming the row is the parent of the button
-                script_key = key
-                break
-
-        # Ensure the overlay buttons are hidden or shown based on the running state
-        if script_key in self.running_processes:
-            self.set_play_stop_button_state(play_button, True)  # Set to "Stop" if running
-            play_button.set_tooltip_text("Stop")  # Set tooltip text to "Stop"
-            print(f"Script {script_key} is running. Setting play button to 'Stop'.")
-        else:
-            self.set_play_stop_button_state(play_button, False)  # Reset to "Play" if not running
-            play_button.set_tooltip_text("Play")  # Set tooltip text to "Play"
-            print(f"Script {script_key} is not running. Setting play button to 'Play'.")
-
-           
     def create_script_list(self):
         # Clear the flowbox
         self.flowbox.remove_all()
@@ -3179,13 +3061,6 @@ class WineCharmApp(Gtk.Application):
             if isinstance(row, Gtk.Overlay):
                 button = row.get_child()  # Get the Gtk.Button inside the Overlay
                 if isinstance(button, Gtk.Button):
-                    # **Check if this is the currently clicked row**
-                    if self.current_clicked_row and self.current_clicked_row[0] == button:
-                        # **Skip resetting this row to preserve user selection**
-                        print(f"Skipping reset for currently selected row: {script_key}")
-                        button.remove_css_class("highlighted")
-                        continue
-
                     # Remove CSS classes from the actual button inside the overlay
                     button.remove_css_class("blue")
                     button.remove_css_class("highlighted")
