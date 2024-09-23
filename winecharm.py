@@ -1319,7 +1319,7 @@ class WineCharmApp(Gtk.Application):
         if runner:
             runner = Path(runner).expanduser().resolve()
             runner_dir = runner.parent.resolve()
-            path_env = f'export PATH=$PATH:{runner_dir}'
+            path_env = f'export PATH={runner_dir}:$PATH'
         else:
             runner = "wine"
             runner_dir = ""  # Or set a specific default if required
@@ -1430,47 +1430,69 @@ class WineCharmApp(Gtk.Application):
         pid = process_info.get('pid')
         script = process_info.get('script')
         wineprefix = Path(process_info.get('wineprefix')).expanduser().resolve()
-        
-        # Extract YAML info safely
-        yaml_info = self.extract_yaml_info(script_key)
-        if not yaml_info:
-            print(f"Warning: No YAML info found for script_key: {script_key}")
-            return False
 
-        script_key = yaml_info.get('sha256sum', script_key)  # Use script_key if sha256sum is missing
-        exe_file = Path(yaml_info.get('exe_file')).expanduser().resolve()
+        # Replacing Extract YAML info with script_data
+        script_data = self.script_list.get(script_key)
+        if not script_data:
+            return None
+
+        script_key = script_data.get('sha256sum', script_key)        
+        exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()        
         exe_name = Path(exe_file).name
         unix_exe_dir_name = exe_file.parent.name
+        wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
+        
+        runner = script_data.get('runner', 'wine')
+        if runner:
+            runner = Path(runner).expanduser().resolve()
+            runner_dir = runner.parent.resolve()
+            path_env = f'export PATH={runner_dir}:$PATH'
+        else:
+            runner = "wine"
+            runner_dir = ""  # Or set a specific default if required
+            path_env = ""
+        
+        
+        exe_name = shlex.quote(str(exe_name))
+        runner_dir = shlex.quote(str(runner_dir))
 
-        print(f"YAML Info: {yaml_info}")
-        print(f"Resolved exe_file: {exe_file}")
-        print(f"wineprefix: {wineprefix}")
-
-        runner = yaml_info.get('runner', 'wine')  # Fallback to 'wine' if runner is not set
-        runner_dir = Path(runner).parent
-
-        # Quote paths and command parts to prevent issues with spaces
-        wineprefix = Path(script).parent
-        exe_name_quoted = shlex.quote(str(exe_name))
-        wineprefix = shlex.quote(str(wineprefix))
 
         def run_get_child_pid():
             try:
+                print("---------------------------------------------")
                 print(f"Looking for child processes of: {exe_name}")
 
                 # Prepare command to filter processes using winedbg
-                winedbg_command_with_grep = (
+                if path_env:
+                    winedbg_command_with_grep = (
                     f"export PATH={shlex.quote(str(runner_dir))}:$PATH;"
                     f"WINEPREFIX={wineprefix} winedbg --command 'info proc' | "
-                    f"grep -A9 \"{exe_name_quoted}\" | grep -v 'grep' | grep '_' | "
+                    f"grep -A9 \"{exe_name}\" | grep -v 'grep' | grep '_' | "
                     f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
                     f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
                     f"grep -v 'svchost.exe'   | grep -v 'plugplay.exe' | grep -v 'winedevice.exe' | "
                     f"cut -f2- -d '_' | tr \"'\" ' '"
-                )
-
+                    )
+                else:
+                    winedbg_command_with_grep = (
+                    f"WINEPREFIX={wineprefix} winedbg --command 'info proc' | "
+                    f"grep -A9 \"{exe_name}\" | grep -v 'grep' | grep '_' | "
+                    f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
+                    f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
+                    f"grep -v 'svchost.exe'   | grep -v 'plugplay.exe' | grep -v 'winedevice.exe' | "
+                    f"cut -f2- -d '_' | tr \"'\" ' '"
+                    )
+                if debug:    
+                    print("---------run_get_child_pid's winedbg_command_with_grep---------------")
+                    print(winedbg_command_with_grep)
+                    print("--------/run_get_child_pid's winedbg_command_with_grep---------------")
+            
                 winedbg_output_filtered = subprocess.check_output(winedbg_command_with_grep, shell=True, text=True).strip().splitlines()
-                #print(f"Filtered winedbg output: {winedbg_output_filtered}")
+                if debug:    
+                    print("--------- run_get_child_pid's winedbg_output_filtered ---------------")
+                    print(winedbg_output_filtered)
+                    print("---------/run_get_child_pid's winedbg_output_filtered ---------------")
+
 
                 # Retrieve the parent directory name and search for processes
                 exe_parent = exe_file.parent.name
@@ -1482,14 +1504,27 @@ class WineCharmApp(Gtk.Application):
 
                     # Command to get PIDs for matching processes
                     pgrep_command = (
-                        f"ps -ax --format pid,command | grep \"{filtered_exe}\" | "
-                        f"grep \"{cleaned_exe_parent_name}\" | grep -v 'grep' | sed 's/^ *//g' | cut -f1 -d ' '"
+                    f"ps -ax --format pid,command | grep \"{filtered_exe}\" | "
+                    f"grep \"{cleaned_exe_parent_name}\" | grep -v 'grep' | "
+                    f"sed 's/^ *//g' | cut -f1 -d ' '"
                     )
-
-                    print(f"Running pgrep command: {pgrep_command}")
-                    pgrep_output = subprocess.check_output(pgrep_command, shell=True, text=True).strip()
-                    child_pids.update(pgrep_output.splitlines())
-
+                    if debug:    
+                        print("--------- run_get_child_pid's pgrep_command ---------------")
+                        print(f"{pgrep_command}")
+                        print("---------/run_get_child_pid's pgrep_command ---------------")
+                        pgrep_output = subprocess.check_output(pgrep_command, shell=True, text=True).strip()
+                        child_pids.update(pgrep_output.splitlines())
+                        
+                    if debug:    
+                        print("--------- run_get_child_pid's pgrep_output ---------------")
+                        print(f"{pgrep_output}")
+                        print("---------/run_get_child_pid's pgrep_output ---------------")
+                        
+                    if debug:    
+                        print("--------- run_get_child_pid's child_pids pgrep_output.splitlines() ---------------")
+                        print(f"{pgrep_output.splitlines()}")
+                        print("---------/run_get_child_pid's child_pids pgrep_output.splitlines() ---------------")
+                    
                 if child_pids:
                     print(f"Found child PIDs: {child_pids}\n")
                     GLib.idle_add(self.add_child_pids_to_running_processes, script_key, child_pids)
