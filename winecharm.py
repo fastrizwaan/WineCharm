@@ -1154,41 +1154,21 @@ class WineCharmApp(Gtk.Application):
         script = Path(script_data['script_path']).resolve()
         progname = script_data['progname']
         script_args = script_data['args']
-        runner = script_data['runner']
-        if runner:
-            runner = str(Path(script_data['runner']).expanduser().resolve()) 
-        else:
-            runner = "wine"
-            
-        env_vars = script_data.get('env_vars', '')  # Ensure env_vars is initialized if missing
-        wine_debug = script_data.get('wine_debug')
-        exe_name = exe_file.name
-
-        # Resolve wineprefix
+        runner = script_data['runner'] or "wine"
+        
         wineprefix = script.parent.resolve()
-
-        print(f"wineprefix = {wineprefix}")
-        print(f"exe_file = {exe_file}")
-        print(f"runner = {runner}")
-        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
-        # Check if any process with the same wineprefix is already running
-        self.prefix_in_use = False
-        for process_info in self.running_processes.values():
-            if Path(process_info['wineprefix']) == wineprefix:
-                self.prefix_in_use = True
-                print(f"Process already running in {wineprefix}. Preventing premature termination.")
-
-        # Proceed with launching or terminating the script process
+        
+        # Check if the script is already running
         if script_key in self.running_processes:
-            self.terminate_script(script_key)  # Pass script_key instead of the entire script path
+            self.terminate_script(script_key)
             self.set_play_stop_button_state(play_stop_button, False)
             self.update_row_highlight(row, False)
 
-            # Ensure the overlay buttons are hidden when the process ends
+            # Ensure overlay buttons are hidden when the process ends
             if self.current_clicked_row:
                 button, play_button, options_button = self.current_clicked_row
                 self.hide_buttons(play_button, options_button)
-                self.set_play_stop_button_state(play_button, False)  # Reset the play button to "Play"
+                self.set_play_stop_button_state(play_button, False)  # Reset play button to "Play"
                 self.current_clicked_row = None
                 button.remove_css_class("highlighted")
                 button.remove_css_class("blue")
@@ -1196,7 +1176,6 @@ class WineCharmApp(Gtk.Application):
             self.launch_script(script_key, play_stop_button, row)
             self.set_play_stop_button_state(play_stop_button, True)
 
-            #self.update_row_highlight(row, True)
 
     def process_ended(self, script_key):
 
@@ -1262,7 +1241,7 @@ class WineCharmApp(Gtk.Application):
         # If no more running processes exist, reset all UI elements
         if not self.running_processes:
             self.reset_all_ui_elements()
-            print("All processes ended. Resetting all UI elements.")
+            #print("All processes ended. Resetting all UI elements.")
 
     def reset_all_ui_elements(self):
         """
@@ -1297,7 +1276,7 @@ class WineCharmApp(Gtk.Application):
 
         # Clear the currently clicked row information
         #self.current_clicked_row = None
-        print("All UI elements reset to default state.")
+        #print("All UI elements reset to default state.")
 
 
         
@@ -1342,18 +1321,18 @@ class WineCharmApp(Gtk.Application):
             print("---------------------/launch_script_data ------------------")
 
         # Check if any process with the same wineprefix is already running
-        self.prefix_in_use = False
+        self.launching_another_from_same_prefix = False
         wineprefix_process_count = 0
        
         for process_info in self.running_processes.values():
             if Path(process_info['wineprefix']) == wineprefix:
                 wineprefix_process_count += 1
 
-        # Set self.prefix_in_use if >1 process shares the wineprefix.
+        # Set self.launching_another_from_same_prefix if >1 process shares the wineprefix.
         if wineprefix_process_count > 1:
-            self.prefix_in_use = True
+            self.launching_another_from_same_prefix = True
         else:
-            self.prefix_in_use = False
+            self.launching_another_from_same_prefix = False
 
 
 
@@ -1423,7 +1402,7 @@ class WineCharmApp(Gtk.Application):
         # Run get_child_pid in a separate thread
         if script_key not in self.running_processes:
             print("Process already ended, nothing to get child PID for")
-            self.prefix_in_use = False
+            self.launching_another_from_same_prefix = False
             return False
 
         process_info = self.running_processes[script_key]
@@ -1540,7 +1519,7 @@ class WineCharmApp(Gtk.Application):
         threading.Thread(target=run_get_child_pid, daemon=True).start()
 
         # After completing the task, reset the flag
-        self.prefix_in_use = False
+        self.launching_another_from_same_prefix = False
         return False
 
 
@@ -1560,71 +1539,53 @@ class WineCharmApp(Gtk.Application):
         else:
             print(f"Script key {script_key} not found in running processes.")
 
-                        
+
+
+
     def terminate_script(self, script_key):
         # Get process info for the script using the script_key
         process_info = self.running_processes.get(script_key)
 
         if not process_info:
-            # No running process found for this script_key
+            print(f"No running process found for script_key: {script_key}")
             return
 
-        # Get the wineprefix, runner, and PIDs associated with the script
+        # Extract relevant information from process_info
         script = process_info.get('script')
-        script_data = self.script_list.get(script_key)
-
-        # Handle case where script_data is missing
-        if not script_data:
-            print(f"Error: Script data for key {script_key} not found.")
-            return
-
-        # Extract wineprefix and runner, defaulting to 'wine' if runner is not specified
-        wineprefix = Path(script).parent
-        runner = script_data.get("runner", "wine")  # Directly use runner from script_data
+        wineprefix = Path(process_info.get('wineprefix')).expanduser().resolve()
+        runner = process_info.get('runner', 'wine')
         pids = process_info.get("pids", [])
+        exe_name = process_info.get('exe_name')
 
         print(f"Terminating script {script_key} with wineprefix {wineprefix}, runner {runner}, and PIDs: {pids}")
 
-        # Check how many processes are running with the same wineprefix
         wineprefix_process_count = 0
-        print("-x" * 50)
 
-        for process_info in self.running_processes.values():
-            if Path(process_info['wineprefix']) == wineprefix:
+        # Count how many processes are using the same wineprefix
+        for proc_info in self.running_processes.values():
+            if Path(proc_info['wineprefix']).expanduser().resolve() == wineprefix:
                 wineprefix_process_count += 1
-                print(f"Process running from {wineprefix}: {process_info}")
+                print(f"Process running from {wineprefix}: {proc_info}")
 
-        existing_running_script = False        
-        for process_info in self.running_processes.values():
-            if Path(process_info['script']) == script:
-                existing_running_script = True
-                print("\n")
-                print("="*50)
-                print(f"Process running from {script}: {process_info}")
+        existing_running_script = any(Path(proc_info['script']).expanduser().resolve() == script for proc_info in self.running_processes.values())
+        
+        print(f"Number of processes with the same wineprefix: {wineprefix_process_count}")
 
         try:
-            # If there is only one PID and no other process from the same wineprefix is running, use wineserver -k
             if wineprefix_process_count == 1 and existing_running_script:
                 runner_dir = Path(runner).parent
                 command = f"export PATH={shlex.quote(str(runner_dir))}:$PATH; WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k"
                 print("=======wineserver -k==========")
+                print("=======wineserver -k==========")
+                print("=======wineserver -k==========")
+                print(f"Running command: {command}")
                 subprocess.run(command, shell=True, check=True)
                 print(f"Successfully killed using wineserver -k")
 
-            # If there are multiple PIDs or another process is running from the same wineprefix, kill PIDs individually
-            elif wineprefix_process_count > 1 or self.prefix_in_use:
-                print("=======os.kill(pid, signal.SIGKILL)==========")
-                for pid in pids:
-                    if self.is_process_running(pid):
-                        try:
-                            os.kill(pid, signal.SIGKILL)
-                            print(f"Successfully terminated process {pid} for script {script_key}")
-                        except ProcessLookupError:
-                            print(f"Process with PID {pid} not found, may have already exited.")
-                        except PermissionError:
-                            print(f"Permission denied to kill process with PID {pid}.")
-                    else:
-                        print(f"Process with PID {pid} is no longer running.")
+            
+            # Case 2: If wineserver -k fails or there are multiple processes, handle manually
+            print("======= Killing processes manually ==========")
+            self.kill_processes_by_name(exe_name, script_key)
 
             # Remove the script from running_processes after termination
             if script_key in self.running_processes:
@@ -1642,13 +1603,22 @@ class WineCharmApp(Gtk.Application):
                 self.hide_buttons(play_button, options_button)
                 self.current_clicked_row = None
 
-        except subprocess.CalledProcessError as e:
-            print(f"Error while executing wineserver -k for script {script_key}: {e}")
         except Exception as e:
             print(f"Error terminating script {script_key}: {e}")
 
         print(f"Termination complete for script {script_key}")
 
+    def kill_processes_by_name(self, exe_name, script_key):
+        """Kill all processes matching the given exe_name."""
+        print(f"Looking for all processes with the name: {exe_name}")
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                # Kill processes with matching exe_name
+                if proc.info['name'].lower() == exe_name.lower():
+                    print(f"Terminating process {proc.info['pid']} with name {proc.info['name']}")
+                    proc.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
 
     def is_process_running(self, pid):
         """Check if a process with the given PID is running."""
@@ -1657,6 +1627,23 @@ class WineCharmApp(Gtk.Application):
             return True
         except OSError:
             return False
+
+
+    def kill_processes_individually(self, pids, script_key):
+        """Kill each process by PID."""
+        for pid in pids:
+            if self.is_process_running(pid):
+                try:
+                    print(f"Terminating PID {pid}")
+                    os.kill(pid, signal.SIGKILL)  # Send SIGKILL to the process
+                    print(f"Successfully terminated process {pid} for script {script_key}")
+                except ProcessLookupError:
+                    print(f"Process with PID {pid} not found, may have already exited.")
+                except PermissionError:
+                    print(f"Permission denied to kill process with PID {pid}.")
+            else:
+                print(f"Process with PID {pid} is no longer running.")
+        print(f"All specified PIDs terminated for {script_key}")
 
 
     def check_running_processes_and_update_buttons(self):
@@ -1690,8 +1677,8 @@ class WineCharmApp(Gtk.Application):
             pgrep_output = [line for line in pgrep_output if do_not_kill not in line]
             
             for script_key, script_data in self.script_list.items():
-                print("=======================================================")
-                print(f"{script_data}")
+                #print("=======================================================")
+                #print(f"{script_data}")
                 script = Path(script_data['script_path'])
                 exe_name = Path(script_data['exe_file']).name
                 unix_exe_dir_name = Path(script_data['exe_file']).parent.name
