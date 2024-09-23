@@ -17,6 +17,7 @@ import time
 import glob
 import fnmatch
 import psutil
+import inspect
 
 from datetime import datetime
 
@@ -26,7 +27,7 @@ gi.require_version('Adw', '1')
 
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 #qfrom concurrent.futures import ThreadPoolExecutor
-
+debug = True
 version = "0.95"
 # Constants
 winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
@@ -886,119 +887,6 @@ class WineCharmApp(Gtk.Application):
 
 
     def create_script_row(self, script_key, script_data):
-
-#        yaml_info = self.extract_yaml_info(script)
-#        exe_name = Path(yaml_info['exe_file'])
-       # exe_name = Path(script_data['exe_file'])
-        script = Path(script_data['script_path'])
-#        script_key = script_data['sha256sum']  # Use sha256sum as the key
-
-        button = Gtk.Button()
-        button.set_hexpand(True)
-        button.set_halign(Gtk.Align.FILL)
-        button.add_css_class("flat")
-        button.add_css_class("normal-font")
-
-        label_text = script_data.get('progname', '').replace('_', ' ') or Path(script_data['script_path']).stem.replace('_', ' ')
-
-    
-
-        # Create an overlay to add play and options buttons
-        overlay = Gtk.Overlay()
-        overlay.set_child(button)
-
-        if self.icon_view:
-            icon = self.load_icon(script, 64, 64)
-            icon_image = Gtk.Image.new_from_paintable(icon)
-            button.set_size_request(64, 64)
-            hbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-            icon_image.set_pixel_size(64)
-            # Create a box to hold both buttons
-            buttons_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-            # Apply the wrapping logic
-            label1, label2, label3 = self.wrap_text_at_20_chars(label_text)
-            label = Gtk.Label(label=label1)
-            if label2:
-                label2 = Gtk.Label(label=label2)
-            if label3:
-                label3 = Gtk.Label(label=label3)
-        else:
-            icon = self.load_icon(script, 32, 32)
-            icon_image = Gtk.Image.new_from_paintable(icon)
-            button.set_size_request(390, 36)
-            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-            icon_image.set_pixel_size(32)
-            # Create a box to hold both buttons
-            buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            label = Gtk.Label(label=label_text)
-            label.set_xalign(0)
-            label2 = Gtk.Label(label="")
-            label3 = Gtk.Label(label="")
-        label.set_hexpand(True)
-        label.set_ellipsize(Pango.EllipsizeMode.END)
-        button.set_child(hbox)
-        hbox.append(icon_image)
-        hbox.append(label)
-        if label2:
-            hbox.append(label2)
-        if label3:
-           hbox.append(label3)
-
-        if script.stem in self.new_scripts:
-            label.set_markup(f"<b>{label.get_text()}</b>")
-
-        button.label = label
-
-        buttons_box.set_margin_end(6)  # Adjust this value to prevent overlapping
-
-        # Play button
-        play_button = Gtk.Button.new_from_icon_name("media-playback-start-symbolic")
-        #play_button.add_css_class("overlay-button")
-        play_button.set_tooltip_text("Play")
-        play_button.set_visible(False)  # Initially hidden
-        buttons_box.append(play_button)
-
-        # Options button
-        options_button = Gtk.Button.new_from_icon_name("emblem-system-symbolic")
-        #options_button.add_css_class("overlay-button")
-        options_button.set_tooltip_text("Options")
-        options_button.set_visible(False)  # Initially hidden
-        buttons_box.append(options_button)
-
-        # Add buttons_box to overlay
-        overlay.add_overlay(buttons_box)
-        buttons_box.set_halign(Gtk.Align.END)
-        buttons_box.set_valign(Gtk.Align.CENTER)
-
-        # **Store references in self.script_data_two**
-        self.script_data_two[script_key] = {
-            'row': overlay,  # The overlay that contains the row UI
-            'play_button': play_button,  # The play button for the row
-            'options_button': options_button,  # The options button
-            'highlighted': False,  # Initially not highlighted
-            'is_running': False,  # Not running initially
-            'is_clicked_row': False,
-            'script_path': script
-        }
-
-        # Connect play button to toggle the script's running state
-        play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, play_button, overlay))
-
-        # Connect options button to show the script's options
-        options_button.connect("clicked", lambda btn: self.show_options_for_script(self.script_data_two[script_key], overlay, script_key))
-
-        # Event handler for button click (handling the row highlight)
-        button.connect("clicked", lambda *args: self.on_script_row_clicked(button, play_button, options_button))
-        # Only highlight if the script is actively running, not just based on name
-        if script_key in self.running_processes:
-            button.add_css_class("highlight")  # This should happen only if the process is running
-        else:
-            button.remove_css_class("highlighted")
-            button.remove_css_class("blue")
-        return overlay
-
-######################################
-    def create_script_row(self, script_key, script_data):
         """
         Creates a row for a given script in the UI, including the play and options buttons.
 
@@ -1266,7 +1154,12 @@ class WineCharmApp(Gtk.Application):
         script = Path(script_data['script_path']).resolve()
         progname = script_data['progname']
         script_args = script_data['args']
-        runner = script_data.get('runner', 'wine')
+        runner = script_data['runner']
+        if runner:
+            runner = str(Path(script_data['runner']).expanduser().resolve()) 
+        else:
+            runner = "wine"
+            
         env_vars = script_data.get('env_vars', '')  # Ensure env_vars is initialized if missing
         wine_debug = script_data.get('wine_debug')
         exe_name = exe_file.name
@@ -1276,12 +1169,13 @@ class WineCharmApp(Gtk.Application):
 
         print(f"wineprefix = {wineprefix}")
         print(f"exe_file = {exe_file}")
-
+        print(f"runner = {runner}")
+        print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
         # Check if any process with the same wineprefix is already running
-        self.launching_another_from_same_prefix = False
+        self.prefix_in_use = False
         for process_info in self.running_processes.values():
             if Path(process_info['wineprefix']) == wineprefix:
-                self.launching_another_from_same_prefix = True
+                self.prefix_in_use = True
                 print(f"Process already running in {wineprefix}. Preventing premature termination.")
 
         # Proceed with launching or terminating the script process
@@ -1303,7 +1197,7 @@ class WineCharmApp(Gtk.Application):
             self.set_play_stop_button_state(play_stop_button, True)
 
             #self.update_row_highlight(row, True)
-####
+
     def process_ended(self, script_key):
 
 
@@ -1408,84 +1302,69 @@ class WineCharmApp(Gtk.Application):
 
         
     def launch_script(self, script_key, play_stop_button, row):
-        #yaml_info = self.extract_yaml_info(script)
-        #exe_file = yaml_info['exe_file']
-        script_data = self.extract_yaml_info(script_key)
-        #print(f"====> {script_data}")
+        script_data = self.script_list.get(script_key)
         if not script_data:
             return None
         
-        exe_file = Path(script_data['exe_file']).expanduser().resolve()
-        script = Path(script_data['script_path'])
-        progname = script_data['progname']
-        script_args = script_data['args']
-        runner = script_data['runner'] or "wine"
-        script_key = script_data['sha256sum']  # Use sha256sum as the key
-        env_vars = str(script_data.get('env_vars', ''))   # Ensure env_vars is initialized if missing
-        wine_debug = str(script_data.get('wine_debug', ''))
+        exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
+        script = Path(script_data.get('script_path', '')).expanduser().resolve()
+        progname = script_data.get('progname', '')
+        script_args = script_data.get('args', '')
+        script_key = script_data.get('sha256sum', script_key)
+        env_vars = script_data.get('env_vars', '')
+        wine_debug = script_data.get('wine_debug', '')
         exe_name = Path(exe_file).name
+        wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
+        runner = script_data.get('runner', 'wine')
+        if runner:
+            runner = Path(runner).expanduser().resolve()
+            runner_dir = runner.parent.resolve()
+            path_env = f'export PATH=$PATH:{runner_dir}'
+        else:
+            runner = "wine"
+            runner_dir = ""  # Or set a specific default if required
+            path_env = ""
+            
+        # shlex quote for bash
+        exe_parent = shlex.quote(str(exe_file.parent.resolve()))
+        wineprefix = shlex.quote(str(wineprefix))
+        runner = shlex.quote(str(runner))
+        runner_dir = shlex.quote(str(runner_dir))
+        exe_name = shlex.quote(str(exe_name))
         
-        
-        #wineprefix = Path(script).parent
-        wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
-        print(f"wineprefix = {wineprefix}")
-        print(f"exe_file = {exe_file}")
-#        progname = yaml_info['progname']
-#        script_args = yaml_info['args']
-#        runner = yaml_info['runner'] or "wine"
-#        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
-#        env_vars = yaml_info.get('env_vars', '')  # Ensure env_vars is initialized if missing
-#        wine_debug = yaml_info.get('wine_debug')
-#        exe_name = Path(exe_file).name
-
-        ## If runner not inside winecharm directory then use system runner
-        #if winecharmdir not in Path(runner).parents:
-        #    runner = "wine"
+        if debug:
+            print("--------------------- launch_script_data ------------------")
+            print(f"exe_file = {exe_file}\nscript = {script}\nprogname = {progname}")
+            print(f"script_args = {script_args}\nscript_key = {script_key}")
+            print(f"env_vars = {env_vars}\nwine_debug = {wine_debug}")
+            print(f"exe_name = {exe_name}\nwineprefix = {wineprefix}")
+            print("runner = {runner}\nrunner_dir = {runner_dir}")
+            print("---------------------/launch_script_data ------------------")
 
         # Check if any process with the same wineprefix is already running
-        self.launching_another_from_same_prefix = False
+        self.prefix_in_use = False
         wineprefix_process_count = 0
-       # print(self.running_processes.values())
-        #print("-x" * 50)
+       
         for process_info in self.running_processes.values():
             if Path(process_info['wineprefix']) == wineprefix:
                 wineprefix_process_count += 1
-                #print(f"Process running from {wineprefix}: {process_info}")
 
-        # Set self.launching_another_from_same_prefix to True only if more than one process is using the same wineprefix
+        # Set self.prefix_in_use if >1 process shares the wineprefix.
         if wineprefix_process_count > 1:
-            self.launching_another_from_same_prefix = True
-            print(f"Multiple processes are already running from {wineprefix}. Launching another would terminate them.")
+            self.prefix_in_use = True
         else:
-            self.launching_another_from_same_prefix = False
-            print(f"No duplicate processes found for {wineprefix} or only one process is running.")
+            self.prefix_in_use = False
 
-        # Proceed with launching the new script process
-        log_file_path = wineprefix / f"{script.stem}.log"
-        #print(f"Logging stderr to {log_file_path}")
 
+
+        #Logging stderr to {log_file_path}")
+        log_file_path = Path(wineprefix) / f"{script.stem}.log"
+
+        # Will be set in Settings
         if wine_debug == "disabled":
             wine_debug = "WINEDEBUG=-all DXVK_LOG_LEVEL=none"
 
-      #  exe_parent = Path(exe_file).parent.resolve()
-        exe_parent = shlex.quote(str(exe_file.parent.resolve()))
- # Parent directory of the exe_file
-
-        wineprefix = shlex.quote(str(wineprefix))
-        runner = shlex.quote(runner)
-        exe_name = shlex.quote(str(exe_name))
-
-
-        #print(f"""
-        #exe_file = {exe_file}
-        #exe_parent = {exe_parent}
-        #wineprefix = {wineprefix}
-        #runner = {runner}
-        #exe_name = {exe_name}
-        #""")
-        
-        
-        
+        # If exe_file not found then show info
         if not Path(exe_file).exists():
             GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
             GLib.idle_add(play_stop_button.set_tooltip_text, "Exe Not Found")
@@ -1495,10 +1374,21 @@ class WineCharmApp(Gtk.Application):
         else:
             play_stop_button.remove_css_class("red")
 
-        command = f"cd {exe_parent} && {wine_debug} {env_vars} WINEPREFIX={wineprefix} {runner} {exe_name} {script_args}"
-        print(f"\n------------------------------")
-        print(f"{command}\n")
-        print(f"\n------------------------------")
+        # Command to launch
+        if path_env:
+            command = (f"{path_env}; cd {exe_parent} && "
+                       f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} "
+                       f"{runner} {exe_name} {script_args}" )
+        else:
+            command = (f"cd {exe_parent} && "
+                       f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} "
+                       f"{runner} {exe_name} {script_args}" )
+        if debug:
+            print(f"----------------------Launch Command--------------------")
+            print(f"{command}")
+            print(f"--------------------------------------------------------")
+            print("")
+            
         try:
             with open(log_file_path, 'w') as log_file:
                 process = subprocess.Popen(
@@ -1516,23 +1406,24 @@ class WineCharmApp(Gtk.Application):
                     "pids": [process.pid],
                     "wineprefix": wineprefix
                 }
-                #print("v"*100)
-                #print(process.pid)
-                #print("^"*100)
                 self.set_play_stop_button_state(play_stop_button, True)
                 self.update_row_highlight(row, True)
                 GLib.timeout_add_seconds(5, self.get_child_pid_async, script_key, exe_name, wineprefix)
 
         except Exception as e:
             print(f"Error launching script: {e}")
-
-        #print(self.running_processes)
-
+        if debug:
+            print(f"launched self.running_processes[script_key]: {self.running_processes[script_key]}")
+            print("-------------------Launch Script's self.running_processes--------------------")
+            print(self.running_processes)
+            print("------------------/Launch Script's self.running_processes--------------------")
+            
+            
     def get_child_pid_async(self, script_key, exe_name, wineprefix):
         # Run get_child_pid in a separate thread
         if script_key not in self.running_processes:
             print("Process already ended, nothing to get child PID for")
-            self.launching_another_from_same_prefix = False
+            self.prefix_in_use = False
             return False
 
         process_info = self.running_processes[script_key]
@@ -1614,7 +1505,7 @@ class WineCharmApp(Gtk.Application):
         threading.Thread(target=run_get_child_pid, daemon=True).start()
 
         # After completing the task, reset the flag
-        self.launching_another_from_same_prefix = False
+        self.prefix_in_use = False
         return False
 
 
@@ -1640,29 +1531,34 @@ class WineCharmApp(Gtk.Application):
         process_info = self.running_processes.get(script_key)
 
         if not process_info:
-            #print(f"No running process found for script_key: {script_key}")
+            # No running process found for this script_key
             return
 
         # Get the wineprefix, runner, and PIDs associated with the script
         script = process_info.get('script')
-        yaml_info = self.extract_yaml_info(script_key)
+        script_data = self.script_list.get(script_key)
+
+        # Handle case where script_data is missing
+        if not script_data:
+            print(f"Error: Script data for key {script_key} not found.")
+            return
 
         # Extract wineprefix and runner, defaulting to 'wine' if runner is not specified
         wineprefix = Path(script).parent
-        runner = yaml_info.get("runner", "wine")
+        runner = script_data.get("runner", "wine")  # Directly use runner from script_data
         pids = process_info.get("pids", [])
 
         print(f"Terminating script {script_key} with wineprefix {wineprefix}, runner {runner}, and PIDs: {pids}")
 
-        # Check if any process with the same wineprefix is already running
-
+        # Check how many processes are running with the same wineprefix
         wineprefix_process_count = 0
-       # print(self.running_processes.values())
         print("-x" * 50)
+
         for process_info in self.running_processes.values():
             if Path(process_info['wineprefix']) == wineprefix:
                 wineprefix_process_count += 1
                 print(f"Process running from {wineprefix}: {process_info}")
+
         existing_running_script = False        
         for process_info in self.running_processes.values():
             if Path(process_info['script']) == script:
@@ -1670,18 +1566,18 @@ class WineCharmApp(Gtk.Application):
                 print("\n")
                 print("="*50)
                 print(f"Process running from {script}: {process_info}")
+
         try:
             # If there is only one PID and no other process from the same wineprefix is running, use wineserver -k
             if wineprefix_process_count == 1 and existing_running_script:
                 runner_dir = Path(runner).parent
                 command = f"export PATH={shlex.quote(str(runner_dir))}:$PATH; WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k"
                 print("=======wineserver -k==========")
-                #print(f"Running command: {command}")
                 subprocess.run(command, shell=True, check=True)
                 print(f"Successfully killed using wineserver -k")
 
             # If there are multiple PIDs or another process is running from the same wineprefix, kill PIDs individually
-            elif wineprefix_process_count > 1 or self.launching_another_from_same_prefix:
+            elif wineprefix_process_count > 1 or self.prefix_in_use:
                 print("=======os.kill(pid, signal.SIGKILL)==========")
                 for pid in pids:
                     if self.is_process_running(pid):
@@ -1698,7 +1594,6 @@ class WineCharmApp(Gtk.Application):
             # Remove the script from running_processes after termination
             if script_key in self.running_processes:
                 del self.running_processes[script_key]
-                #print(f"Script {script_key} removed from running processes.")
 
             # Reset UI for the row associated with the script
             row = process_info.get("row")
@@ -1760,6 +1655,8 @@ class WineCharmApp(Gtk.Application):
             pgrep_output = [line for line in pgrep_output if do_not_kill not in line]
             
             for script_key, script_data in self.script_list.items():
+                print("=======================================================")
+                print(f"{script_data}")
                 script = Path(script_data['script_path'])
                 exe_name = Path(script_data['exe_file']).name
                 unix_exe_dir_name = Path(script_data['exe_file']).parent.name
@@ -1894,7 +1791,7 @@ class WineCharmApp(Gtk.Application):
     def extract_yaml_info(self, script_key):
         #print(f" ===== > script key = {script_key}")
         script_data = self.script_list.get(script_key)
-        #print(f"===== > script_data = {script_data}")
+        print(f"===== > script_data = {script_data}")
         if script_data:
             return script_data
         else:
@@ -2499,13 +2396,15 @@ class WineCharmApp(Gtk.Application):
         Args:
             script_info (dict): Information about the script stored in script_data_two.
             row (Gtk.Widget): The row UI element where the options will be displayed.
-            script_key (str): The unique key for the script.
+            script_key (str): The unique key for the script (should be sha256sum or a unique identifier).
         """
+        # Get the script path from script_info
         script = Path(script_info['script_path'])  # Get the script path from script_info
 
         # Ensure the search button is toggled off and the search entry is cleared
         self.search_button.set_active(False)
         self.main_frame.set_child(None)
+
         scrolled_window = Gtk.ScrolledWindow()
         scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled_window.set_vexpand(True)
@@ -2560,17 +2459,19 @@ class WineCharmApp(Gtk.Application):
 
             # Enable or disable the "Show log" button based on log file existence and size
             if label == "Show log":
-                log_file_path = Path(script.parent) / f"{script.stem}.log"
+                log_file_path = script.parent / f"{script.stem}.log"
                 if not log_file_path.exists() or log_file_path.stat().st_size == 0:
                     option_button.set_sensitive(False)
 
+            # Ensure the correct button (`btn`) is passed to the callback
             option_button.connect(
                 "clicked",
-                lambda btn, cb=callback, sc=script, sk=script_key, ob=option_button: self.callback_wrapper(cb, sc, sk, ob)
+                lambda btn, cb=callback, sc=script, sk=script_key: self.callback_wrapper(cb, sc, sk, btn)
             )
 
-        # Set the header bar title to the script's icon and name
+        # Use `script` as a Path object for `create_icon_title_widget`
         self.headerbar.set_title_widget(self.create_icon_title_widget(script))
+
         self.menu_button.set_visible(False)
         self.search_button.set_visible(False)
         self.view_toggle_button.set_visible(False)
@@ -2580,9 +2481,10 @@ class WineCharmApp(Gtk.Application):
         self.back_button.set_visible(True)
 
         self.open_button.set_visible(False)
-        self.replace_open_button_with_launch(script, row, script_key)
-        self.update_execute_button_icon(script)
+        self.replace_open_button_with_launch(script_info, row, script_key)
+        self.update_execute_button_icon(script_info)
         self.selected_row = None
+
 
 
     def show_log_file(self, script, script_key, *args):
@@ -2632,7 +2534,7 @@ class WineCharmApp(Gtk.Application):
         #script_key = yaml_info['sha256sum']  # Use sha256sum as the key
         #env_vars = yaml_info.get('env_vars', '')  # Ensure env_vars is initialized if missing
         #wine_debug = yaml_info.get('wine_debug', '')
-        exe_name = exe_file.name
+        #exe_name = exe_file.name
 
         # Ensure the runner path is valid and resolve it
         runner = Path(runner).expanduser().resolve() if runner else Path("wine")
@@ -2694,15 +2596,274 @@ class WineCharmApp(Gtk.Application):
             subprocess.Popen(command)
         except Exception as e:
             print(f"Error opening file manager: {e}")
+            
     def show_delete_confirmation(self, script, button):
-        self.replace_button_with_overlay(script, "Delete Wineprefix?", "wineprefix", button)
+        """
+        Show an Adw.MessageDialog to confirm the deletion of the Wine prefix.
+        
+        Args:
+            script: The script that contains information about the Wine prefix.
+            button: The button that triggered the deletion request.
+        """
+        wineprefix = Path(script).parent
+
+        # Create a confirmation dialog
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,  # Assuming self.window is the main application window
+            title="Delete Wine Prefix",
+            body=f"Are you sure you want to delete the Wine prefix for {wineprefix.name}?"
+        )
+        
+        # Add the "Delete" and "Cancel" buttons
+        dialog.add_response("delete", "Delete")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+        
+        # Show the dialog and connect the response signal
+        dialog.connect("response", self.on_delete_confirmation_response, wineprefix)
+
+        # Present the dialog (use present instead of show to avoid deprecation warning)
+        dialog.present()
+
+
+    def on_delete_confirmation_response(self, dialog, response_id, wineprefix):
+        """
+        Handle the response from the delete confirmation dialog.
+        
+        Args:
+            dialog: The Adw.MessageDialog instance.
+            response_id: The ID of the response clicked by the user.
+            wineprefix: The path to the Wine prefix that is potentially going to be deleted.
+        """
+        if response_id == "delete":
+            # Perform the deletion of the Wine prefix
+            try:
+                if wineprefix.exists() and wineprefix.is_dir():
+                    shutil.rmtree(wineprefix)
+                    print(f"Deleted Wine prefix: {wineprefix}")
+                    
+                    # Remove the script/row associated with this Wine prefix
+                    script_key = self.get_script_key_from_wineprefix(wineprefix)
+                    if script_key in self.script_list:
+                        del self.script_list[script_key]
+                        print(f"Removed script {script_key} from script_list")
+                    else:
+                        print(f"Script not found in script_list for Wine prefix: {wineprefix}")
+
+                    # Trigger the back button to return to the previous view
+                    self.on_back_button_clicked(None)
+                else:
+                    print(f"Wine prefix does not exist: {wineprefix}")
+            except Exception as e:
+                print(f"Error deleting Wine prefix: {e}")
+        else:
+            print("Deletion canceled")
+
+        # Close the dialog
+        dialog.close()
+
+    def get_script_key_from_wineprefix(self, wineprefix):
+        """
+        Retrieve the script_key for a given Wine prefix.
+        
+        Args:
+            wineprefix: The path to the Wine prefix.
+            
+        Returns:
+            The corresponding script_key from script_list, if found.
+        """
+        for script_key, script_info in self.script_list.items():
+            script_path = Path(script_info['script_path'])
+            if script_path.parent == wineprefix:
+                return script_key
+        return None
+
 
     def show_delete_shortcut_confirmation(self, script, button):
-        self.replace_button_with_overlay(script, "Delete shortcut?", "shortcut", button)
+        """
+        Show an Adw.MessageDialog to confirm the deletion of the shortcut.
+        
+        Args:
+            script: The script that contains information about the shortcut.
+            button: The button that triggered the deletion request.
+        """
+        shortcut_file = Path(script)
 
-    def show_wine_arguments_entry(self, script, button):
-        yaml_info = self.extract_yaml_info(script)
-        self.replace_button_with_entry_overlay(script, "Args:", button)
+        # Create a confirmation dialog
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,  # Assuming self.window is the main application window
+            title="Delete Shortcut",
+            body=f"Are you sure you want to delete the shortcut for {shortcut_file.name}?"
+        )
+        
+        # Add the "Delete" and "Cancel" buttons
+        dialog.add_response("delete", "Delete")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+        
+        # Show the dialog and connect the response signal
+        dialog.connect("response", self.on_delete_shortcut_confirmation_response, shortcut_file)
+
+        # Present the dialog (use present instead of show to avoid deprecation warning)
+        dialog.present()
+
+    def on_delete_shortcut_confirmation_response(self, dialog, response_id, shortcut_file):
+        """
+        Handle the response from the delete shortcut confirmation dialog.
+        
+        Args:
+            dialog: The Adw.MessageDialog instance.
+            response_id: The ID of the response clicked by the user.
+            shortcut_file: The path to the shortcut that is potentially going to be deleted.
+        """
+        if response_id == "delete":
+            # Perform the deletion of the shortcut
+            try:
+                if shortcut_file.exists() and shortcut_file.is_file():
+                    shortcut_file.unlink()  # Delete the shortcut file
+                    print(f"Deleted shortcut: {shortcut_file}")
+                    
+                    # Remove the script/row associated with this shortcut
+                    script_key = self.get_script_key_from_shortcut(shortcut_file)
+                    if script_key in self.script_list:
+                        del self.script_list[script_key]
+                        print(f"Removed script {script_key} from script_list")
+                    else:
+                        print(f"Script not found in script_list for shortcut: {shortcut_file}")
+
+                    # Trigger the back button to return to the previous view
+                    self.on_back_button_clicked(None)
+                else:
+                    print(f"Shortcut file does not exist: {shortcut_file}")
+            except Exception as e:
+                print(f"Error deleting shortcut: {e}")
+        else:
+            print("Deletion canceled")
+
+        # Close the dialog
+        dialog.close()
+
+    def get_script_key_from_shortcut(self, shortcut_file):
+        """
+        Retrieve the script_key for a given shortcut file.
+        
+        Args:
+            shortcut_file: The path to the shortcut.
+            
+        Returns:
+            The corresponding script_key from script_list, if found.
+        """
+        for script_key, script_info in self.script_list.items():
+            script_path = Path(script_info['script_path'])
+            if script_path == shortcut_file:
+                return script_key
+        return None
+
+    def show_wine_arguments_entry(self, script, script_key, *args):
+        """
+        Show an Adw.MessageDialog to allow the user to edit Wine arguments.
+
+        Args:
+            script_key: The sha256sum key for the script.
+            button: The button that triggered the edit request.
+        """
+        # Retrieve script_data directly from self.script_list using the sha256sum as script_key
+        print("--=---------------------------========-------------")
+        print(f"script_key = {script_key}")
+        print(f"self.script_list:\n{self.script_list}")
+        script_data = self.script_list.get(script_key)
+        
+        #script = Path(script_data['script_path'])
+        print("--=---------------------------========-------------")
+        
+        print(script_data)
+        # Handle case where the script_key is not found
+        if not script_data:
+            print(f"Error: Script with key {script_key} not found.")
+            return
+
+        # Get the current arguments or set a default value
+        current_args = script_data.get('args')
+        if not current_args:  # This checks if args is None, empty string, or any falsy value
+            current_args = "-opengl -SkipBuildPatchPrereq"
+
+        # Create an Adw.MessageDialog
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,  # Assuming self.window is the main application window
+            title="Edit Wine Arguments",
+            body="Modify the Wine arguments for this script:"
+        )
+
+        # Create an entry field and set the current arguments or default
+        entry = Gtk.Entry()
+        entry.set_text(current_args)
+
+        # Add the entry field to the dialog
+        dialog.set_extra_child(entry)
+
+        # Add "OK" and "Cancel" buttons
+        dialog.add_response("ok", "OK")
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+
+        # Connect the response signal to handle the user's input
+        dialog.connect("response", self.on_wine_arguments_dialog_response, entry, script_key)
+
+        # Present the dialog
+        dialog.present()
+
+
+    def on_wine_arguments_dialog_response(self, dialog, response_id, entry, script_key):
+        """
+        Handle the response from the Wine arguments dialog.
+        
+        Args:
+            dialog: The Adw.MessageDialog instance.
+            response_id: The ID of the response clicked by the user.
+            entry: The Gtk.Entry widget where the user modified the Wine arguments.
+            script_key: The key for the script in the script_list.
+        """
+        if response_id == "ok":
+            # Get the new Wine arguments from the entry
+            new_args = entry.get_text().strip()
+
+            # Update the script data in both the YAML file and self.script_list
+            try:
+                # Update the in-memory script data
+                script_info = self.extract_yaml_info(script_key)
+                script_info['args'] = new_args
+
+                # Update the in-memory representation
+                self.script_list[script_key]['args'] = new_args
+
+                # Get the script path from the script info
+                script_path = Path(script_info['script_path'])
+
+                # Write the updated info back to the YAML file
+                with open(script_path, 'w') as file:
+                    yaml.dump(script_info, file, default_flow_style=False, width=1000)
+
+                print(f"Updated Wine arguments for {script_path}: {new_args}")
+
+                ## Optionally refresh the script list or UI to reflect the changes
+                ##self.create_script_list()
+
+            except Exception as e:
+                print(f"Error updating Wine arguments for {script_key}: {e}")
+
+        else:
+            print("Wine arguments modification canceled")
+
+        # Close the dialog
+        dialog.close()
+
+
 
     def show_rename_shortcut_entry(self, script, button):
         self.replace_button_with_entry_overlay(script, "New Shortcut Name:", button, rename=True)
@@ -2765,26 +2926,28 @@ class WineCharmApp(Gtk.Application):
             shutil.move(extracted_icon_path, icon_path)
         self.create_script_list()
 
+
+
     def callback_wrapper(self, callback, script, script_key, button=None, *args):
-        """
-        Wraps callbacks to ensure the right number of arguments are passed to each callback.
-        
-        callback_params: callback method parameter names
-        """
-        # Retrieve the parameters of the callback
-        callback_params = callback.__code__.co_varnames
-        
-        # If the callback expects script, script_key, and button
-        if 'button' in callback_params and len(callback_params) >= 3:
-            return callback(script, script_key, button, *args)
-        
-        # If the callback expects only script and script_key (no button)
-        elif 'script_key' in callback_params and len(callback_params) == 2:
-            return callback(script, script_key, *args)
-        
-        # If the callback expects only script (no script_key or button)
+        # Ensure button is a valid GTK button object, not a string
+        if button is None or not hasattr(button, 'get_parent'):
+            raise ValueError("Invalid button object passed to replace_button_with_overlay.")
+
+        # Call the callback with the appropriate number of arguments
+        callback_params = inspect.signature(callback).parameters
+
+        if len(callback_params) == 2:
+            # Callback expects only script and script_key
+            return callback(script, script_key)
+        elif len(callback_params) == 3:
+            # Callback expects script, script_key, and button
+            return callback(script, script_key, button)
         else:
-            return callback(script, *args)
+            # Default case, pass all arguments (script, script_key, button, and *args)
+            return callback(script, script_key, button, *args)
+
+
+
 
 
     def update_execute_button_icon(self, script):
@@ -2811,35 +2974,55 @@ class WineCharmApp(Gtk.Application):
             print(f"Error running winetricks script {script_name}: {e}")
 
     def replace_button_with_overlay(self, script, confirmation_text, action_type, button):
+        # Ensure button is a valid GTK button object
+        if button is None or not hasattr(button, 'get_parent'):
+            raise ValueError("Invalid button object passed to replace_button_with_overlay.")
+        
         parent = button.get_parent()
 
+        # Check if the parent is a valid Gtk.FlowBoxChild
         if isinstance(parent, Gtk.FlowBoxChild):
-            # Create the overlay and the confirmation box
+            # Create an overlay and a confirmation box
             overlay = Gtk.Overlay()
 
             confirmation_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
             confirmation_box.set_valign(Gtk.Align.START)
             confirmation_box.set_halign(Gtk.Align.FILL)
             confirmation_box.set_margin_start(10)
+
+            # Add the confirmation label to the confirmation box
             confirmation_label = Gtk.Label(label=confirmation_text)
             confirmation_box.append(confirmation_label)
 
+            # Create and style the "Yes" button (destructive action)
             yes_button = Gtk.Button()
             yes_button_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
             yes_button.set_child(yes_button_icon)
             yes_button.add_css_class("destructive-action")
+
+            # Create and style the "No" button (suggested action)
             no_button = Gtk.Button()
             no_button_icon = Gtk.Image.new_from_icon_name("window-close-symbolic")
             no_button.set_child(no_button_icon)
             no_button.add_css_class("suggested-action")
+
+            # Append buttons to the confirmation box
             confirmation_box.append(yes_button)
             confirmation_box.append(no_button)
 
+            # Set the confirmation box as the child of the overlay
             overlay.set_child(confirmation_box)
+
+            # Replace the parent widget's child with the overlay
             parent.set_child(overlay)
 
+            # Connect signals to the "Yes" and "No" buttons
             yes_button.connect("clicked", self.on_confirm_action, script, action_type, parent, button)
             no_button.connect("clicked", self.on_cancel_button_clicked, parent, button)
+
+        else:
+            raise ValueError("The button's parent is not a Gtk.FlowBoxChild.")
+
 
     def replace_button_with_entry_overlay(self, script, prompt_text, button, rename=False):
         parent = button.get_parent()
@@ -3030,12 +3213,6 @@ class WineCharmApp(Gtk.Application):
         else:
             productname_match = re.search(r'Product Name\s+:\s+(.+)', product_output)
             return productname_match.group(1).strip() if productname_match else None
-
-
-##############
-  
-##############            
-
 
     def get_play_button_from_row(self, row):
         """
