@@ -16,6 +16,7 @@ import socket
 import time
 import glob
 import fnmatch
+import psutil
 
 from datetime import datetime
 
@@ -160,25 +161,62 @@ class WineCharmApp(Gtk.Application):
         print("Settings action triggered")
         # You can add code here to open a settings window or dialog.
 
+    def find_matching_processes(self, exe_name_pattern):
+        matching_processes = []
+        
+        for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
+            try:
+                # Retrieve the process name, executable path, or command line arguments
+                proc_name = proc.info['name']
+                proc_exe = proc.info['exe']
+                proc_cmdline = proc.info['cmdline']
+                
+                # Match the executable name pattern
+                if proc_exe and exe_name_pattern in proc_exe:
+                    matching_processes.append(proc)
+                elif proc_name and exe_name_pattern in proc_name:
+                    matching_processes.append(proc)
+                elif proc_cmdline and any(exe_name_pattern in arg for arg in proc_cmdline):
+                    matching_processes.append(proc)
+            
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                # Ignore processes that are no longer available or cannot be accessed
+                pass
+        
+        return matching_processes
+
+
     def on_kill_all_clicked(self, action=None, param=None):
         try:
-            # Get the list of all relevant processes, including WineCharm and .exe processes
-            all_processes_output = subprocess.check_output(["pgrep", "-aif", "\\.exe|{}".format(do_not_kill)]).decode()
-            all_processes_lines = all_processes_output.splitlines()
-
             winecharm_pids = []
             wine_exe_pids = []
+            exe_name_pattern = ".exe"  # Pattern for executables
 
-            for line in all_processes_lines:
-                pid = int(line.split()[0])
-                command = line.split(None, 1)[1]
+            # Iterate over all processes using psutil
+            for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
+                try:
+                    # Process information
+                    pid = proc.info['pid']
+                    proc_name = proc.info['name']
+                    proc_exe = proc.info['exe']
+                    proc_cmdline = proc.info['cmdline']
+                    
+                    # Build command string for matching (similar to pgrep)
+                    command = " ".join(proc_cmdline) if proc_cmdline else proc_name
+                    
+                    # Check if this is a WineCharm process (using do_not_kill pattern)
+                    if do_not_kill in command:
+                        winecharm_pids.append(pid)
+                    # Check if this is a .exe process and exclude PID 1 (system process)
+                    elif exe_name_pattern in command.lower() and pid != 1:
+                        wine_exe_pids.append(pid)
+                
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    # Ignore processes that are no longer available or cannot be accessed
+                    pass
 
-                if do_not_kill in command:
-                    winecharm_pids.append(pid)
-                elif ".exe" in command.lower() and pid != 1:  # Ensure PID 1 is not included
-                    wine_exe_pids.append(pid)
-
-            wine_exe_pids.reverse()  # Reverse the list to kill child processes first
+            # Reverse to kill child processes first (if applicable)
+            wine_exe_pids.reverse()
 
             # Kill the Wine exe processes, excluding WineCharm PIDs
             for pid in wine_exe_pids:
@@ -191,7 +229,7 @@ class WineCharmApp(Gtk.Application):
                     except PermissionError:
                         print(f"Permission denied to kill PID: {pid}")
 
-        except subprocess.CalledProcessError as e:
+        except Exception as e:
             print(f"Error retrieving process list: {e}")
 
         # Optionally, clear the running processes dictionary
@@ -219,6 +257,7 @@ class WineCharmApp(Gtk.Application):
 
     def quit_app(self, action=None, param=None):
         self.quit()
+
 
     def get_default_icon_path(self):
         xdg_data_dirs = os.getenv("XDG_DATA_DIRS", "").split(":")
