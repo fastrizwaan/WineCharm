@@ -773,7 +773,7 @@ class WineCharmApp(Gtk.Application):
         #print("Back button clicked")
 
         # Restore the script list
-        self.create_script_list()
+        GLib.idle_add(self.create_script_list)
 
         # Reset the header bar title and visibility of buttons
         self.window.set_title("Wine Charm")
@@ -3295,7 +3295,7 @@ class WineCharmApp(Gtk.Application):
         else:
             self.flowbox.set_max_children_per_line(4)
         # Recreate the script list with the new view
-        self.create_script_list()
+        GLib.idle_add(self.create_script_list)
 
     def on_import_wine_directory_clicked(self):
         pass
