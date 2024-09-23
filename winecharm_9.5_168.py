@@ -80,7 +80,6 @@ class WineCharmApp(Gtk.Application):
         self.create_required_directories() # Create Required Directories
         self.tempdir = tempdir
         self.icon_view = False
-        self.script_list = {}
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
         self.script_buttons = {}
@@ -139,8 +138,7 @@ class WineCharmApp(Gtk.Application):
             except Exception as e:
                 print(f"Error creating directory {directory}: {e}")
         else:
-            pass 
-            #print(f"Directory already exists: {directory}")
+            print(f"Directory already exists: {directory}")
 
     def create_required_directories(self):
         winecharm_data_dir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data")).resolve()
@@ -234,7 +232,6 @@ class WineCharmApp(Gtk.Application):
 
     def on_startup(self, app):
         self.create_main_window()
-        self.load_script_list()
         self.create_script_list()
         self.check_running_processes_and_update_buttons()
         
@@ -447,8 +444,6 @@ class WineCharmApp(Gtk.Application):
         self.check_running_processes_and_update_buttons()
         current_running_processes = self.get_running_processes()
         self.cleanup_ended_processes(current_running_processes)
-        #print(" - - - current_running_processes - - -  on_focus_in - - - ")
-        #print(current_running_processes)
 
     def on_focus_out(self, controller):
         self.monitoring_active = False
@@ -626,48 +621,19 @@ class WineCharmApp(Gtk.Application):
         self.filter_script_list(search_term)
 
     def filter_script_list(self, search_term):
-        """
-        Filters the script list based on the search term and updates the UI accordingly.
-        
-        Parameters:
-            search_term (str): The term to search for within script names.
-        """
-        # Normalize the search term for case-insensitive matching
-        search_term = search_term.lower()
-        
-        # Clear the existing flowbox to prepare for the filtered scripts
+        scripts = self.find_python_scripts()
         self.flowbox.remove_all()
-        
-        # Flag to check if any scripts match the search term
-        found_match = False
-        
-        # Iterate over all scripts in self.script_list using script_key and script_data
-        for script_key, script_data in self.script_list.items():
-            # Resolve the script path and executable name
-            script_path = Path(script_data['script_path']).expanduser().resolve()
-            exe_name = Path(script_data['exe_file']).expanduser().resolve().name
-            
-            # Debugging output (optional)
-            print(f"Filtering script: {script_path} with key: {script_key}")
-            
-            # Check if the search term is present in the script's stem (file name without extension)
-            if search_term in script_path.stem.lower():
-                found_match = True
-                
-                # Create a script row. Ensure that create_script_row accepts script_key and script_data
-                row = self.create_script_row(script_key, script_data)
-                
-                # Append the created row to the flowbox for display
-                self.flowbox.append(row)
-                
-                # If the script is currently running, update the UI to reflect its running state
-                if script_key in self.running_processes:
-                    self.update_ui_for_running_process(script_key, row, self.running_processes)
-        
-        # Optionally, show a message if no scripts match the search term
-        if not found_match:
-            self.show_info_dialog("No Results", "No scripts match your search criteria.")
+        filtered_scripts = [script for script in scripts if search_term in script.stem.lower()]
 
+        for script in filtered_scripts:
+            row = self.create_script_row(script)
+            self.flowbox.append(row)
+
+            # Check if the script is currently running and highlight it
+            yaml_info = self.extract_yaml_info(script)
+            script_key = yaml_info['sha256sum']
+            if script_key in self.running_processes:
+                self.update_ui_for_running_process(script_key, row, self.running_processes)
 
     def on_open_button_clicked(self, button):
         self.open_file_dialog()
@@ -765,6 +731,29 @@ class WineCharmApp(Gtk.Application):
             self.vbox.prepend(self.open_button)
         self.open_button.set_visible(True)
 
+    def create_script_list(self):
+        # Clear the flowbox
+        self.flowbox.remove_all()
+
+        # Rebuild the script list
+        self.script_buttons = {}
+        scripts = self.find_python_scripts()
+
+        for script in scripts:
+            row = self.create_script_row(script)
+            if row:
+                self.flowbox.append(row)
+                yaml_info = self.extract_yaml_info(script)
+                script_key = yaml_info['sha256sum']
+
+                self.script_buttons[script_key] = row
+
+                # Check if the script is running
+                if script_key in self.running_processes:
+                    row.add_css_class("highlighted")
+                else:
+                    row.remove_css_class("highlighted")
+                    row.remove_css_class("blue")
                     
     def wrap_text_at_20_chars(self):
         text="Speedpro Installer Setup"
@@ -823,36 +812,11 @@ class WineCharmApp(Gtk.Application):
             label3 = label3[:18] + "..."
             
         return label1, label2, label3
-        
-    def create_script_list(self):
-        # Clear the flowbox
-        self.flowbox.remove_all()
 
-        # Rebuild the script list
-        self.script_data_two = {}  # Use script_data to hold all script-related data
-
-        # Iterate over self.script_list
-        for script_key, script_info in self.script_list.items():
-            row = self.create_script_row(script_key, script_info)
-            if row:
-                self.flowbox.append(row)
-
-            # After row creation, highlight if the process is running
-            if script_key in self.running_processes:
-                self.update_row_highlight(row, True)
-                self.script_data_two[script_key]['highlighted'] = True
-            else:
-                self.update_row_highlight(row, False)
-                self.script_data_two[script_key]['highlighted'] = False
-
-
-    def create_script_row(self, script_key, script_data):
-
-#        yaml_info = self.extract_yaml_info(script)
-#        exe_name = Path(yaml_info['exe_file'])
-       # exe_name = Path(script_data['exe_file'])
-        script = Path(script_data['script_path'])
-#        script_key = script_data['sha256sum']  # Use sha256sum as the key
+    def create_script_row(self, script):
+        yaml_info = self.extract_yaml_info(script)
+        exe_name = Path(yaml_info['exe_file']).name
+        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
 
         button = Gtk.Button()
         button.set_hexpand(True)
@@ -860,7 +824,7 @@ class WineCharmApp(Gtk.Application):
         button.add_css_class("flat")
         button.add_css_class("normal-font")
 
-        label_text = script_data.get('progname', '').replace('_', ' ') or Path(script_data['script_path']).stem.replace('_', ' ')
+        label_text = script.stem.replace("_", " ")
 
     
 
@@ -931,158 +895,27 @@ class WineCharmApp(Gtk.Application):
         buttons_box.set_halign(Gtk.Align.END)
         buttons_box.set_valign(Gtk.Align.CENTER)
 
-        # **Store references in self.script_data_two**
-        self.script_data_two[script_key] = {
-            'row': overlay,  # The overlay that contains the row UI
-            'play_button': play_button,  # The play button for the row
-            'options_button': options_button,  # The options button
-            'highlighted': False,  # Initially not highlighted
-            'is_running': False,  # Not running initially
-            'is_clicked_row': False,
-            'script_path': script
-        }
+        # Store the button in the dictionary using script_key as the key
+        #self.script_buttons[script_key] = button
 
-        # Connect play button to toggle the script's running state
-        play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, play_button, overlay))
+        # Connect play button to the toggle_play_stop method
+        play_button.connect("clicked", lambda btn: self.toggle_play_stop(script, play_button, button))
 
-        # Connect options button to show the script's options
-        options_button.connect("clicked", lambda btn: self.show_options_for_script(self.script_data_two[script_key], overlay, script_key))
+        # Connect options button to the show_options_for_script method
+        options_button.connect("clicked", lambda btn: self.show_options_for_script(script, button))
 
-        # Event handler for button click (handling the row highlight)
+        # Event handler for button click
         button.connect("clicked", lambda *args: self.on_script_row_clicked(button, play_button, options_button))
+
         # Only highlight if the script is actively running, not just based on name
         if script_key in self.running_processes:
             button.add_css_class("highlight")  # This should happen only if the process is running
         else:
             button.remove_css_class("highlighted")
             button.remove_css_class("blue")
-        return overlay
-
-######################################
-    def create_script_row(self, script_key, script_data):
-        """
-        Creates a row for a given script in the UI, including the play and options buttons.
-
-        Args:
-            script_key (str): The unique key for the script (e.g., sha256sum).
-            script_data (dict): Data associated with the script.
-
-        Returns:
-            Gtk.Overlay: The overlay containing the row UI.
-        """
-        script = Path(script_data['script_path']).expanduser()
-
-        # Create the main button for the row
-        button = Gtk.Button()
-        button.set_hexpand(True)
-        button.set_halign(Gtk.Align.FILL)
-        button.add_css_class("flat")
-        button.add_css_class("normal-font")
-
-        # Extract the program name or fallback to the script stem
-        label_text, label2_text, label3_text = "", "", ""
-        label_text = script_data.get('progname', '').replace('_', ' ') or script.stem.replace('_', ' ')
-
-        # Create an overlay to add play and options buttons
-        overlay = Gtk.Overlay()
-        overlay.set_child(button)
-
-        if self.icon_view:
-            # Icon view mode: Larger icon size and vertically oriented layout
-            icon = self.load_icon(script, 64, 64)
-            icon_image = Gtk.Image.new_from_paintable(icon)
-            button.set_size_request(64, 64)
-            icon_image.set_pixel_size(64)
-            hbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-
-            # Create a box to hold both buttons in vertical orientation
-            buttons_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-
-            # Apply text wrapping logic for the label
-            label1, label2, label3 = self.wrap_text_at_20_chars(label_text)
-            label = Gtk.Label(label=label1)
-            if label2:
-                label2 = Gtk.Label(label=label2)
-            if label3:
-                label3 = Gtk.Label(label=label3)
-        else:
-            # Non-icon view mode: Smaller icon size and horizontally oriented layout
-            icon = self.load_icon(script, 32, 32)
-            icon_image = Gtk.Image.new_from_paintable(icon)
-            button.set_size_request(390, 36)
-            icon_image.set_pixel_size(32)
-            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-
-            # Create a box to hold both buttons in horizontal orientation
-            buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-
-            # Use a single line label for non-icon view
-            label = Gtk.Label(label=label_text)
-            label.set_xalign(0)
-            label2 = Gtk.Label(label="")
-            label3 = Gtk.Label(label="")
-
-        # Set up the label and icon in the button
-        hbox.append(icon_image)
-        hbox.append(label)
-        if self.icon_view and label2:
-            hbox.append(label2)
-        if self.icon_view and label3:
-            hbox.append(label3)
-
-        button.set_child(hbox)
-
-        # Apply bold styling to the label if the script is new
-        if script.stem in self.new_scripts:
-            label.set_markup(f"<b>{label.get_text()}</b>")
-            if label2:
-                label2.set_markup(f"<b>{label2.get_text()}</b>")
-
-            if label3:
-                label3.set_markup(f"<b>{label3.get_text()}</b>")
             
-        buttons_box.set_margin_end(6)  # Adjust this value to prevent overlapping
-
-        # Play button
-        play_button = Gtk.Button.new_from_icon_name("media-playback-start-symbolic")
-        play_button.set_tooltip_text("Play")
-        play_button.set_visible(False)  # Initially hidden
-        buttons_box.append(play_button)
-
-        # Options button
-        options_button = Gtk.Button.new_from_icon_name("emblem-system-symbolic")
-        options_button.set_tooltip_text("Options")
-        options_button.set_visible(False)  # Initially hidden
-        buttons_box.append(options_button)
-
-        # Add the buttons box to the overlay
-        overlay.add_overlay(buttons_box)
-        buttons_box.set_halign(Gtk.Align.END)
-        buttons_box.set_valign(Gtk.Align.CENTER)
-
-        # **Store references in self.script_data_two**
-        self.script_data_two[script_key] = {
-            'row': overlay,  # The overlay that contains the row UI
-            'play_button': play_button,  # The play button for the row
-            'options_button': options_button,  # The options button
-            'highlighted': False,  # Initially not highlighted
-            'is_running': False,  # Not running initially
-            'is_clicked_row': False,
-            'script_path': script
-        }
-
-        # Connect the play button to toggle the script's running state
-        play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, play_button, overlay))
-
-        # Connect the options button to show the script's options
-        options_button.connect("clicked", lambda btn: self.show_options_for_script(self.script_data_two[script_key], overlay, script_key))
-
-        # Event handler for button click (handles row highlighting)
-        button.connect("clicked", lambda *args: self.on_script_row_clicked(button, play_button, options_button))
-
         return overlay
 
-       
     def show_buttons(self, play_button, options_button):
         play_button.set_visible(True)
         options_button.set_visible(True)
@@ -1094,68 +927,33 @@ class WineCharmApp(Gtk.Application):
             options_button.set_visible(False)
 
     def on_script_row_clicked(self, button, play_button, options_button):
-        """
-        Handles the click event on a script row. Manages row highlighting and play/stop button state
-        using the `is_clicked_row` property within `script_data_two`.
+        # Clear previous overlays
+        if self.current_clicked_row:
+            prev_button, prev_play_button, prev_options_button = self.current_clicked_row
+            self.hide_buttons(prev_play_button, prev_options_button)
+            prev_button.remove_css_class("blue")
 
-        Args:
-            button (Gtk.Button): The button associated with the script row.
-            play_button (Gtk.Button): The play button inside the script row.
-            options_button (Gtk.Button): The options button inside the script row.
-        """
+        # Toggle the highlight class
+        if self.current_clicked_row == (button, play_button, options_button):
+            self.current_clicked_row = None
+            button.remove_css_class("blue")
+        else:
+            self.current_clicked_row = (button, play_button, options_button)
+            button.add_css_class("blue")
+            self.show_buttons(play_button, options_button)
 
-        # Retrieve the script key associated with the clicked button
+        # Retrieve the script key associated with this button
         script_key = None
-        for key, info in self.script_data_two.items():
-            if info['row'] == button.get_parent():  # Assuming 'row' is the parent of the button
+        for key, row in self.script_buttons.items():
+            if row == button.get_parent():  # Assuming row is the parent of the button
                 script_key = key
                 break
 
-        # If no script_key was found, exit the function early
-        if not script_key:
-            print("No script_key associated with this button.")
-            return
-
-        # Update `is_clicked_row` for all script rows, marking only the current one as True
-        for key, data in self.script_data_two.items():
-            if key == script_key:
-                data['is_clicked_row'] = True  # Mark the current row as clicked
-            else:
-                data['is_clicked_row'] = False  # Unmark all other rows
-
-        # Iterate over all script buttons and update the UI based on `is_clicked_row`
-        for key, data in self.script_data_two.items():
-            row_button = data['row']
-            row_play_button = data['play_button']
-            row_options_button = data['options_button']
-
-            if data['is_clicked_row']:
-                # Set this row as clicked: highlight it and show the play/stop buttons
-                row_button.add_css_class("blue")
-                self.show_buttons(row_play_button, row_options_button)
-            else:
-                # Set this row as not clicked: remove highlight and hide buttons
-                row_button.remove_css_class("blue")
-                self.hide_buttons(row_play_button, row_options_button)
-
-        # Check if the script is running and update the play button and row highlight accordingly
-        if self.script_data_two[script_key]['is_running']:
-            # Script is running: set play button to 'Stop' and add 'highlighted' class to the row
-            self.set_play_stop_button_state(play_button, True)
-            play_button.set_tooltip_text("Stop")
-            button.add_css_class("highlighted")  # Ensure 'highlighted' for running scripts
-            print(f"Script {script_key} is running. Setting play button to 'Stop' and adding 'highlighted'.")
+        # Ensure the overlay buttons are hidden when the process ends
+        if script_key in self.running_processes:
+            self.set_play_stop_button_state(play_button, True)  # Set to "Stop" if running
         else:
-            # Script is not running: set play button to 'Play' and remove 'highlighted' class from the row
-            self.set_play_stop_button_state(play_button, False)
-            play_button.set_tooltip_text("Play")
-            button.remove_css_class("highlighted")  # Remove 'highlighted' if not running
-            print(f"Script {script_key} is not running. Setting play button to 'Play' and removing 'highlighted'.")
-
-
-
-
-
+            self.set_play_stop_button_state(play_button, False)  # Reset to "Play" otherwise
 
     def find_row_by_script_stem(self, script_stem):
         script_label = script_stem.replace('_', ' ')
@@ -1172,19 +970,15 @@ class WineCharmApp(Gtk.Application):
         scripts.sort(key=lambda x: x.stat().st_mtime, reverse=True)
         return scripts
 
-    def replace_open_button_with_launch(self, script, row, script_key):
-        script_data = self.extract_yaml_info(script_key)
-        if not script_data:
-            return None
-            
+    def replace_open_button_with_launch(self, script, row):
         if self.open_button.get_parent():
             self.vbox.remove(self.open_button)
 
         self.launch_button = Gtk.Button()
         self.launch_button.set_size_request(390, 36)
 
-        #yaml_info = self.extract_yaml_info(script)
-        script_key = script_data['sha256sum']  # Use sha256sum as the key
+        yaml_info = self.extract_yaml_info(script)
+        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
 
         if script_key in self.running_processes:
             launch_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
@@ -1194,7 +988,7 @@ class WineCharmApp(Gtk.Application):
             self.launch_button.set_tooltip_text("Play")
 
         self.launch_button.set_child(launch_icon)
-        self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, self.launch_button, row))
+        self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(script, self.launch_button, row))
 
         # Store the script_key associated with this launch button
         self.launch_button_exe_name = script_key
@@ -1214,29 +1008,44 @@ class WineCharmApp(Gtk.Application):
         if highlight:
             row.add_css_class("highlighted")
         else:
-            row.remove_css_class("blue")
             row.remove_css_class("highlighted")
+            row.remove_css_class("blue")
 
-    def toggle_play_stop(self, script_key, play_stop_button, row):
-        script_data = self.extract_yaml_info(script_key)
-        if not script_data:
-            print(f"No script data found for script_key: {script_key}")
-            return
+    def toggle_play_stop(self, script, play_stop_button, row):
+        yaml_info = self.extract_yaml_info(script)
+        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
 
-        exe_file = Path(script_data['exe_file']).expanduser().resolve()
-        script = Path(script_data['script_path']).resolve()
-        progname = script_data['progname']
-        script_args = script_data['args']
-        runner = script_data.get('runner', 'wine')
-        env_vars = script_data.get('env_vars', '')  # Ensure env_vars is initialized if missing
-        wine_debug = script_data.get('wine_debug')
-        exe_name = exe_file.name
+        if script_key in self.running_processes:
+            self.terminate_script(script_key)  # Pass script_key instead of the entire script path
+            self.set_play_stop_button_state(play_stop_button, False)
+            self.update_row_highlight(row, False)
 
-        # Resolve wineprefix
-        wineprefix = script.parent.resolve()
+            # Ensure the overlay buttons are hidden when the process ends
+            if self.current_clicked_row:
+                play_button, options_button = self.current_clicked_row[1], self.current_clicked_row[2]
+                self.hide_buttons(play_button, options_button)
+                self.set_play_stop_button_state(play_button, False)  # Reset the play button to "Play"
+                self.current_clicked_row = None
+        else:
+            self.launch_script(script, play_stop_button, row)
+            self.set_play_stop_button_state(play_stop_button, True)
+            #self.update_row_highlight(row, True)
 
-        print(f"wineprefix = {wineprefix}")
-        print(f"exe_file = {exe_file}")
+    def launch_script(self, script, play_stop_button, row):
+        yaml_info = self.extract_yaml_info(script)
+        exe_file = yaml_info['exe_file']
+        wineprefix = Path(script).parent
+        progname = yaml_info['progname']
+        script_args = yaml_info['args']
+        runner = yaml_info['runner'] or "wine"
+        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
+        env_vars = yaml_info.get('env_vars', '')  # Ensure env_vars is initialized if missing
+        wine_debug = yaml_info.get('wine_debug')
+        exe_name = Path(exe_file).name
+
+        ## If runner not inside winecharm directory then use system runner
+        #if winecharmdir not in Path(runner).parents:
+        #    runner = "wine"
 
         # Check if any process with the same wineprefix is already running
         self.launching_another_from_same_prefix = False
@@ -1245,208 +1054,18 @@ class WineCharmApp(Gtk.Application):
                 self.launching_another_from_same_prefix = True
                 print(f"Process already running in {wineprefix}. Preventing premature termination.")
 
-        # Proceed with launching or terminating the script process
-        if script_key in self.running_processes:
-            self.terminate_script(script_key)  # Pass script_key instead of the entire script path
-            self.set_play_stop_button_state(play_stop_button, False)
-            self.update_row_highlight(row, False)
-
-            # Ensure the overlay buttons are hidden when the process ends
-            if self.current_clicked_row:
-                button, play_button, options_button = self.current_clicked_row
-                self.hide_buttons(play_button, options_button)
-                self.set_play_stop_button_state(play_button, False)  # Reset the play button to "Play"
-                self.current_clicked_row = None
-                button.remove_css_class("highlighted")
-                button.remove_css_class("blue")
-        else:
-            self.launch_script(script_key, play_stop_button, row)
-            self.set_play_stop_button_state(play_stop_button, True)
-
-            #self.update_row_highlight(row, True)
-####
-    def process_ended(self, script_key):
-
-
-        # Get the process information for the given script_key
-        script_info = self.script_data_two.get(script_key)
-        if not script_info:
-            print(f"No script data found for script_key: {script_key}")
-            return
-
-        # Retrieve row, play_button, and options_button from script_data_two
-        row = script_info.get('row')
-        play_button = script_info.get('play_button')
-        options_button = script_info.get('options_button')
-
-        # If the row exists, remove any highlights (un-highlight the row)
-        if row:
-            row.remove_css_class("highlighted")
-            row.remove_css_class("blue")
-            #print(f"Un-highlighted row for script_key: {script_key}")
-
-        # Hide the play and options buttons
-        if play_button and options_button:
-            self.hide_buttons(play_button, options_button)
-            self.set_play_stop_button_state(play_button, False)  # Reset play button to 'Play'
-            #print(f"Play and options buttons hidden for script_key: {script_key}")
-
-        # Reset script_data_two's is_running flag for this script
-        script_info['is_running'] = False
-
-        # Check if the script was the currently clicked row
-        if self.current_clicked_row:
-            current_button, current_play_button, current_options_button = self.current_clicked_row
-
-            # If the current clicked row matches the script, un-highlight it and hide buttons
-            if current_button == row:
-                self.hide_buttons(current_play_button, current_options_button)
-                current_button.remove_css_class("blue")
-                self.current_clicked_row = None
-                #print(f"Current clicked row reset for script_key: {script_key}")
-
-        # Update the launch button state if the script was launched from it
-        if self.launch_button and getattr(self, 'launch_button_exe_name', None) == script_key:
-            self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-            self.launch_button.set_tooltip_text("Play")
-           # print(f"Launch button reset for script_key: {script_key}")
-
-        # Handle the wineprefix and process linked files (if applicable)
-        process_info = self.running_processes.get(script_key)
-        if process_info:
-            script_path = process_info.get("script")
-            if script_path and script_path.exists():
-                wineprefix = Path(script_path).parent  # Use the parent directory as the wineprefix
-                print(f"Processing wineprefix: {wineprefix}")
-                if wineprefix:
-                    self.create_scripts_for_lnk_files(wineprefix)
-
-        # Remove the script from the running processes
-        if script_key in self.running_processes:
-            del self.running_processes[script_key]
-            print(f"Removed {script_key} from running_processes")
-
-        # If no more running processes exist, reset all UI elements
-        if not self.running_processes:
-            self.reset_all_ui_elements()
-            print("All processes ended. Resetting all UI elements.")
-
-    def reset_all_ui_elements(self):
-        """
-        Resets all UI elements (row highlights, button states) to their default state.
-        """
-        # Reset row highlights and button states for all scripts in script_data_two
-        for script_key, script_info in self.script_data_two.items():
-            row = script_info.get('row')
-            play_button = script_info.get('play_button')
-            options_button = script_info.get('options_button')
-
-            # Reset row highlight (remove 'highlighted' and 'blue' classes)
-            if row:
-                self.update_row_highlight(row, False)  # Un-highlight the row
-                row.remove_css_class("blue")  # Remove 'blue' if it's applied
-                row.remove_css_class("highlighted")  # Ensure 'highlighted' is also removed
-                script_info['highlighted'] = False  # Update the script info state
-                script_info['is_clicked_row'] = False  # Mark it as not clicked
-
-            # Hide play and options buttons
-            if play_button and options_button:
-                self.hide_buttons(play_button, options_button)
-
-            # Reset the play button state to "Play"
-            if play_button:
-                self.set_play_stop_button_state(play_button, False)
-
-        # Reset the launch button if it exists
-        if self.launch_button:
-            self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-            self.launch_button.set_tooltip_text("Play")
-
-        # Clear the currently clicked row information
-        #self.current_clicked_row = None
-        print("All UI elements reset to default state.")
-
-
-        
-    def launch_script(self, script_key, play_stop_button, row):
-        #yaml_info = self.extract_yaml_info(script)
-        #exe_file = yaml_info['exe_file']
-        script_data = self.extract_yaml_info(script_key)
-        #print(f"====> {script_data}")
-        if not script_data:
-            return None
-        
-        exe_file = Path(script_data['exe_file']).expanduser().resolve()
-        script = Path(script_data['script_path'])
-        progname = script_data['progname']
-        script_args = script_data['args']
-        runner = script_data['runner'] or "wine"
-        script_key = script_data['sha256sum']  # Use sha256sum as the key
-        env_vars = str(script_data.get('env_vars', ''))   # Ensure env_vars is initialized if missing
-        wine_debug = str(script_data.get('wine_debug', ''))
-        exe_name = Path(exe_file).name
-        
-        
-        #wineprefix = Path(script).parent
-        wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
-        print(f"wineprefix = {wineprefix}")
-        print(f"exe_file = {exe_file}")
-#        progname = yaml_info['progname']
-#        script_args = yaml_info['args']
-#        runner = yaml_info['runner'] or "wine"
-#        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
-#        env_vars = yaml_info.get('env_vars', '')  # Ensure env_vars is initialized if missing
-#        wine_debug = yaml_info.get('wine_debug')
-#        exe_name = Path(exe_file).name
-
-        ## If runner not inside winecharm directory then use system runner
-        #if winecharmdir not in Path(runner).parents:
-        #    runner = "wine"
-
-        # Check if any process with the same wineprefix is already running
-        self.launching_another_from_same_prefix = False
-        wineprefix_process_count = 0
-       # print(self.running_processes.values())
-        #print("-x" * 50)
-        for process_info in self.running_processes.values():
-            if Path(process_info['wineprefix']) == wineprefix:
-                wineprefix_process_count += 1
-                #print(f"Process running from {wineprefix}: {process_info}")
-
-        # Set self.launching_another_from_same_prefix to True only if more than one process is using the same wineprefix
-        if wineprefix_process_count > 1:
-            self.launching_another_from_same_prefix = True
-            print(f"Multiple processes are already running from {wineprefix}. Launching another would terminate them.")
-        else:
-            self.launching_another_from_same_prefix = False
-            print(f"No duplicate processes found for {wineprefix} or only one process is running.")
-
         # Proceed with launching the new script process
         log_file_path = wineprefix / f"{script.stem}.log"
-        #print(f"Logging stderr to {log_file_path}")
+        print(f"Logging stderr to {log_file_path}")
 
         if wine_debug == "disabled":
             wine_debug = "WINEDEBUG=-all DXVK_LOG_LEVEL=none"
 
-      #  exe_parent = Path(exe_file).parent.resolve()
-        exe_parent = shlex.quote(str(exe_file.parent.resolve()))
- # Parent directory of the exe_file
-
+        exe_parent = shlex.quote(str(Path(exe_file).parent))
         wineprefix = shlex.quote(str(wineprefix))
         runner = shlex.quote(runner)
         exe_name = shlex.quote(str(exe_name))
 
-
-        #print(f"""
-        #exe_file = {exe_file}
-        #exe_parent = {exe_parent}
-        #wineprefix = {wineprefix}
-        #runner = {runner}
-        #exe_name = {exe_name}
-        #""")
-        
-        
-        
         if not Path(exe_file).exists():
             GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
             GLib.idle_add(play_stop_button.set_tooltip_text, "Exe Not Found")
@@ -1457,9 +1076,8 @@ class WineCharmApp(Gtk.Application):
             play_stop_button.remove_css_class("red")
 
         command = f"cd {exe_parent} && {wine_debug} {env_vars} WINEPREFIX={wineprefix} {runner} {exe_name} {script_args}"
-        print(f"\n------------------------------")
-        print(f"{command}\n")
-        print(f"\n------------------------------")
+        print(command)
+
         try:
             with open(log_file_path, 'w') as log_file:
                 process = subprocess.Popen(
@@ -1477,9 +1095,7 @@ class WineCharmApp(Gtk.Application):
                     "pids": [process.pid],
                     "wineprefix": wineprefix
                 }
-                #print("v"*100)
-                #print(process.pid)
-                #print("^"*100)
+
                 self.set_play_stop_button_state(play_stop_button, True)
                 self.update_row_highlight(row, True)
                 GLib.timeout_add_seconds(5, self.get_child_pid_async, script_key, exe_name, wineprefix)
@@ -1487,7 +1103,7 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error launching script: {e}")
 
-        #print(self.running_processes)
+        print(self.running_processes)
 
     def get_child_pid_async(self, script_key, exe_name, wineprefix):
         # Run get_child_pid in a separate thread
@@ -1495,62 +1111,87 @@ class WineCharmApp(Gtk.Application):
             print("Process already ended, nothing to get child PID for")
             self.launching_another_from_same_prefix = False
             return False
-
+            
         process_info = self.running_processes[script_key]
         pid = process_info.get('pid')
+        #xe_name = process_info.get('exe_name')
         script = process_info.get('script')
-        wineprefix = Path(process_info.get('wineprefix')).expanduser().resolve()
-        
-        # Extract YAML info safely
-        yaml_info = self.extract_yaml_info(script_key)
-        if not yaml_info:
-            print(f"Warning: No YAML info found for script_key: {script_key}")
-            return False
-
-        script_key = yaml_info.get('sha256sum', script_key)  # Use script_key if sha256sum is missing
-        exe_file = Path(yaml_info.get('exe_file')).expanduser().resolve()
-        exe_name = Path(exe_file).name
-        unix_exe_dir_name = exe_file.parent.name
-
-        print(f"YAML Info: {yaml_info}")
-        print(f"Resolved exe_file: {exe_file}")
-        print(f"wineprefix: {wineprefix}")
-
-        runner = yaml_info.get('runner', 'wine')  # Fallback to 'wine' if runner is not set
-        runner_dir = Path(runner).parent
-
+        wineprefix = Path(process_info['script']).parent
+        yaml_info = self.extract_yaml_info(script)
+        script_key = yaml_info['sha256sum']
+        exe_name = Path(yaml_info['exe_file']).name
+        unix_exe_dir_name = Path(yaml_info['exe_file']).parent.name  # Get the parent directory name
+        print(yaml_info)
         # Quote paths and command parts to prevent issues with spaces
         wineprefix = Path(script).parent
         exe_name_quoted = shlex.quote(str(exe_name))
         wineprefix = shlex.quote(str(wineprefix))
 
+        
+        runner =  yaml_info['runner']
+        print(runner)
+        runner_dir = Path(runner).parent
+
+    #rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
+        # Use wineprefix along with winedbg to accurately target the process
+        #refined_processes = self.get_wine_processes(wineprefix, exe_name)
+        #command = f"export PATH={shlex.quote(str(runner_dir))}:$PATH; echo $PATH; which wineserver; WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k"
+        grep_exe_name = exe_name.strip("'")
+
+        # Store exe_name and exe_parent mapped by script_key to handle parent directory matching
+        exe_name_info = {}
+
+        for script in self.find_python_scripts():
+            yaml_info = self.extract_yaml_info(script)
+            exe_name_from_script = Path(yaml_info['exe_file']).name
+            exe_parent = Path(yaml_info['exe_file']).parent.name
+            script_key_from_script = yaml_info['sha256sum']
+
+            # Store the exe_parent mapped by script_key
+            exe_name_info[script_key_from_script] = {
+                'exe_name': exe_name_from_script,
+                'exe_parent': exe_parent
+            }
+
         def run_get_child_pid():
             try:
                 print(f"Looking for child processes of: {exe_name}")
 
-                # Prepare command to filter processes using winedbg
+                # Command to get the process information using winedbg
+                #winedbg_command = f"WINEPREFIX={wineprefix} winedbg --command 'info proc'"
+                #winedbg_output = subprocess.check_output(winedbg_command, shell=True, text=True).strip()
+
+                #print("-----------------------------------------------")
+                #print(f"Executed command: {winedbg_command}")
+                #print(f"winedbg output:\n{winedbg_output}")
+                #print('===============================================')
+
+                # Search for the exe_name in the winedbg output using grep
                 winedbg_command_with_grep = (
-                    f"export PATH={shlex.quote(str(runner_dir))}:$PATH;"
+                    f"export PATH={shlex.quote(str(runner_dir))}:$PATH; echo $PATH;"
                     f"WINEPREFIX={wineprefix} winedbg --command 'info proc' | "
-                    f"grep -A9 \"{exe_name_quoted}\" | grep -v 'grep' | grep '_' | "
+                    f"grep -A9 '{grep_exe_name}' | grep -v 'grep' | grep '_' | "
                     f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
                     f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
                     f"grep -v 'svchost.exe'   | grep -v 'plugplay.exe' | grep -v 'winedevice.exe' | "
                     f"cut -f2- -d '_' | tr \"'\" ' '"
                 )
 
+                # Get the relevant process line from winedbg output
                 winedbg_output_filtered = subprocess.check_output(winedbg_command_with_grep, shell=True, text=True).strip().splitlines()
-                #print(f"Filtered winedbg output: {winedbg_output_filtered}")
+                print(f"Filtered winedbg output: {winedbg_output_filtered}")
 
-                # Retrieve the parent directory name and search for processes
-                exe_parent = exe_file.parent.name
+                # Retrieve the exe_parent from the info
+                exe_parent = exe_name_info.get(script_key, {}).get('exe_parent')
                 child_pids = set()
 
                 for filtered_exe in winedbg_output_filtered:
                     filtered_exe = filtered_exe.strip()
-                    cleaned_exe_parent_name = re.escape(exe_parent)
 
-                    # Command to get PIDs for matching processes
+                    # pgrep command to find matching processes with exe_parent
+                    cleaned_exe_parent_name = exe_parent.replace(r'[', '\\[')
+                    cleaned_exe_parent_name = cleaned_exe_parent_name.replace(r']', '\\]')
+
                     pgrep_command = (
                         f"ps -ax --format pid,command | grep \"{filtered_exe}\" | "
                         f"grep \"{cleaned_exe_parent_name}\" | grep -v 'grep' | sed 's/^ *//g' | cut -f1 -d ' '"
@@ -1558,92 +1199,76 @@ class WineCharmApp(Gtk.Application):
 
                     print(f"Running pgrep command: {pgrep_command}")
                     pgrep_output = subprocess.check_output(pgrep_command, shell=True, text=True).strip()
+
+                    # Add all found PIDs to the child_pids set (to avoid duplicates)
                     child_pids.update(pgrep_output.splitlines())
 
+                # If we found child PIDs, pass them to the UI update
                 if child_pids:
-                    print(f"Found child PIDs: {child_pids}\n")
+                    print(f"Found child PIDs: {child_pids}")
                     GLib.idle_add(self.add_child_pids_to_running_processes, script_key, child_pids)
                 else:
                     print(f"No child process found for {exe_name}")
 
             except subprocess.CalledProcessError as e:
                 print(f"Error executing command: {e}")
-            except Exception as e:
-                print(f"Unexpected error: {e}")
+            except ValueError as e:
+                print(f"Value error: {e}")
 
         # Start the background thread
         threading.Thread(target=run_get_child_pid, daemon=True).start()
-
+    
         # After completing the task, reset the flag
         self.launching_another_from_same_prefix = False
+        print(f"Finished retrieving child PIDs. Reset launching_another_from_same_prefix to {self.launching_another_from_same_prefix}")
+        # Returning False so GLib.timeout_add_seconds doesn't repeat
         return False
 
 
     def add_child_pids_to_running_processes(self, script_key, child_pids):
         # Add the child PIDs to the running_processes dictionary
         if script_key in self.running_processes:
-            process_info = self.running_processes.get(script_key)
-
-            # Merge the existing PIDs with the new child PIDs, ensuring uniqueness
-            current_pids = set(process_info.get('pids', []))  # Convert existing PIDs to a set for uniqueness
-            current_pids.update([int(pid) for pid in child_pids])  # Update with child PIDs
-
-            # Update the running processes with the merged PIDs
-            self.running_processes[script_key]["pids"] = list(current_pids)
-
-            print(f"Updated {script_key} with child PIDs: {self.running_processes[script_key]['pids']}")
+            self.running_processes[script_key]["pids"] = []
+            for pid in child_pids:
+                self.running_processes[script_key]["pids"].append(int(pid))
+                
+            #print(f"Updated {script_key} with child PIDs: {self.running_processes[script_key]['pids']}")
         else:
             print(f"Script key {script_key} not found in running processes.")
-
                         
     def terminate_script(self, script_key):
         # Get process info for the script using the script_key
         process_info = self.running_processes.get(script_key)
-
+        
         if not process_info:
-            #print(f"No running process found for script_key: {script_key}")
+            print(f"No running process found for script_key: {script_key}")
             return
 
         # Get the wineprefix, runner, and PIDs associated with the script
         script = process_info.get('script')
-        yaml_info = self.extract_yaml_info(script_key)
-
-        # Extract wineprefix and runner, defaulting to 'wine' if runner is not specified
+        yaml_info = self.extract_yaml_info(script)
+        
+        # Extract wineprefix and runner
         wineprefix = Path(script).parent
-        runner = yaml_info.get("runner", "wine")
-        pids = process_info.get("pids", [])
+        runner = yaml_info.get("runner", "wine")  # Default to 'wine' if runner is not provided
 
+        pids = process_info.get("pids", [])
         print(f"Terminating script {script_key} with wineprefix {wineprefix}, runner {runner}, and PIDs: {pids}")
 
-        # Check if any process with the same wineprefix is already running
 
-        wineprefix_process_count = 0
-       # print(self.running_processes.values())
-        print("-x" * 50)
-        for process_info in self.running_processes.values():
-            if Path(process_info['wineprefix']) == wineprefix:
-                wineprefix_process_count += 1
-                print(f"Process running from {wineprefix}: {process_info}")
-        existing_running_script = False        
-        for process_info in self.running_processes.values():
-            if Path(process_info['script']) == script:
-                existing_running_script = True
-                print("\n")
-                print("="*50)
-                print(f"Process running from {script}: {process_info}")
+
         try:
-            # If there is only one PID and no other process from the same wineprefix is running, use wineserver -k
-            if wineprefix_process_count == 1 and existing_running_script:
+            # If there is only one PID, use wineserver -k to kill the entire wineprefix
+            if len(pids) == 1 and not self.launching_another_from_same_prefix:
                 runner_dir = Path(runner).parent
                 command = f"export PATH={shlex.quote(str(runner_dir))}:$PATH; WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k"
-                print("=======wineserver -k==========")
-                #print(f"Running command: {command}")
+                print("=================")
+                print(f"Running command: {command}")
                 subprocess.run(command, shell=True, check=True)
-                print(f"Successfully killed using wineserver -k")
+                print(f"Successfully killed all processes in wineprefix {wineprefix} using wineserver -k")
 
-            # If there are multiple PIDs or another process is running from the same wineprefix, kill PIDs individually
-            elif wineprefix_process_count > 1 or self.launching_another_from_same_prefix:
-                print("=======os.kill(pid, signal.SIGKILL)==========")
+            # If there are multiple PIDs, kill each process individually
+            elif len(pids) > 1 or self.launching_another_from_same_prefix:
                 for pid in pids:
                     if self.is_process_running(pid):
                         try:
@@ -1657,24 +1282,9 @@ class WineCharmApp(Gtk.Application):
                         print(f"Process with PID {pid} is no longer running.")
 
             # Remove the script from running_processes after termination
-            if script_key in self.running_processes:
-                del self.running_processes[script_key]
-                #print(f"Script {script_key} removed from running processes.")
+            del self.running_processes[script_key]
+            self.update_row_highlight(process_info['row'], False)
 
-            # Reset UI for the row associated with the script
-            row = process_info.get("row")
-            if row:
-                self.update_row_highlight(row, False)
-
-            # Ensure the play/stop button is reset if it was clicked for this script
-            if self.current_clicked_row and self.current_clicked_row[0] == row:
-                play_button, options_button = self.current_clicked_row[1], self.current_clicked_row[2]
-                self.set_play_stop_button_state(play_button, False)
-                self.hide_buttons(play_button, options_button)
-                self.current_clicked_row = None
-
-        except subprocess.CalledProcessError as e:
-            print(f"Error while executing wineserver -k for script {script_key}: {e}")
         except Exception as e:
             print(f"Error terminating script {script_key}: {e}")
 
@@ -1691,50 +1301,60 @@ class WineCharmApp(Gtk.Application):
 
 
     def check_running_processes_and_update_buttons(self):
+        if not self.monitoring_active:
+            self.stop_monitoring()
+            return False
+
         current_running_processes = self.get_running_processes()
         self.cleanup_ended_processes(current_running_processes)
 
+        # Highlight running processes in the current (possibly filtered) view
         for script_key, process_info in self.running_processes.items():
-            script_info = self.script_data_two.get(script_key)
-            if script_info:
-                row = script_info.get('row')
-                if row and row.get_parent():
-                    self.update_ui_for_running_process(script_key, row, current_running_processes)
+            row = process_info["row"]
+            if row and row.get_parent():  # Check if the row is currently displayed in the flowbox
+                self.update_ui_for_running_process(script_key, row, self.running_processes)
 
-        if not current_running_processes:
+        if not current_running_processes or self.count >= 5:
             self.stop_monitoring()
+        else:
+            self.count += 1
+
+        return False
+
+
 
     def get_running_processes(self):
         current_running_processes = {}
         exe_name_count = {}
 
-        # Count occurrences of each exe_name
-        for script_key, script_data in self.script_list.items():
-            exe_name = Path(script_data['exe_file']).expanduser().resolve().name
+        # First, count occurrences of each exe_name
+        for script in self.find_python_scripts():
+            yaml_info = self.extract_yaml_info(script)
+            exe_name = Path(yaml_info['exe_file']).name
             exe_name_count[exe_name] = exe_name_count.get(exe_name, 0) + 1
-
         try:
             # Get all running .exe processes with their command lines
             pgrep_output = subprocess.check_output(["pgrep", "-aif", "\\.exe"]).decode().splitlines()
 
             # Filter out any processes that match do_not_kill
             pgrep_output = [line for line in pgrep_output if do_not_kill not in line]
-            
-            for script_key, script_data in self.script_list.items():
-                script = Path(script_data['script_path'])
-                exe_name = Path(script_data['exe_file']).name
-                unix_exe_dir_name = Path(script_data['exe_file']).parent.name
-                wineprefix = Path(script).parent
+
+            for script in self.find_python_scripts():
+                yaml_info = self.extract_yaml_info(script)
+                script_key = yaml_info['sha256sum']
+                exe_name = Path(yaml_info['exe_file']).name
+                unix_exe_dir_name = Path(yaml_info['exe_file']).parent.name  # Get the parent directory name
 
                 # Quote paths and command parts to prevent issues with spaces
-                #wineprefix = Path(script).parent
-                #exe_name = shlex.quote(str(exe_name))
-                #wineprefix = shlex.quote(str(wineprefix))
-                
+                wineprefix = Path(script).parent
+                exe_name_quoted = shlex.quote(str(exe_name))
+                wineprefix = shlex.quote(str(wineprefix))
+
+
                 # Check if exe_name has duplicates
                 is_duplicate = exe_name_count[exe_name] > 1
 
-                # Find matching processes
+                # Find processes that match the exe_name (and the parent directory name if duplicates exist)
                 if is_duplicate:
                     matching_processes = [
                         (int(line.split()[0]), line.split(None, 1)[1]) for line in pgrep_output
@@ -1746,26 +1366,32 @@ class WineCharmApp(Gtk.Application):
                         if exe_name in line and int(line.split()[0]) != 1
                     ]
 
-                # If the process is still running
                 if matching_processes:
                     for pid, cmd in matching_processes:
-                        row_info = self.script_buttons.get(script_key)
-                        if row_info:
-                            row = row_info.get("row")
-                            if row:
-                                if script_key not in current_running_processes:
-                                    current_running_processes[script_key] = {
-                                        "row": row,
-                                        "script": script,
-                                        "exe_name": exe_name,
-                                        "pids": [],
-                                        "command": cmd,
-                                        "wineprefix": wineprefix
-                                    }
-                                if pid not in current_running_processes[script_key]["pids"]:
-                                    current_running_processes[script_key]["pids"].append(pid)
-
-                # If no matching process is found, mark it as ended
+                        row = self.script_buttons.get(script_key)
+                        
+                        #print("+++++++++++++++++++++++++++++++++++++++++++++++")
+                        #print(script_key, exe_name, wineprefix)
+                        # Fetch and update child PIDs asynchronously
+                        #GLib.timeout_add_seconds(0.01, self.get_child_pid_async, script_key, exe_name_quoted, wineprefix)
+                        if row:
+                            if script_key not in current_running_processes:
+                                current_running_processes[script_key] = {
+                                    "row": row,
+                                    "script": script,
+                                    "exe_name": exe_name,
+                                    "pids": [],
+                                    "command": cmd,
+                                    "wineprefix" : wineprefix
+                                }
+                            if pid not in current_running_processes[script_key]["pids"]:
+                                current_running_processes[script_key]["pids"].append(pid)
+                                
+                            if self.launch_button:
+                                self.set_play_stop_button_state(self.launch_button, True)
+                                
+                        else:
+                            self.update_row_highlight(row, False)
                 else:
                     self.process_ended(script_key)
 
@@ -1774,13 +1400,10 @@ class WineCharmApp(Gtk.Application):
             self.stop_monitoring()
             self.count = 0
 
-        # Merge new running processes with existing ones
+        # Merge the new current_running_processes dictionary with the existing self.running_processes dictionary
         for script_key, process_info in current_running_processes.items():
             if script_key in self.running_processes:
-                # Merge PIDs to avoid duplicates
-                current_pids = set(self.running_processes[script_key].get("pids", []))
-                current_pids.update(process_info["pids"])
-                self.running_processes[script_key]["pids"] = list(current_pids)
+                self.running_processes[script_key]["pids"].extend(process_info["pids"])
             else:
                 self.running_processes[script_key] = process_info
 
@@ -1798,88 +1421,66 @@ class WineCharmApp(Gtk.Application):
             row (Gtk.Widget): The corresponding row widget in the UI.
             current_running_processes (dict): A dictionary containing details of the current running processes.
         """
-        # Get the script info from script_data_two
-        script_info = self.script_data_two.get(script_key)
-        if not script_info:
-            print(f"No script data found for script_key: {script_key}")
-            return
-
-        # Check if the script is running
-        if script_key not in current_running_processes:
-            # Script is not running, remove 'highlighted' class
+        if script_key not in self.running_processes:
+            print(f"REMOVNG HIGHLIGHT to row for script_key: {script_key}")  # Debugging output
+            self.running_processes[script_key] = current_running_processes[script_key]
             self.update_row_highlight(row, False)
-            row.remove_css_class("highlighted")
-            row.remove_css_class("blue")
-            script_info['is_running'] = False
-            print(f"Removed 'highlighted' from row for script_key: {script_key}")
-        else:
-            # Script is running, ensure the 'highlighted' class is added
+            
+            
+        if not row.has_css_class("highlighted"):
+            print("check_running_processes_and_update_buttons: highlighting")
+            #self.update_row_highlight(row, False)
             self.update_row_highlight(row, True)
-            #row.remove_css_class("blue")  # Ensure 'blue' is removed
-            row.add_css_class("highlighted")  # Add 'highlighted' for running scripts
-            script_info['is_running'] = True
-            print(f"Added 'highlighted' to row for script_key: {script_key}")
+            #row.add_css_class("highlighted")
+#        else:
+#            self.update_row_highlight(row, False)
+            # Ensure the overlay buttons are hidden when the process ends
 
-        # Update the play/stop button if the script is currently clicked
-        if script_info.get('is_clicked_row', False):
-            play_button = script_info.get('play_button')
-            options_button = script_info.get('options_button')
-            if play_button and options_button:
-                self.show_buttons(play_button, options_button)
-                self.set_play_stop_button_state(play_button, True)
-                print(f"Updated play/stop button for script_key: {script_key}")
-
-        # Update the launch button state if it matches the script_key
-        if self.launch_button and getattr(self, 'launch_button_exe_name', None) == script_key:
+#        # not updating button state from monitoring
+#        if self.current_clicked_row:
+#            play_button, options_button = self.current_clicked_row[1], self.current_clicked_row[2]
+#            #self.hide_buttons(play_button, options_button)
+#            self.set_play_stop_button_state(play_button, True)  # Reset the play button to "Play"
+##            self.current_clicked_row = None
+                            
+        # Only update the launch button if it belongs to this script
+        if self.launch_button and self.launch_button_exe_name == script_key:
             self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
             self.launch_button.set_tooltip_text("Stop")
-            print(f"Updated launch button for script_key: {script_key}")
-
 
     def cleanup_ended_processes(self, current_running_processes):
-        print("- - - current_running_processes - - -  cleanup_ended_processes - - -")
-        print(current_running_processes)
+
         for script_key in list(self.running_processes.keys()):
             if script_key not in current_running_processes:
                 self.process_ended(script_key)
 
         if not current_running_processes:
-            print(" - - "*50)
-            print("Calling self.reset_all_ui_elements()")
             self.reset_all_ui_elements()
 
+        #self.running_processes = current_running_processes
 
     def find_row_by_script_key(self, script_key):
         return self.script_buttons.get(script_key)
 
-    def extract_yaml_info(self, script_key):
-        #print(f" ===== > script key = {script_key}")
-        script_data = self.script_list.get(script_key)
-        #print(f"===== > script_data = {script_data}")
-        if script_data:
-            return script_data
-        else:
-            print(f"Warning: Script with key {script_key} not found in script_list.")
-            return {}
-
-    def determine_progname(self, productname, exe_no_space, exe_name):
-        """
-        Determine the program name based on the product name extracted by exiftool, or fallback to executable name.
-        Args:
-            productname (str): The product name extracted from the executable.
-            exe_no_space (str): The executable name without spaces.
-            exe_name (str): The original executable name.
-        Returns:
-            str: The determined program name.
-        """
-        # Logic to determine the program name based on exe name and product name
-        if "setup" in exe_name.lower() or "install" in exe_name.lower():
-            return productname + ' Setup'
-        elif "setup" in productname.lower() or "install" in productname.lower():
-            return productname
-        else:
-            # Fallback to product name or executable name without spaces if productname contains numbers or is non-ascii
-            return productname if productname and not any(char.isdigit() for char in productname) and productname.isascii() else exe_no_space
+    def extract_yaml_info(self, script):
+        if not script.exists():
+            raise FileNotFoundError(f"Script file not found: {script}")
+        with open(script, 'r') as file:
+            try:
+                data = yaml.safe_load(file)
+            except yaml.YAMLError as e:
+                print(f"Error loading YAML file {script}: {e}")
+                data = {}
+        yaml_info = {
+            'exe_file': str(Path(data.get('exe_file', '')).expanduser().resolve()), 
+            'wineprefix': str(Path(data.get('wineprefix', '')).expanduser().resolve()), 
+            'runner':  data.get('runner', ''),
+            'progname': data.get('progname', ''), 
+            'args': data.get('args', ''),
+            'sha256sum': data.get('sha256sum', ''),
+            'wine_debug': data.get('wine_debug', '')  # Ensure wine_debug is captured
+        }
+        return yaml_info
 
 
     def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False):
@@ -1912,6 +1513,7 @@ class WineCharmApp(Gtk.Application):
         ]
         product_output = self.run_command(" ".join(product_cmd))
         if product_output is None:
+            #print(f"Error: Failed to retrieve product name for {exe_file}")
             productname = exe_no_space
         else:
             productname_match = re.search(r'Product Name\s+:\s+(.+)', product_output)
@@ -1921,16 +1523,18 @@ class WineCharmApp(Gtk.Application):
         if use_exe_name:
             progname = exe_name  # Use exe_name if flag is set
         else:
-            progname = self.determine_progname(productname, exe_no_space, exe_name)
-            
-        # Create YAML file with proper naming
-        yaml_file_path = prefix_dir / f"{exe_no_space if use_exe_name else progname.replace(' ', '_')}.charm"
+            # Default progname logic with fallback to exe_no_space
+            if "setup" in exe_name.lower() or "install" in exe_name.lower():
+                progname = productname + ' Setup'
+            elif "setup" in productname.lower() or "install" in productname.lower():
+                progname = productname
+            else:
+                progname = productname if productname and not any(char.isdigit() for char in productname) and productname.isascii() else exe_no_space
 
         # Prepare YAML data
         yaml_data = {
             'exe_file': str(exe_file).replace(str(Path.home()), "~"),
-            'script_path': str(yaml_file_path).replace(str(Path.home()), "~"), 
-            'wineprefix': str(prefix_dir).replace(str(Path.home()), "~"),
+
             'progname': progname,
             'args': "",
             'sha256sum': sha256_hash.hexdigest(),
@@ -1938,95 +1542,26 @@ class WineCharmApp(Gtk.Application):
             'wine_debug': "WINEDEBUG=fixme-all DXVK_LOG_LEVEL=none",  # Set a default or allow it to be empty
             'env_vars': ""  # Initialize with an empty string or set a default if necessary
         }
-
+            #'wineprefix': str(prefix_dir).replace(str(Path.home()), "~"),        
+        # Create YAML file with proper naming
+        yaml_file_path = prefix_dir / f"{exe_no_space if use_exe_name else progname.replace(' ', '_')}.charm"
         with open(yaml_file_path, 'w') as yaml_file:
-            yaml.dump(yaml_data, yaml_file, default_flow_style=False, width=1000)
+            yaml.dump(yaml_data, yaml_file, default_flow_style=False, width=1000) 
+
 
         # Extract icon and create desktop entry
         icon_path = self.extract_icon(exe_file, prefix_dir, exe_no_space, progname)
         self.create_desktop_entry(progname, yaml_file_path, icon_path, prefix_dir)
 
-        # Add the new script data directly to self.script_list
-        self.script_list[sha256_hash.hexdigest()] = yaml_data
+        # Add or update script row in UI if multi files are being created.
+        GLib.idle_add(self.add_or_update_script_row, yaml_file_path)
 
         self.new_scripts.add(yaml_file_path.stem)
-        print("#"*100)
-        print(self.new_scripts)
-        print(yaml_file_path.stem)
-
-        # Add or update script row in UI
-        # Add the new script data to the top of self.script_list
-        self.script_list = {sha256_hash.hexdigest(): yaml_data, **self.script_list}
-
-#        self.add_or_update_script_row(sha256_hash.hexdigest(), yaml_data)
-        GLib.idle_add(self.create_script_list)
 
 
 
 
-    def add_or_update_script_row(self, script_key, script_data):
-        """
-        Add a new script row to the flowbox or update an existing one.
-        
-        Args:
-            script_key (str): The unique key for the script (e.g., sha256sum).
-            script_data (dict): Data associated with the script.
-        """
-        self.flowbox.remove_all()
-        # Create the row using the newly added script data
-        row = self.create_script_row(script_key, script_data)
-
-        # Append or prepend the row to the flowbox
-        if row:
-            self.flowbox.append(row)
-
-        # Highlight the row if the script is running
-        if script_key in self.running_processes:
-            self.update_row_highlight(row, True)
-            self.script_data_two[script_key]['highlighted'] = True
-        else:
-            self.update_row_highlight(row, False)
-            self.script_data_two[script_key]['highlighted'] = False
-
-        # Update the icon for the row after the script is added
-        self.update_script_row_icon(script_key)
-
-
-
-    def update_script_row_icon(self, script_key):
-        """
-        Update the icon for a specific script row once the icon is available.
-        
-        Args:
-            script_key (str): The unique key for the script (e.g., sha256sum).
-        """
-        script_info = self.script_data_two.get(script_key)
-        if not script_info:
-            return
-
-        row = script_info.get('row')
-        script_path = Path(script_info.get('script_path')).expanduser()
-        icon_path = script_path.with_suffix(".png")  # Assuming the icon is saved as a .png file
-
-        # Check if the icon exists and update the UI
-        if icon_path.exists():
-            # Load the icon and update the row
-            icon = self.load_icon(script_path, 64, 64)
-            button = row.get_child()  # Assuming the button is the child of the overlay
-            hbox = button.get_child()  # Get the HBox inside the button
-            icon_image = hbox.get_first_child()  # Get the first child (the icon image)
-            icon_image.set_from_paintable(icon)
-            print(f"Updated icon for script: {script_key}")
-        else:
-            print(f"Icon not found for script: {script_key}")
-
-    def xadd_or_update_script_row(self, script_key, script_data):
-        script_info = self.script_data_two.get(script_key)
-        if not script_info:
-            return
-
-        row = script_info.get('row')
-        script_path = Path(script_info.get('script_path')).expanduser()
+    def add_or_update_script_row(self, script_path):
         script_name = script_path.stem.replace("_", " ")
 
         # Clear the existing rows
@@ -2034,78 +1569,10 @@ class WineCharmApp(Gtk.Application):
 
         # Recreate the script list
         self.create_script_list()
-        self.update_script_row_icon(script_key)
-        # Update the icon for the row after the script is added
 
-    def update_script_row(self, row, script_key, script_data):
-        """
-        Update the contents of an existing script row.
+        # No need to call show(), as widgets are visible by default in GTK 4
 
-        Args:
-            row (Gtk.Widget): The row to update.
-            script_data (dict): The updated data for the script.
-        """
-        # Assuming the row has a button with a label and an icon
-        button = row.get_child()  # Assuming the button is the child of the row (Overlay)
-        hbox = button.get_child()  # Assuming hbox is the child of the button (inside the overlay)
 
-        # Update the label with the new script data
-        label_text = script_data.get('progname', '').replace('_', ' ') or Path(script_data['script_path']).stem.replace('_', ' ')
-        
-        # Assuming the label is the second child of the hbox
-        label = hbox.get_first_child().get_next_sibling()  # Get the label after the icon in the hbox
-        if isinstance(label, Gtk.Label):
-            label.set_text(label_text)
-
-        # Update any other necessary elements of the row, such as play and options buttons
-        play_button = self.script_data_two[script_data['sha256sum']].get('play_button')
-        options_button = self.script_data_two[script_data['sha256sum']].get('options_button')
-
-        # Set button states based on whether the script is running
-        if script_data['sha256sum'] in self.running_processes:
-            self.set_play_stop_button_state(play_button, True)  # Set to "Stop"
-            play_button.set_tooltip_text("Stop")
-        else:
-            self.set_play_stop_button_state(play_button, False)  # Set to "Play"
-            play_button.set_tooltip_text("Play")
-
-        # If necessary, update tooltips, icon, and any other button-related properties
-        # You can add further updates here as required.
-        self.update_script_row_icon(script_key)
-        
-    def add_or_update_script_row(self, script_key, script_data):
-        """
-        Add a new script row to the flowbox or update an existing one.
-        
-        Args:
-            script_key (str): The unique key for the script (e.g., sha256sum).
-            script_data (dict): Data associated with the script.
-        """
-        # Check if the script row already exists in self.script_data_two
-        existing_script_info = self.script_data_two.get(script_key)
-
-        if existing_script_info:
-            # If the row exists, update it instead of appending a new one
-            row = existing_script_info.get('row')
-            self.update_script_row(row, script_key, script_data)
-        else:
-            # Create the row using the newly added script data
-            row = self.create_script_row(script_key, script_data)
-
-            # Prepend the row to the flowbox if it's new
-            if row:
-                self.flowbox.prepend(row)
-
-        # Highlight the row if the script is running
-        if script_key in self.running_processes:
-            self.update_row_highlight(row, True)
-            self.script_data_two[script_key]['highlighted'] = True
-        else:
-            self.update_row_highlight(row, False)
-            self.script_data_two[script_key]['highlighted'] = False
-
-        # Update the icon for the row after the script is added
-        self.update_script_row_icon(script_key)
 
     def extract_icon(self, exe_file, wineprefix, exe_no_space, progname):
         self.create_required_directories()
@@ -2453,17 +1920,7 @@ class WineCharmApp(Gtk.Application):
 
 
 
-    def show_options_for_script(self, script_info, row, script_key):
-        """
-        Display the options for a specific script.
-        
-        Args:
-            script_info (dict): Information about the script stored in script_data_two.
-            row (Gtk.Widget): The row UI element where the options will be displayed.
-            script_key (str): The unique key for the script.
-        """
-        script = Path(script_info['script_path'])  # Get the script path from script_info
-
+    def show_options_for_script(self, script, row):
         # Ensure the search button is toggled off and the search entry is cleared
         self.search_button.set_active(False)
         self.main_frame.set_child(None)
@@ -2524,10 +1981,11 @@ class WineCharmApp(Gtk.Application):
                 log_file_path = Path(script.parent) / f"{script.stem}.log"
                 if not log_file_path.exists() or log_file_path.stat().st_size == 0:
                     option_button.set_sensitive(False)
-
+            
             option_button.connect(
                 "clicked",
-                lambda btn, cb=callback, sc=script, sk=script_key, ob=option_button: self.callback_wrapper(cb, sc, sk, ob)
+                lambda btn, cb=callback, sc=script, ob=option_button:
+                self.callback_wrapper(cb, sc, ob)
             )
 
         # Set the header bar title to the script's icon and name
@@ -2535,18 +1993,17 @@ class WineCharmApp(Gtk.Application):
         self.menu_button.set_visible(False)
         self.search_button.set_visible(False)
         self.view_toggle_button.set_visible(False)
-
+        
         if self.back_button.get_parent() is None:
             self.headerbar.pack_start(self.back_button)
         self.back_button.set_visible(True)
 
         self.open_button.set_visible(False)
-        self.replace_open_button_with_launch(script, row, script_key)
+        self.replace_open_button_with_launch(script, row)
         self.update_execute_button_icon(script)
         self.selected_row = None
 
-
-    def show_log_file(self, script, script_key, *args):
+    def show_log_file(self, script, *args):
         log_file_path = Path(script.parent) / f"{script.stem}.log"
         if log_file_path.exists() and log_file_path.stat().st_size > 0:
             try:
@@ -2554,51 +2011,26 @@ class WineCharmApp(Gtk.Application):
             except subprocess.CalledProcessError as e:
                 print(f"Error opening log file: {e}")
 
-
-    def open_terminal(self, script, script_key, *args):
-        script_data = self.extract_yaml_info(script_key)
-        if not script_data:
-            return None
-
-#        yaml_info = self.extract_yaml_info(script)
-#        exe_name = Path(yaml_info['exe_file'])
-        #exe_name = Path(script_data['exe_file'])
-        #script = Path(script_data['script_path'])
-        #wineprefix = Path(script).parent
-        #exe_name_quoted = shlex.quote(str(exe_name))
-        #wineprefix = shlex.quote(str(wineprefix))
-        #exe_file = Path(script_data['exe_file']).expanduser().resolve()
-        #wineprefix = Path(script).parent.resolve()
-
-        exe_file = Path(script_data['exe_file']).expanduser().resolve()
-        script = Path(script_data['script_path'])
-        progname = script_data['progname']
-        script_args = script_data['args']
-        runner = script_data['runner'] or "wine"
-        script_key = script_data['sha256sum']  # Use sha256sum as the key
-        env_vars = script_data.get('env_vars', '')   # Ensure env_vars is initialized if missing
-        wine_debug = script_data.get('wine_debug')
+    def open_terminal(self, script, *args):
+        yaml_info = self.extract_yaml_info(script)
+        exe_file = yaml_info['exe_file']
+        wineprefix = Path(script).parent
+        progname = yaml_info['progname']
+        script_args = yaml_info['args']
+        runner = yaml_info['runner'] or "wine"
+        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
+        env_vars = yaml_info.get('env_vars', '')  # Ensure env_vars is initialized if missing
+        wine_debug = yaml_info.get('wine_debug')
         exe_name = Path(exe_file).name
+        wineprefix = Path(script).parent
+
+        # If the runner is empty or None, fallback to "wine"
+        #runner = runner or "wine"
         
-        
-        #wineprefix = Path(script).parent
-        wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
+        #if winecharmdir not in Path(runner).parents:
+        #    runner = "wine"
 
-
-
-        #yaml_info = self.extract_yaml_info(script)
-        #progname = script_data.get('progname')
-        #script_args = script_data.get('args')
-        #runner = yaml_info['runner'] or "wine"
-        #script_key = yaml_info['sha256sum']  # Use sha256sum as the key
-        #env_vars = yaml_info.get('env_vars', '')  # Ensure env_vars is initialized if missing
-        #wine_debug = yaml_info.get('wine_debug', '')
-        exe_name = exe_file.name
-
-        # Ensure the runner path is valid and resolve it
-        runner = Path(runner).expanduser().resolve() if runner else Path("wine")
-        runner_dir = runner.parent.resolve()
-
+        runner_dir = Path(runner).parent
         print(" - - - - - runner_dir - - - - - ")
         print(runner)
         print(runner_dir)
@@ -2607,6 +2039,7 @@ class WineCharmApp(Gtk.Application):
         self.ensure_directory_exists(wineprefix)
 
         if shutil.which("flatpak-spawn"):
+
             command = [
                 "wcterm",
                 "bash",
@@ -2614,6 +2047,7 @@ class WineCharmApp(Gtk.Application):
                 "-c",
                 rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
             ]
+            print(command)
         else:
             command = [
                 "gnome-terminal",
@@ -2624,21 +2058,17 @@ class WineCharmApp(Gtk.Application):
                 "-c",
                 rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
             ]
-
-        print(f"Running command: {command}")
-        
         try:
             subprocess.Popen(command)
         except Exception as e:
             print(f"Error opening terminal: {e}")
-
 
     def install_dxvk_vkd3d(self, script, button):
         wineprefix = Path(script).parent
         self.run_winetricks_script("vkd3d dxvk", wineprefix)
         self.create_script_list()
 
-    def open_filemanager(self, script, script_key, *args):
+    def open_filemanager(self, script, *args):
         wineprefix = Path(script).parent
         print(f"Opening file manager for {wineprefix}")
         command = ["xdg-open", str(wineprefix)]
@@ -2647,7 +2077,7 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error opening file manager: {e}")
 
-    def open_script_file(self, script, script_key, *args):
+    def open_script_file(self, script, *args):
         wineprefix = Path(script).parent
         print(f"Opening file manager for {wineprefix}")
         command = ["xdg-open", str(script)]
@@ -2700,10 +2130,7 @@ class WineCharmApp(Gtk.Application):
             print(f"An error occurred: {e}")
 
     def change_icon(self, script, new_icon_path):
-        script_data = self.extract_yaml_info(script_key)
-        if not script_data:
-            return None    
-        script_path = Path(script_data['script_path'])
+        script_path = Path(script)
         icon_path = script_path.with_suffix(".png")
         backup_icon_path = icon_path.with_suffix(".bak")
 
@@ -2714,7 +2141,7 @@ class WineCharmApp(Gtk.Application):
         self.create_script_list()
 
     def extract_and_change_icon(self, script, exe_path):
-        script_path = Path(script_data['script_path'])
+        script_path = Path(script)
         icon_path = script_path.with_suffix(".png")
         backup_icon_path = icon_path.with_suffix(".bak")
 
@@ -2726,27 +2153,22 @@ class WineCharmApp(Gtk.Application):
             shutil.move(extracted_icon_path, icon_path)
         self.create_script_list()
 
-    def callback_wrapper(self, callback, script, script_key, button=None, *args):
-        """
-        Wraps callbacks to ensure the right number of arguments are passed to each callback.
-        
-        callback_params: callback method parameter names
-        """
-        # Retrieve the parameters of the callback
+    def callback_wrapper(self, callback, script, button=None, *args):
+        # Check the method signature of the callback to determine what to pass
         callback_params = callback.__code__.co_varnames
-        
-        # If the callback expects script, script_key, and button
-        if 'button' in callback_params and len(callback_params) >= 3:
-            return callback(script, script_key, button, *args)
-        
-        # If the callback expects only script and script_key (no button)
-        elif 'script_key' in callback_params and len(callback_params) == 2:
-            return callback(script, script_key, *args)
-        
-        # If the callback expects only script (no script_key or button)
-        else:
-            return callback(script, *args)
 
+        # If both 'option_button' and 'button' are expected
+        if 'option_button' in callback_params and 'button' in callback_params:
+            return callback(script, button, button, *args)
+        # If only 'button' is expected
+        elif 'button' in callback_params:
+            return callback(script, button)
+        # If only 'option_button' is expected
+        elif 'option_button' in callback_params:
+            return callback(script, button)
+        # If neither 'button' nor 'option_button' is expected, just pass the script
+        else:
+            return callback(script)
 
     def update_execute_button_icon(self, script):
         for child in self.options_listbox:
@@ -2855,7 +2277,7 @@ class WineCharmApp(Gtk.Application):
                 ok_button.connect("clicked", lambda btn: self.on_ok_button_clicked(entry.get_text().strip(), script))
 
     def on_ok_rename_button_clicked(self, new_name, script):
-        script_path = Path(script_data['script_path'])
+        script_path = Path(script)
         yaml_info = self.extract_yaml_info(script)
         
         old_progname = yaml_info['progname']
@@ -2992,21 +2414,58 @@ class WineCharmApp(Gtk.Application):
             productname_match = re.search(r'Product Name\s+:\s+(.+)', product_output)
             return productname_match.group(1).strip() if productname_match else None
 
+    def process_ended(self, script_key):
+        
+        process_info = self.running_processes.get(script_key)
 
-##############
-  
-##############            
+        if process_info:
+            row = process_info.get("row")
+            if row:
+                row.remove_css_class("highlighted")
+                row.remove_css_class("blue")
+
+            # Ensure the overlay buttons are hidden when the process ends
+            if self.current_clicked_row:
+                button, play_button, options_button = self.current_clicked_row[0], self.current_clicked_row[1], self.current_clicked_row[2]
+
+                self.hide_buttons(play_button, options_button)
+                self.set_play_stop_button_state(play_button, False)  # Reset the play button to "Play"
+                self.current_clicked_row = None
+                button.remove_css_class("highlighted")
+                button.remove_css_class("blue")
+                
+            # Check if self.launch_button is not None before modifying it
+            if self.launch_button and getattr(self, 'launch_button_exe_name', None) == script_key:
+                self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+                self.launch_button.set_tooltip_text("Play")
+
+            script_path = process_info.get("script")
+            if script_path and script_path.exists():
+                yaml_info = self.extract_yaml_info(script_path)
+                wineprefix = Path(script_path).parent
+                if wineprefix:
+                    wineprefix_path = Path(wineprefix)
+                    self.create_scripts_for_lnk_files(wineprefix_path)
 
 
-    def get_play_button_from_row(self, row):
-        """
-        Helper method to retrieve the play button from a script row.
-        Assumes that the play button is one of the children in the row.
-        """
-        for child in row.get_children():
-            if isinstance(child, Gtk.Button) and child.get_tooltip_text() == "Play" or child.get_tooltip_text() == "Stop":
-                return child
-        return None
+            # Remove the process from the running processes
+            if script_key in self.running_processes:
+                del self.running_processes[script_key]
+
+            # If there are no more running processes, reset all UI elements
+            if not self.running_processes:
+                self.reset_all_ui_elements()
+           
+            
+    def reset_all_ui_elements(self):
+        # Reset any UI elements that should be updated when no processes are running
+        for row in self.script_buttons.values():
+            row.remove_css_class("highlighted")
+            row.remove_css_class("blue")
+        
+        if self.launch_button:
+            self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+            self.launch_button.set_tooltip_text("Play")
 
 
     def copy_template(self, prefix_dir):
@@ -3205,7 +2664,6 @@ class WineCharmApp(Gtk.Application):
                 return False
 
     def load_icon(self, script, x, y):
-        
         icon_name = script.stem + ".png"
         icon_dir = script.parent
         icon_path = icon_dir / icon_name
@@ -3434,40 +2892,379 @@ class WineCharmApp(Gtk.Application):
         if self.open_button:
             self.open_button.set_sensitive(True)
         print("Open button enabled.")
+       
+       
+#####################
 
-    def load_script_list(self):
-        """Loads all .charm files into the self.script_list dictionary."""
-        self.script_list = {}
+    def check_running_processes_and_update_buttons(self):
+        if not self.monitoring_active:
+            self.stop_monitoring()
+            return False
 
-        # Find all .charm files
-        scripts = []
-        for root, dirs, files in os.walk(prefixes_dir):
-            depth = root[len(str(prefixes_dir)):].count(os.sep)
-            if depth >= 2:
-                dirs[:] = []  # Prune the search space
-                continue
-            scripts.extend([Path(root) / file for file in files if file.endswith(".charm")])
+        current_running_processes = self.get_running_processes()
+        self.cleanup_ended_processes(current_running_processes)
 
-        # Sort the scripts by modification time
-        scripts.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        # Highlight running processes in the current (possibly filtered) view
+        for script_key, process_info in self.running_processes.items():
+            row_info = self.script_buttons.get(script_key)  # Ensure we are accessing the correct structure
+            if row_info:
+                row = row_info.get("row")  # Extract the row from the dictionary
+                if row and row.get_parent():  # Check if the row is currently displayed in the flowbox
+                    self.update_ui_for_running_process(script_key, row, self.running_processes)
 
-        # Load each script's data
-        for script_file in scripts:
-            with open(script_file, 'r') as f:
-                try:
-                    script_data = yaml.safe_load(f)
-                    script_data['script_path'] = str(script_file)
-                    script_key = script_data.get('sha256sum')
-                    if script_key:
-                        self.script_list[script_key] = script_data  # Use sha256sum as the key
-                    else:
-                        print(f"Warning: Script {script_file} missing 'sha256sum'. Skipping.")
-                except Exception as e:
-                    print(f"Error loading script {script_file}: {e}")
+        if not current_running_processes or self.count >= 5:
+            self.stop_monitoring()
+        else:
+            self.count += 1
 
-        print(f"Loaded {len(self.script_list)} scripts.")
+        return False
 
-                
+    def on_focus_in(self, controller):
+        if self.monitoring_active:
+            return  # Prevent multiple activations
+
+        #print("Focus In")
+        self.count = 0
+        self.monitoring_active = True
+        self.start_monitoring()
+        self.check_running_processes_and_update_buttons()
+        current_running_processes = self.get_running_processes()
+        self.cleanup_ended_processes(current_running_processes)
+
+
+    def show_buttons(self, play_button, options_button):
+        play_button.set_visible(True)
+        options_button.set_visible(True)
+
+    def hide_buttons(self, play_button, options_button):
+        if play_button is not None:
+            play_button.set_visible(False)
+        if options_button is not None:
+            options_button.set_visible(False)
+
+    def on_script_row_clicked(self, button, play_button, options_button):
+        # Clear previous overlays
+        if self.current_clicked_row:
+            prev_button, prev_play_button, prev_options_button = self.current_clicked_row
+            self.hide_buttons(prev_play_button, prev_options_button)
+            prev_button.remove_css_class("blue")
+
+        # Toggle the highlight class
+        if self.current_clicked_row == (button, play_button, options_button):
+            self.current_clicked_row = None
+            button.remove_css_class("blue")
+        else:
+            self.current_clicked_row = (button, play_button, options_button)
+            button.add_css_class("blue")
+            self.show_buttons(play_button, options_button)
+
+        # Retrieve the script key associated with this button
+        script_key = None
+        for key, row in self.script_buttons.items():
+            if row == button.get_parent():  # Assuming row is the parent of the button
+                script_key = key
+                break
+
+        # Ensure the overlay buttons are hidden when the process ends
+        if script_key in self.running_processes:
+            self.set_play_stop_button_state(play_button, True)  # Set to "Stop" if running
+        else:
+            self.set_play_stop_button_state(play_button, False)  # Reset to "Play" otherwise    def show_buttons(self, play_button, options_button):
+        play_button.set_visible(True)
+        options_button.set_visible(True)
+
+    def hide_buttons(self, play_button, options_button):
+        if play_button is not None:
+            play_button.set_visible(False)
+        if options_button is not None:
+            options_button.set_visible(False)
+
+    def on_script_row_clicked(self, button, play_button, options_button):
+        # Clear previous overlays
+        if self.current_clicked_row:
+            prev_button, prev_play_button, prev_options_button = self.current_clicked_row
+            self.hide_buttons(prev_play_button, prev_options_button)
+            prev_button.remove_css_class("blue")
+
+        # Toggle the highlight class
+        if self.current_clicked_row == (button, play_button, options_button):
+            self.current_clicked_row = None
+            button.remove_css_class("blue")
+        else:
+            self.current_clicked_row = (button, play_button, options_button)
+            button.add_css_class("blue")
+            self.show_buttons(play_button, options_button)
+
+        # Retrieve the script key associated with this button
+        script_key = None
+        for key, info in self.script_buttons.items():
+            if info['row'] == button.get_parent():  # Assuming the row is the parent of the button
+                script_key = key
+                break
+
+        # Ensure the overlay buttons are hidden or shown based on the running state
+        if script_key in self.running_processes:
+            self.set_play_stop_button_state(play_button, True)  # Set to "Stop" if running
+            play_button.set_tooltip_text("Stop")  # Set tooltip text to "Stop"
+            print(f"Script {script_key} is running. Setting play button to 'Stop'.")
+        else:
+            self.set_play_stop_button_state(play_button, False)  # Reset to "Play" if not running
+            play_button.set_tooltip_text("Play")  # Set tooltip text to "Play"
+            print(f"Script {script_key} is not running. Setting play button to 'Play'.")
+
+           
+    def create_script_list(self):
+        # Clear the flowbox
+        self.flowbox.remove_all()
+
+        # Clear the script buttons dictionary
+        self.script_buttons = {}
+
+        # Find all scripts
+        scripts = self.find_python_scripts()
+
+        for script in scripts:
+            row = self.create_script_row(script)
+            if row:
+                self.flowbox.append(row)
+
+                # Extract YAML information to get script_key
+                yaml_info = self.extract_yaml_info(script)
+                script_key = yaml_info['sha256sum']
+
+                # Navigate the hierarchy to find the play and options buttons
+                button_box = row.get_child()  # First child of the overlay is the button box (hbox or vbox)
+                if isinstance(button_box, Gtk.Box):
+                    buttons_box = button_box.get_first_child().get_next_sibling()  # Assuming hbox or vbox inside button
+                    if buttons_box:
+                        play_button = buttons_box.get_first_child()
+                        options_button = play_button.get_next_sibling()
+
+                        # Store row, play button, and options button in the dictionary
+                        self.script_buttons[script_key] = {
+                            'row': row,
+                            'play_button': play_button,
+                            'options_button': options_button
+                        }
+
+                        # Check if the script is running and update the row appearance accordingly
+                        if script_key in self.running_processes:
+                            row.add_css_class("highlighted")
+                        else:
+                            row.remove_css_class("highlighted")
+                            row.remove_css_class("blue")
+
+    def create_script_row(self, script):
+        yaml_info = self.extract_yaml_info(script)
+        exe_name = Path(yaml_info['exe_file']).name
+        script_key = yaml_info['sha256sum']  # Use sha256sum as the key
+
+        button = Gtk.Button()
+        button.set_hexpand(True)
+        button.set_halign(Gtk.Align.FILL)
+        button.add_css_class("flat")
+        button.add_css_class("normal-font")
+
+        label_text = script.stem.replace("_", " ")
+
+        # Create an overlay to add play and options buttons
+        overlay = Gtk.Overlay()
+        overlay.set_child(button)
+
+        if self.icon_view:
+            icon = self.load_icon(script, 64, 64)
+            icon_image = Gtk.Image.new_from_paintable(icon)
+            button.set_size_request(64, 64)
+            hbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            icon_image.set_pixel_size(64)
+            # Create a box to hold both buttons
+            buttons_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            # Apply the wrapping logic
+            label1, label2, label3 = self.wrap_text_at_20_chars(label_text)
+            label = Gtk.Label(label=label1)
+            if label2:
+                label2 = Gtk.Label(label=label2)
+            if label3:
+                label3 = Gtk.Label(label=label3)
+        else:
+            icon = self.load_icon(script, 32, 32)
+            icon_image = Gtk.Image.new_from_paintable(icon)
+            button.set_size_request(390, 36)
+            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+            icon_image.set_pixel_size(32)
+            # Create a box to hold both buttons
+            buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            label = Gtk.Label(label=label_text)
+            label.set_xalign(0)
+            label2 = Gtk.Label(label="")
+            label3 = Gtk.Label(label="")
+        label.set_hexpand(True)
+        label.set_ellipsize(Pango.EllipsizeMode.END)
+        button.set_child(hbox)
+        hbox.append(icon_image)
+        hbox.append(label)
+        if label2:
+            hbox.append(label2)
+        if label3:
+            hbox.append(label3)
+
+        if script.stem in self.new_scripts:
+            label.set_markup(f"<b>{label.get_text()}</b>")
+
+        button.label = label
+
+        buttons_box.set_margin_end(6)  # Adjust this value to prevent overlapping
+
+        # Play button
+        play_button = Gtk.Button.new_from_icon_name("media-playback-start-symbolic")
+        play_button.set_tooltip_text("Play")
+        play_button.set_visible(False)  # Initially hidden
+        buttons_box.append(play_button)
+
+        # Options button
+        options_button = Gtk.Button.new_from_icon_name("emblem-system-symbolic")
+        options_button.set_tooltip_text("Options")
+        options_button.set_visible(False)  # Initially hidden
+        buttons_box.append(options_button)
+
+        # Add buttons_box to overlay
+        overlay.add_overlay(buttons_box)
+        buttons_box.set_halign(Gtk.Align.END)
+        buttons_box.set_valign(Gtk.Align.CENTER)
+
+        # **Store references in self.script_buttons**
+        self.script_buttons[script_key] = {
+            'row': overlay,
+            'play_button': play_button,
+            'options_button': options_button
+        }
+        print(f"Stored script_buttons entry for {script_key}")  # Debug statement
+
+        # Connect play button to the toggle_play_stop method
+        play_button.connect("clicked", lambda btn: self.toggle_play_stop(script, play_button, button))
+
+        # Connect options button to the show_options_for_script method
+        options_button.connect("clicked", lambda btn: self.show_options_for_script(script, button))
+
+        # Event handler for button click
+        button.connect("clicked", lambda *args: self.on_script_row_clicked(button, play_button, options_button))
+
+        # Only highlight if the script is actively running, not just based on name
+        if script_key in self.running_processes:
+            button.add_css_class("highlight")  # This should happen only if the process is running
+        else:
+            button.remove_css_class("highlighted")
+            button.remove_css_class("blue")
+
+        return overlay
+
+    def reset_all_ui_elements(self):
+        print("reset_all_ui_elements called")  # Debug statement
+
+        for script_key, info in self.script_buttons.items():
+            # **Debugging: Print the type of info**
+            print(f"Processing script_key: {script_key}, info type: {type(info)}")  # Debug statement
+
+            # Ensure 'info' is a dictionary and has the expected keys
+            if not isinstance(info, dict) or not all(key in info for key in ['row', 'play_button', 'options_button']):
+                print(f"Unexpected structure for script_key {script_key}: {info}")
+                continue  # Skip this entry if it's not structured as expected
+
+            # Extract the row, play_button, and options_button from the info dictionary
+            row = info['row']
+            play_button = info['play_button']
+            options_button = info['options_button']
+
+            # Ensure row is the correct widget (it should be an Overlay or similar container)
+            if isinstance(row, Gtk.Overlay):
+                button = row.get_child()  # Get the Gtk.Button inside the Overlay
+                if isinstance(button, Gtk.Button):
+                    # **Check if this is the currently clicked row**
+                    if self.current_clicked_row and self.current_clicked_row[0] == button:
+                        # **Skip resetting this row to preserve user selection**
+                        print(f"Skipping reset for currently selected row: {script_key}")
+                        button.remove_css_class("highlighted")
+                        continue
+
+                    # Remove CSS classes from the actual button inside the overlay
+                    button.remove_css_class("blue")
+                    button.remove_css_class("highlighted")
+                    print(f"Removed CSS classes from button in row: {script_key}")  # Debug statement
+
+                    # Request GTK to redraw the button to apply the changes
+                    button.queue_draw()  # Redraw the button
+                else:
+                    print(f"Expected Gtk.Button inside the Overlay for {script_key}, but got {type(button)}")
+            else:
+                print(f"Unexpected row type for {script_key}: {type(row)}")
+
+            # Hide play and options buttons
+            self.hide_buttons(play_button, options_button)
+            print(f"Hid buttons for row: {script_key}")  # Debug statement
+
+            # Reset the launch button if it exists
+            if self.launch_button:
+                self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+                self.launch_button.set_tooltip_text("Play")
+                print("Reset launch button to 'Play' icon")  # Debug statement
+
+
+
+    def hide_buttons(self, play_button, options_button):
+        if play_button is not None:
+            play_button.set_visible(False)
+            print("Play button hidden.")  # Debug statement
+        if options_button is not None:
+            options_button.set_visible(False)
+            print("Options button hidden.")  # Debug statement
+
+    def process_ended(self, script_key):
+        print(f"process_ended called for script_key: {script_key}")  # Debug statement
+
+        process_info = self.running_processes.get(script_key)
+
+        if process_info:
+            # Access the stored references
+            row_info = self.script_buttons.get(script_key)
+            if row_info:
+                row = row_info['row']
+                play_button = row_info['play_button']
+                options_button = row_info['options_button']
+
+                # Remove CSS classes
+                row.remove_css_class("highlighted")
+                row.remove_css_class("blue")
+                print(f"Removed CSS classes from row: {script_key}")  # Debug statement
+
+                # Hide buttons
+                self.hide_buttons(play_button, options_button)
+                print(f"Hid buttons for row: {script_key}")  # Debug statement
+
+            # Reset the launch button if it belongs to this script
+            if self.launch_button and getattr(self, 'launch_button_exe_name', None) == script_key:
+                self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+                self.launch_button.set_tooltip_text("Play")
+                print(f"Reset launch button for script_key: {script_key}")  # Debug
+
+            # Perform additional actions if needed
+            script_path = process_info.get("script")
+            if script_path and script_path.exists():
+                yaml_info = self.extract_yaml_info(script_path)
+                wineprefix = Path(script_path).parent
+                if wineprefix:
+                    wineprefix_path = Path(wineprefix)
+                    self.create_scripts_for_lnk_files(wineprefix_path)
+
+            # Remove the process from running_processes
+            if script_key in self.running_processes:
+                del self.running_processes[script_key]
+                print(f"Removed script_key from running_processes: {script_key}")  # Debug
+
+            # If no more running processes, reset UI
+            if not self.running_processes:
+                self.reset_all_ui_elements()
+                print("All processes ended. Resetting all UI elements.")  # Debug
+#####################         
 def parse_args():
     import argparse
     parser = argparse.ArgumentParser(description="WineCharm GUI application")

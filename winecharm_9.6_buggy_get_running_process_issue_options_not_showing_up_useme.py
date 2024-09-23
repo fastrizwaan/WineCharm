@@ -446,7 +446,7 @@ class WineCharmApp(Gtk.Application):
         self.start_monitoring()
         self.check_running_processes_and_update_buttons()
         current_running_processes = self.get_running_processes()
-        self.cleanup_ended_processes(current_running_processes)
+        #self.cleanup_ended_processes(current_running_processes)
         #print(" - - - current_running_processes - - -  on_focus_in - - - ")
         #print(current_running_processes)
 
@@ -950,12 +950,7 @@ class WineCharmApp(Gtk.Application):
 
         # Event handler for button click (handling the row highlight)
         button.connect("clicked", lambda *args: self.on_script_row_clicked(button, play_button, options_button))
-        # Only highlight if the script is actively running, not just based on name
-        if script_key in self.running_processes:
-            button.add_css_class("highlight")  # This should happen only if the process is running
-        else:
-            button.remove_css_class("highlighted")
-            button.remove_css_class("blue")
+
         return overlay
 
 ######################################
@@ -1477,9 +1472,9 @@ class WineCharmApp(Gtk.Application):
                     "pids": [process.pid],
                     "wineprefix": wineprefix
                 }
-                #print("v"*100)
-                #print(process.pid)
-                #print("^"*100)
+                print("v"*100)
+                print(process.pid)
+                print("^"*100)
                 self.set_play_stop_button_state(play_stop_button, True)
                 self.update_row_highlight(row, True)
                 GLib.timeout_add_seconds(5, self.get_child_pid_async, script_key, exe_name, wineprefix)
@@ -1487,7 +1482,7 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error launching script: {e}")
 
-        #print(self.running_processes)
+        print(self.running_processes)
 
     def get_child_pid_async(self, script_key, exe_name, wineprefix):
         # Run get_child_pid in a separate thread
@@ -1519,28 +1514,27 @@ class WineCharmApp(Gtk.Application):
         runner = yaml_info.get('runner', 'wine')  # Fallback to 'wine' if runner is not set
         runner_dir = Path(runner).parent
 
-        # Quote paths and command parts to prevent issues with spaces
-        wineprefix = Path(script).parent
-        exe_name_quoted = shlex.quote(str(exe_name))
-        wineprefix = shlex.quote(str(wineprefix))
-
         def run_get_child_pid():
             try:
+                print("\n")
+                print("-----"*5)
                 print(f"Looking for child processes of: {exe_name}")
 
                 # Prepare command to filter processes using winedbg
                 winedbg_command_with_grep = (
-                    f"export PATH={shlex.quote(str(runner_dir))}:$PATH;"
+                    f"export PATH={shlex.quote(str(runner_dir))}:$PATH; echo $PATH;"
                     f"WINEPREFIX={wineprefix} winedbg --command 'info proc' | "
-                    f"grep -A9 \"{exe_name_quoted}\" | grep -v 'grep' | grep '_' | "
+                    f"grep -A9 '{shlex.quote(exe_name)}' | grep -v 'grep' | grep '_' | "
                     f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
                     f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
                     f"grep -v 'svchost.exe'   | grep -v 'plugplay.exe' | grep -v 'winedevice.exe' | "
                     f"cut -f2- -d '_' | tr \"'\" ' '"
                 )
-
+                print("-----"*5)
+                print(f"winedbg_command_with_grep: {winedbg_command_with_grep}")
+                print("-----"*5)
                 winedbg_output_filtered = subprocess.check_output(winedbg_command_with_grep, shell=True, text=True).strip().splitlines()
-                #print(f"Filtered winedbg output: {winedbg_output_filtered}")
+                print(f"\nFiltered winedbg output: {winedbg_output_filtered}")
 
                 # Retrieve the parent directory name and search for processes
                 exe_parent = exe_file.parent.name
@@ -1692,7 +1686,7 @@ class WineCharmApp(Gtk.Application):
 
     def check_running_processes_and_update_buttons(self):
         current_running_processes = self.get_running_processes()
-        self.cleanup_ended_processes(current_running_processes)
+        #self.cleanup_ended_processes(current_running_processes)
 
         for script_key, process_info in self.running_processes.items():
             script_info = self.script_data_two.get(script_key)
@@ -1701,8 +1695,8 @@ class WineCharmApp(Gtk.Application):
                 if row and row.get_parent():
                     self.update_ui_for_running_process(script_key, row, current_running_processes)
 
-        if not current_running_processes:
-            self.stop_monitoring()
+        #if not current_running_processes:
+        #    self.stop_monitoring()
 
     def get_running_processes(self):
         current_running_processes = {}
@@ -1726,11 +1720,6 @@ class WineCharmApp(Gtk.Application):
                 unix_exe_dir_name = Path(script_data['exe_file']).parent.name
                 wineprefix = Path(script).parent
 
-                # Quote paths and command parts to prevent issues with spaces
-                #wineprefix = Path(script).parent
-                #exe_name = shlex.quote(str(exe_name))
-                #wineprefix = shlex.quote(str(wineprefix))
-                
                 # Check if exe_name has duplicates
                 is_duplicate = exe_name_count[exe_name] > 1
 
@@ -1805,14 +1794,14 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Check if the script is running
-        if script_key not in current_running_processes:
+        if script_key not in self.running_processes:
             # Script is not running, remove 'highlighted' class
             self.update_row_highlight(row, False)
             row.remove_css_class("highlighted")
             row.remove_css_class("blue")
             script_info['is_running'] = False
             print(f"Removed 'highlighted' from row for script_key: {script_key}")
-        else:
+        elif script_key in self.running_processes:
             # Script is running, ensure the 'highlighted' class is added
             self.update_row_highlight(row, True)
             #row.remove_css_class("blue")  # Ensure 'blue' is removed
