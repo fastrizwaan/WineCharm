@@ -3320,37 +3320,31 @@ class WineCharmApp(Gtk.Application):
             # Remove existing socket file if it exists
             if self.SOCKET_FILE.exists():
                 self.SOCKET_FILE.unlink()
-            
+
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
                 server.bind(str(self.SOCKET_FILE))
                 server.listen()
+
                 while True:
                     conn, _ = server.accept()
                     with conn:
                         message = conn.recv(1024).decode()
                         if message:
-                            cwd, file_path = message.split("||")
-                            base_path = Path(cwd)
-                            pattern = file_path.split("/")[-1]
-                            directory = "/".join(file_path.split("/")[:-1])
-                            search_path = base_path / directory
+                            command_parts = message.split("||")
+                            command = command_parts[0]
 
-                            if not search_path.exists():
-                                print(f"Directory does not exist: {search_path}")
-                                continue
+                            if command == "show_dialog":
+                                title = command_parts[1]
+                                body = command_parts[2]
+                                # Call show_info_dialog in the main thread using GLib.idle_add
+                                GLib.idle_add(self.show_info_dialog, title, body)
+                            elif command == "process_file":
+                                file_path = command_parts[1]
+                                GLib.idle_add(self.process_cli_file, file_path)
 
-                            abs_file_paths = list(search_path.glob(pattern))
-                            if abs_file_paths:
-                                for abs_file_path in abs_file_paths:
-                                    if abs_file_path.exists():
-                                        print(f"Resolved absolute file path: {abs_file_path}")
-                                        GLib.idle_add(self.process_cli_file, str(abs_file_path))
-                                    else:
-                                        print(f"File does not exist: {abs_file_path}")
-                            else:
-                                print(f"No files matched the pattern: {file_path}")
-
+        # Run the server in a separate thread
         threading.Thread(target=server_thread, daemon=True).start()
+
 
     def initialize_app(self):
         if not hasattr(self, 'window') or not self.window:
@@ -3734,14 +3728,16 @@ def main():
                 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
                     client.connect(str(app.SOCKET_FILE))
                     file_extension = Path(args.file).suffix.lower()
-                    if not file_extension in ['.exe', '.msi']:
-                         print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
-                         app.show_info_dialog("RIZVAN Invalid file type: {file_extension}", "Only .exe or .msi files are allowed.")
-                         return
-                         
-                    message = f"{os.getcwd()}||{args.file}"
-                    print("-=-=-=-=-=-=-=-")
-                    print(message)
+
+                    # If the file is not .exe or .msi, send a show_dialog command to the running instance
+                    if file_extension not in ['.exe', '.msi']:
+                        print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
+                        message = f"show_dialog||Invalid file type: {file_extension}||Only .exe or .msi files are allowed."
+                        client.sendall(message.encode())
+                        return
+
+                    # Otherwise, send a process_file command to the running instance
+                    message = f"process_file||{args.file}"
                     client.sendall(message.encode())
                     print(f"Sent file path to existing instance: {args.file}")
                 return
@@ -3750,14 +3746,17 @@ def main():
         else:
             print("No existing instance found, starting a new one.")
 
+        # Set the command-line file for processing
         app.command_line_file = args.file
 
+    # Start the socket server and run the application
     app.start_socket_server()
-
     app.run(sys.argv)
 
+    # Clean up the socket file
     if app.SOCKET_FILE.exists():
         app.SOCKET_FILE.unlink()
+
 
 
 if __name__ == "__main__":
