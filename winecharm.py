@@ -236,7 +236,7 @@ class WineCharmApp(Gtk.Application):
 
         # Optionally, clear the running processes dictionary
         self.running_processes.clear()
-        self.create_script_list()
+        GLib.timeout_add_seconds(0, self.create_script_list)
 
     def on_help_clicked(self, action=None, param=None):
         print("Help action triggered")
@@ -355,7 +355,7 @@ class WineCharmApp(Gtk.Application):
         self.show_initializing_step("Initialization Complete!")
         self.mark_step_as_done("Initialization Complete!")
         self.hide_processing_spinner()
-        self.create_script_list()
+        GLib.timeout_add_seconds(0, self.create_script_list)
         
         # Check if there's a command-line file to process after initialization
         if self.command_line_file:
@@ -640,7 +640,7 @@ class WineCharmApp(Gtk.Application):
         key_controller.connect("key-pressed", self.on_key_pressed)
         self.window.add_controller(key_controller)
 
-        self.create_script_list()
+        GLib.timeout_add_seconds(0, self.create_script_list)
 
     def create_menu_model(self):
         menu = Gio.Menu()
@@ -716,7 +716,7 @@ class WineCharmApp(Gtk.Application):
         
         # Optionally, show a message if no scripts match the search term
         if not found_match:
-            self.show_info_dialog("No Results", "No scripts match your search criteria.")
+            GLib.timeout_add_seconds(0, self.show_info_dialog, "No Results", "No scripts match your search criteria.")
 
 
     def on_open_button_clicked(self, button):
@@ -1358,7 +1358,7 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
             GLib.idle_add(play_stop_button.set_tooltip_text, "Exe Not Found")
             play_stop_button.add_css_class("red")
-            self.show_info_dialog("Exe Not found", str(Path(exe_file)))
+            GLib.timeout_add_seconds(0, self.show_info_dialog, "Exe Not found", str(Path(exe_file)))
             return
         else:
             play_stop_button.remove_css_class("red")
@@ -1927,7 +1927,7 @@ class WineCharmApp(Gtk.Application):
         self.script_list = {sha256_hash.hexdigest(): yaml_data, **self.script_list}
 
 #        self.add_or_update_script_row(sha256_hash.hexdigest(), yaml_data)
-        GLib.idle_add(self.create_script_list)
+        GLib.timeout_add_seconds(0, self.create_script_list)
 
 
 
@@ -2203,13 +2203,26 @@ class WineCharmApp(Gtk.Application):
         if self.window is None:
             print(f"Cannot show dialog: window is not available.")
             return
-        
-        dialog = Adw.MessageDialog.new(self.window)
+
+        # Create the dialog
+        dialog = Adw.MessageDialog()
+
+        # Attach the dialog to the main window and make it modal
+        dialog.set_transient_for(self.window)
+        dialog.set_modal(True)
+
+        # Set the heading and body text for the dialog
         dialog.set_heading(title)
         dialog.set_body(message)
+
+        # Add "OK" button and set it as the default response
         dialog.add_response("ok", "OK")
         dialog.set_default_response("ok")
+
+        # Connect the response signal to destroy the dialog when the user clicks "OK"
         dialog.connect("response", lambda d, r: d.destroy())
+
+        # Present the dialog to the user
         dialog.present()
 
     def create_backup_archive(self, wineprefix, backup_path):
@@ -2308,11 +2321,11 @@ class WineCharmApp(Gtk.Application):
             self.create_backup_archive(wineprefix, backup_path)
 
             # Notify the user that the backup is complete
-            GLib.timeout_add_seconds(1, self.show_info_dialog, "Backup Complete", f"Backup saved to {backup_path}")
+            GLib.timeout_add_seconds(0, self.show_info_dialog, "Backup Complete", f"Backup saved to {backup_path}")
 
         except Exception as e:
             print(f"Error during backup: {e}")
-            GLib.idle_add(self.show_info_dialog, "Backup Failed", str(e))
+            GLib.timeout_add_seconds(0, self.show_info_dialog, "Backup Failed", str(e))
             
 
         finally:
@@ -2413,11 +2426,11 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(self.create_script_list)  # Schedule to run in the main thread
 
             # Step 6: Show a dialog confirming the extraction is complete
-            GLib.idle_add(self.show_info_dialog, "Restore Complete", f"Backup extracted to {extracted_prefix_dir}")
+            GLib.timeout_add_seconds(0, self.show_info_dialog, "Restore Complete", f"Backup extracted to {extracted_prefix_dir}")
 
         except Exception as e:
             print(f"Error extracting backup: {e}")
-            GLib.idle_add(self.show_info_dialog, "Error", f"Failed to restore backup: {str(e)}")
+            GLib.timeout_add_seconds(0, self.show_info_dialog, "Error", f"Failed to restore backup: {str(e)}")
 
 
 
@@ -3173,7 +3186,7 @@ class WineCharmApp(Gtk.Application):
                 return
 
             self.create_yaml_file(abs_file_path, None)
-            self.create_script_list()
+            GLib.timeout_add_seconds(0, self.create_script_list)
         except Exception as e:
             print(f"Error processing file: {e}")
         finally:
@@ -3337,7 +3350,7 @@ class WineCharmApp(Gtk.Application):
                                 title = command_parts[1]
                                 body = command_parts[2]
                                 # Call show_info_dialog in the main thread using GLib.idle_add
-                                GLib.idle_add(self.show_info_dialog, title, body)
+                                GLib.timeout_add_seconds(0, self.show_info_dialog, title, body)
                             elif command == "process_file":
                                 file_path = command_parts[1]
                                 GLib.idle_add(self.process_cli_file, file_path)
@@ -3372,7 +3385,7 @@ class WineCharmApp(Gtk.Application):
                 print(f"File does not exist: {abs_file_path}")
                 return
             self.create_yaml_file(abs_file_path, None)
-            self.create_script_list()
+
         except Exception as e:
             print(f"Error processing file: {e}")
         finally:
@@ -3441,8 +3454,7 @@ class WineCharmApp(Gtk.Application):
                 self.process_cli_file(self.command_line_file)
             else:
                 print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
-               # self.show_info_dialog("Invalid File Type", "Only .exe and .msi files are supported.")
-                GLib.timeout_add_seconds(1, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
+                GLib.timeout_add_seconds(0, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
                 self.command_line_file = None
                 return False
 
@@ -3536,8 +3548,7 @@ class WineCharmApp(Gtk.Application):
                     threading.Thread(target=self.copy_wine_directory, args=(directory, dest_dir)).start()
                 else:
                     print(f"Invalid directory selected: {directory}")
-                    #self.show_info_dialog("Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
-                    GLib.timeout_add_seconds(1, self.show_info_dialog, "Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
+                    GLib.timeout_add_seconds(0, self.show_info_dialog, "Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
         dialog.destroy()
         print("FileChooserDialog destroyed.")
 
@@ -3723,30 +3734,49 @@ def main():
     app = WineCharmApp()
 
     if args.file:
+        # Get the file extension
+        file_extension = Path(args.file).suffix.lower()
+
+        # Validate the file type early before any further processing
+        if file_extension not in ['.exe', '.msi']:
+            print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
+            
+            # If no instance is running, start WineCharmApp and show the error dialog directly
+            if not app.SOCKET_FILE.exists():
+                app.start_socket_server()
+                GLib.timeout_add_seconds(0, app.show_info_dialog, "Invalid File Type", f"Only .exe or .msi files are allowed. You provided: {file_extension}")
+                app.run(sys.argv)
+
+                # Clean up the socket file
+                if app.SOCKET_FILE.exists():
+                    app.SOCKET_FILE.unlink()
+            else:
+                # If an instance is running, send the error message to the running instance
+                try:
+                    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+                        client.connect(str(app.SOCKET_FILE))
+                        message = f"show_dialog||Invalid file type: {file_extension}||Only .exe or .msi files are allowed."
+                        client.sendall(message.encode())
+                    return
+                except ConnectionRefusedError:
+                    print("No existing instance found, starting a new one.")
+            
+            # Return early to skip further processing
+            return
+
+        # At this point, the file type is valid, continue with processing
         if app.SOCKET_FILE.exists():
             try:
                 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
                     client.connect(str(app.SOCKET_FILE))
-                    file_extension = Path(args.file).suffix.lower()
-
-                    # If the file is not .exe or .msi, send a show_dialog command to the running instance
-                    if file_extension not in ['.exe', '.msi']:
-                        print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
-                        message = f"show_dialog||Invalid file type: {file_extension}||Only .exe or .msi files are allowed."
-                        client.sendall(message.encode())
-                        return
-
-                    # Otherwise, send a process_file command to the running instance
                     message = f"process_file||{args.file}"
                     client.sendall(message.encode())
                     print(f"Sent file path to existing instance: {args.file}")
                 return
             except ConnectionRefusedError:
                 print("No existing instance found, starting a new one.")
-        else:
-            print("No existing instance found, starting a new one.")
 
-        # Set the command-line file for processing
+        # If no existing instance is found, proceed with normal startup and processing
         app.command_line_file = args.file
 
     # Start the socket server and run the application
@@ -3756,6 +3786,7 @@ def main():
     # Clean up the socket file
     if app.SOCKET_FILE.exists():
         app.SOCKET_FILE.unlink()
+
 
 
 
