@@ -27,36 +27,34 @@ gi.require_version('Adw', '1')
 
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 
+debug = True
+version = "0.95"
+# Constants
+winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
+prefixes_dir = winecharmdir / "Prefixes"
+templates_dir = winecharmdir / "Templates"
+runners_dir = winecharmdir / "Runners"
+default_template = templates_dir / "WineCharm-win64"
+
+applicationsdir = Path(os.path.expanduser("~/.local/share/applications")).resolve()
+tempdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/tmp")).resolve()
+iconsdir = Path(os.path.expanduser("~/.local/share/icons")).resolve()
+do_not_kill = "bin/winecharm"
+
+SOCKET_FILE = winecharmdir / "winecharm_socket"
+
+# These need to be dynamically updated:
+runner = ""  # which wine
+wine_version = ""  # runner --version
+template = ""  # default: WineCharm-win64 ; #if not found in settings.yaml at winecharm directory add default_template
+arch = ""  # default: win64 ; # #if not found in settings.yaml at winecharm directory add win64
+
+
 class WineCharmApp(Gtk.Application):
     def __init__(self):
         super().__init__(application_id='io.github.fastrizwaan.WineCharm', flags=Gio.ApplicationFlags.HANDLES_OPEN)
         self.window = None  # Initialize window as None
         Adw.init()
-        
-        # Move the global variables to instance attributes
-        self.debug = True
-        self.version = "0.95"
-        
-        # Paths and directories
-        self.winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
-        self.prefixes_dir = self.winecharmdir / "Prefixes"
-        self.templates_dir = self.winecharmdir / "Templates"
-        self.runners_dir = self.winecharmdir / "Runners"
-        self.default_template = self.templates_dir / "WineCharm-win64"
-        
-        self.applicationsdir = Path(os.path.expanduser("~/.local/share/applications")).resolve()
-        self.tempdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/tmp")).resolve()
-        self.iconsdir = Path(os.path.expanduser("~/.local/share/icons")).resolve()
-        self.do_not_kill = "bin/winecharm"
-        
-        self.SOCKET_FILE = self.winecharmdir / "winecharm_socket"
-
-        # Variables that need to be dynamically updated
-        self.runner = ""  # which wine
-        self.wine_version = ""  # runner --version
-        self.template = ""  # default: WineCharm-win64, if not found in settings.yaml
-        self.arch = ""  # default: win
-                
         self.connect("activate", self.on_activate)
         self.connect("startup", self.on_startup)
         self.connect("open", self.on_open)
@@ -82,6 +80,7 @@ class WineCharmApp(Gtk.Application):
         self.count = 0
         self.focus_event_timer_id = None        
         self.create_required_directories() # Create Required Directories
+        self.tempdir = tempdir
         self.icon_view = False
         self.script_list = {}
         # Register the SIGINT signal handler
@@ -147,13 +146,13 @@ class WineCharmApp(Gtk.Application):
 
     def create_required_directories(self):
         winecharm_data_dir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data")).resolve()
-        self.tempdir =  winecharm_data_dir / "tmp"
-        self.winecharmdir = winecharm_data_dir / "winecharm"
-        self.prefixes_dir = self.winecharmdir / "Prefixes"
-        self.templates_dir = self.winecharmdir / "Templates"
-        self.runners_dir = self.winecharmdir / "Runners"
+        tempdir =  winecharm_data_dir / "tmp"
+        winecharmdir = winecharm_data_dir / "winecharm"
+        prefixes_dir = winecharmdir / "Prefixes"
+        templates_dir = winecharmdir / "Templates"
+        runners_dir = winecharmdir / "Runners"
 
-        directories = [self.winecharmdir, self.prefixes_dir, self.templates_dir, self.runners_dir, self.tempdir]
+        directories = [winecharmdir, prefixes_dir, templates_dir, runners_dir, tempdir]
 
         for directory in directories:
             self.ensure_directory_exists(directory)
@@ -206,8 +205,8 @@ class WineCharmApp(Gtk.Application):
                     # Build command string for matching (similar to pgrep)
                     command = " ".join(proc_cmdline) if proc_cmdline else proc_name
                     
-                    # Check if this is a WineCharm process (using self.do_not_kill pattern)
-                    if self.do_not_kill in command:
+                    # Check if this is a WineCharm process (using do_not_kill pattern)
+                    if do_not_kill in command:
                         winecharm_pids.append(pid)
                     # Check if this is a .exe process and exclude PID 1 (system process)
                     elif exe_name_pattern in command.lower() and pid != 1:
@@ -247,7 +246,7 @@ class WineCharmApp(Gtk.Application):
             transient_for=self.window,
             application_name="WineCharm",
             application_icon="io.github.fastrizwaan.WineCharm",
-            version=f"{self.version}",
+            version=f"{version}",
             copyright="GNU General Public License (GPLv3+)",
             comments="A Charming Wine GUI Application",
             website="https://github.com/fastrizwaan/WineCharm",
@@ -283,8 +282,8 @@ class WineCharmApp(Gtk.Application):
         if missing_programs:
             self.show_missing_programs_dialog(missing_programs)
         else:
-            if not self.default_template.exists():
-                self.initialize_template(self.default_template, self.on_template_initialized)
+            if not default_template.exists():
+                self.initialize_template(default_template, self.on_template_initialized)
             else:
                 self.set_dynamic_variables()
                 # Process the command-line file if the template already exists
@@ -451,23 +450,14 @@ class WineCharmApp(Gtk.Application):
         dialog.present()
         
     def set_dynamic_variables(self):
-        # Set instance attributes instead of globals
-        self.runner = subprocess.getoutput('which wine')
-        self.wine_version = subprocess.getoutput(f"{self.runner} --version")
-        
-        # Check if settings.yml exists and set the template and arch accordingly
-        settings_file = self.winecharmdir / "settings.yml"
-        if settings_file.exists():
-            settings = self.load_settings()  # Assuming load_settings() returns a dictionary
-            self.template = settings.get('template', "WineCharm-win64")
-            self.arch = settings.get('arch', "win64")
-        else:
-            self.template = "WineCharm-win64"
-            self.arch = "win64"
-
+        global runner, wine_version, template, arch
+        runner = subprocess.getoutput('which wine')
+        wine_version = subprocess.getoutput(f"{runner} --version")
+        template = "WineCharm-win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('template', "WineCharm-win64")
+        arch = "win64" if not (winecharmdir / "settings.yml").exists() else self.load_settings().get('arch', "win64")
 
     def load_settings(self):
-        settings_file_path = self.winecharmdir / "settings.yml"
+        settings_file_path = winecharmdir / "settings.yml"
         if settings_file_path.exists():
             with open(settings_file_path, 'r') as settings_file:
                 return yaml.safe_load(settings_file)
@@ -518,8 +508,8 @@ class WineCharmApp(Gtk.Application):
                 self._monitoring_id = None
 
     def handle_sigint(self, signum, frame):
-        if self.SOCKET_FILE.exists():
-            self.SOCKET_FILE.unlink()
+        if SOCKET_FILE.exists():
+            SOCKET_FILE.unlink()
         self.quit()
 
     def create_main_window(self):
@@ -1100,8 +1090,8 @@ class WineCharmApp(Gtk.Application):
 
     def find_python_scripts(self):
         scripts = []
-        for root, dirs, files in os.walk(self.prefixes_dir):
-            depth = root[len(str(self.prefixes_dir)):].count(os.sep)
+        for root, dirs, files in os.walk(prefixes_dir):
+            depth = root[len(str(prefixes_dir)):].count(os.sep)
             if depth >= 2:
                 dirs[:] = []  # Prune the search space
                 continue
@@ -1321,7 +1311,7 @@ class WineCharmApp(Gtk.Application):
         runner_dir = shlex.quote(str(runner_dir))
         exe_name = shlex.quote(str(exe_name))
         
-        if self.debug:
+        if debug:
             print("--------------------- launch_script_data ------------------")
             print(f"exe_file = {exe_file}\nscript = {script}\nprogname = {progname}")
             print(f"script_args = {script_args}\nscript_key = {script_key}")
@@ -1372,7 +1362,7 @@ class WineCharmApp(Gtk.Application):
             command = (f"cd {exe_parent} && "
                        f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} "
                        f"{runner} {exe_name} {script_args}" )
-        if self.debug:
+        if debug:
             print(f"----------------------Launch Command--------------------")
             print(f"{command}")
             print(f"--------------------------------------------------------")
@@ -1401,7 +1391,7 @@ class WineCharmApp(Gtk.Application):
 
         except Exception as e:
             print(f"Error launching script: {e}")
-        if self.debug:
+        if debug:
             print(f"launched self.running_processes[script_key]: {self.running_processes[script_key]}")
             print("-------------------Launch Script's self.running_processes--------------------")
             print(self.running_processes)
@@ -1471,13 +1461,13 @@ class WineCharmApp(Gtk.Application):
                     f"grep -v 'svchost.exe'   | grep -v 'plugplay.exe' | grep -v 'winedevice.exe' | "
                     f"cut -f2- -d '_' | tr \"'\" ' '"
                     )
-                if self.debug:    
+                if debug:    
                     print("---------run_get_child_pid's winedbg_command_with_grep---------------")
                     print(winedbg_command_with_grep)
                     print("--------/run_get_child_pid's winedbg_command_with_grep---------------")
             
                 winedbg_output_filtered = subprocess.check_output(winedbg_command_with_grep, shell=True, text=True).strip().splitlines()
-                if self.debug:    
+                if debug:    
                     print("--------- run_get_child_pid's winedbg_output_filtered ---------------")
                     print(winedbg_output_filtered)
                     print("---------/run_get_child_pid's winedbg_output_filtered ---------------")
@@ -1497,19 +1487,19 @@ class WineCharmApp(Gtk.Application):
                     f"grep \"{cleaned_exe_parent_name}\" | grep -v 'grep' | "
                     f"sed 's/^ *//g' | cut -f1 -d ' '"
                     )
-                    if self.debug:    
+                    if debug:    
                         print("--------- run_get_child_pid's pgrep_command ---------------")
                         print(f"{pgrep_command}")
                         print("---------/run_get_child_pid's pgrep_command ---------------")
                         pgrep_output = subprocess.check_output(pgrep_command, shell=True, text=True).strip()
                         child_pids.update(pgrep_output.splitlines())
                         
-                    if self.debug:    
+                    if debug:    
                         print("--------- run_get_child_pid's pgrep_output ---------------")
                         print(f"{pgrep_output}")
                         print("---------/run_get_child_pid's pgrep_output ---------------")
                         
-                    if self.debug:    
+                    if debug:    
                         print("--------- run_get_child_pid's child_pids pgrep_output.splitlines() ---------------")
                         print(f"{pgrep_output.splitlines()}")
                         print("---------/run_get_child_pid's child_pids pgrep_output.splitlines() ---------------")
@@ -1683,8 +1673,8 @@ class WineCharmApp(Gtk.Application):
             # Get all running .exe processes with their command lines
             pgrep_output = subprocess.check_output(["pgrep", "-aif", "\\.exe"]).decode().splitlines()
 
-            # Filter out any processes that match self.do_not_kill
-            pgrep_output = [line for line in pgrep_output if self.do_not_kill not in line]
+            # Filter out any processes that match do_not_kill
+            pgrep_output = [line for line in pgrep_output if do_not_kill not in line]
             
             for script_key, script_data in self.script_list.items():
                 #print("=======================================================")
@@ -1865,9 +1855,9 @@ class WineCharmApp(Gtk.Application):
 
         # Handle prefix directory
         if prefix_dir is None:
-            prefix_dir = self.prefixes_dir / f"{exe_no_space}-{sha256sum}"
+            prefix_dir = prefixes_dir / f"{exe_no_space}-{sha256sum}"
             if not prefix_dir.exists():
-                if self.default_template.exists():
+                if default_template.exists():
                     self.copy_template(prefix_dir)
                 else:
                     self.ensure_directory_exists(prefix_dir)
@@ -2395,14 +2385,14 @@ class WineCharmApp(Gtk.Application):
                 ['tar', '-tf', file_path],
                 universal_newlines=True
             ).splitlines()[0].split('/')[0]
-            extracted_prefix_dir = Path(self.prefixes_dir) / extracted_prefix_name
+            extracted_prefix_dir = Path(prefixes_dir) / extracted_prefix_name
 
             print(f"Extracted prefix name: {extracted_prefix_name}")
             print(f"Extracting to: {extracted_prefix_dir}")
 
-            # Step 3: Extract the archive to self.prefixes_dir
+            # Step 3: Extract the archive to prefixes_dir
             subprocess.run(
-                ['tar', '-I', 'zstd -T0', '-xf', file_path, '-C', self.prefixes_dir],
+                ['tar', '-I', 'zstd -T0', '-xf', file_path, '-C', prefixes_dir],
                 check=True
             )
 
@@ -3263,7 +3253,7 @@ class WineCharmApp(Gtk.Application):
                  print(f"Template is being initialized, skipping copy_template!!!!")
                  return
             print(f"Copying default template to {prefix_dir}")
-            shutil.copytree(self.default_template, prefix_dir, symlinks=True)
+            shutil.copytree(default_template, prefix_dir, symlinks=True)
         except shutil.Error as e:
             for src, dst, err in e.args[0]:
                 if not os.path.exists(dst):
@@ -3294,14 +3284,14 @@ class WineCharmApp(Gtk.Application):
                 desktop_file.write(desktop_file_content)
 
             # Create a symlink to the desktop entry in the applications directory
-            symlink_path = self.applicationsdir / f"{progname}.desktop"
+            symlink_path = applicationsdir / f"{progname}.desktop"
             if symlink_path.exists() or symlink_path.is_symlink():
                 symlink_path.unlink()
             symlink_path.symlink_to(desktop_file_path)
 
             # Create a symlink to the icon in the icons directory if it exists
             if icon_path:
-                icon_symlink_path = self.iconsdir / f"{icon_path.name}"
+                icon_symlink_path = iconsdir / f"{icon_path.name}"
                 if icon_symlink_path.exists() or icon_symlink_path.is_symlink():
                     icon_symlink_path.unlink(missing_ok=True)
                 icon_symlink_path.symlink_to(icon_path)
@@ -3312,17 +3302,17 @@ class WineCharmApp(Gtk.Application):
 
     def start_socket_server(self):
         def server_thread():
-            socket_dir = self.SOCKET_FILE.parent
+            socket_dir = SOCKET_FILE.parent
 
             # Ensure the directory for the socket file exists
             self.create_required_directories()
 
             # Remove existing socket file if it exists
-            if self.SOCKET_FILE.exists():
-                self.SOCKET_FILE.unlink()
+            if SOCKET_FILE.exists():
+                SOCKET_FILE.unlink()
             
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as server:
-                server.bind(str(self.SOCKET_FILE))
+                server.bind(str(SOCKET_FILE))
                 server.listen()
                 while True:
                     conn, _ = server.accept()
@@ -3363,8 +3353,8 @@ class WineCharmApp(Gtk.Application):
             if missing_programs:
                 self.show_missing_programs_dialog(missing_programs)
             else:
-                if not self.default_template.exists():
-                    self.initialize_template(self.default_template, self.on_template_initialized)
+                if not default_template.exists():
+                    self.initialize_template(default_template, self.on_template_initialized)
                 else:
                     self.set_dynamic_variables()
 
@@ -3537,7 +3527,7 @@ class WineCharmApp(Gtk.Application):
                     self.show_processing_spinner(f"Importing {Path(directory).name}")
                     self.disable_open_button()
 
-                    dest_dir = self.prefixes_dir / Path(directory).name
+                    dest_dir = prefixes_dir / Path(directory).name
                     print(f"Copying Wine directory to: {dest_dir}")
                     threading.Thread(target=self.copy_wine_directory, args=(directory, dest_dir)).start()
                 else:
@@ -3689,8 +3679,8 @@ class WineCharmApp(Gtk.Application):
 
         # Find all .charm files
         scripts = []
-        for root, dirs, files in os.walk(self.prefixes_dir):
-            depth = root[len(str(self.prefixes_dir)):].count(os.sep)
+        for root, dirs, files in os.walk(prefixes_dir):
+            depth = root[len(str(prefixes_dir)):].count(os.sep)
             if depth >= 2:
                 dirs[:] = []  # Prune the search space
                 continue
@@ -3729,10 +3719,10 @@ def main():
     app = WineCharmApp()
 
     if args.file:
-        if app.SOCKET_FILE.exists():
+        if SOCKET_FILE.exists():
             try:
                 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
-                    client.connect(str(app.SOCKET_FILE))
+                    client.connect(str(SOCKET_FILE))
                     file_extension = Path(args.file).suffix.lower()
                     if not file_extension in ['.exe', '.msi']:
                          print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
@@ -3756,8 +3746,8 @@ def main():
 
     app.run(sys.argv)
 
-    if app.SOCKET_FILE.exists():
-        app.SOCKET_FILE.unlink()
+    if SOCKET_FILE.exists():
+        SOCKET_FILE.unlink()
 
 
 if __name__ == "__main__":
