@@ -236,7 +236,7 @@ class WineCharmApp(Gtk.Application):
 
         # Optionally, clear the running processes dictionary
         self.running_processes.clear()
-        GLib.timeout_add_seconds(0, self.create_script_list)
+        GLib.timeout_add_seconds(0.5, self.create_script_list)
 
     def on_help_clicked(self, action=None, param=None):
         print("Help action triggered")
@@ -355,7 +355,7 @@ class WineCharmApp(Gtk.Application):
         self.show_initializing_step("Initialization Complete!")
         self.mark_step_as_done("Initialization Complete!")
         self.hide_processing_spinner()
-        GLib.timeout_add_seconds(0, self.create_script_list)
+        GLib.timeout_add_seconds(0.5, self.create_script_list)
         
         # Check if there's a command-line file to process after initialization
         if self.command_line_file:
@@ -640,7 +640,7 @@ class WineCharmApp(Gtk.Application):
         key_controller.connect("key-pressed", self.on_key_pressed)
         self.window.add_controller(key_controller)
 
-        GLib.timeout_add_seconds(0, self.create_script_list)
+        GLib.timeout_add_seconds(0.5, self.create_script_list)
 
     def create_menu_model(self):
         menu = Gio.Menu()
@@ -716,7 +716,7 @@ class WineCharmApp(Gtk.Application):
         
         # Optionally, show a message if no scripts match the search term
         if not found_match:
-            GLib.timeout_add_seconds(0, self.show_info_dialog, "No Results", "No scripts match your search criteria.")
+            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "No Results", "No scripts match your search criteria.")
 
 
     def on_open_button_clicked(self, button):
@@ -727,7 +727,7 @@ class WineCharmApp(Gtk.Application):
         filter_model = Gio.ListStore.new(Gtk.FileFilter)
         filter_model.append(self.create_file_filter())
         file_dialog.set_filters(filter_model)
-        file_dialog.open(self.window, None, self.on_file_dialog_response)
+        file_dialog.open(self.window, None, self.on_open_file_dialog_response)
 
     def create_file_filter(self):
         file_filter = Gtk.FileFilter()
@@ -737,7 +737,7 @@ class WineCharmApp(Gtk.Application):
         file_filter.add_pattern("*.msi")
         return file_filter
 
-    def on_file_dialog_response(self, dialog, result):
+    def on_open_file_dialog_response(self, dialog, result):
         try:
             file = dialog.open_finish(result)
             if file:
@@ -779,6 +779,8 @@ class WineCharmApp(Gtk.Application):
                 pass  # Keep showing spinner
             else:
                 GLib.idle_add(self.hide_processing_spinner)
+            
+            GLib.timeout_add_seconds(0.5, self.create_script_list)
 
     def on_back_button_clicked(self, button):
         #print("Back button clicked")
@@ -1358,7 +1360,7 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
             GLib.idle_add(play_stop_button.set_tooltip_text, "Exe Not Found")
             play_stop_button.add_css_class("red")
-            GLib.timeout_add_seconds(0, self.show_info_dialog, "Exe Not found", str(Path(exe_file)))
+            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Exe Not found", str(Path(exe_file)))
             return
         else:
             play_stop_button.remove_css_class("red")
@@ -1927,7 +1929,7 @@ class WineCharmApp(Gtk.Application):
         self.script_list = {sha256_hash.hexdigest(): yaml_data, **self.script_list}
 
 #        self.add_or_update_script_row(sha256_hash.hexdigest(), yaml_data)
-        GLib.timeout_add_seconds(0, self.create_script_list)
+        
 
 
 
@@ -2170,6 +2172,8 @@ class WineCharmApp(Gtk.Application):
                 # Only one exe file, use the product_name for the YAML file
                 self.create_yaml_file(exe_files[0], wineprefix, use_exe_name=False)
 
+        # After create_yaml_file is finished, re-create the script list    
+        GLib.timeout_add_seconds(0.5, self.create_script_list)
 
 
 
@@ -2321,11 +2325,11 @@ class WineCharmApp(Gtk.Application):
             self.create_backup_archive(wineprefix, backup_path)
 
             # Notify the user that the backup is complete
-            GLib.timeout_add_seconds(0, self.show_info_dialog, "Backup Complete", f"Backup saved to {backup_path}")
+            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Backup Complete", f"Backup saved to {backup_path}")
 
         except Exception as e:
             print(f"Error during backup: {e}")
-            GLib.timeout_add_seconds(0, self.show_info_dialog, "Backup Failed", str(e))
+            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Backup Failed", str(e))
             
 
         finally:
@@ -2333,72 +2337,74 @@ class WineCharmApp(Gtk.Application):
             self.process_reg_files(wineprefix)
 
 
-    def on_backup_dialog_response(self, dialog, response, script):
-        if response == Gtk.ResponseType.OK:
-            backup_file = dialog.get_file()
-            if backup_file:
-                backup_path = backup_file.get_path()
-                print(f"Backup will be saved to: {backup_path}")
-                # Proceed to backup
-                threading.Thread(target=self.backup_prefix, args=(script, backup_path)).start()
-        dialog.destroy()
-
     def show_backup_prefix_dialog(self, script, button):
         # Step 1: Suggest the backup file name
         default_backup_name = f"{script.stem} prefix backup.tar.zst"
 
-        # Create a dialog to get the backup file name and target directory
-        dialog = Gtk.FileChooserDialog(
-            title="Select Backup Location",
-            action=Gtk.FileChooserAction.SAVE,
-            transient_for=self.window,
-            modal=True
-        )
-        dialog.add_buttons(
-            "Cancel", Gtk.ResponseType.CANCEL,
-            "Save", Gtk.ResponseType.OK
-        )
+        # Create a Gtk.FileDialog instance for saving the file
+        file_dialog = Gtk.FileDialog.new()
 
-        # Set the default backup file name
-        dialog.set_current_name(default_backup_name)
+        # Set the initial file name using set_initial_name() method
+        file_dialog.set_initial_name(default_backup_name)
 
-        # Show the dialog and connect the response handler
-        dialog.connect("response", self.on_backup_dialog_response, script)
-        dialog.present()
+        # Open the dialog asynchronously to select the save location
+        file_dialog.save(self.window, None, self.on_backup_prefix_dialog_response, script)
+
+        print("FileDialog presented for saving the backup.")
+
+    def on_backup_prefix_dialog_response(self, dialog, result, script):
+        try:
+            # Retrieve the selected file (save location) using save_finish()
+            backup_file = dialog.save_finish(result)
+            if backup_file:
+                backup_path = backup_file.get_path()  # Get the backup file path
+                print(f"Backup will be saved to: {backup_path}")
+                
+                # Start the backup process in a separate thread
+                threading.Thread(target=self.backup_prefix, args=(script, backup_path)).start()
+
+        except GLib.Error as e:
+            # Handle any errors, such as cancellation
+            print(f"An error occurred: {e}")
+
 
     def restore_from_backup(self, action=None, param=None):
-        # Step 1: Show open file dialog to select a .tar.zst file
+        # Step 1: Create required directories (if needed)
         self.create_required_directories()
 
-        dialog = Gtk.FileChooserDialog(
-            title="Select Backup File",
-            transient_for=self.window,
-            modal=True,
-            action=Gtk.FileChooserAction.OPEN
-        )
-        dialog.add_buttons("Cancel", Gtk.ResponseType.CANCEL, "Open", Gtk.ResponseType.OK)
+        # Step 2: Create a new Gtk.FileDialog instance
+        file_dialog = Gtk.FileDialog.new()
 
-        # Set the file filter to only show .tar.zst files
-        filter_tar_zst = Gtk.FileFilter()
-        filter_tar_zst.set_name("Compressed Backup Files (*.tar.zst)")
-        filter_tar_zst.add_pattern("*.tar.zst")
-        dialog.add_filter(filter_tar_zst)  # Updated method to add the filter
+        # Step 3: Create a file filter for .tar.zst files
+        file_filter = Gtk.FileFilter()
+        file_filter.set_name("Compressed Backup Files (*.tar.zst)")
+        file_filter.add_pattern("*.tar.zst")
 
-        def on_response(dialog, response):
-            if response == Gtk.ResponseType.OK:
-                # Use `get_file()` to get the selected file in GTK 4, but handle it differently
-                selected_file = dialog.get_file()
-                if selected_file:
-                    file_path = selected_file.get_path()  # Correctly use `get_path()` method from the file object
-                    print(f"Selected file: {file_path}")
-                    
-                    # Start a thread for the extraction process to avoid freezing the UI
-                    threading.Thread(target=self.perform_restore, args=(file_path,)).start()
+        # Step 4: Set the filter on the dialog
+        filter_model = Gio.ListStore.new(Gtk.FileFilter)
+        filter_model.append(file_filter)
+        file_dialog.set_filters(filter_model)
 
-            dialog.close()
+        # Step 5: Open the dialog and handle the response
+        file_dialog.open(self.window, None, self.on_restore_file_dialog_response)
 
-        dialog.connect("response", on_response)
-        dialog.show()
+    def on_restore_file_dialog_response(self, dialog, result):
+        try:
+            # Retrieve the selected file using open_finish() for Gtk.FileDialog in GTK 4
+            file = dialog.open_finish(result)
+            if file:
+                # Get the file path
+                file_path = file.get_path()
+                print(f"Selected file: {file_path}")
+                
+                # Start a thread to restore from the backup (process the file)
+                threading.Thread(target=self.perform_restore, args=(file_path,)).start()
+
+        except GLib.Error as e:
+            # Handle errors, such as dialog cancellation
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"An error occurred: {e}")
+
 
     def perform_restore(self, file_path):
         # Perform the extraction in a separate thread
@@ -2426,11 +2432,11 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(self.create_script_list)  # Schedule to run in the main thread
 
             # Step 6: Show a dialog confirming the extraction is complete
-            GLib.timeout_add_seconds(0, self.show_info_dialog, "Restore Complete", f"Backup extracted to {extracted_prefix_dir}")
+            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Restore Complete", f"Backup extracted to {extracted_prefix_dir}")
 
         except Exception as e:
             print(f"Error extracting backup: {e}")
-            GLib.timeout_add_seconds(0, self.show_info_dialog, "Error", f"Failed to restore backup: {str(e)}")
+            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Error", f"Failed to restore backup: {str(e)}")
 
 
 
@@ -2910,19 +2916,194 @@ class WineCharmApp(Gtk.Application):
 
 
 
-    def show_rename_shortcut_entry(self, script, button):
-        self.replace_button_with_entry_overlay(script, "New Shortcut Name:", button, rename=True)
+    def show_rename_shortcut_entry(self, script, script_key, *args):
+        """
+        Show an Adw.MessageDialog to allow the user to rename a shortcut.
 
-    def show_change_icon_dialog(self, script, option_button, button):
+        Args:
+            script_key: The sha256sum key for the script.
+            button: The button that triggered the rename request.
+        """
+        # Retrieve script_data directly from self.script_list using the sha256sum as script_key
+        print(f"script_key = {script_key}")
+        print(f"self.script_list:\n{self.script_list}")
+        script_data = self.script_list.get(script_key)
+
+        # Handle case where the script_key is not found
+        if not script_data:
+            print(f"Error: Script with key {script_key} not found.")
+            return
+
+        # Get the current name of the shortcut
+        current_name = script_data.get('progname')
+        if not current_name:  # In case the current name is missing
+            current_name = "New Shortcut"
+
+        # Create an Adw.MessageDialog for renaming
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,  # Assuming self.window is the main application window
+            title="Rename Shortcut",
+            body="Enter the new name for the shortcut:"
+        )
+
+        # Create an entry field and set the current name
+        entry = Gtk.Entry()
+        entry.set_text(current_name)
+
+        # Add the entry field to the dialog
+        dialog.set_extra_child(entry)
+
+        # Add "OK" and "Cancel" buttons
+        dialog.add_response("ok", "OK")
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+
+        # Connect the response signal to handle the user's input
+        dialog.connect("response", self.on_show_rename_shortcut_dialog_response, entry, script_key)
+
+        # Present the dialog
+        dialog.present()
+
+    def on_show_rename_shortcut_dialog_response(self, dialog, response_id, entry, script_key):
+        """
+        Handle the response from the Rename Shortcut dialog.
+
+        Args:
+            dialog: The Adw.MessageDialog instance.
+            response_id: The ID of the response clicked by the user.
+            entry: The Gtk.Entry widget where the user entered the new shortcut name.
+            script_key: The key for the script in the script_list.
+        """
+        if response_id == "ok":
+            # Get the new shortcut name from the entry
+            new_name = entry.get_text().strip()
+
+            # Update the script data in both the YAML file and self.script_list
+            try:
+                # Update the in-memory script data
+                script_info = self.extract_yaml_info(script_key)
+                old_progname = script_info.get('progname', '')
+
+                # Update the in-memory representation
+                script_info['progname'] = new_name
+
+                # Get the script path from the script info
+                script_path = Path(script_info['script_path'])
+
+                # Write the updated info back to the YAML file
+                with open(script_path, 'w') as file:
+                    yaml.dump(script_info, file, default_flow_style=False, width=1000)
+
+                # Rename the .charm file and associated icon
+                new_script_path = self.rename_script_and_icon(script_path, old_progname, new_name)
+
+                # Extract icon and create desktop entry
+                exe_file = Path(script_info['exe_file'])  # Assuming exe_file exists in script_info
+                icon_path = new_script_path.with_suffix(".png")  # Correct the icon path generation
+                print("#" * 100)
+                print(icon_path)
+
+                # Remove the old script_key and update script data with the new path
+                if script_key in self.script_list:
+                    # Load the script data first
+                    script_data = self.script_list[script_key]
+
+                    # Update the script path with the new script path
+                    script_data['script_path'] = str(new_script_path)
+                    
+                    # Update self.script_data_two if necessary
+                    self.script_data_two['script_path'] = str(new_script_path)
+
+                    # Remove the old script_key from script_list
+                    del self.script_list[script_key]
+
+                    # Update the UI row for the renamed script
+                    row = self.create_script_row(script_key, script_data)
+                    if row:
+                        self.flowbox.prepend(row)
+
+                    print(f"Removed old script_key {script_key} from script_list")
+
+                # Generate new script_key based on the new shortcut name
+                sha256_hash = hashlib.sha256(new_script_path.stem.encode())
+
+                # Add the new script data directly to self.script_list with the new script_key
+                self.script_list[sha256_hash.hexdigest()] = script_info
+
+                # Mark the script as new and update the UI
+                self.new_scripts.add(new_script_path.stem)
+                print("#" * 100)
+                print(self.new_scripts)
+                print(new_script_path.stem)
+
+                # Add or update script row in UI
+                self.script_list = {sha256_hash.hexdigest(): script_info, **self.script_list}
+
+                # Refresh the UI to load the renamed script
+                self.create_script_list()
+
+                print(f"Renamed and loaded script: {new_script_path}")
+
+            except Exception as e:
+                print(f"Error updating shortcut name for {script_key}: {e}")
+
+        else:
+            print("Shortcut rename canceled")
+
+        # Close the dialog
+        dialog.close()
+
+
+    def rename_script_and_icon(self, script_path, old_progname, new_name):
+        """
+        Rename the script file and its associated icon file.
+
+        Args:
+            script_path: The path to the script file.
+            old_progname: The old name of the shortcut.
+            new_name: The new name of the shortcut.
+
+        Returns:
+            Path: The new path of the renamed script file.
+        """
+        try:
+            # Rename the icon file if it exists
+            old_icon_name = f"{old_progname.replace(' ', '_')}.png"
+            new_icon_name = f"{new_name.replace(' ', '_')}.png"
+            icon_path = script_path.parent / old_icon_name
+            if icon_path.exists():
+                new_icon_path = script_path.parent / new_icon_name
+                icon_path.rename(new_icon_path)
+                print(f"Renamed icon from {old_icon_name} to {new_icon_name}")
+
+            # Rename the .charm file
+            new_script_path = script_path.with_stem(new_name.replace(' ', '_'))
+            script_path.rename(new_script_path)
+            print(f"Renamed script from {script_path} to {new_script_path}")
+            self.headerbar.set_title_widget(self.create_icon_title_widget(new_script_path))
+            return new_script_path
+
+        except Exception as e:
+            print(f"Error renaming script or icon: {e}")
+            return script_path  # Return the original path in case of failure
+
+
+    def show_change_icon_dialog(self, script, *args):
         file_dialog = Gtk.FileDialog.new()
         file_filter = Gtk.FileFilter()
         file_filter.set_name("Image and Executable files")
         file_filter.add_mime_type("image/png")
         file_filter.add_mime_type("image/svg+xml")
+        file_filter.add_mime_type("image/jpeg")  # For .jpg and .jpeg
+
         file_filter.add_mime_type("application/x-ms-dos-executable")
         file_filter.add_pattern("*.exe")
         file_filter.add_pattern("*.msi")
-
+        file_filter.add_pattern("*.jpg")
+        file_filter.add_pattern("*.jpeg")
+        
         filter_model = Gio.ListStore.new(Gtk.FileFilter)
         filter_model.append(file_filter)
         file_dialog.set_filters(filter_model)
@@ -2935,20 +3116,20 @@ class WineCharmApp(Gtk.Application):
             if file:
                 file_path = file.get_path()
                 suffix = Path(file_path).suffix.lower()
-                if suffix in [".png", ".svg"]:
+                if suffix in [".png", ".svg", ".jpg", ".jpeg"]:
                     self.change_icon(script, file_path)
                 elif suffix in [".exe", ".msi"]:
                     self.extract_and_change_icon(script, file_path)
                 # Update the icon in the title bar
                 self.headerbar.set_title_widget(self.create_icon_title_widget(script))
+                self.new_scripts.add(script.stem)
         except GLib.Error as e:
-            print(f"An error occurred: {e}")
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"An error occurred: {e}")
+
 
     def change_icon(self, script, new_icon_path):
-        script_data = self.extract_yaml_info(script_key)
-        if not script_data:
-            return None    
-        script_path = Path(script_data['script_path'])
+        script_path = Path(script)
         icon_path = script_path.with_suffix(".png")
         backup_icon_path = icon_path.with_suffix(".bak")
 
@@ -2956,10 +3137,11 @@ class WineCharmApp(Gtk.Application):
             shutil.move(icon_path, backup_icon_path)
 
         shutil.copy(new_icon_path, icon_path)
-        self.create_script_list()
+        
+        
 
     def extract_and_change_icon(self, script, exe_path):
-        script_path = Path(script_data['script_path'])
+        script_path = Path(script)
         icon_path = script_path.with_suffix(".png")
         backup_icon_path = icon_path.with_suffix(".bak")
 
@@ -2969,7 +3151,8 @@ class WineCharmApp(Gtk.Application):
         extracted_icon_path = self.extract_icon(exe_path, script_path.parent, script_path.stem, script_path.stem)
         if extracted_icon_path:
             shutil.move(extracted_icon_path, icon_path)
-        self.create_script_list()
+            
+  
 
 
 
@@ -3186,12 +3369,12 @@ class WineCharmApp(Gtk.Application):
                 return
 
             self.create_yaml_file(abs_file_path, None)
-            GLib.timeout_add_seconds(0, self.create_script_list)
         except Exception as e:
             print(f"Error processing file: {e}")
         finally:
             print("hide_processing_spinner")
             GLib.idle_add(self.hide_processing_spinner)
+            GLib.timeout_add_seconds(0.5, self.create_script_list)
 
     def on_confirm_action(self, button, script, action_type, parent, original_button):
         try:
@@ -3350,7 +3533,7 @@ class WineCharmApp(Gtk.Application):
                                 title = command_parts[1]
                                 body = command_parts[2]
                                 # Call show_info_dialog in the main thread using GLib.idle_add
-                                GLib.timeout_add_seconds(0, self.show_info_dialog, title, body)
+                                GLib.timeout_add_seconds(0.5, self.show_info_dialog, title, body)
                             elif command == "process_file":
                                 file_path = command_parts[1]
                                 GLib.idle_add(self.process_cli_file, file_path)
@@ -3393,6 +3576,8 @@ class WineCharmApp(Gtk.Application):
                 pass  # Keep showing spinner
             else:
                 GLib.timeout_add_seconds(1, self.hide_processing_spinner)
+                
+            GLib.timeout_add_seconds(0.5, self.create_script_list)
 
 
     def show_processing_spinner(self, message="Processing..."):
@@ -3454,7 +3639,7 @@ class WineCharmApp(Gtk.Application):
                 self.process_cli_file(self.command_line_file)
             else:
                 print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
-                GLib.timeout_add_seconds(0, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
+                GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
                 self.command_line_file = None
                 return False
 
@@ -3517,40 +3702,47 @@ class WineCharmApp(Gtk.Application):
     
 # import wine directory
     def on_import_wine_directory_clicked(self, action, param):
-        dialog = Gtk.FileChooserDialog(
-            title="Select Wine Directory",
-            action=Gtk.FileChooserAction.SELECT_FOLDER,
-            transient_for=self.window,
-            modal=True
-        )
-        dialog.add_buttons(
-            "Cancel", Gtk.ResponseType.CANCEL,
-            "Open", Gtk.ResponseType.OK
-        )
-        dialog.connect("response", self.on_import_directory_response)
-        dialog.present()
-        print("FileChooserDialog presented for importing Wine directory.")
+        # Create a new Gtk.FileDialog for selecting a directory
+        file_dialog = Gtk.FileDialog.new()
 
+        # Set the action to select a folder (in GTK 4, it's done by default via FileDialog)
+        file_dialog.set_modal(True)
 
-    def on_import_directory_response(self, dialog, response):
-        if response == Gtk.ResponseType.OK:
-            file = dialog.get_file()
-            if file:
-                directory = file.get_path()
+        # Open the dialog to select a folder (async operation)
+        file_dialog.select_folder(self.window, None, self.on_import_directory_response)
+
+        print("FileDialog presented for importing Wine directory.")
+
+    def on_import_directory_response(self, dialog, result):
+        try:
+            # Retrieve the selected directory using select_folder_finish() in GTK 4
+            folder = dialog.select_folder_finish(result)
+            if folder:
+                directory = folder.get_path()  # Get the directory path
                 print(f"Selected directory: {directory}")
+
+                # Check if it's a valid Wine directory by verifying the existence of "system.reg"
                 if directory and (Path(directory) / "system.reg").exists():
                     print(f"Valid Wine directory selected: {directory}")
                     self.show_processing_spinner(f"Importing {Path(directory).name}")
                     self.disable_open_button()
 
+                    # Copy the Wine directory to the prefixes directory
                     dest_dir = self.prefixes_dir / Path(directory).name
                     print(f"Copying Wine directory to: {dest_dir}")
+                    
+                    # Use threading to avoid blocking the UI while copying
                     threading.Thread(target=self.copy_wine_directory, args=(directory, dest_dir)).start()
                 else:
                     print(f"Invalid directory selected: {directory}")
-                    GLib.timeout_add_seconds(0, self.show_info_dialog, "Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
-        dialog.destroy()
-        print("FileChooserDialog destroyed.")
+                    GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
+        
+        except GLib.Error as e:
+            # Handle any errors that occurred during folder selection
+            print(f"An error occurred: {e}")
+
+        print("FileDialog operation complete.")
+
 
     def copy_wine_directory(self, src, dst):
         try:
@@ -3577,6 +3769,8 @@ class WineCharmApp(Gtk.Application):
         exe_files = self.find_exe_files(wineprefix)
         for exe_file in exe_files:
             self.create_yaml_file(exe_file, wineprefix, use_exe_name=True)
+            
+        GLib.timeout_add_seconds(0.5, self.create_script_list)
 
     def find_exe_files(self, wineprefix):
         drive_c = Path(wineprefix) / "drive_c"
@@ -3744,7 +3938,7 @@ def main():
             # If no instance is running, start WineCharmApp and show the error dialog directly
             if not app.SOCKET_FILE.exists():
                 app.start_socket_server()
-                GLib.timeout_add_seconds(0, app.show_info_dialog, "Invalid File Type", f"Only .exe or .msi files are allowed. You provided: {file_extension}")
+                GLib.timeout_add_seconds(1.5, app.show_info_dialog, "Invalid File Type", f"Only .exe or .msi files are allowed. You provided: {file_extension}")
                 app.run(sys.argv)
 
                 # Clean up the socket file
