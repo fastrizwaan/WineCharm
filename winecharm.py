@@ -511,18 +511,27 @@ class WineCharmApp(Gtk.Application):
         self.monitoring_active = False
 
     def start_monitoring(self, delay=2):
-        self.stop_monitoring()  # Ensure the old monitoring is stopped before starting a new one
-        self._monitoring_id = GLib.timeout_add_seconds(delay, self.check_running_processes_and_update_buttons)
+        """
+        Start the monitoring process if it's not already active.
+        """
+        # Check if monitoring is already active
+        if not hasattr(self, 'monitoring_active') or not self.monitoring_active:
+            self.monitoring_active = True
+            self._monitoring_id = GLib.timeout_add_seconds(delay, self.check_running_processes_and_update_buttons)
 
     def stop_monitoring(self):
+        """
+        Stop the GLib monitoring if it's currently active.
+        """
         if hasattr(self, '_monitoring_id') and self._monitoring_id is not None:
-            try:
-                if GLib.source_remove(self._monitoring_id):
-                    #print(f"Monitoring source {self._monitoring_id} removed.")
-                    self._monitoring_id = None
-            except ValueError:
-                #print(f"Warning: Attempted to remove a non-existent or already removed source ID {self._monitoring_id}")
-                self._monitoring_id = None
+            # Attempt to remove the monitoring source
+            removed = GLib.source_remove(self._monitoring_id)
+            if removed:
+                print(f"Monitoring source {self._monitoring_id} removed.")
+            self._monitoring_id = None
+        # Reset the monitoring_active flag
+        self.monitoring_active = False
+
 
     def handle_sigint(self, signum, frame):
         if self.SOCKET_FILE.exists():
@@ -1642,8 +1651,8 @@ class WineCharmApp(Gtk.Application):
                 if row and row.get_parent():
                     self.update_ui_for_running_process(script_key, row, current_running_processes)
 
-        if not current_running_processes:
-            self.stop_monitoring()
+        #if not current_running_processes:
+        #    self.stop_monitoring()
 
     def get_running_processes(self):
         current_running_processes = {}
@@ -1750,14 +1759,15 @@ class WineCharmApp(Gtk.Application):
             row.remove_css_class("highlighted")
             row.remove_css_class("blue")
             ui_state['is_running'] = False
+            ui.state['is_clicked_row'] = False
             print(f"Removed 'highlighted' from row for script_key: {script_key}")
-        else:
-            # Script is running, ensure the 'highlighted' class is added
-            self.update_row_highlight(row, True)
-            #row.remove_css_class("blue")  # Ensure 'blue' is removed
-            row.add_css_class("highlighted")  # Add 'highlighted' for running scripts
-            ui_state['is_running'] = True
-            print(f"Added 'highlighted' to row for script_key: {script_key}")
+#        else:
+#            # Script is running, ensure the 'highlighted' class is added
+#            self.update_row_highlight(row, True)
+#            #row.remove_css_class("blue")  # Ensure 'blue' is removed
+#            row.add_css_class("highlighted")  # Add 'highlighted' for running scripts
+#            ui_state['is_running'] = True
+#            print(f"Added 'highlighted' to row for script_key: {script_key}")
 
         # Update the play/stop button if the script is currently clicked
         if ui_state.get('is_clicked_row', False):
@@ -2235,47 +2245,138 @@ class WineCharmApp(Gtk.Application):
                 file_path = file.get_path()
                 print(f"Selected file: {file_path}")
                 
-                # Start a thread to restore from the backup (process the file)
-                threading.Thread(target=self.perform_restore, args=(file_path,)).start()
+                # Clear the flowbox and show a progress spinner
+                GLib.idle_add(self.flowbox.remove_all)
+                self.show_processing_spinner(f"Restoring from {Path(file_path).name}")
+                self.disconnect_open_button()
+
+                # Start a thread to restore from the backup (process the file in steps)
+                threading.Thread(target=self.perform_restore_steps, args=(file_path,)).start()
 
         except GLib.Error as e:
             # Handle errors, such as dialog cancellation
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                 print(f"An error occurred: {e}")
 
+    def perform_restore_steps(self, file_path):
+        """
+        Perform the restore process in steps, showing progress for each.
+        """
+        steps = [
+            ("Extracting Backup File", lambda: self.extract_backup(file_path)),
+            ("Processing Registry Files", lambda: self.process_reg_files(self.extract_prefix_dir(file_path))),
+            ("Add Shortcuts to Script List", lambda: self.add_charm_files_to_script_list(self.extract_prefix_dir(file_path)))
+        ]
 
-    def perform_restore(self, file_path):
-        # Perform the extraction in a separate thread
-        try:
-            # Step 2: Extract the prefix name from the .tar.zst file
-            extracted_prefix_name = subprocess.check_output(
-                ['tar', '-tf', file_path],
-                universal_newlines=True
-            ).splitlines()[0].split('/')[0]
-            extracted_prefix_dir = Path(self.prefixes_dir) / extracted_prefix_name
+        def perform_steps():
+            for step_text, step_func in steps:
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    step_func()  # Execute the function for this step
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except Exception as e:
+                    print(f"Error during step '{step_text}': {e}")
+                    GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
+                    break
 
-            print(f"Extracted prefix name: {extracted_prefix_name}")
-            print(f"Extracting to: {extracted_prefix_dir}")
+            # Once complete, re-enable the UI and restore the script list
+            GLib.idle_add(self.on_restore_completed)
 
-            # Step 3: Extract the archive to self.prefixes_dir
-            subprocess.run(
-                ['tar', '-I', 'zstd -T0', '-xf', file_path, '-C', self.prefixes_dir],
-                check=True
-            )
+        threading.Thread(target=perform_steps).start()
+        
+    def add_charm_files_to_script_list(self, extracted_prefix_dir):
+        """
+        Find all .charm files in the extracted prefix directory and add them to self.script_list.
+        
+        Args:
+            extracted_prefix_dir: The directory where the Wine prefix has been extracted.
+        """
+        # Look for all .charm files in the extracted directory
+        charm_files = list(Path(extracted_prefix_dir).rglob("*.charm"))  # Recursively find all .charm files
+        
+        if not charm_files:
+            print(f"No .charm files found in {extracted_prefix_dir}")
+            return
 
-            # Step 4: Process the extracted registry files
-            self.process_reg_files(extracted_prefix_dir)
+        print(f"Found {len(charm_files)} .charm files in {extracted_prefix_dir}")
 
-            # Step 5: Update the script list
-            GLib.idle_add(self.create_script_list)  # Schedule to run in the main thread
+        for charm_file in charm_files:
+            try:
+                with open(charm_file, 'r') as file:
+                    script_data = yaml.safe_load(file)  # Load the YAML content from the .charm file
+                    
+                    if not isinstance(script_data, dict):
+                        print(f"Invalid format in {charm_file}")
+                        continue
 
-            # Step 6: Show a dialog confirming the extraction is complete
-            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Restore Complete", f"Backup extracted to {extracted_prefix_dir}")
+                    # Extract the script key (e.g., sha256sum) from the loaded data
+                    script_key = script_data.get('sha256sum')
+                    if not script_key:
+                        print(f"Missing 'sha256sum' in {charm_file}, skipping...")
+                        continue
 
-        except Exception as e:
-            print(f"Error extracting backup: {e}")
-            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Error", f"Failed to restore backup: {str(e)}")
+                    # Add the new script data directly to self.script_list
+                    self.new_scripts.add(charm_file.stem)
+                    # Set 'script_path' to the charm file itself if not already set
+                    script_data['script_path'] = str(charm_file.expanduser().resolve())
+                    self.script_list = {script_key: script_data, **self.script_list}
+                    # Add to self.script_list using the script_key
+                    self.script_list[script_key] = script_data
+                    print(f"Added {charm_file} to script_list with key {script_key}")
 
+            except Exception as e:
+                print(f"Error loading .charm file {charm_file}: {e}")
+        
+        # Once done, update the UI
+       # GLib.idle_add(self.create_script_list)
+
+        
+    def on_restore_completed(self):
+        """
+        Called when the restore process is complete. Updates UI, restores scripts, and resets the open button.
+        """
+        # Reconnect open button and reset its label
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)
+        self.reconnect_open_button()
+        self.hide_processing_spinner()
+
+        # Restore the script list in the flowbox
+        GLib.idle_add(self.create_script_list)
+
+        print("Restore process completed and script list restored.")
+
+    def extract_backup(self, file_path):
+        """
+        Extract the .tar.zst backup to the Wine prefixes directory.
+        """
+        # Step 2: Extract the prefix name from the .tar.zst file
+        extracted_prefix_name = subprocess.check_output(
+            ['tar', '-tf', file_path],
+            universal_newlines=True
+        ).splitlines()[0].split('/')[0]
+        extracted_prefix_dir = Path(self.prefixes_dir) / extracted_prefix_name
+
+        print(f"Extracted prefix name: {extracted_prefix_name}")
+        print(f"Extracting to: {extracted_prefix_dir}")
+
+        # Step 3: Extract the archive to self.prefixes_dir
+        subprocess.run(
+            ['tar', '-I', 'zstd -T0', '-xf', file_path, '-C', self.prefixes_dir],
+            check=True
+        )
+
+        return extracted_prefix_dir  # Return the extracted directory
+
+    def extract_prefix_dir(self, file_path):
+        """
+        Return the extracted prefix directory for the backup file.
+        """
+        extracted_prefix_name = subprocess.check_output(
+            ['tar', '-tf', file_path],
+            universal_newlines=True
+        ).splitlines()[0].split('/')[0]
+        return Path(self.prefixes_dir) / extracted_prefix_name
 
 
     def show_options_for_script(self, ui_state, row, script_key):
