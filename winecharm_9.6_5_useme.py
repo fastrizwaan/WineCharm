@@ -2314,13 +2314,25 @@ class WineCharmApp(Gtk.Application):
                 file_path = file.get_path()
                 print(f"Selected file: {file_path}")
 
+                # Step 1: Check if there's enough disk space before proceeding
+                enough_space, available_space, uncompressed_size = self.check_disk_space_and_uncompressed_size(self.prefixes_dir, file_path)
+
+                if not enough_space:
+                    # Show warning about disk space
+                    self.show_info_dialog(
+                        "Insufficient Disk Space",
+                        f"The uncompressed size of the backup is {uncompressed_size / (1024 * 1024):.2f} MB, "
+                        f"but only {available_space / (1024 * 1024):.2f} MB is available. Please free up space."
+                    )
+                    return
+
                 # Clear the flowbox and show a progress spinner
                 GLib.idle_add(self.flowbox.remove_all)
                 self.show_processing_spinner(f"Restoring from {Path(file_path).name}")
                 self.disconnect_open_button()
 
                 # Start a thread to restore from the backup (process the file in steps)
-                self.perform_restore_steps(file_path)
+                threading.Thread(target=self.perform_restore_steps, args=(file_path,)).start()
 
         except GLib.Error as e:
             # Handle errors, such as dialog cancellation
@@ -2328,6 +2340,32 @@ class WineCharmApp(Gtk.Application):
                 print(f"An error occurred: {e}")
 
 
+    def perform_restore_steps(self, file_path):
+        """
+        Perform the restore process in steps, showing progress for each.
+        """
+        steps = [
+            ("Extracting Backup File", lambda: self.extract_backup(file_path)),
+            ("Processing Registry Files", lambda: self.process_reg_files(self.extract_prefix_dir(file_path))),
+            ("Add Shortcuts to Script List", lambda: self.add_charm_files_to_script_list(self.extract_prefix_dir(file_path)))
+        ]
+
+        def perform_steps():
+            for step_text, step_func in steps:
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    step_func()  # Execute the function for this step
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except Exception as e:
+                    print(f"Error during step '{step_text}': {e}")
+                    GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
+                    break
+
+            # Once complete, re-enable the UI and restore the script list
+            GLib.idle_add(self.on_restore_completed)
+
+        threading.Thread(target=perform_steps).start()
+        
     def add_charm_files_to_script_list(self, extracted_prefix_dir):
         """
         Find all .charm files in the extracted prefix directory and add them to self.script_list.
@@ -2340,7 +2378,6 @@ class WineCharmApp(Gtk.Application):
         
         if not charm_files:
             print(f"No .charm files found in {extracted_prefix_dir}")
-            #GLib.idle_add(self.show_initializing_step, "Checking Available Disk Space")
             return
 
         print(f"Found {len(charm_files)} .charm files in {extracted_prefix_dir}")
@@ -2422,69 +2459,6 @@ class WineCharmApp(Gtk.Application):
             universal_newlines=True
         ).splitlines()[0].split('/')[0]
         return Path(self.prefixes_dir) / extracted_prefix_name
-
-    def perform_restore_steps(self, file_path):
-        """
-        Perform the restore process in steps, showing progress for each.
-        """
-        steps = [
-            ("Checking Uncompressed Size", lambda: self.check_disk_space_and_show_step(file_path)),
-            ("Extracting Backup File", lambda: self.extract_backup(file_path)),
-            ("Processing Registry Files", lambda: self.process_reg_files(self.extract_prefix_dir(file_path))),
-            ("Add Shortcuts to Script List", lambda: self.add_charm_files_to_script_list(self.extract_prefix_dir(file_path))),
-
-        ]
-        #for wzt restore
-#            ("Create Exe Shortcuts", lambda: self.create_scripts_for_exe_files(self.extract_prefix_dir(file_path)))
-        def perform_steps():
-            for step_text, step_func in steps:
-                # Queue the UI update safely in the main thread
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    # Perform the restore step and check the result
-                    result = step_func()
-                    if result is False:
-                        # Stop further steps if a step fails
-                        print(f"Step '{step_text}' failed, aborting restore process.")
-                        break
-
-                    # Mark the step as done in the main thread
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                except Exception as e:
-                    print(f"Error during step '{step_text}': {e}")
-                    GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
-                    break
-
-            # Once complete, update the UI in the main thread
-            GLib.idle_add(self.on_restore_completed)
-
-        # Start the restore process in a new thread
-        threading.Thread(target=perform_steps).start()
-
-
-
-    def check_disk_space_and_show_step(self, file_path):
-        """
-        Check available disk space and the uncompressed size of the backup file, showing this as a step.
-        """
-        # Update the UI to indicate that disk space is being checked
-        #GLib.idle_add(self.show_initializing_step, "Checking Available Disk Space")
-
-        # Perform the disk space and uncompressed size check
-        enough_space, available_space, uncompressed_size = self.check_disk_space_and_uncompressed_size(self.prefixes_dir, file_path)
-
-        if not enough_space:
-            # Show warning about disk space
-            GLib.idle_add(self.show_info_dialog, "Insufficient Disk Space",
-                          f"The uncompressed size of the backup is {uncompressed_size / (1024 * 1024):.2f} MB, "
-                          f"but only {available_space / (1024 * 1024):.2f} MB is available. Please free up space.")
-            return False  # Return False to indicate failure and prevent further steps
-
-        # If enough space, update the UI and log the success
-        GLib.idle_add(self.show_initializing_step, f"Uncompressed size check passed: {uncompressed_size / (1024 * 1024):.2f} MB")
-        print(f"Uncompressed size check passed: {uncompressed_size / (1024 * 1024)} MB")
-
-        return True  # Return True to indicate success
 
 
     def show_options_for_script(self, ui_state, row, script_key):
@@ -3826,7 +3800,6 @@ class WineCharmApp(Gtk.Application):
         self.set_open_button_label("Open")
         self.set_open_button_icon_visible(True)
         print("Open button reconnected and UI reset.")
-        
     def create_scripts_for_exe_files(self, wineprefix):
         exe_files = self.find_exe_files(wineprefix)
         for exe_file in exe_files:
