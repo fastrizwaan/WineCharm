@@ -194,25 +194,24 @@ class WineCharmApp(Gtk.Application):
             wine_exe_pids = []
             exe_name_pattern = ".exe"  # Pattern for executables
 
-            # Iterate over all processes using psutil
-            for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
+            # Find all processes that match the .exe pattern using find_matching_processes
+            matching_processes = self.find_matching_processes(exe_name_pattern)
+
+            for proc in matching_processes:
                 try:
-                    # Process information
                     pid = proc.info['pid']
-                    proc_name = proc.info['name']
-                    proc_exe = proc.info['exe']
                     proc_cmdline = proc.info['cmdline']
-                    
+
                     # Build command string for matching (similar to pgrep)
-                    command = " ".join(proc_cmdline) if proc_cmdline else proc_name
-                    
+                    command = " ".join(proc_cmdline) if proc_cmdline else proc.info['name']
+
                     # Check if this is a WineCharm process (using self.do_not_kill pattern)
                     if self.do_not_kill in command:
                         winecharm_pids.append(pid)
                     # Check if this is a .exe process and exclude PID 1 (system process)
-                    elif exe_name_pattern in command.lower() and pid != 1:
+                    elif pid != 1:
                         wine_exe_pids.append(pid)
-                
+
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     # Ignore processes that are no longer available or cannot be accessed
                     pass
@@ -397,14 +396,22 @@ class WineCharmApp(Gtk.Application):
         self.flowbox.queue_draw()  # Ensure the flowbox redraws itself to show the new button
 
     def mark_step_as_done(self, step_text):
+        """
+        Mark the step as done by updating the UI with a checkmark.
+        """
         child = self.flowbox.get_first_child()
         while child:
             button = child.get_child()
-            if button.label.get_text() == step_text:
-                button.checkbox.set_active(True)
-                button.add_css_class("normal-font")
-                break
+            if isinstance(button, Gtk.Button):  # Ensure you're working with a Gtk.Button
+                label = button.get_child().get_last_child()  # Access the label inside the button
+                if isinstance(label, Gtk.Label) and label.get_text() == step_text:
+                    checkbox = button.get_first_child().get_first_child()  # Access the checkbox inside the button
+                    if isinstance(checkbox, Gtk.CheckButton):
+                        checkbox.set_active(True)  # Mark the checkbox as checked
+                    button.add_css_class("normal-font")  # Optionally update the style
+                    break
             child = child.get_next_sibling()
+
         self.flowbox.queue_draw()  # Ensure the flowbox redraws itself to update the checkbox status
 
     def check_required_programs(self):
@@ -642,15 +649,6 @@ class WineCharmApp(Gtk.Application):
 
         GLib.timeout_add_seconds(0.5, self.create_script_list)
 
-    def create_menu_model(self):
-        menu = Gio.Menu()
-        for label, action in self.hamburger_actions:
-            menu.append(label, f"app.{action.__name__}")
-            action_item = Gio.SimpleAction.new(action.__name__, None)
-            action_item.connect("activate", action)
-            self.add_action(action_item)
-        return menu
-
     def on_key_pressed(self, controller, keyval, keycode, state):
         if keyval == Gdk.KEY_Escape:
             self.search_button.set_active(False)
@@ -680,7 +678,7 @@ class WineCharmApp(Gtk.Application):
         Filters the script list based on the search term and updates the UI accordingly.
         
         Parameters:
-            search_term (str): The term to search for within script names.
+            search_term (str): The term to search for within exe_name, script_name (script_path.stem), or progname.
         """
         # Normalize the search term for case-insensitive matching
         search_term = search_term.lower()
@@ -693,15 +691,15 @@ class WineCharmApp(Gtk.Application):
         
         # Iterate over all scripts in self.script_list using script_key and script_data
         for script_key, script_data in self.script_list.items():
-            # Resolve the script path and executable name
+            # Resolve the script path, executable name, and get the progname
             script_path = Path(script_data['script_path']).expanduser().resolve()
             exe_name = Path(script_data['exe_file']).expanduser().resolve().name
+            progname = script_data.get('progname', '').lower()  # Fallback to empty string if 'progname' is missing
             
-            # Debugging output (optional)
-            print(f"Filtering script: {script_path} with key: {script_key}")
-            
-            # Check if the search term is present in the script's stem (file name without extension)
-            if search_term in script_path.stem.lower():
+            # Check if the search term is present in the exe_name, script_name (stem), or progname
+            if (search_term in exe_name.lower() or 
+                search_term in script_path.stem.lower() or 
+                search_term in progname):
                 found_match = True
                 
                 # Create a script row. Ensure that create_script_row accepts script_key and script_data
@@ -713,10 +711,9 @@ class WineCharmApp(Gtk.Application):
                 # If the script is currently running, update the UI to reflect its running state
                 if script_key in self.running_processes:
                     self.update_ui_for_running_process(script_key, row, self.running_processes)
-        
-        # Optionally, show a message if no scripts match the search term
+
         if not found_match:
-            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "No Results", "No scripts match your search criteria.")
+            print(f"No matches found for search term: {search_term}")
 
 
     def on_open_button_clicked(self, button):
@@ -785,8 +782,6 @@ class WineCharmApp(Gtk.Application):
     def on_back_button_clicked(self, button):
         #print("Back button clicked")
 
-        # Restore the script list
-        GLib.idle_add(self.create_script_list)
 
         # Reset the header bar title and visibility of buttons
         self.window.set_title("Wine Charm")
@@ -810,14 +805,10 @@ class WineCharmApp(Gtk.Application):
         if self.main_frame.get_child() != self.scrolled:
             self.main_frame.set_child(self.scrolled)
 
+        # Restore the script list
+        self.create_script_list()
         self.check_running_processes_and_update_buttons()
         
-    def restore_open_button(self):
-        if not self.open_button.get_parent():
-            self.vbox.prepend(self.open_button)
-        self.open_button.set_visible(True)
-
-                    
     def wrap_text_at_20_chars(self):
         text="Speedpro Installer Setup"
         if len(text) < 20:
@@ -881,21 +872,21 @@ class WineCharmApp(Gtk.Application):
         self.flowbox.remove_all()
 
         # Rebuild the script list
-        self.script_data_two = {}  # Use script_data to hold all script-related data
+        self.script_ui_data = {}  # Use script_data to hold all script-related data
 
         # Iterate over self.script_list
-        for script_key, script_info in self.script_list.items():
-            row = self.create_script_row(script_key, script_info)
+        for script_key, script_data in self.script_list.items():
+            row = self.create_script_row(script_key, script_data)
             if row:
                 self.flowbox.append(row)
 
             # After row creation, highlight if the process is running
             if script_key in self.running_processes:
                 self.update_row_highlight(row, True)
-                self.script_data_two[script_key]['highlighted'] = True
+                self.script_ui_data[script_key]['highlighted'] = True
             else:
                 self.update_row_highlight(row, False)
-                self.script_data_two[script_key]['highlighted'] = False
+                self.script_ui_data[script_key]['highlighted'] = False
 
 
     def create_script_row(self, script_key, script_data):
@@ -999,8 +990,8 @@ class WineCharmApp(Gtk.Application):
         buttons_box.set_halign(Gtk.Align.END)
         buttons_box.set_valign(Gtk.Align.CENTER)
 
-        # **Store references in self.script_data_two**
-        self.script_data_two[script_key] = {
+        # **Store references in self.script_ui_data**
+        self.script_ui_data[script_key] = {
             'row': overlay,  # The overlay that contains the row UI
             'play_button': play_button,  # The play button for the row
             'options_button': options_button,  # The options button
@@ -1014,7 +1005,7 @@ class WineCharmApp(Gtk.Application):
         play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, play_button, overlay))
 
         # Connect the options button to show the script's options
-        options_button.connect("clicked", lambda btn: self.show_options_for_script(self.script_data_two[script_key], overlay, script_key))
+        options_button.connect("clicked", lambda btn: self.show_options_for_script(self.script_ui_data[script_key], overlay, script_key))
 
         # Event handler for button click (handles row highlighting)
         button.connect("clicked", lambda *args: self.on_script_row_clicked(button, play_button, options_button))
@@ -1045,7 +1036,7 @@ class WineCharmApp(Gtk.Application):
 
         # Retrieve the script key associated with the clicked button
         script_key = None
-        for key, info in self.script_data_two.items():
+        for key, info in self.script_ui_data.items():
             if info['row'] == button.get_parent():  # Assuming 'row' is the parent of the button
                 script_key = key
                 break
@@ -1056,14 +1047,14 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Update `is_clicked_row` for all script rows, marking only the current one as True
-        for key, data in self.script_data_two.items():
+        for key, data in self.script_ui_data.items():
             if key == script_key:
                 data['is_clicked_row'] = True  # Mark the current row as clicked
             else:
                 data['is_clicked_row'] = False  # Unmark all other rows
 
         # Iterate over all script buttons and update the UI based on `is_clicked_row`
-        for key, data in self.script_data_two.items():
+        for key, data in self.script_ui_data.items():
             row_button = data['row']
             row_play_button = data['play_button']
             row_options_button = data['options_button']
@@ -1078,7 +1069,7 @@ class WineCharmApp(Gtk.Application):
                 self.hide_buttons(row_play_button, row_options_button)
 
         # Check if the script is running and update the play button and row highlight accordingly
-        if self.script_data_two[script_key]['is_running']:
+        if self.script_ui_data[script_key]['is_running']:
             # Script is running: set play button to 'Stop' and add 'highlighted' class to the row
             self.set_play_stop_button_state(play_button, True)
             play_button.set_tooltip_text("Stop")
@@ -1090,15 +1081,6 @@ class WineCharmApp(Gtk.Application):
             play_button.set_tooltip_text("Play")
             button.remove_css_class("highlighted")  # Remove 'highlighted' if not running
             print(f"Script {script_key} is not running. Setting play button to 'Play' and removing 'highlighted'.")
-
-
-
-
-
-
-    def find_row_by_script_stem(self, script_stem):
-        script_label = script_stem.replace('_', ' ')
-        return self.script_buttons.get(script_label)
 
     def find_python_scripts(self):
         scripts = []
@@ -1193,15 +1175,15 @@ class WineCharmApp(Gtk.Application):
 
 
         # Get the process information for the given script_key
-        script_info = self.script_data_two.get(script_key)
-        if not script_info:
+        ui_state = self.script_ui_data.get(script_key)
+        if not ui_state:
             print(f"No script data found for script_key: {script_key}")
             return
 
         # Retrieve row, play_button, and options_button from script_data_two
-        row = script_info.get('row')
-        play_button = script_info.get('play_button')
-        options_button = script_info.get('options_button')
+        row = ui_state.get('row')
+        play_button = ui_state.get('play_button')
+        options_button = ui_state.get('options_button')
 
         # If the row exists, remove any highlights (un-highlight the row)
         if row:
@@ -1216,18 +1198,18 @@ class WineCharmApp(Gtk.Application):
             #print(f"Play and options buttons hidden for script_key: {script_key}")
 
         # Reset script_data_two's is_running flag for this script
-        script_info['is_running'] = False
+        ui_state['is_running'] = False
 
         # Check if the script was the currently clicked row
         if self.current_clicked_row:
             current_button, current_play_button, current_options_button = self.current_clicked_row
 
-            # If the current clicked row matches the script, un-highlight it and hide buttons
-            if current_button == row:
-                self.hide_buttons(current_play_button, current_options_button)
-                current_button.remove_css_class("blue")
-                self.current_clicked_row = None
-                #print(f"Current clicked row reset for script_key: {script_key}")
+      #      # If the current clicked row matches the script, un-highlight it and hide buttons
+      #      if current_button == row:
+      #          self.hide_buttons(current_play_button, current_options_button)
+      #          current_button.remove_css_class("blue")
+      #          self.current_clicked_row = None
+      #          #print(f"Current clicked row reset for script_key: {script_key}")
 
         # Update the launch button state if the script was launched from it
         if self.launch_button and getattr(self, 'launch_button_exe_name', None) == script_key:
@@ -1260,18 +1242,18 @@ class WineCharmApp(Gtk.Application):
         Resets all UI elements (row highlights, button states) to their default state.
         """
         # Reset row highlights and button states for all scripts in script_data_two
-        for script_key, script_info in self.script_data_two.items():
-            row = script_info.get('row')
-            play_button = script_info.get('play_button')
-            options_button = script_info.get('options_button')
+        for script_key, ui_state in self.script_ui_data.items():
+            row = ui_state.get('row')
+            play_button = ui_state.get('play_button')
+            options_button = ui_state.get('options_button')
 
             # Reset row highlight (remove 'highlighted' and 'blue' classes)
             if row:
                 self.update_row_highlight(row, False)  # Un-highlight the row
                 row.remove_css_class("blue")  # Remove 'blue' if it's applied
                 row.remove_css_class("highlighted")  # Ensure 'highlighted' is also removed
-                script_info['highlighted'] = False  # Update the script info state
-                script_info['is_clicked_row'] = False  # Mark it as not clicked
+                ui_state['highlighted'] = False  # Update the script info state
+                ui_state['is_clicked_row'] = False  # Mark it as not clicked
 
             # Hide play and options buttons
             if play_button and options_button:
@@ -1281,13 +1263,13 @@ class WineCharmApp(Gtk.Application):
             if play_button:
                 self.set_play_stop_button_state(play_button, False)
 
-        # Reset the launch button if it exists
-        if self.launch_button:
-            self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-            self.launch_button.set_tooltip_text("Play")
+            # Reset the launch button if it exists
+            if self.launch_button:
+                self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+                self.launch_button.set_tooltip_text("Play")
 
-        # Clear the currently clicked row information
-        #self.current_clicked_row = None
+            # Clear the currently clicked row information
+            self.current_clicked_row = None
         #print("All UI elements reset to default state.")
 
 
@@ -1555,6 +1537,10 @@ class WineCharmApp(Gtk.Application):
 
 
     def terminate_script(self, script_key):
+        script_data = self.extract_yaml_info(script_key)
+        if not script_data:
+            return None
+            
         # Get process info for the script using the script_key
         process_info = self.running_processes.get(script_key)
 
@@ -1562,10 +1548,13 @@ class WineCharmApp(Gtk.Application):
             print(f"No running process found for script_key: {script_key}")
             return
 
+        runner = script_data['runner'] or "wine"
         # Extract relevant information from process_info
+        #runner = process_info.get('runner', 'wine')
+        #script = Path(script_data['script_path'])
+        #wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
         script = process_info.get('script')
         wineprefix = Path(process_info.get('wineprefix')).expanduser().resolve()
-        runner = process_info.get('runner', 'wine')
         pids = process_info.get("pids", [])
         exe_name = process_info.get('exe_name')
 
@@ -1588,10 +1577,12 @@ class WineCharmApp(Gtk.Application):
                 runner_dir = Path(runner).parent
                 command = f"export PATH={shlex.quote(str(runner_dir))}:$PATH; WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k"
                 print("=======wineserver -k==========")
-                print("=======wineserver -k==========")
-                print("=======wineserver -k==========")
                 print(f"Running command: {command}")
-                subprocess.run(command, shell=True, check=True)
+
+                # Run the command in a full bash shell environment
+                bash_command = f"bash -c {shlex.quote(command)}"
+                subprocess.run(bash_command, shell=True, check=True)
+
                 print(f"Successfully killed using wineserver -k")
 
             
@@ -1603,10 +1594,6 @@ class WineCharmApp(Gtk.Application):
             if script_key in self.running_processes:
                 del self.running_processes[script_key]
 
-            # Reset UI for the row associated with the script
-            row = process_info.get("row")
-            if row:
-                self.update_row_highlight(row, False)
 
             # Ensure the play/stop button is reset if it was clicked for this script
             if self.current_clicked_row and self.current_clicked_row[0] == row:
@@ -1615,6 +1602,10 @@ class WineCharmApp(Gtk.Application):
                 self.hide_buttons(play_button, options_button)
                 self.current_clicked_row = None
 
+            # Reset UI for the row associated with the script
+            row = process_info.get("row")
+            if row:
+                self.update_row_highlight(row, False)
         except Exception as e:
             print(f"Error terminating script {script_key}: {e}")
 
@@ -1640,32 +1631,14 @@ class WineCharmApp(Gtk.Application):
         except OSError:
             return False
 
-
-    def kill_processes_individually(self, pids, script_key):
-        """Kill each process by PID."""
-        for pid in pids:
-            if self.is_process_running(pid):
-                try:
-                    print(f"Terminating PID {pid}")
-                    os.kill(pid, signal.SIGKILL)  # Send SIGKILL to the process
-                    print(f"Successfully terminated process {pid} for script {script_key}")
-                except ProcessLookupError:
-                    print(f"Process with PID {pid} not found, may have already exited.")
-                except PermissionError:
-                    print(f"Permission denied to kill process with PID {pid}.")
-            else:
-                print(f"Process with PID {pid} is no longer running.")
-        print(f"All specified PIDs terminated for {script_key}")
-
-
     def check_running_processes_and_update_buttons(self):
         current_running_processes = self.get_running_processes()
         self.cleanup_ended_processes(current_running_processes)
 
         for script_key, process_info in self.running_processes.items():
-            script_info = self.script_data_two.get(script_key)
-            if script_info:
-                row = script_info.get('row')
+            ui_state = self.script_ui_data.get(script_key)
+            if ui_state:
+                row = ui_state.get('row')
                 if row and row.get_parent():
                     self.update_ui_for_running_process(script_key, row, current_running_processes)
 
@@ -1676,8 +1649,11 @@ class WineCharmApp(Gtk.Application):
         current_running_processes = {}
         exe_name_count = {}
 
+        # Create a copy of the script_list to avoid modifying it while iterating
+        script_list_copy = self.script_list.copy()
+
         # Count occurrences of each exe_name
-        for script_key, script_data in self.script_list.items():
+        for script_key, script_data in script_list_copy.items():
             exe_name = Path(script_data['exe_file']).expanduser().resolve().name
             exe_name_count[exe_name] = exe_name_count.get(exe_name, 0) + 1
 
@@ -1688,19 +1664,12 @@ class WineCharmApp(Gtk.Application):
             # Filter out any processes that match self.do_not_kill
             pgrep_output = [line for line in pgrep_output if self.do_not_kill not in line]
             
-            for script_key, script_data in self.script_list.items():
-                #print("=======================================================")
-                #print(f"{script_data}")
+            for script_key, script_data in script_list_copy.items():
                 script = Path(script_data['script_path'])
                 exe_name = Path(script_data['exe_file']).name
                 unix_exe_dir_name = Path(script_data['exe_file']).parent.name
                 wineprefix = Path(script).parent
 
-                # Quote paths and command parts to prevent issues with spaces
-                #wineprefix = Path(script).parent
-                #exe_name = shlex.quote(str(exe_name))
-                #wineprefix = shlex.quote(str(wineprefix))
-                
                 # Check if exe_name has duplicates
                 is_duplicate = exe_name_count[exe_name] > 1
 
@@ -1769,8 +1738,8 @@ class WineCharmApp(Gtk.Application):
             current_running_processes (dict): A dictionary containing details of the current running processes.
         """
         # Get the script info from script_data_two
-        script_info = self.script_data_two.get(script_key)
-        if not script_info:
+        ui_state = self.script_ui_data.get(script_key)
+        if not ui_state:
             print(f"No script data found for script_key: {script_key}")
             return
 
@@ -1780,20 +1749,20 @@ class WineCharmApp(Gtk.Application):
             self.update_row_highlight(row, False)
             row.remove_css_class("highlighted")
             row.remove_css_class("blue")
-            script_info['is_running'] = False
+            ui_state['is_running'] = False
             print(f"Removed 'highlighted' from row for script_key: {script_key}")
         else:
             # Script is running, ensure the 'highlighted' class is added
             self.update_row_highlight(row, True)
             #row.remove_css_class("blue")  # Ensure 'blue' is removed
             row.add_css_class("highlighted")  # Add 'highlighted' for running scripts
-            script_info['is_running'] = True
+            ui_state['is_running'] = True
             print(f"Added 'highlighted' to row for script_key: {script_key}")
 
         # Update the play/stop button if the script is currently clicked
-        if script_info.get('is_clicked_row', False):
-            play_button = script_info.get('play_button')
-            options_button = script_info.get('options_button')
+        if ui_state.get('is_clicked_row', False):
+            play_button = ui_state.get('play_button')
+            options_button = ui_state.get('options_button')
             if play_button and options_button:
                 self.show_buttons(play_button, options_button)
                 self.set_play_stop_button_state(play_button, True)
@@ -1807,20 +1776,17 @@ class WineCharmApp(Gtk.Application):
 
 
     def cleanup_ended_processes(self, current_running_processes):
-        print("- - - current_running_processes - - -  cleanup_ended_processes - - -")
-        print(current_running_processes)
+        #print("- - - current_running_processes - - -  cleanup_ended_processes - - -")
+        #print(current_running_processes)
         for script_key in list(self.running_processes.keys()):
             if script_key not in current_running_processes:
                 self.process_ended(script_key)
 
         if not current_running_processes:
-            print(" - - "*50)
-            print("Calling self.reset_all_ui_elements()")
+            #print(" - - "*50)
+            #print("Calling self.reset_all_ui_elements()")
             self.reset_all_ui_elements()
 
-
-    def find_row_by_script_key(self, script_key):
-        return self.script_buttons.get(script_key)
 
     def extract_yaml_info(self, script_key):
         #print(f" ===== > script key = {script_key}")
@@ -1865,6 +1831,19 @@ class WineCharmApp(Gtk.Application):
                 sha256_hash.update(byte_block)
         sha256sum = sha256_hash.hexdigest()[:10]
 
+        # Check if a script with the same sha256sum already exists
+        script_key = sha256_hash.hexdigest()
+        if script_key in self.script_list:
+            # Remove the existing .charm file and its entry from the script list
+            existing_script_path = Path(self.script_list[script_key]['script_path']).expanduser().resolve()
+            if existing_script_path.exists():
+                existing_script_path.unlink()  # Remove the existing file
+                print(f"Removed existing charm file: {existing_script_path}")
+
+            # Remove the entry from script_list
+            #del self.script_list[script_key]
+            #print(f"Removed old script_key {script_key} from script_list")
+
         # Handle prefix directory
         if prefix_dir is None:
             prefix_dir = self.prefixes_dir / f"{exe_no_space}-{sha256sum}"
@@ -1877,9 +1856,7 @@ class WineCharmApp(Gtk.Application):
         wineprefix_name = prefix_dir.name
 
         # Extract product name using exiftool
-        product_cmd = [
-            'exiftool', shlex.quote(str(exe_file))
-        ]
+        product_cmd = ['exiftool', shlex.quote(str(exe_file))]
         product_output = self.run_command(" ".join(product_cmd))
         if product_output is None:
             productname = exe_no_space
@@ -1909,173 +1886,34 @@ class WineCharmApp(Gtk.Application):
             'env_vars': ""  # Initialize with an empty string or set a default if necessary
         }
 
+        # Write the new YAML file
         with open(yaml_file_path, 'w') as yaml_file:
             yaml.dump(yaml_data, yaml_file, default_flow_style=False, width=1000)
 
+        # Update yaml_data with resolved paths
+        yaml_data['exe_file'] = str(exe_file.expanduser().resolve())
+        yaml_data['script_path'] = str(yaml_file_path.expanduser().resolve())
+        yaml_data['wineprefix'] = str(prefix_dir.expanduser().resolve())
         # Extract icon and create desktop entry
         icon_path = self.extract_icon(exe_file, prefix_dir, exe_no_space, progname)
         self.create_desktop_entry(progname, yaml_file_path, icon_path, prefix_dir)
 
         # Add the new script data directly to self.script_list
-        self.script_list[sha256_hash.hexdigest()] = yaml_data
-
         self.new_scripts.add(yaml_file_path.stem)
-        print("#"*100)
-        print(self.new_scripts)
-        print(yaml_file_path.stem)
 
         # Add or update script row in UI
-        # Add the new script data to the top of self.script_list
-        self.script_list = {sha256_hash.hexdigest(): yaml_data, **self.script_list}
-
-#        self.add_or_update_script_row(sha256_hash.hexdigest(), yaml_data)
-        
-
-
-
-
-    def add_or_update_script_row(self, script_key, script_data):
-        """
-        Add a new script row to the flowbox or update an existing one.
-        
-        Args:
-            script_key (str): The unique key for the script (e.g., sha256sum).
-            script_data (dict): Data associated with the script.
-        """
-        self.flowbox.remove_all()
-        # Create the row using the newly added script data
-        row = self.create_script_row(script_key, script_data)
-
-        # Append or prepend the row to the flowbox
+        self.script_list[script_key] = yaml_data
+        # Update the UI row for the renamed script
+        row = self.create_script_row(script_key, yaml_data)
         if row:
-            self.flowbox.append(row)
-
-        # Highlight the row if the script is running
-        if script_key in self.running_processes:
-            self.update_row_highlight(row, True)
-            self.script_data_two[script_key]['highlighted'] = True
-        else:
-            self.update_row_highlight(row, False)
-            self.script_data_two[script_key]['highlighted'] = False
-
-        # Update the icon for the row after the script is added
-        self.update_script_row_icon(script_key)
-
-
-
-    def update_script_row_icon(self, script_key):
-        """
-        Update the icon for a specific script row once the icon is available.
+            self.flowbox.prepend(row)
+        # 
+        self.script_list = {script_key: yaml_data, **self.script_list}
+        self.script_ui_data[script_key]['script_path'] = yaml_data['script_path']
+        #script_data['script_path'] = yaml_data['script_path']
         
-        Args:
-            script_key (str): The unique key for the script (e.g., sha256sum).
-        """
-        script_info = self.script_data_two.get(script_key)
-        if not script_info:
-            return
+        print(f"Created new charm file: {yaml_file_path} with script_key {script_key}")
 
-        row = script_info.get('row')
-        script_path = Path(script_info.get('script_path')).expanduser()
-        icon_path = script_path.with_suffix(".png")  # Assuming the icon is saved as a .png file
-
-        # Check if the icon exists and update the UI
-        if icon_path.exists():
-            # Load the icon and update the row
-            icon = self.load_icon(script_path, 64, 64)
-            button = row.get_child()  # Assuming the button is the child of the overlay
-            hbox = button.get_child()  # Get the HBox inside the button
-            icon_image = hbox.get_first_child()  # Get the first child (the icon image)
-            icon_image.set_from_paintable(icon)
-            print(f"Updated icon for script: {script_key}")
-        else:
-            print(f"Icon not found for script: {script_key}")
-
-    def xadd_or_update_script_row(self, script_key, script_data):
-        script_info = self.script_data_two.get(script_key)
-        if not script_info:
-            return
-
-        row = script_info.get('row')
-        script_path = Path(script_info.get('script_path')).expanduser()
-        script_name = script_path.stem.replace("_", " ")
-
-        # Clear the existing rows
-        self.flowbox.remove_all()
-
-        # Recreate the script list
-        self.create_script_list()
-        self.update_script_row_icon(script_key)
-        # Update the icon for the row after the script is added
-
-    def update_script_row(self, row, script_key, script_data):
-        """
-        Update the contents of an existing script row.
-
-        Args:
-            row (Gtk.Widget): The row to update.
-            script_data (dict): The updated data for the script.
-        """
-        # Assuming the row has a button with a label and an icon
-        button = row.get_child()  # Assuming the button is the child of the row (Overlay)
-        hbox = button.get_child()  # Assuming hbox is the child of the button (inside the overlay)
-
-        # Update the label with the new script data
-        label_text = script_data.get('progname', '').replace('_', ' ') or Path(script_data['script_path']).stem.replace('_', ' ')
-        
-        # Assuming the label is the second child of the hbox
-        label = hbox.get_first_child().get_next_sibling()  # Get the label after the icon in the hbox
-        if isinstance(label, Gtk.Label):
-            label.set_text(label_text)
-
-        # Update any other necessary elements of the row, such as play and options buttons
-        play_button = self.script_data_two[script_data['sha256sum']].get('play_button')
-        options_button = self.script_data_two[script_data['sha256sum']].get('options_button')
-
-        # Set button states based on whether the script is running
-        if script_data['sha256sum'] in self.running_processes:
-            self.set_play_stop_button_state(play_button, True)  # Set to "Stop"
-            play_button.set_tooltip_text("Stop")
-        else:
-            self.set_play_stop_button_state(play_button, False)  # Set to "Play"
-            play_button.set_tooltip_text("Play")
-
-        # If necessary, update tooltips, icon, and any other button-related properties
-        # You can add further updates here as required.
-        self.update_script_row_icon(script_key)
-        
-    def add_or_update_script_row(self, script_key, script_data):
-        """
-        Add a new script row to the flowbox or update an existing one.
-        
-        Args:
-            script_key (str): The unique key for the script (e.g., sha256sum).
-            script_data (dict): Data associated with the script.
-        """
-        # Check if the script row already exists in self.script_data_two
-        existing_script_info = self.script_data_two.get(script_key)
-
-        if existing_script_info:
-            # If the row exists, update it instead of appending a new one
-            row = existing_script_info.get('row')
-            self.update_script_row(row, script_key, script_data)
-        else:
-            # Create the row using the newly added script data
-            row = self.create_script_row(script_key, script_data)
-
-            # Prepend the row to the flowbox if it's new
-            if row:
-                self.flowbox.prepend(row)
-
-        # Highlight the row if the script is running
-        if script_key in self.running_processes:
-            self.update_row_highlight(row, True)
-            self.script_data_two[script_key]['highlighted'] = True
-        else:
-            self.update_row_highlight(row, False)
-            self.script_data_two[script_key]['highlighted'] = False
-
-        # Update the icon for the row after the script is added
-        self.update_script_row_icon(script_key)
 
     def extract_icon(self, exe_file, wineprefix, exe_no_space, progname):
         self.create_required_directories()
@@ -2173,7 +2011,7 @@ class WineCharmApp(Gtk.Application):
                 self.create_yaml_file(exe_files[0], wineprefix, use_exe_name=False)
 
         # After create_yaml_file is finished, re-create the script list    
-        GLib.timeout_add_seconds(0.5, self.create_script_list)
+        #GLib.timeout_add_seconds(0.5, self.create_script_list)
 
 
 
@@ -2440,17 +2278,17 @@ class WineCharmApp(Gtk.Application):
 
 
 
-    def show_options_for_script(self, script_info, row, script_key):
+    def show_options_for_script(self, ui_state, row, script_key):
         """
         Display the options for a specific script.
         
         Args:
-            script_info (dict): Information about the script stored in script_data_two.
+            ui_state (dict): Information about the script stored in script_data_two.
             row (Gtk.Widget): The row UI element where the options will be displayed.
             script_key (str): The unique key for the script (should be sha256sum or a unique identifier).
         """
-        # Get the script path from script_info
-        script = Path(script_info['script_path'])  # Get the script path from script_info
+        # Get the script path from ui_state
+        script = Path(ui_state['script_path'])  # Get the script path from ui_state
 
         # Ensure the search button is toggled off and the search entry is cleared
         self.search_button.set_active(False)
@@ -2481,7 +2319,7 @@ class WineCharmApp(Gtk.Application):
             ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
             ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager),
             ("Edit Script File", "text-editor-symbolic", self.open_script_file),
-            ("Delete Wineprefix", "edit-delete-symbolic", self.show_delete_confirmation),
+            ("Delete Wineprefix", "edit-delete-symbolic", self.show_delete_wineprefix_confirmation),
             ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation),
             ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
             ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
@@ -2532,8 +2370,8 @@ class WineCharmApp(Gtk.Application):
         self.back_button.set_visible(True)
 
         self.open_button.set_visible(False)
-        self.replace_open_button_with_launch(script_info, row, script_key)
-        self.update_execute_button_icon(script_info)
+        self.replace_open_button_with_launch(ui_state, row, script_key)
+        self.update_execute_button_icon(ui_state)
         self.selected_row = None
 
 
@@ -2591,9 +2429,9 @@ class WineCharmApp(Gtk.Application):
         runner = Path(runner).expanduser().resolve() if runner else Path("wine")
         runner_dir = runner.parent.resolve()
 
-        print(" - - - - - runner_dir - - - - - ")
-        print(runner)
-        print(runner_dir)
+        #print(" - - - - - runner_dir - - - - - ")
+        #print(runner)
+        #print(runner_dir)
         print(f"Opening terminal for {wineprefix}")
 
         self.ensure_directory_exists(wineprefix)
@@ -2648,7 +2486,7 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error opening file manager: {e}")
             
-    def show_delete_confirmation(self, script, button):
+    def show_delete_wineprefix_confirmation(self, script, button):
         """
         Show an Adw.MessageDialog to confirm the deletion of the Wine prefix.
         
@@ -2673,13 +2511,13 @@ class WineCharmApp(Gtk.Application):
         dialog.set_default_response("cancel")
         
         # Show the dialog and connect the response signal
-        dialog.connect("response", self.on_delete_confirmation_response, wineprefix)
+        dialog.connect("response", self.on_delete_wineprefix_confirmation_response, wineprefix)
 
         # Present the dialog (use present instead of show to avoid deprecation warning)
         dialog.present()
 
 
-    def on_delete_confirmation_response(self, dialog, response_id, wineprefix):
+    def on_delete_wineprefix_confirmation_response(self, dialog, response_id, wineprefix):
         """
         Handle the response from the delete confirmation dialog.
         
@@ -2689,19 +2527,26 @@ class WineCharmApp(Gtk.Application):
             wineprefix: The path to the Wine prefix that is potentially going to be deleted.
         """
         if response_id == "delete":
+            # Get all script_keys associated with the wineprefix
+            script_keys = self.get_script_keys_from_wineprefix(wineprefix)
+
+            if not script_keys:
+                print(f"No scripts found for Wine prefix: {wineprefix}")
+                return
+
             # Perform the deletion of the Wine prefix
             try:
                 if wineprefix.exists() and wineprefix.is_dir():
                     shutil.rmtree(wineprefix)
                     print(f"Deleted Wine prefix: {wineprefix}")
                     
-                    # Remove the script/row associated with this Wine prefix
-                    script_key = self.get_script_key_from_wineprefix(wineprefix)
-                    if script_key in self.script_list:
-                        del self.script_list[script_key]
-                        print(f"Removed script {script_key} from script_list")
-                    else:
-                        print(f"Script not found in script_list for Wine prefix: {wineprefix}")
+                    # Remove all script_keys associated with this Wine prefix from script_list
+                    for script_key in script_keys:
+                        if script_key in self.script_list:
+                            del self.script_list[script_key]
+                            print(f"Removed script {script_key} from script_list")
+                        else:
+                            print(f"Script {script_key} not found in script_list for Wine prefix: {wineprefix}")
 
                     # Trigger the back button to return to the previous view
                     self.on_back_button_clicked(None)
@@ -2715,21 +2560,24 @@ class WineCharmApp(Gtk.Application):
         # Close the dialog
         dialog.close()
 
-    def get_script_key_from_wineprefix(self, wineprefix):
+
+    def get_script_keys_from_wineprefix(self, wineprefix):
         """
-        Retrieve the script_key for a given Wine prefix.
+        Retrieve the list of script_keys for a given Wine prefix.
         
         Args:
             wineprefix: The path to the Wine prefix.
             
         Returns:
-            The corresponding script_key from script_list, if found.
+            A list of script_keys corresponding to the given wineprefix.
         """
-        for script_key, script_info in self.script_list.items():
-            script_path = Path(script_info['script_path'])
+        script_keys = []
+        for script_key, script_data in self.script_list.items():
+            script_path = Path(script_data['script_path'])
             if script_path.parent == wineprefix:
-                return script_key
-        return None
+                script_keys.append(script_key)
+        return script_keys
+
 
 
     def show_delete_shortcut_confirmation(self, script, button):
@@ -2808,8 +2656,8 @@ class WineCharmApp(Gtk.Application):
         Returns:
             The corresponding script_key from script_list, if found.
         """
-        for script_key, script_info in self.script_list.items():
-            script_path = Path(script_info['script_path'])
+        for script_key, script_data in self.script_list.items():
+            script_path = Path(script_data['script_path'])
             if script_path == shortcut_file:
                 return script_key
         return None
@@ -2826,7 +2674,13 @@ class WineCharmApp(Gtk.Application):
         print("--=---------------------------========-------------")
         print(f"script_key = {script_key}")
         print(f"self.script_list:\n{self.script_list}")
+        # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
+        if script_data:
+            script_path = Path(script_data['script_path'])
+        else:
+            print(f"Error: Script key {script_key} not found in script_list.")
+            return
         
         #script = Path(script_data['script_path'])
         print("--=---------------------------========-------------")
@@ -2887,18 +2741,18 @@ class WineCharmApp(Gtk.Application):
             # Update the script data in both the YAML file and self.script_list
             try:
                 # Update the in-memory script data
-                script_info = self.extract_yaml_info(script_key)
-                script_info['args'] = new_args
+                script_data = self.extract_yaml_info(script_key)
+                script_data['args'] = new_args
 
                 # Update the in-memory representation
                 self.script_list[script_key]['args'] = new_args
 
                 # Get the script path from the script info
-                script_path = Path(script_info['script_path'])
+                script_path = Path(script_data['script_path'])
 
                 # Write the updated info back to the YAML file
                 with open(script_path, 'w') as file:
-                    yaml.dump(script_info, file, default_flow_style=False, width=1000)
+                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
 
                 print(f"Updated Wine arguments for {script_path}: {new_args}")
 
@@ -2927,11 +2781,12 @@ class WineCharmApp(Gtk.Application):
         # Retrieve script_data directly from self.script_list using the sha256sum as script_key
         print(f"script_key = {script_key}")
         print(f"self.script_list:\n{self.script_list}")
+        # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
-
-        # Handle case where the script_key is not found
-        if not script_data:
-            print(f"Error: Script with key {script_key} not found.")
+        if script_data:
+            script_path = Path(script_data['script_path'])
+        else:
+            print(f"Error: Script key {script_key} not found in script_list.")
             return
 
         # Get the current name of the shortcut
@@ -2983,24 +2838,27 @@ class WineCharmApp(Gtk.Application):
             # Update the script data in both the YAML file and self.script_list
             try:
                 # Update the in-memory script data
-                script_info = self.extract_yaml_info(script_key)
-                old_progname = script_info.get('progname', '')
+                script_data = self.extract_yaml_info(script_key)
+                old_progname = script_data.get('progname', '')
 
                 # Update the in-memory representation
-                script_info['progname'] = new_name
+                script_data['progname'] = new_name
 
                 # Get the script path from the script info
-                script_path = Path(script_info['script_path'])
+                script_path = Path(script_data['script_path'])
 
                 # Write the updated info back to the YAML file
                 with open(script_path, 'w') as file:
-                    yaml.dump(script_info, file, default_flow_style=False, width=1000)
+                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
 
                 # Rename the .charm file and associated icon
                 new_script_path = self.rename_script_and_icon(script_path, old_progname, new_name)
+                
+                # Ensure that script_data still contains the same sha256sum
+                existing_sha256sum = script_data.get('sha256sum')
 
                 # Extract icon and create desktop entry
-                exe_file = Path(script_info['exe_file'])  # Assuming exe_file exists in script_info
+                exe_file = Path(script_data['exe_file'])  # Assuming exe_file exists in script_data
                 icon_path = new_script_path.with_suffix(".png")  # Correct the icon path generation
                 print("#" * 100)
                 print(icon_path)
@@ -3009,15 +2867,16 @@ class WineCharmApp(Gtk.Application):
                 if script_key in self.script_list:
                     # Load the script data first
                     script_data = self.script_list[script_key]
-
+                    #print(script_data['script_path'])
+                    
                     # Update the script path with the new script path
                     script_data['script_path'] = str(new_script_path)
-                    
-                    # Update self.script_data_two if necessary
-                    self.script_data_two['script_path'] = str(new_script_path)
+                    print(script_data['script_path'])
 
-                    # Remove the old script_key from script_list
-                    del self.script_list[script_key]
+
+
+                    # Update the script_list with the updated script_data
+                    self.script_list[script_key] = script_data
 
                     # Update the UI row for the renamed script
                     row = self.create_script_row(script_key, script_data)
@@ -3026,23 +2885,27 @@ class WineCharmApp(Gtk.Application):
 
                     print(f"Removed old script_key {script_key} from script_list")
 
-                # Generate new script_key based on the new shortcut name
-                sha256_hash = hashlib.sha256(new_script_path.stem.encode())
-
-                # Add the new script data directly to self.script_list with the new script_key
-                self.script_list[sha256_hash.hexdigest()] = script_info
-
+                if script_key in self.script_ui_data:
+                    # Update the script_path for the given script_key
+                    self.script_ui_data[script_key]['script_path'] = str(new_script_path)
+                    print(f"Updated script_path for {script_key} to {new_script_path}")
+                else:
+                    print(f"Error: script_key {script_key} not found in script_data_two")   
+                    print("#" * 100)
+                    
+                # Add the updated script data to self.script_list using the existing sha256sum
+                self.script_list[existing_sha256sum] = script_data
+                
+                row = self.create_script_row(existing_sha256sum, script_data)
+                
                 # Mark the script as new and update the UI
                 self.new_scripts.add(new_script_path.stem)
-                print("#" * 100)
-                print(self.new_scripts)
-                print(new_script_path.stem)
 
                 # Add or update script row in UI
-                self.script_list = {sha256_hash.hexdigest(): script_info, **self.script_list}
+                self.script_list = {existing_sha256sum: script_data, **self.script_list}
 
                 # Refresh the UI to load the renamed script
-                self.create_script_list()
+                # self.create_script_list()
 
                 print(f"Renamed and loaded script: {new_script_path}")
 
@@ -3055,6 +2918,27 @@ class WineCharmApp(Gtk.Application):
         # Close the dialog
         dialog.close()
 
+
+    def open_script_file(self, script, script_key, *args):
+        """
+        Open the file manager to show the script's location.
+        """
+        wineprefix = Path(script).parent
+        print(f"Opening file manager for {wineprefix}")
+        
+        # Ensure we're using the updated script path
+        script_data = self.script_list.get(script_key)
+        if script_data:
+            script_path = Path(script_data['script_path'])
+        else:
+            print(f"Error: Script key {script_key} not found in script_list.")
+            return
+        
+        command = ["xdg-open", str(script_path)]
+        try:
+            subprocess.Popen(command)
+        except Exception as e:
+            print(f"Error opening file manager: {e}")
 
     def rename_script_and_icon(self, script_path, old_progname, new_name):
         """
@@ -3090,7 +2974,14 @@ class WineCharmApp(Gtk.Application):
             return script_path  # Return the original path in case of failure
 
 
-    def show_change_icon_dialog(self, script, *args):
+    def show_change_icon_dialog(self, script, script_key, *args):
+        # Ensure we're using the updated script path
+        script_data = self.script_list.get(script_key)
+        if script_data:
+            script_path = Path(script_data['script_path'])
+        else:
+            print(f"Error: Script key {script_key} not found in script_list.")
+            return
         file_dialog = Gtk.FileDialog.new()
         file_filter = Gtk.FileFilter()
         file_filter.set_name("Image and Executable files")
@@ -3108,28 +2999,28 @@ class WineCharmApp(Gtk.Application):
         filter_model.append(file_filter)
         file_dialog.set_filters(filter_model)
 
-        file_dialog.open(self.window, None, lambda dlg, res: self.on_change_icon_response(dlg, res, script))
+        file_dialog.open(self.window, None, lambda dlg, res: self.on_change_icon_response(dlg, res, script_path))
 
-    def on_change_icon_response(self, dialog, result, script):
+    def on_change_icon_response(self, dialog, result, script_path):
         try:
             file = dialog.open_finish(result)
             if file:
                 file_path = file.get_path()
                 suffix = Path(file_path).suffix.lower()
                 if suffix in [".png", ".svg", ".jpg", ".jpeg"]:
-                    self.change_icon(script, file_path)
+                    self.change_icon(script_path, file_path)
                 elif suffix in [".exe", ".msi"]:
-                    self.extract_and_change_icon(script, file_path)
+                    self.extract_and_change_icon(script_path, file_path)
                 # Update the icon in the title bar
-                self.headerbar.set_title_widget(self.create_icon_title_widget(script))
-                self.new_scripts.add(script.stem)
+                self.headerbar.set_title_widget(self.create_icon_title_widget(script_path))
+                self.new_scripts.add(script_path.stem)
         except GLib.Error as e:
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                 print(f"An error occurred: {e}")
 
 
-    def change_icon(self, script, new_icon_path):
-        script_path = Path(script)
+    def change_icon(self, script_path, new_icon_path):
+        script_path = Path(script_path)
         icon_path = script_path.with_suffix(".png")
         backup_icon_path = icon_path.with_suffix(".bak")
 
@@ -3140,8 +3031,8 @@ class WineCharmApp(Gtk.Application):
         
         
 
-    def extract_and_change_icon(self, script, exe_path):
-        script_path = Path(script)
+    def extract_and_change_icon(self, script_path, exe_path):
+        script_path = Path(script_path)
         icon_path = script_path.with_suffix(".png")
         backup_icon_path = icon_path.with_suffix(".bak")
 
@@ -3200,163 +3091,6 @@ class WineCharmApp(Gtk.Application):
             print(f"Successfully ran {script_name} in {wineprefix}")
         except subprocess.CalledProcessError as e:
             print(f"Error running winetricks script {script_name}: {e}")
-
-    def replace_button_with_overlay(self, script, confirmation_text, action_type, button):
-        # Ensure button is a valid GTK button object
-        if button is None or not hasattr(button, 'get_parent'):
-            raise ValueError("Invalid button object passed to replace_button_with_overlay.")
-        
-        parent = button.get_parent()
-
-        # Check if the parent is a valid Gtk.FlowBoxChild
-        if isinstance(parent, Gtk.FlowBoxChild):
-            # Create an overlay and a confirmation box
-            overlay = Gtk.Overlay()
-
-            confirmation_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            confirmation_box.set_valign(Gtk.Align.START)
-            confirmation_box.set_halign(Gtk.Align.FILL)
-            confirmation_box.set_margin_start(10)
-
-            # Add the confirmation label to the confirmation box
-            confirmation_label = Gtk.Label(label=confirmation_text)
-            confirmation_box.append(confirmation_label)
-
-            # Create and style the "Yes" button (destructive action)
-            yes_button = Gtk.Button()
-            yes_button_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
-            yes_button.set_child(yes_button_icon)
-            yes_button.add_css_class("destructive-action")
-
-            # Create and style the "No" button (suggested action)
-            no_button = Gtk.Button()
-            no_button_icon = Gtk.Image.new_from_icon_name("window-close-symbolic")
-            no_button.set_child(no_button_icon)
-            no_button.add_css_class("suggested-action")
-
-            # Append buttons to the confirmation box
-            confirmation_box.append(yes_button)
-            confirmation_box.append(no_button)
-
-            # Set the confirmation box as the child of the overlay
-            overlay.set_child(confirmation_box)
-
-            # Replace the parent widget's child with the overlay
-            parent.set_child(overlay)
-
-            # Connect signals to the "Yes" and "No" buttons
-            yes_button.connect("clicked", self.on_confirm_action, script, action_type, parent, button)
-            no_button.connect("clicked", self.on_cancel_button_clicked, parent, button)
-
-        else:
-            raise ValueError("The button's parent is not a Gtk.FlowBoxChild.")
-
-
-    def replace_button_with_entry_overlay(self, script, prompt_text, button, rename=False):
-        parent = button.get_parent()
-
-        if isinstance(parent, Gtk.FlowBoxChild):
-            # Create the overlay and the entry box
-            overlay = Gtk.Overlay()
-
-            entry_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            entry_box.set_halign(Gtk.Align.FILL)
-            entry_box.set_valign(Gtk.Align.CENTER)
-            entry_box.set_margin_start(10)
-
-            entry_label = Gtk.Label(label=prompt_text)
-            entry_box.append(entry_label)
-
-            # Get the current name for renaming or arguments for pre-filling the entry
-            yaml_info = self.extract_yaml_info(script)
-            if rename:
-                entry = Gtk.Entry()
-                entry.set_text(yaml_info['progname'])
-            else:
-                entry = Gtk.Entry()
-                entry.set_text(yaml_info['args'] or "-opengl -SkipBuildPatchPrereq")
-            
-            entry.select_region(0, -1)  # Select all the text in the entry
-            entry.set_hexpand(True)
-            entry_box.append(entry)
-
-            button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            ok_button = Gtk.Button()
-            ok_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
-            ok_button.set_child(ok_icon)
-
-            cancel_button = Gtk.Button()
-            cancel_icon = Gtk.Image.new_from_icon_name("window-close-symbolic")
-            cancel_button.set_child(cancel_icon)
-
-            button_box.append(cancel_button)
-            button_box.append(ok_button)
-
-            entry_box.append(button_box)
-
-            overlay.set_child(entry_box)
-            parent.set_child(overlay)
-
-            # Connect cancel and ok button actions
-            cancel_button.connect("clicked", self.on_cancel_button_clicked, parent, button)
-            if rename:
-                ok_button.connect("clicked", lambda btn: self.on_ok_rename_button_clicked(entry.get_text().strip(), script))
-            else:
-                ok_button.connect("clicked", lambda btn: self.on_ok_button_clicked(entry.get_text().strip(), script))
-
-    def on_ok_rename_button_clicked(self, new_name, script):
-        script_path = Path(script_data['script_path'])
-        yaml_info = self.extract_yaml_info(script)
-        
-        old_progname = yaml_info['progname']
-        old_icon_name = f"{old_progname.replace(' ', '_')}.png"
-        new_icon_name = f"{new_name.replace(' ', '_')}.png"
-        
-        # Update the YAML information
-        yaml_info['progname'] = new_name
-        
-        try:
-            # Write the updated info back to the YAML file
-            with open(script_path, 'w') as file:
-                yaml.dump(yaml_info, file, default_flow_style=False, width=1000)
-            
-            # Rename the icon file if it exists
-            icon_path = script_path.parent / old_icon_name
-            if icon_path.exists():
-                new_icon_path = script_path.parent / new_icon_name
-                icon_path.rename(new_icon_path)
-                print(f"Renamed icon from {old_icon_name} to {new_icon_name}")
-            
-            # Rename the .charm file
-            new_script_path = script_path.with_stem(new_name.replace(' ', '_'))
-            script_path.rename(new_script_path)
-            print(f"Renamed script from {script_path} to {new_script_path}")
-            
-            # Update the UI
-            self.create_script_list()
-            
-        except Exception as e:
-            print(f"Error renaming script or icon: {e}")
-        
-        # Go back to the previous view
-        self.on_back_button_clicked(None)
-
-    def on_ok_button_clicked(self, new_args, script):
-        try:
-            # Update the script with the new arguments
-            script_info = self.extract_yaml_info(script)
-            script_info['args'] = new_args
-            
-            # Write the updated info back to the YAML file
-            with open(script, 'w') as file:
-                yaml.dump(script_info, file, default_flow_style=False, width=1000)
-            
-            # Update the UI or whatever is necessary
-            self.create_script_list()
-
-        except Exception as e:
-            print(f"Error updating script arguments: {e}")
-            
 
     def process_file(self, file_path):
         try:
@@ -3441,17 +3175,6 @@ class WineCharmApp(Gtk.Application):
         else:
             productname_match = re.search(r'Product Name\s+:\s+(.+)', product_output)
             return productname_match.group(1).strip() if productname_match else None
-
-    def get_play_button_from_row(self, row):
-        """
-        Helper method to retrieve the play button from a script row.
-        Assumes that the play button is one of the children in the row.
-        """
-        for child in row.get_children():
-            if isinstance(child, Gtk.Button) and child.get_tooltip_text() == "Play" or child.get_tooltip_text() == "Stop":
-                return child
-        return None
-
 
     def copy_template(self, prefix_dir):
         try:
@@ -3697,10 +3420,6 @@ class WineCharmApp(Gtk.Application):
         # Recreate the script list with the new view
         self.create_script_list()
 
-    def on_import_wine_directory_clicked(self):
-        pass
-    
-# import wine directory
     def on_import_wine_directory_clicked(self, action, param):
         # Create a new Gtk.FileDialog for selecting a directory
         file_dialog = Gtk.FileDialog.new()
@@ -3724,15 +3443,24 @@ class WineCharmApp(Gtk.Application):
                 # Check if it's a valid Wine directory by verifying the existence of "system.reg"
                 if directory and (Path(directory) / "system.reg").exists():
                     print(f"Valid Wine directory selected: {directory}")
-                    self.show_processing_spinner(f"Importing {Path(directory).name}")
-                    self.disable_open_button()
 
-                    # Copy the Wine directory to the prefixes directory
+                    self.show_processing_spinner(f"Importing {Path(directory).name}")
+                    self.disconnect_open_button()
+
+                    # Destination directory
                     dest_dir = self.prefixes_dir / Path(directory).name
-                    print(f"Copying Wine directory to: {dest_dir}")
-                    
-                    # Use threading to avoid blocking the UI while copying
-                    threading.Thread(target=self.copy_wine_directory, args=(directory, dest_dir)).start()
+
+                    # Check if destination directory already exists
+                    if dest_dir.exists():
+                        print(f"Destination directory already exists: {dest_dir}")
+                        # Show confirmation dialog for overwriting
+                        GLib.idle_add(self.show_overwrite_confirmation_dialog, directory, dest_dir)
+                    else:
+                        # Clear the flowbox for non-existing directories
+                        GLib.idle_add(self.flowbox.remove_all)
+                        
+                        # Proceed with copying if the directory doesn't exist
+                        threading.Thread(target=self.import_wine_directory, args=(directory, dest_dir)).start()
                 else:
                     print(f"Invalid directory selected: {directory}")
                     GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
@@ -3743,6 +3471,20 @@ class WineCharmApp(Gtk.Application):
 
         print("FileDialog operation complete.")
 
+    def on_import_wine_directory_completed(self):
+        """
+        Called when the import process is complete. Updates UI, restores scripts, and resets the open button.
+        """
+        # Reconnect open button and reset its label
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)
+        self.reconnect_open_button()
+        self.hide_processing_spinner()
+
+        # Restore the script list in the flowbox
+        GLib.idle_add(self.create_script_list)
+
+        print("Wine directory import completed and script list restored.")
 
     def copy_wine_directory(self, src, dst):
         try:
@@ -3765,6 +3507,121 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(self.hide_processing_spinner)
             print("Completed importing Wine directory process.")
 
+    def show_overwrite_confirmation_dialog(self, src, dest_dir):
+        """
+        Show a confirmation dialog asking the user whether to overwrite the existing directory.
+        """
+        # Don't clear the flowbox here — only clear it after the user selects "Overwrite"
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,
+            title="Overwrite Existing Directory?",
+            body=f"The directory {dest_dir.name} already exists. Do you want to overwrite it?"
+        )
+        
+        # Add overwrite and cancel buttons
+        dialog.add_response("overwrite", "Overwrite")
+        dialog.set_response_appearance("overwrite", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+        
+        # Connect the dialog response to the overwrite handler
+        dialog.connect("response", self.on_overwrite_response, src, dest_dir)
+        
+        # Show the dialog
+        dialog.present()
+
+
+    def on_overwrite_response(self, dialog, response_id, src, dest_dir):
+        """
+        Handle the response from the overwrite confirmation dialog.
+        """
+        if response_id == "overwrite":
+            print(f"User chose to overwrite the directory: {dest_dir}")
+            
+            # Clear the flowbox now because the user chose to overwrite
+            GLib.idle_add(self.flowbox.remove_all)
+            
+            # Delete the existing directory and start the import process
+            try:
+                shutil.rmtree(dest_dir)  # Remove the directory
+                print(f"Deleted existing directory: {dest_dir}")
+                # Start the import process after deletion
+                threading.Thread(target=self.import_wine_directory, args=(src, dest_dir)).start()
+            except Exception as e:
+                print(f"Error deleting directory: {e}")
+                GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Error", f"Could not delete directory: {e}")
+        else:
+            print("User canceled the overwrite.")
+            # If canceled, restore the UI to its original state
+            self.reconnect_open_button()
+            self.hide_processing_spinner()
+            # No need to restore the script list as it wasn't cleared
+
+
+
+
+
+
+    def import_wine_directory(self, src, dst):
+        """
+        Import the Wine directory in steps: copy the directory, process registry files, and create scripts for executables.
+        """
+        steps = [
+            ("Copying Wine directory", lambda: self.custom_copytree(src, dst)),
+            ("Processing registry files", lambda: self.process_reg_files(dst)),
+            ("Creating scripts for .exe files", lambda: self.create_scripts_for_exe_files(dst)),
+        ]
+
+        def perform_import_steps():
+            for step_text, step_func in steps:
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    step_func()
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except Exception as e:
+                    print(f"Error during step '{step_text}': {e}")
+                    break
+            
+            # Re-enable UI elements and restore the script list after the import process
+            GLib.idle_add(self.on_import_wine_directory_completed)
+
+        threading.Thread(target=perform_import_steps).start()
+
+
+
+
+    def disconnect_open_button(self):
+        """
+        Disconnect the open button's handler and update its label to "Importing...".
+        """
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+        
+        if not hasattr(self, 'spinner') or not self.spinner:  # Ensure spinner is not created multiple times
+            self.spinner = Gtk.Spinner()
+            self.spinner.start()
+            self.open_button_box.append(self.spinner)
+
+        self.set_open_button_label("Importing...")
+        self.set_open_button_icon_visible(False)  # Hide the open-folder icon
+        print("Open button disconnected and spinner shown.")
+
+    def reconnect_open_button(self):
+        """
+        Reconnect the open button's handler and reset its label.
+        """
+        if self.open_button_handler_id is not None:
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
+        
+        if self.spinner:
+            self.spinner.stop()
+            self.open_button_box.remove(self.spinner)
+            self.spinner = None  # Ensure the spinner reference is cleared
+
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)
+        print("Open button reconnected and UI reset.")
     def create_scripts_for_exe_files(self, wineprefix):
         exe_files = self.find_exe_files(wineprefix)
         for exe_file in exe_files:
@@ -3904,6 +3761,8 @@ class WineCharmApp(Gtk.Application):
                     print(f"Error loading script {script_file}: {e}")
 
         print(f"Loaded {len(self.script_list)} scripts.")
+
+
 
 
                 
