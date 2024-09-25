@@ -3886,17 +3886,8 @@ class WineCharmApp(Gtk.Application):
         """Loads all .charm files into the self.script_list dictionary."""
         self.script_list = {}
 
-        # Find all .charm files
-        scripts = []
-        for root, dirs, files in os.walk(self.prefixes_dir):
-            depth = root[len(str(self.prefixes_dir)):].count(os.sep)
-            if depth >= 2:
-                dirs[:] = []  # Prune the search space
-                continue
-            scripts.extend([Path(root) / file for file in files if file.endswith(".charm")])
-
-        # Sort the scripts by modification time
-        scripts.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        # Find all .charm files using the find_python_scripts method
+        scripts = self.find_python_scripts()
 
         # Load each script's data
         for script_file in scripts:
@@ -3913,6 +3904,7 @@ class WineCharmApp(Gtk.Application):
                     print(f"Error loading script {script_file}: {e}")
 
         print(f"Loaded {len(self.script_list)} scripts.")
+
 
                 
 def parse_args():
