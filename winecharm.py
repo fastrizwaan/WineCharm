@@ -2533,7 +2533,8 @@ class WineCharmApp(Gtk.Application):
             ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
             ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
             ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog),
-            ("Backup Prefix", "document-save-symbolic", self.show_backup_prefix_dialog),  # New option
+            ("Backup Prefix", "document-save-symbolic", self.show_backup_prefix_dialog),  
+            ("Reset Shortcut", "view-refresh-symbolic", self.reset_shortcut_confirmation)  
         ]
 
         for label, icon_name, callback in options:
@@ -3327,7 +3328,92 @@ class WineCharmApp(Gtk.Application):
         if extracted_icon_path:
             shutil.move(extracted_icon_path, icon_path)
             
+    def reset_shortcut_confirmation(self, script, script_key, button=None):
+        script_data = self.script_list.get(script_key)
+        if script_data:
+            exe_file = Path(script_data.get('exe_file'))
+
+        # Create a confirmation dialog
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,  # Assuming self.window is the main application window
+            title="Reset Shortcut",
+            body=f"This will reset all changes and recreate the shortcut for {exe_file.name}. Do you want to proceed?"
+        )
+        
+        # Add the "Reset" and "Cancel" buttons
+        dialog.add_response("reset", "Reset")
+        dialog.set_response_appearance("reset", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+        
+        # Show the dialog and connect the response signal to handle the reset
+        dialog.connect("response", self.on_reset_shortcut_confirmation_response, script_key)
+
+        # Present the dialog
+        dialog.present()
+
+
+    def on_reset_shortcut_confirmation_response(self, dialog, response_id, script_key):
+        if response_id == "reset":
+            # Proceed with resetting the shortcut
+            script_data = self.script_list.get(script_key)
+            if script_data:
+                script = script_data['script_path']
+                self.reset_shortcut(script, script_key)
+            else:
+                print(f"Error: Script key {script_key} not found in script_list.")
+        else:
+            print("Reset canceled")
+
+        # Close the dialog
+        dialog.close()
   
+    def reset_shortcut(self, script, script_key, *args):
+        """
+        Reset the shortcut by recreating the YAML file for the script.
+        
+        Args:
+            script: The path to the script.
+            script_key: The unique key for the script in the script_list.
+        """
+        # Ensure we're using the updated script path
+        script_data = self.script_list.get(script_key)
+        if not script_data:
+            print(f"Error: Script key {script_key} not found in script_list.")
+            return
+        
+        # Extract exe_file and wineprefix from script_data
+        exe_file = Path(script_data['exe_file']).expanduser().resolve()
+        wineprefix = Path(script_data.get('wineprefix')).expanduser().resolve()
+        script_path = Path(script_data.get('script_path')).expanduser().resolve()
+
+        
+        # Ensure the exe_file and wineprefix exist
+        if not exe_file.exists():
+            print(f"Error: Executable file {exe_file} not found.")
+            return
+        
+        if not wineprefix.exists():
+            print(f"Error: Wineprefix directory {wineprefix} not found.")
+            return
+        
+        try:
+            backup_path = script_path.with_suffix('.bak')
+            script_path.rename(backup_path)
+            print(f"Renamed existing script to: {backup_path}")
+            # Call the method to recreate the YAML file
+            self.create_yaml_file(exe_file, wineprefix)
+            print(f"Successfully reset the shortcut for script: {exe_file}")
+        except Exception as e:
+            print(f"Error resetting shortcut: {e}")
+        finally:
+            script_data = self.script_list.get(script_key)
+            if not script_data:
+                print(f"Error: Script key {script_key} not found in script_list.")
+                return
+            script_path = Path(script_data.get('script_path')).expanduser().resolve()
+            self.headerbar.set_title_widget(self.create_icon_title_widget(script_path))
 
 
 
