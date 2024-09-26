@@ -1330,6 +1330,8 @@ class WineCharmApp(Gtk.Application):
         wine_debug = script_data.get('wine_debug', '')
         exe_name = Path(exe_file).name
         wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
+        #print("*"*100)
+        #print(wineprefix)
         runner = script_data.get('runner', 'wine')
         if runner:
             runner = Path(runner).expanduser().resolve()
@@ -1346,6 +1348,9 @@ class WineCharmApp(Gtk.Application):
         # shlex quote for bash
         exe_parent = shlex.quote(str(exe_file.parent.resolve()))
         wineprefix = shlex.quote(str(wineprefix))
+        #print("="*100)
+        #print(wineprefix)
+        #print(wineprefix.strip("'"))
         runner = shlex.quote(str(runner))
         runner_dir = shlex.quote(str(runner_dir))
         exe_name = shlex.quote(str(exe_name))
@@ -1421,7 +1426,7 @@ class WineCharmApp(Gtk.Application):
                     "script": script,
                     "exe_name": exe_name,
                     "pids": [process.pid],
-                    "wineprefix": wineprefix
+                    "wineprefix": wineprefix.strip("'")
                 }
                 self.set_play_stop_button_state(play_stop_button, True)
                 self.update_row_highlight(row, True)
@@ -1593,12 +1598,13 @@ class WineCharmApp(Gtk.Application):
             return
 
         runner = script_data['runner'] or "wine"
-        # Extract relevant information from process_info
-        #runner = process_info.get('runner', 'wine')
-        #script = Path(script_data['script_path'])
-        #wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
         script = process_info.get('script')
+        # Retrieve wineprefix without extra quotes
         wineprefix = Path(process_info.get('wineprefix')).expanduser().resolve()
+        
+        #print("#"*100)
+        #print(wineprefix)
+        
         pids = process_info.get("pids", [])
         exe_name = process_info.get('exe_name')
 
@@ -1619,6 +1625,7 @@ class WineCharmApp(Gtk.Application):
         try:
             if wineprefix_process_count == 1 and existing_running_script:
                 runner_dir = Path(runner).parent
+                # Apply shlex.quote() only when needed for shell execution
                 command = f"export PATH={shlex.quote(str(runner_dir))}:$PATH; WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k"
                 print("=======wineserver -k==========")
                 print(f"Running command: {command}")
@@ -1628,28 +1635,18 @@ class WineCharmApp(Gtk.Application):
                 subprocess.run(bash_command, shell=True, check=True)
 
                 print(f"Successfully killed using wineserver -k")
-
             
-            # Case 2: If wineserver -k fails or there are multiple processes, handle manually
-            print("======= Killing processes manually ==========")
+            # If wineserver -k fails or there are multiple processes, handle manually
             self.kill_processes_by_name(exe_name, script_key)
 
             # Remove the script from running_processes after termination
             if script_key in self.running_processes:
                 del self.running_processes[script_key]
 
-
-            # Ensure the play/stop button is reset if it was clicked for this script
-            if self.current_clicked_row and self.current_clicked_row[0] == row:
-                play_button, options_button = self.current_clicked_row[1], self.current_clicked_row[2]
-                self.set_play_stop_button_state(play_button, False)
-                self.hide_buttons(play_button, options_button)
-                self.current_clicked_row = None
-
-            # Reset UI for the row associated with the script
             row = process_info.get("row")
             if row:
                 self.update_row_highlight(row, False)
+
         except Exception as e:
             print(f"Error terminating script {script_key}: {e}")
 
