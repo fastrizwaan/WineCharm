@@ -2705,20 +2705,40 @@ class WineCharmApp(Gtk.Application):
         """
         wineprefix = Path(script).parent
 
+        # Get all charm files associated with the wineprefix
+        charm_files = list(wineprefix.rglob("*.charm"))
+
         # Create a confirmation dialog
         dialog = Adw.MessageDialog(
             modal=True,
             transient_for=self.window,  # Assuming self.window is the main application window
             title="Delete Wine Prefix",
-            body=f"Are you sure you want to delete the Wine prefix for {wineprefix.name}?"
+            body=f"Deleting {wineprefix.name} will remove:"
         )
-        
+
+        # Create a vertical box to hold the program list (without checkboxes)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+
+        if not charm_files:
+            # No charm files found, display a message
+            no_programs_label = Gtk.Label(label="No programs found in this Wine prefix.")
+            vbox.append(no_programs_label)
+        else:
+            # Add each charm file's icon and program name to the dialog
+            for charm_file in charm_files:
+                # Create an icon + label widget (reusing the function for consistency)
+                icon_title_widget = self.create_icon_title_widget(charm_file)
+                vbox.append(icon_title_widget)
+
+        # Add the program list to the dialog
+        dialog.set_extra_child(vbox)
+
         # Add the "Delete" and "Cancel" buttons
         dialog.add_response("delete", "Delete")
         dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.add_response("cancel", "Cancel")
         dialog.set_default_response("cancel")
-        
+
         # Show the dialog and connect the response signal
         dialog.connect("response", self.on_delete_wineprefix_confirmation_response, wineprefix)
 
@@ -2728,7 +2748,7 @@ class WineCharmApp(Gtk.Application):
 
     def on_delete_wineprefix_confirmation_response(self, dialog, response_id, wineprefix):
         """
-        Handle the response from the delete confirmation dialog.
+        Handle the response from the delete Wine prefix confirmation dialog.
         
         Args:
             dialog: The Adw.MessageDialog instance.
@@ -2768,6 +2788,7 @@ class WineCharmApp(Gtk.Application):
 
         # Close the dialog
         dialog.close()
+
 
 
     def get_script_keys_from_wineprefix(self, wineprefix):
