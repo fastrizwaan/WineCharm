@@ -960,6 +960,7 @@ class WineCharmApp(Gtk.Application):
             # Use a single line label for non-icon view
             label = Gtk.Label(label=label_text)
             label.set_xalign(0)
+            label.set_ellipsize(Pango.EllipsizeMode.END)
             label2 = Gtk.Label(label="")
             label3 = Gtk.Label(label="")
 
@@ -1332,12 +1333,15 @@ class WineCharmApp(Gtk.Application):
         runner = script_data.get('runner', 'wine')
         if runner:
             runner = Path(runner).expanduser().resolve()
-            runner_dir = runner.parent.resolve()
+            runner_dir = runner.papath_envrent.resolve()
             path_env = f'export PATH={runner_dir}:$PATH'
         else:
             runner = "wine"
             runner_dir = ""  # Or set a specific default if required
             path_env = ""
+
+        #Logging stderr to {log_file_path}")
+        log_file_path = Path(wineprefix) / f"{script.stem}.log"
             
         # shlex quote for bash
         exe_parent = shlex.quote(str(exe_file.parent.resolve()))
@@ -1352,7 +1356,8 @@ class WineCharmApp(Gtk.Application):
             print(f"script_args = {script_args}\nscript_key = {script_key}")
             print(f"env_vars = {env_vars}\nwine_debug = {wine_debug}")
             print(f"exe_name = {exe_name}\nwineprefix = {wineprefix}")
-            print("runner = {runner}\nrunner_dir = {runner_dir}")
+            print(f"runner = {runner}\nrunner_dir = {runner_dir}")
+            print(f"log_file_path = {log_file_path}")
             print("---------------------/launch_script_data ------------------")
 
         # Check if any process with the same wineprefix is already running
@@ -1371,8 +1376,6 @@ class WineCharmApp(Gtk.Application):
 
 
 
-        #Logging stderr to {log_file_path}")
-        log_file_path = Path(wineprefix) / f"{script.stem}.log"
 
         # Will be set in Settings
         if wine_debug == "disabled":
