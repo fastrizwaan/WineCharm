@@ -274,6 +274,8 @@ class WineCharmApp(Gtk.Application):
 
     def on_startup(self, app):
         self.create_main_window()
+        # Clear or initialize the script list
+        self.script_list = {}
         self.load_script_list()
         self.create_script_list()
         self.check_running_processes_and_update_buttons()
@@ -1091,16 +1093,46 @@ class WineCharmApp(Gtk.Application):
             button.remove_css_class("highlighted")  # Remove 'highlighted' if not running
             print(f"Script {script_key} is not running. Setting play button to 'Play' and removing 'highlighted'.")
 
-    def find_python_scripts(self):
+    def find_charm_files(self, prefixdir=None):
+        """
+        Finds .charm files within the provided prefix directory, searching up to 2 levels deep.
+        
+        Args:
+            prefixdir (Path or str): The directory to search in. Defaults to self.prefixes_dir.
+
+        Returns:
+            List[Path]: A sorted list of .charm files found, sorted by modification time (newest first).
+        """
+        if prefixdir is None:
+            prefixdir = self.prefixes_dir
+        
+        # Ensure prefixdir is a Path object
+        prefixdir = Path(prefixdir).expanduser().resolve()
+
+        # Check if the directory exists
+        if not prefixdir.exists() or not prefixdir.is_dir():
+            print(f"Directory does not exist: {prefixdir}")
+            return []
+
         scripts = []
-        for root, dirs, files in os.walk(self.prefixes_dir):
-            depth = root[len(str(self.prefixes_dir)):].count(os.sep)
-            if depth >= 2:
-                dirs[:] = []  # Prune the search space
+        
+        # Walk through the directory, but limit the depth to 2
+        for root, dirs, files in os.walk(prefixdir):
+            current_depth = Path(root).relative_to(prefixdir).parts
+
+            # If the depth is greater than 2, prune the search space by not descending into subdirectories
+            if len(current_depth) >= 2:
+                dirs[:] = []  # Prune subdirectories
                 continue
+
+            # Collect .charm files
             scripts.extend([Path(root) / file for file in files if file.endswith(".charm")])
+
+        # Sort files by modification time (newest first)
         scripts.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        
         return scripts
+
 
     def replace_open_button_with_launch(self, script, row, script_key):
         script_data = self.extract_yaml_info(script_key)
@@ -2223,14 +2255,31 @@ class WineCharmApp(Gtk.Application):
         # Step 2: Create a new Gtk.FileDialog instance
         file_dialog = Gtk.FileDialog.new()
 
-        # Step 3: Create a file filter for .tar.zst files
-        file_filter = Gtk.FileFilter()
-        file_filter.set_name("Compressed Backup Files (*.tar.zst)")
-        file_filter.add_pattern("*.tar.zst")
+        # Step 3: Create file filters for .tar.zst and .wzt files
+        file_filter_combined = Gtk.FileFilter()
+        file_filter_combined.set_name("Backup Files (*.tar.zst, *.wzt)")
+        file_filter_combined.add_pattern("*.tar.zst")
+        file_filter_combined.add_pattern("*.wzt")
 
-        # Step 4: Set the filter on the dialog
+        file_filter_tar = Gtk.FileFilter()
+        file_filter_tar.set_name("Compressed Backup Files (*.tar.zst)")
+        file_filter_tar.add_pattern("*.tar.zst")
+
+        file_filter_wzt = Gtk.FileFilter()
+        file_filter_wzt.set_name("Winezgui Backup Files (*.wzt)")
+        file_filter_wzt.add_pattern("*.wzt")
+
+        # Step 4: Set the filters on the dialog
         filter_model = Gio.ListStore.new(Gtk.FileFilter)
-        filter_model.append(file_filter)
+        
+        # Add the combined filter as the default option
+        filter_model.append(file_filter_combined)
+
+        # Add individual filters for .tar.zst and .wzt files
+        filter_model.append(file_filter_tar)
+        filter_model.append(file_filter_wzt)
+        
+        # Apply the filters to the file dialog
         file_dialog.set_filters(filter_model)
 
         # Step 5: Open the dialog and handle the response
@@ -2314,18 +2363,285 @@ class WineCharmApp(Gtk.Application):
                 file_path = file.get_path()
                 print(f"Selected file: {file_path}")
 
-                # Clear the flowbox and show a progress spinner
-                GLib.idle_add(self.flowbox.remove_all)
-                self.show_processing_spinner(f"Restoring from {Path(file_path).name}")
-                self.disconnect_open_button()
-
-                # Start a thread to restore from the backup (process the file in steps)
-                self.perform_restore_steps(file_path)
+                # Check the file extension to determine whether it's a .tar.zst or .wzt file
+                if file_path.endswith(".tar.zst"):
+                    self.restore_tar_zst_backup(file_path)
+                elif file_path.endswith(".wzt"):
+                    self.restore_wzt_backup(file_path)
 
         except GLib.Error as e:
             # Handle errors, such as dialog cancellation
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                 print(f"An error occurred: {e}")
+
+    def restore_tar_zst_backup(self, file_path):
+        """
+        Restore from a .tar.zst backup file.
+        """
+        # Clear the flowbox and show a progress spinner
+        GLib.idle_add(self.flowbox.remove_all)
+        self.show_processing_spinner(f"Restoring from {Path(file_path).name}")
+        self.disconnect_open_button()
+
+        # Start a thread to restore from the backup (process the file in steps)
+        self.perform_restore_steps(file_path)
+
+    def restore_wzt_backup(self, file_path):
+        """
+        Restore from a .wzt backup file.
+        """
+        # Clear the flowbox and show a progress spinner
+        GLib.idle_add(self.flowbox.remove_all)
+        self.show_processing_spinner(f"Extracting WZT from {Path(file_path).name}")
+        self.disconnect_open_button()
+
+        # Start the WZT extraction in a separate thread
+        threading.Thread(target=self.extract_wzt_file, args=(file_path,), daemon=True).start()
+
+    def extract_wzt_file(self, wzt_file):
+        """
+        Extract the .wzt file to the Wine prefixes directory.
+        """
+        extract_dir = Path(self.prefixes_dir)
+        extract_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            # Extract the wzt_prefix
+            wzt_prefix = subprocess.check_output(
+                ["bash", "-c", f"tar -tf '{wzt_file}' | head -n2 | grep '/' | cut -f1 -d '/'"]
+            ).decode('utf-8').strip()
+            
+            extracted_wzt_prefix = extract_dir / wzt_prefix
+            
+            subprocess.run(
+                ["tar", "-xvf", wzt_file, "-C", extract_dir],
+                check=True
+            )
+            self.perform_replacements(extracted_wzt_prefix)
+            self.process_sh_files(extracted_wzt_prefix)
+            self.find_and_save_lnk_files(extracted_wzt_prefix)
+
+            self.on_extraction_complete(success=True, message=f"Extracted all files to {extracted_wzt_prefix}")
+            self.extracted_dir = extract_dir
+        except subprocess.CalledProcessError as e:
+            print(f"Error extracting file: {e}")
+            self.on_extraction_complete(success=False, message=f"Error extracting file: {e}")
+
+    def on_extraction_complete(self, success, message):
+        """
+        Handle the completion of the extraction process.
+        """
+        GLib.idle_add(self.hide_processing_spinner)
+        GLib.idle_add(self.reconnect_open_button)
+
+        if success:
+            print(message)
+            # Perform any UI updates necessary after a successful extraction
+            GLib.idle_add(self.show_info_dialog, "Extraction Completed", message)
+        else:
+            print(f"Extraction failed: {message}")
+            GLib.idle_add(self.show_info_dialog, "Extraction Error", message)
+
+    def perform_replacements(self, directory):
+        user = os.getenv('USER')
+        usershome = os.path.expanduser('~')
+        datadir = os.getenv('DATADIR', '/usr/share')
+
+        # Simplified replacements using plain strings
+        find_replace_pairs = {
+            "XOCONFIGXO": "\\\\?\\H:\\.config",
+            "XOFLATPAKNAMEXO": "io.github.fastrizwaan.WineCharm",
+            "XOINSTALLTYPEXO": "flatpak",
+            "XOPREFIXXO": ".var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Prefixes",
+            "XOWINEZGUIDIRXO": ".var/app/io.github.fastrizwaan.WineCharm/data/winecharm",
+            "XODATADIRXO": datadir,
+            "XODESKTOPDIRXO": ".local/share/applications/winecharm",
+            "XOAPPLICATIONSXO": ".local/share/applications",
+            "XOAPPLICATIONSDIRXO": ".local/share/applications",
+            "XOREGUSERSUSERXO": f"\\\\users\\\\{user}",
+            "XOREGHOMEUSERXO": f"\\\\home\\\\{user}",
+            "XOREGUSERNAMEUSERXO": f'"USERNAME"="{user}"',
+            "XOREGINSTALLEDBYUSERXO": f'"InstalledBy"="{user}"',
+            "XOREGREGOWNERUSERXO": f'"RegOwner"="{user}"',
+            "XOUSERHOMEXO": usershome,
+            "XOUSERSUSERXO": f"/users/{user}",
+            "XOMEDIASUSERXO": f"/media/{user}",
+            "XOFLATPAKIDXO": "io.github.fastrizwaan.WineCharm",
+            "XOWINEEXEXO": "/app/bin/wine",
+            "XOWINEVERXO": "wine-9.0",
+        }
+
+        self.replace_strings_in_files(directory, find_replace_pairs)
+        
+        
+        
+
+    def replace_strings_in_files(self, directory, find_replace_pairs):
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                file_path = os.path.join(root, file)
+
+                # Skip binary files
+                if self.is_binary_file(file_path):
+                    print(f"Skipping binary file: {file_path}")
+                    continue
+
+                # Skip files where permission is denied
+                if not os.access(file_path, os.R_OK | os.W_OK):
+                    print(f"Skipping file: {file_path} (Permission denied)")
+                    continue
+
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+
+                    for find, replace in find_replace_pairs.items():
+                        content = content.replace(find, replace)
+
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(content)
+
+                    print(f"Replacements applied to file: {file_path}")
+                except (UnicodeDecodeError, FileNotFoundError, PermissionError) as e:
+                    print(f"Skipping file: {file_path} ({e})")
+
+    def is_binary_file(self, file_path):
+        try:
+            with open(file_path, 'rb') as f:
+                chunk = f.read(1024)
+                if b'\0' in chunk:
+                    return True
+        except Exception as e:
+            print(f"Could not check file {file_path} ({e})")
+        return False
+        
+    def process_sh_files(self, directory):
+        """
+        Process all .sh files and convert them to .charm files.
+        """
+        sh_files = self.find_sh_files(directory)
+        for sh_file in sh_files:
+            variables = self.extract_infofile_path_from_sh(sh_file)
+            exe_file = variables.get('EXE_FILE', '')
+            progname = variables.get('PROGNAME', '')
+            sha256sum = variables.get('CHECKSUM', '')
+
+            info_file_path = variables.get('INFOFILE')
+            if info_file_path:
+                info_file_path = os.path.join(os.path.dirname(sh_file), info_file_path)
+                if os.path.exists(info_file_path):
+                    try:
+                        info_data = self.parse_info_file(info_file_path)
+                        runner = info_data.get('Runner', '')
+                        args = info_data.get('Args', '')
+
+                        yml_path = sh_file.replace('.sh', '.charm')
+                        self.create_charm_file({
+                            'exe_file': exe_file,
+                            'progname': progname,
+                            'sha256sum': sha256sum,
+                            'runner': runner,
+                            'args': args,
+                        }, yml_path)
+
+                        print(f"Created {yml_path}")
+                    except Exception as e:
+                        print(f"Error parsing INFOFILE {info_file_path}: {e}")
+                else:
+                    print(f"INFOFILE {info_file_path} not found")
+            else:
+                print(f"No INFOFILE found in {sh_file}")
+
+    def create_charm_file(self, info_data, yml_path):
+        # Print to confirm the function is being executed
+        print(f"Creating .charm file at path: {yml_path}")
+
+        # Prepare the data to be written
+        exe_file = info_data.get('exe_file', '')
+        progname = info_data.get('progname', '')
+        args = info_data.get('args', '')
+        sha256sum = info_data.get('sha256sum', '')
+        runner = info_data.get('runner', '')
+
+        # Debugging: Print values before writing
+        print(f"exe_file: {exe_file}")
+        print(f"progname: {progname}")
+        print(f"args: {args}")
+        print(f"sha256sum: {sha256sum}")
+        print(f"runner: {runner}")
+
+        # Manually write the actual content to the file
+        try:
+            with open(yml_path, 'w') as yml_file:
+                yml_file.write(f"exe_file: '{exe_file}'\n")
+                yml_file.write(f"progname: '{progname}'\n")
+                yml_file.write(f"args: '{args}'\n")
+                yml_file.write(f"sha256sum: '{sha256sum}'\n")
+                yml_file.write(f"runner: '{runner}'\n")
+            print(f"Actual content written to {yml_path}")
+        except Exception as e:
+            print(f"Error writing to file: {e}")
+
+
+
+    def extract_infofile_path_from_sh(self, file_path):
+        variables = {}
+        with open(file_path, 'r') as file:
+            for line in file:
+                if line.startswith('export '):
+                    parts = line.split('=', 1)
+                    if len(parts) == 2:
+                        key = parts[0].replace('export ', '').strip()
+                        value = parts[1].strip().strip('"')
+                        variables[key] = value
+        return variables
+                
+    def find_sh_files(self, directory):
+        sh_files = []
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if file.endswith(".sh"):
+                    sh_files.append(os.path.join(root, file))
+        return sh_files
+
+    def find_and_save_lnk_files(self, wineprefix):
+        drive_c = wineprefix / "drive_c"
+        found_lnk_files_path = wineprefix / "found_lnk_files.yaml"
+        lnk_files = []
+
+        for root, dirs, files in os.walk(drive_c):
+            for file in files:
+                file_path = Path(root) / file
+                if file_path.suffix.lower() == ".lnk" and file_path.is_file():
+                    print(f"Found .lnk file: {file_path}")
+                    lnk_files.append(file_path.name)
+
+        # Read existing found_lnk_files if the file exists
+        if found_lnk_files_path.exists():
+            with open(found_lnk_files_path, 'r') as file:
+                existing_lnk_files = yaml.safe_load(file) or []
+        else:
+            existing_lnk_files = []
+
+        # Merge found lnk files with existing ones, avoiding duplicates
+        updated_lnk_files = list(set(existing_lnk_files + lnk_files))
+
+        # Save the updated list back to found_lnk_files.yaml
+        with open(found_lnk_files_path, 'w') as file:
+            yaml.dump(updated_lnk_files, file, default_flow_style=False)
+
+        print(f"Saved {len(lnk_files)} .lnk files to {found_lnk_files_path}")
+        self.load_script_list(wineprefix)
+
+    def parse_info_file(self, file_path):
+        info_data = {}
+        with open(file_path, 'r') as file:
+            for line in file:
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    info_data[key.strip()] = value.strip()
+        return info_data
+
 
 
     def add_charm_files_to_script_list(self, extracted_prefix_dir):
@@ -2416,12 +2732,30 @@ class WineCharmApp(Gtk.Application):
     def extract_prefix_dir(self, file_path):
         """
         Return the extracted prefix directory for the backup file.
+        This method ensures that only the first directory is returned, not individual files.
         """
-        extracted_prefix_name = subprocess.check_output(
-            ['tar', '-tf', file_path],
-            universal_newlines=True
-        ).splitlines()[0].split('/')[0]
-        return Path(self.prefixes_dir) / extracted_prefix_name
+        try:
+            # Extract only directories by filtering those that end with '/'
+            extracted_prefix_name = subprocess.check_output(
+                ["bash", "-c", f"tar -tf '{file_path}' | grep '/$' | head -n1 | cut -f1 -d '/'"]
+            ).decode('utf-8').strip()
+
+            if not extracted_prefix_name:
+                raise Exception("No directory found in the tar archive.")
+
+            # Print the correct path for debugging
+            extracted_prefix_path = Path(self.prefixes_dir) / extracted_prefix_name
+            print("#" * 100)
+            print(extracted_prefix_path)
+            
+            return extracted_prefix_path
+        except subprocess.CalledProcessError as e:
+            print(f"Error extracting prefix directory: {e}")
+            return None
+        except Exception as e:
+            print(f"Error: {e}")
+            return None
+
 
     def perform_restore_steps(self, file_path):
         """
@@ -2485,7 +2819,99 @@ class WineCharmApp(Gtk.Application):
         print(f"Uncompressed size check passed: {uncompressed_size / (1024 * 1024)} MB")
 
         return True  # Return True to indicate success
+###########################3
+    def restore_wzt_backup(self, file_path):
+        """
+        Restore from a .wzt backup file in steps, showing progress for each step.
+        """
+        # Clear the flowbox and show a progress spinner
+        GLib.idle_add(self.flowbox.remove_all)
+        self.show_processing_spinner(f"Extracting WZT from {Path(file_path).name}")
+        self.disconnect_open_button()
 
+        # Start the WZT extraction process in steps
+        self.perform_wzt_restore_steps(file_path)
+
+
+    def perform_wzt_restore_steps(self, wzt_file):
+        """
+        Perform the WZT extraction process in steps, showing progress for each.
+        """
+        steps = [
+            ("Checking Disk Space", lambda: self.check_disk_space_and_show_step(wzt_file)),
+            ("Extracting WZT Backup File", lambda: self.extract_wzt_file(wzt_file)),
+            ("Performing Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(wzt_file))),
+            ("Processing Shell Files", lambda: self.process_sh_files(self.extract_prefix_dir(wzt_file))),
+            ("Finding and Saving LNK Files", lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(wzt_file))),
+        ]
+
+        def perform_steps():
+            for step_text, step_func in steps:
+                # Queue the UI update safely in the main thread
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    # Perform the restore step and check the result
+                    result = step_func()
+                    if result is False:
+                        # Stop further steps if a step fails
+                        print(f"Step '{step_text}' failed, aborting restore process.")
+                        break
+
+                    # Mark the step as done in the main thread
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except Exception as e:
+                    print(f"Error during step '{step_text}': {e}")
+                    GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
+                    break
+
+            # Once complete, update the UI in the main thread
+            GLib.idle_add(self.on_restore_completed)
+
+        # Start the restore process in a new thread
+        threading.Thread(target=perform_steps).start()
+
+
+    def extract_wzt_file(self, wzt_file):
+        """
+        Extract the .wzt file to the Wine prefixes directory and process the files.
+        """
+        extract_dir = Path(self.prefixes_dir)                           
+        extract_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            # Extract the first directory (prefix) inside the WZT archive
+            wzt_prefix = subprocess.check_output(
+                ["bash", "-c", f"tar -tf '{wzt_file}' | grep '/$' | head -n1 | cut -f1 -d '/'"]
+            ).decode('utf-8').strip()
+            
+            if not wzt_prefix:
+                raise Exception("Unable to determine WZT prefix directory")
+
+            extracted_wzt_prefix = extract_dir / wzt_prefix
+            
+            # Extract the entire WZT archive into the correct prefix directory
+            subprocess.run(
+                ["tar", "-xvf", wzt_file, "-C", extract_dir],
+                check=True
+            )
+            
+            # Perform replacements, process .sh files, and find .lnk files
+            self.perform_replacements(extracted_wzt_prefix)
+            self.process_sh_files(extracted_wzt_prefix)
+            self.find_and_save_lnk_files(extracted_wzt_prefix)
+
+            # Mark extraction as complete
+            self.on_extraction_complete(success=True, message=f"Extracted all files to {extracted_wzt_prefix}")
+            self.extracted_dir = extracted_wzt_prefix  # Update the extracted directory reference
+        except subprocess.CalledProcessError as e:
+            print(f"Error extracting file: {e}")
+            self.on_extraction_complete(success=False, message=f"Error extracting file: {e}")
+        except Exception as e:
+            print(f"Error: {e}")
+            self.on_extraction_complete(success=False, message=f"Error: {e}")
+
+
+    #####################
 
     def show_options_for_script(self, ui_state, row, script_key):
         """
@@ -3385,7 +3811,15 @@ class WineCharmApp(Gtk.Application):
         
         # Extract exe_file and wineprefix from script_data
         exe_file = Path(script_data['exe_file']).expanduser().resolve()
-        wineprefix = Path(script_data.get('wineprefix')).expanduser().resolve()
+        wineprefix = script_data.get('wineprefix')
+        script =  Path(script_data['script_path']).expanduser().resolve()
+        if wineprefix is None:
+            wineprefix = script.parent  # Use script's parent directory if wineprefix is not provided
+        else:
+            wineprefix = Path(wineprefix).expanduser().resolve()
+
+        script_path = Path(script_data.get('script_path')).expanduser().resolve()
+
         script_path = Path(script_data.get('script_path')).expanduser().resolve()
 
         
@@ -4105,28 +4539,52 @@ class WineCharmApp(Gtk.Application):
             self.open_button.set_sensitive(True)
         print("Open button enabled.")
 
-    def load_script_list(self):
-        """Loads all .charm files into the self.script_list dictionary."""
-        self.script_list = {}
+    def load_script_list(self, prefixdir=None):
+        """
+        Loads all .charm files from the specified directory (or the default self.prefixes_dir)
+        into the self.script_list dictionary.
+        
+        Args:
+            prefixdir (str or Path, optional): The directory to search for .charm files.
+                                               Defaults to self.prefixes_dir.
+        """
+        # Use the specified prefix directory, or default to self.prefixes_dir
+        if prefixdir is None:
+            prefixdir = self.prefixes_dir
+        
+        # Find all .charm files in the directory
+        scripts = self.find_charm_files(prefixdir)
 
-        # Find all .charm files using the find_python_scripts method
-        scripts = self.find_python_scripts()
-
-        # Load each script's data
+        # Process each .charm file
         for script_file in scripts:
-            with open(script_file, 'r') as f:
-                try:
+            try:
+                with open(script_file, 'r') as f:
+                    # Load the YAML data from the .charm file
                     script_data = yaml.safe_load(f)
+
+                    # Ensure script_data is a dictionary
+                    if not isinstance(script_data, dict):
+                        print(f"Warning: Invalid format in {script_file}, skipping.")
+                        continue
+
+                    # Add script path to script_data
                     script_data['script_path'] = str(script_file)
+
+                    # Use 'sha256sum' as the key in script_list
                     script_key = script_data.get('sha256sum')
                     if script_key:
-                        self.script_list[script_key] = script_data  # Use sha256sum as the key
+                        self.script_list[script_key] = script_data
                     else:
                         print(f"Warning: Script {script_file} missing 'sha256sum'. Skipping.")
-                except Exception as e:
-                    print(f"Error loading script {script_file}: {e}")
 
+            except yaml.YAMLError as yaml_err:
+                print(f"YAML error in {script_file}: {yaml_err}")
+            except Exception as e:
+                print(f"Error loading script {script_file}: {e}")
+
+        # Print the total number of loaded scripts
         print(f"Loaded {len(self.script_list)} scripts.")
+
 
 
 
