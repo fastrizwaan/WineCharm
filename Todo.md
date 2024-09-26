@@ -25,4 +25,9 @@ Refactoring winecharm
 
 
 
+# Current issue
+- [ ] if the process has ended, the launch_button is not reverted to stop and highlight is not removed
+- [ ]  Error terminating script f427f2d354acd78f2177aaeb78a677d34d7825751dc3abe70d40fd537b70c4d8: Command 'bash -c 'export PATH=.:$PATH; WINEPREFIX=/var/home/rizvan/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Prefixes/ReShade_Setup_6.1.1-f427f2d354 wineserver -k'' returned non-zero exit status 1.
 
+is not resetting the play functionality.
+ 
