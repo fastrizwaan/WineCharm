@@ -2826,14 +2826,25 @@ class WineCharmApp(Gtk.Application):
         checkbox_dict = {}
 
         # Create a vertical box to hold the checkboxes
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
 
-        # Iterate through the charm files and create checkboxes
+        # Iterate through the charm files and create checkboxes with icons and labels
         for charm_file in charm_files:
-            # Extract the program name from the charm file
-            program_name = charm_file.stem  # Placeholder for actual program name extraction
-            checkbox = Gtk.CheckButton(label=program_name)
-            vbox.append(checkbox)
+            # Create the icon and title widget (icon + label) for each charm file
+            icon_title_widget = self.create_icon_title_widget(charm_file)
+
+            # Create a horizontal box to hold the checkbox and the icon/label widget
+            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+
+            # Create a checkbox for each shortcut
+            checkbox = Gtk.CheckButton()
+            hbox.append(checkbox)
+
+            # Append the icon and title widget (icon + label)
+            hbox.append(icon_title_widget)
+
+            # Add the horizontal box (with checkbox and icon+label) to the vertical box
+            vbox.append(hbox)
 
             # Store the checkbox and associated file in the dictionary
             checkbox_dict[checkbox] = charm_file
@@ -2869,8 +2880,23 @@ class WineCharmApp(Gtk.Application):
                 if checkbox.get_active():  # Check if the checkbox is selected
                     try:
                         if charm_file.exists():
-                            charm_file.unlink()  # Delete the file
+                            # Delete the shortcut file
+                            charm_file.unlink()
                             print(f"Deleted shortcut: {charm_file}")
+
+                            # Remove the script_key from self.script_list
+                            script_key = self.get_script_key_from_shortcut(charm_file)
+                            if script_key in self.script_list:
+                                del self.script_list[script_key]
+                                print(f"Removed script {script_key} from script_list")
+
+                            # Optionally, remove from ui_data if applicable
+                            if hasattr(self, 'ui_data') and script_key in self.ui_data:
+                                del self.ui_data[script_key]
+                                print(f"Removed script {script_key} from ui_data")
+
+                            # Optionally update the UI (e.g., refresh the script list or view)
+                            self.create_script_list()  # Update the UI to reflect changes
                         else:
                             print(f"Shortcut file does not exist: {charm_file}")
                     except Exception as e:
@@ -2880,6 +2906,7 @@ class WineCharmApp(Gtk.Application):
 
         # Close the dialog
         dialog.close()
+
 
 
     def get_script_key_from_shortcut(self, shortcut_file):
