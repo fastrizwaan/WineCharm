@@ -1081,11 +1081,12 @@ class WineCharmApp(Gtk.Application):
                 self.hide_buttons(row_play_button, row_options_button)
 
         # Check if the script is running and update the play button and row highlight accordingly
-        if self.script_ui_data[script_key]['is_running']:
+#        if self.script_ui_data[script_key]['is_running']:
+        if script_key in self.running_processes:
             # Script is running: set play button to 'Stop' and add 'highlighted' class to the row
             self.set_play_stop_button_state(play_button, True)
             play_button.set_tooltip_text("Stop")
-            button.add_css_class("highlighted")  # Ensure 'highlighted' for running scripts
+            #button.add_css_class("highlighted")  # Ensure 'highlighted' for running scripts
             print(f"Script {script_key} is running. Setting play button to 'Stop' and adding 'highlighted'.")
         else:
             # Script is not running: set play button to 'Play' and remove 'highlighted' class from the row
@@ -1313,7 +1314,9 @@ class WineCharmApp(Gtk.Application):
             # Clear the currently clicked row information
             self.current_clicked_row = None
         #print("All UI elements reset to default state.")
-
+        # Optionally, clear the running processes dictionary
+        self.running_processes.clear()
+        #GLib.timeout_add_seconds(0.5, self.create_script_list)
 
         
     def launch_script(self, script_key, play_stop_button, row):
@@ -1335,7 +1338,7 @@ class WineCharmApp(Gtk.Application):
         runner = script_data.get('runner', 'wine')
         if runner:
             runner = Path(runner).expanduser().resolve()
-            runner_dir = runner.papath_envrent.resolve()
+            runner_dir = runner.parent.expanduser().resolve()
             path_env = f'export PATH={runner_dir}:$PATH'
         else:
             runner = "wine"
@@ -2685,6 +2688,10 @@ class WineCharmApp(Gtk.Application):
                     self.script_list[script_key] = script_data
                     print(f"Added {charm_file} to script_list with key {script_key}")
 
+                    # Update the timestamp of the .charm file
+                    charm_file.touch()
+                    print(f"Updated timestamp for {charm_file}")
+                
             except Exception as e:
                 print(f"Error loading .charm file {charm_file}: {e}")
         
@@ -4573,7 +4580,10 @@ class WineCharmApp(Gtk.Application):
                     # Use 'sha256sum' as the key in script_list
                     script_key = script_data.get('sha256sum')
                     if script_key:
-                        self.script_list[script_key] = script_data
+                        if prefixdir == self.prefixes_dir:
+                            self.script_list[script_key] = script_data
+                        else:
+                            self.script_list = {script_key: script_data, **self.script_list}
                     else:
                         print(f"Warning: Script {script_file} missing 'sha256sum'. Skipping.")
 
