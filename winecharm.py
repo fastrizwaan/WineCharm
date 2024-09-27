@@ -1135,7 +1135,6 @@ class WineCharmApp(Gtk.Application):
         
         return scripts
 
-
     def replace_open_button_with_launch(self, script, row, script_key):
         script_data = self.extract_yaml_info(script_key)
         if not script_data:
@@ -4576,6 +4575,9 @@ class WineCharmApp(Gtk.Application):
 
                     # Add script path to script_data
                     script_data['script_path'] = str(script_file)
+
+                    # Add modification time (mtime) to script_data
+                    script_data['mtime'] = script_file.stat().st_mtime
 
                     # Use 'sha256sum' as the key in script_list
                     script_key = script_data.get('sha256sum')
