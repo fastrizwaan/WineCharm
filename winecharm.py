@@ -18,6 +18,7 @@ import glob
 import fnmatch
 import psutil
 import inspect
+import argparse
 
 from datetime import datetime
 
@@ -658,6 +659,7 @@ class WineCharmApp(Gtk.Application):
         self.vbox.append(self.open_button)
 
         self.search_entry = Gtk.Entry()
+        self.search_entry.set_size_request(-1, 36)
         self.search_entry.set_placeholder_text("Search")
         self.search_entry.connect("activate", self.on_search_entry_activated)
         self.search_entry.connect("changed", self.on_search_entry_changed)
@@ -2039,7 +2041,7 @@ class WineCharmApp(Gtk.Application):
         yaml_data['wineprefix'] = str(prefix_dir.expanduser().resolve())
         # Extract icon and create desktop entry
         icon_path = self.extract_icon(exe_file, prefix_dir, exe_no_space, progname)
-        self.create_desktop_entry(progname, yaml_file_path, icon_path, prefix_dir)
+        #self.create_desktop_entry(progname, yaml_file_path, icon_path, prefix_dir)
 
         # Add the new script data directly to self.script_list
         self.new_scripts.add(yaml_file_path.stem)
@@ -3081,13 +3083,15 @@ class WineCharmApp(Gtk.Application):
             ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
             ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager),
             ("Edit Script File", "text-editor-symbolic", self.open_script_file),
-            ("Delete Wineprefix", "edit-delete-symbolic", self.show_delete_wineprefix_confirmation),
+            ("Delete Wineprefix", "user-trash-symbolic", self.show_delete_wineprefix_confirmation),
             ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation),
             ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
             ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
             ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog),
             ("Backup Prefix", "document-save-symbolic", self.show_backup_prefix_dialog),  
-            ("Reset Shortcut", "view-refresh-symbolic", self.reset_shortcut_confirmation)  
+            ("Reset Shortcut", "view-refresh-symbolic", self.reset_shortcut_confirmation),
+            ("Add Desktop Shortcut", "user-bookmarks-symbolic", self.add_desktop_shortcut),
+            ("Remove Desktop Shortcut", "action-unavailable-symbolic", self.remove_desktop_shortcut)
         ]
 
         for label, icon_name, callback in options:
@@ -4141,11 +4145,17 @@ class WineCharmApp(Gtk.Application):
             print(f"Error copying template: {e}")
 
     def create_desktop_entry(self, progname, script_path, icon_path, wineprefix):
-        return; # do not create
+#        return; # do not create
+        # Create desktop shortcut based on flatpak sandbox or system
+        if shutil.which("flatpak-spawn"):
+            exec_command = f"flatpak run io.github.fastrizwaan.WineCharm '{script_path}'"
+        else: #system
+            exec_command = f"winecharm '{script_path}'"
+            
         desktop_file_content = f"""[Desktop Entry]
     Name={progname}
     Type=Application
-    Exec=wine '{script_path}'
+    Exec={exec_command}
     Icon={icon_path if icon_path else 'wine'}
     Keywords=winecharm; game; {progname};
     NoDisplay=false
@@ -4161,7 +4171,8 @@ class WineCharmApp(Gtk.Application):
                 desktop_file.write(desktop_file_content)
 
             # Create a symlink to the desktop entry in the applications directory
-            symlink_path = self.applicationsdir / f"{progname}.desktop"
+            symlink_path = self.applicationsdir / f"winecharm_{progname}.desktop"
+            
             if symlink_path.exists() or symlink_path.is_symlink():
                 symlink_path.unlink()
             symlink_path.symlink_to(desktop_file_path)
@@ -4786,34 +4797,359 @@ class WineCharmApp(Gtk.Application):
         # Print the total number of loaded scripts
         print(f"Loaded {len(self.script_list)} scripts.")
 
+    def add_desktop_shortcut(self, script, script_key, *args):
+        """
+        Show a dialog with checkboxes to allow the user to select shortcuts for desktop creation.
+        
+        Args:
+            script: The script that contains information about the shortcut.
+            script_key: The unique identifier for the script in the script_list.
+        """
+        # Ensure we're using the updated script path from the script_data
+        script_data = self.script_list.get(script_key)
+        if not script_data:
+            print(f"Error: Script key {script_key} not found in script_list.")
+            return
+
+        # Extract the Wine prefix directory associated with this script
+        wine_prefix_dir = Path(script_data['script_path']).parent
+
+        # Fetch the list of charm files only in the specific Wine prefix directory
+        charm_files = list(wine_prefix_dir.rglob("*.charm"))
+
+        # If there are no charm files, show a message
+        if not charm_files:
+            self.show_info_dialog("No Shortcuts", f"No shortcuts are available for desktop creation in {wine_prefix_dir}.")
+            return
+
+        # Create a new dialog for selecting shortcuts
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,
+            title="Create Desktop Shortcuts",
+            body=f"Select the shortcuts you want to create for {wine_prefix_dir.name}:"
+        )
+
+        # A dictionary to store the checkboxes and corresponding charm files
+        checkbox_dict = {}
+
+        # Create a vertical box to hold the checkboxes
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+
+        # Iterate through the charm files and create checkboxes with icons and labels
+        for charm_file in charm_files:
+            # Create the icon and title widget (icon + label) for each charm file
+            icon_title_widget = self.create_icon_title_widget(charm_file)
+
+            # Create a horizontal box to hold the checkbox and the icon/label widget
+            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+
+            # Create a checkbox for each shortcut
+            checkbox = Gtk.CheckButton()
+            hbox.append(checkbox)
+
+            # Append the icon and title widget (icon + label)
+            hbox.append(icon_title_widget)
+
+            # Add the horizontal box (with checkbox and icon+label) to the vertical box
+            vbox.append(hbox)
+
+            # Store the checkbox and associated file in the dictionary
+            checkbox_dict[checkbox] = charm_file
+
+        # Add the vertical box to the dialog
+        dialog.set_extra_child(vbox)
+
+        # Add "Create" and "Cancel" buttons
+        dialog.add_response("create", "Create")
+        dialog.set_response_appearance("create", Adw.ResponseAppearance.SUGGESTED)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+
+        # Connect the response signal to handle desktop shortcut creation
+        dialog.connect("response", self.on_add_desktop_shortcut_response, checkbox_dict)
+
+        # Present the dialog
+        dialog.present()
 
 
+    def on_add_desktop_shortcut_response(self, dialog, response_id, checkbox_dict):
+        """
+        Handle the response from the create desktop shortcut dialog.
+        
+        Args:
+            dialog: The Adw.MessageDialog instance.
+            response_id: The ID of the response clicked by the user.
+            checkbox_dict: Dictionary mapping checkboxes to charm files.
+        """
+        if response_id == "create":
+            # Iterate through the checkboxes and create shortcuts for selected files
+            for checkbox, charm_file in checkbox_dict.items():
+                if checkbox.get_active():  # Check if the checkbox is selected
+                    try:
+                        # Load the script data to create the desktop shortcut
+                        script_key = self.get_script_key_from_shortcut(charm_file)
+                        script_data = self.script_list.get(script_key)
 
-                
+                        if not script_data:
+                            print(f"Error: Script data for {charm_file} not found.")
+                            continue
+
+                        progname = script_data.get('progname', '')
+                        script_path = Path(script_data['script_path']).expanduser().resolve()
+                        wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
+                        icon_name = script_path.stem + ".png"
+                        icon_dir = script_path.parent
+                        icon_path = icon_dir / icon_name
+
+                        # Create the desktop entry using the existing method
+                        self.create_desktop_entry(progname, script_path, icon_path, wineprefix)
+                        print(f"Desktop shortcut created for: {charm_file}")
+
+                    except Exception as e:
+                        print(f"Error creating desktop shortcut for {charm_file}: {e}")
+
+            # Notify the user of successful shortcut creation
+            self.show_info_dialog("Shortcut Created", "Desktop shortcuts created successfully.")
+
+        else:
+            print("Shortcut creation canceled")
+
+        # Close the dialog
+        dialog.close()
+
+    def remove_desktop_shortcut(self, script, script_key, *args):
+        """
+        Show a dialog with checkboxes to allow the user to select desktop shortcuts for deletion.
+
+        Args:
+            script: The script that contains information about the shortcut.
+            script_key: The unique identifier for the script in the script_list.
+        """
+        # Ensure we're using the updated script path from the script_data
+        script_data = self.script_list.get(script_key)
+        if not script_data:
+            print(f"Error: Script key {script_key} not found in script_list.")
+            return
+
+        # Extract the Wine prefix directory associated with this script
+        wine_prefix_dir = Path(script_data['script_path']).parent
+
+        # Fetch the list of desktop files in the specific Wine prefix directory
+        desktop_files = list(wine_prefix_dir.glob("*.desktop"))
+
+        # If there are no desktop shortcut files, show a message
+        if not desktop_files:
+            self.show_info_dialog("No Desktop Shortcuts", f"No desktop shortcuts are available for deletion in {wine_prefix_dir}.")
+            return
+
+        # Create a new dialog for selecting desktop shortcuts
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,
+            title="Delete Desktop Shortcuts",
+            body=f"Select the desktop shortcuts you want to delete for {wine_prefix_dir.name}:"
+        )
+
+        # A dictionary to store the checkboxes and corresponding desktop files
+        checkbox_dict = {}
+
+        # Create a vertical box to hold the checkboxes
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+
+        # Iterate through the desktop files and create checkboxes with icons and labels
+        for desktop_file in desktop_files:
+            # Create the icon and title widget (icon + label) for each desktop file
+            icon_title_widget = self.create_icon_title_widget(desktop_file)
+
+            # Create a horizontal box to hold the checkbox and the icon/label widget
+            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+
+            # Create a checkbox for each desktop shortcut
+            checkbox = Gtk.CheckButton()
+            hbox.append(checkbox)
+
+            # Append the icon and title widget (icon + label)
+            hbox.append(icon_title_widget)
+
+            # Add the horizontal box (with checkbox and icon+label) to the vertical box
+            vbox.append(hbox)
+
+            # Store the checkbox and associated file in the dictionary
+            checkbox_dict[checkbox] = desktop_file
+
+        # Add the vertical box to the dialog
+        dialog.set_extra_child(vbox)
+
+        # Add "Delete" and "Cancel" buttons
+        dialog.add_response("delete", "Delete")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+
+        # Connect the response signal to handle desktop shortcut deletion
+        dialog.connect("response", self.on_remove_desktop_shortcut_response, checkbox_dict)
+
+        # Present the dialog
+        dialog.present()
+
+
+    def on_remove_desktop_shortcut_response(self, dialog, response_id, checkbox_dict):
+        """
+        Handle the response from the delete desktop shortcut dialog.
+
+        Args:
+            dialog: The Adw.MessageDialog instance.
+            response_id: The ID of the response clicked by the user.
+            checkbox_dict: Dictionary mapping checkboxes to desktop files.
+        """
+        if response_id == "delete":
+            # Iterate through the checkboxes and delete selected files
+            for checkbox, desktop_file in checkbox_dict.items():
+                if checkbox.get_active():  # Check if the checkbox is selected
+                    try:
+                        if desktop_file.exists():
+                            # Delete the desktop file
+                            desktop_file.unlink()
+                            print(f"Deleted desktop shortcut: {desktop_file}")
+
+                            # Find and delete the symbolic link in the applications directory
+                            symlink_path = self.applicationsdir / f"winecharm_{desktop_file.stem}.desktop"
+                            if symlink_path.exists() or symlink_path.is_symlink():
+                                symlink_path.unlink()
+                                print(f"Removed symlink: {symlink_path}")
+
+                        else:
+                            print(f"Desktop shortcut file does not exist: {desktop_file}")
+                    except Exception as e:
+                        print(f"Error deleting desktop shortcut: {e}")
+        else:
+            print("Deletion canceled")
+
+        # Close the dialog
+        dialog.close()
+
+
 def parse_args():
-    import argparse
-    parser = argparse.ArgumentParser(description="WineCharm GUI application")
-    parser.add_argument('file', nargs='?', help="Path to the .exe or .msi file")
+    """
+    Parse command-line arguments.
+    """
+    parser = argparse.ArgumentParser(description="WineCharm GUI application or headless mode for .charm files")
+    parser.add_argument('file', nargs='?', help="Path to the .exe, .msi, or .charm file")
     return parser.parse_args()
-
-
+    
 def main():
     args = parse_args()
 
+    # Create an instance of WineCharmApp
     app = WineCharmApp()
 
+    # If a file is provided, handle it appropriately
     if args.file:
-        # Get the file extension
-        file_extension = Path(args.file).suffix.lower()
+        file_path = Path(args.file).expanduser().resolve()
+        file_extension = file_path.suffix.lower()
 
-        # Validate the file type early before any further processing
-        if file_extension not in ['.exe', '.msi']:
-            print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
+        # If it's a .charm file, launch it without GUI
+        if file_extension == '.charm':
+            try:
+                # Load the .charm file data
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    script_data = yaml.safe_load(file)
+
+                exe_file = script_data.get("exe_file")
+                if not exe_file:
+                    print("Error: No executable file defined in the .charm script.")
+                    sys.exit(1)
+
+                # Prepare to launch the executable
+                exe_path = Path(exe_file).expanduser().resolve()
+                if not exe_path.exists():
+                    print(f"Error: Executable '{exe_path}' not found.")
+                    sys.exit(1)
+
+                # Extract additional environment and arguments
+                wineprefix = script_data.get('script_path')
+
+                if not wineprefix:
+                    wineprefix = Path(file_path).parent.expanduser().resolve()
+                env_vars = script_data.get("env_vars", "").strip()
+                script_args = script_data.get("args", "").strip()
+                runner = script_data.get("runner", "wine")
+
+                # Resolve runner path
+                if runner:
+                    runner = Path(runner).expanduser().resolve()
+                    runner_dir = runner.parent.expanduser().resolve()
+                    path_env = f'export PATH={runner_dir}:$PATH'
+                else:
+                    runner = "wine"
+                    runner_dir = ""  # Or set a specific default if required
+                    path_env = ""
+
+                # Prepare the command safely using shlex for quoting
+                exe_parent = shlex.quote(str(exe_path.parent.resolve()))
+                wineprefix = shlex.quote(str(wineprefix))
+                runner = shlex.quote(str(runner))
+
+                # Construct the command parts
+                command_parts = []
+
+                # Add path to runner if it exists
+                if path_env:
+                    command_parts.append(f"{path_env}")
+
+                # Change to the executable's directory
+                command_parts.append(f"cd {exe_parent}")
+
+                # Add environment variables if present
+                if env_vars:
+                    command_parts.append(f"{env_vars}")
+
+                # Add wineprefix and runner
+                command_parts.append(f"WINEPREFIX={wineprefix} {runner} {shlex.quote(str(exe_path))}")
+
+                # Add script arguments if present
+                if script_args:
+                    command_parts.append(f"{script_args}")
+
+                # Join all the command parts
+                command = " && ".join(command_parts)
+
+                print(f"Executing: {command}")
+                subprocess.run(command, shell=True)
+
+                # Exit after headless execution to ensure no GUI elements are opened
+                sys.exit(0)
+
+            except Exception as e:
+                print(f"Error: Unable to launch the .charm script: {e}")
+                sys.exit(1)
+
+        # For .exe or .msi files, validate the file type and continue with GUI mode
+        elif file_extension in ['.exe', '.msi']:
+            if app.SOCKET_FILE.exists():
+                try:
+                    # Send the file to an existing running instance
+                    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+                        client.connect(str(app.SOCKET_FILE))
+                        message = f"process_file||{args.file}"
+                        client.sendall(message.encode())
+                        print(f"Sent file path to existing instance: {args.file}")
+                    return
+                except ConnectionRefusedError:
+                    print("No existing instance found, starting a new one.")
+
+            # If no existing instance is running, proceed with normal startup and processing
+            app.command_line_file = args.file
+
+        else:
+            # Invalid file type, print error and handle accordingly
+            print(f"Invalid file type: {file_extension}. Only .exe, .msi, or .charm files are allowed.")
             
             # If no instance is running, start WineCharmApp and show the error dialog directly
             if not app.SOCKET_FILE.exists():
                 app.start_socket_server()
-                GLib.timeout_add_seconds(1.5, app.show_info_dialog, "Invalid File Type", f"Only .exe or .msi files are allowed. You provided: {file_extension}")
+                GLib.timeout_add_seconds(1.5, app.show_info_dialog, "Invalid File Type", f"Only .exe, .msi, or .charm files are allowed. You provided: {file_extension}")
                 app.run(sys.argv)
 
                 # Clean up the socket file
@@ -4824,7 +5160,7 @@ def main():
                 try:
                     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
                         client.connect(str(app.SOCKET_FILE))
-                        message = f"show_dialog||Invalid file type: {file_extension}||Only .exe or .msi files are allowed."
+                        message = f"show_dialog||Invalid file type: {file_extension}||Only .exe, .msi, or .charm files are allowed."
                         client.sendall(message.encode())
                     return
                 except ConnectionRefusedError:
@@ -4833,22 +5169,7 @@ def main():
             # Return early to skip further processing
             return
 
-        # At this point, the file type is valid, continue with processing
-        if app.SOCKET_FILE.exists():
-            try:
-                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
-                    client.connect(str(app.SOCKET_FILE))
-                    message = f"process_file||{args.file}"
-                    client.sendall(message.encode())
-                    print(f"Sent file path to existing instance: {args.file}")
-                return
-            except ConnectionRefusedError:
-                print("No existing instance found, starting a new one.")
-
-        # If no existing instance is found, proceed with normal startup and processing
-        app.command_line_file = args.file
-
-    # Start the socket server and run the application
+    # Start the socket server and run the application (GUI mode)
     app.start_socket_server()
     app.run(sys.argv)
 
@@ -4856,10 +5177,6 @@ def main():
     if app.SOCKET_FILE.exists():
         app.SOCKET_FILE.unlink()
 
-
-
-
 if __name__ == "__main__":
     main()
-
 
