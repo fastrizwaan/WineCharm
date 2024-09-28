@@ -2306,9 +2306,14 @@ class WineCharmApp(Gtk.Application):
         self.set_open_button_label("Exporting...")
         self.show_processing_spinner("Preparing backup...")
 
+        # Get the user's home directory to replace with `~`
+        usershome = os.path.expanduser('~')
+        find_replace_pairs = {usershome: "~"}
+
         # Step 2: Define the steps for the backup process
         def perform_backup_steps():
             steps = [
+                (f"Replace <b>\"{usershome}\"</b> with '~' in all files", lambda: self.replace_strings_in_files(wineprefix, find_replace_pairs)),
                 ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
                 ("Creating backup archive", lambda: self.create_backup_archive(wineprefix, backup_path)),
                 ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
