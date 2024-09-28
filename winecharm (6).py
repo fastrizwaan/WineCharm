@@ -34,8 +34,8 @@ class WineCharmApp(Gtk.Application):
         Adw.init()
         
         # Move the global variables to instance attributes
-        self.debug = False
-        self.version = "0.96"
+        self.debug = True
+        self.version = "0.95"
         
         # Paths and directories
         self.winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
@@ -541,34 +541,22 @@ class WineCharmApp(Gtk.Application):
         self.quit()
 
     def create_main_window(self):
-
         self.window = Gtk.ApplicationWindow(application=self)
         self.window.set_title("Wine Charm")
         self.window.set_default_size(420, 560)
         self.window.add_css_class("common-background")
-
+        
         self.headerbar = Gtk.HeaderBar()
         self.headerbar.set_show_title_buttons(True)
         self.headerbar.add_css_class("flat")
         self.window.set_titlebar(self.headerbar)
 
-        # Create a box to hold the app icon and the title label
-        self.title_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        #title_box.set_margin_start(0)
-
-        # App icon
+        app_icon_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        app_icon_box.set_margin_start(10)
         app_icon = Gtk.Image.new_from_icon_name("io.github.fastrizwaan.WineCharm")
         app_icon.set_pixel_size(18)  # Set icon size to 18
-        self.title_box.append(app_icon)
-
-        # Title label
-        title_label = Gtk.Label(label="Wine Charm")
-        title_label.set_markup("<b>Wine Charm</b>")  # Use Pango Markup to make the text bold
-        title_label.set_use_markup(True)  # Enable markup for this label
-        self.title_box.append(title_label)
-
-        # Set the title_box as the title widget of the headerbar
-        self.headerbar.set_title_widget(self.title_box)
+        app_icon_box.append(app_icon)
+        self.headerbar.pack_start(app_icon_box)
 
         # Back button
         self.back_button = Gtk.Button.new_from_icon_name("go-previous-symbolic")
@@ -577,16 +565,13 @@ class WineCharmApp(Gtk.Application):
         self.back_button.connect("clicked", self.on_back_button_clicked)
         self.headerbar.pack_start(self.back_button)
 
-        # Create a box to hold the Search button and the view toggle button
-        view_and_sort_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=1)
-
         # Search button
         self.search_button = Gtk.ToggleButton()
         search_icon = Gtk.Image.new_from_icon_name("system-search-symbolic")
         self.search_button.set_child(search_icon)
         self.search_button.connect("toggled", self.on_search_button_clicked)
         self.search_button.add_css_class("flat")
-        view_and_sort_box.append(self.search_button)  # Add search button to the left
+        self.headerbar.pack_start(self.search_button)
 
         # Icon/List view toggle button
         self.view_toggle_button = Gtk.ToggleButton()
@@ -596,12 +581,8 @@ class WineCharmApp(Gtk.Application):
         self.view_toggle_button.add_css_class("flat")
         self.view_toggle_button.set_tooltip_text("Toggle Icon/List View")
         self.view_toggle_button.connect("toggled", self.on_view_toggle_button_clicked)
-        view_and_sort_box.append(self.view_toggle_button)
+        self.headerbar.pack_start(self.view_toggle_button)
 
-        # Add the view_and_sort_box to the headerbar
-        self.headerbar.pack_start(view_and_sort_box)
-
-        # Keep the existing menu button on the right side of the headerbar
         self.menu_button = Gtk.MenuButton()
         menu_icon = Gtk.Image.new_from_icon_name("open-menu-symbolic")
         self.menu_button.set_child(menu_icon)
@@ -609,34 +590,15 @@ class WineCharmApp(Gtk.Application):
         self.menu_button.set_tooltip_text("Menu")
         self.headerbar.pack_end(self.menu_button)
 
-        # Create the main menu for the right menu button
         menu = Gio.Menu()
-
-        # Create a "Sort" submenu and add sorting options
-        sort_submenu = Gio.Menu()
-        sort_submenu.append("Name (A-Z)", "win.sort_az")
-        sort_submenu.append("Name (Z-A)", "win.sort_za")
-        sort_submenu.append("Wineprefix (A-Z)", "win.sort_wineprefix")
-        sort_submenu.append("Wineprefix (Z-A)", "win.sort_wineprefix_reverse")
-        sort_submenu.append("Time (Newest First)", "win.sort_mtime")
-        sort_submenu.append("Time (Oldest First)", "win.sort_mtime_oldest")
-
-        # Add the sort submenu to the main menu
-        menu.append_submenu("🔠 Sort", sort_submenu)
+        for label, action in self.hamburger_actions:
+            menu.append(label, f"app.{action.__name__}")
+            action_item = Gio.SimpleAction.new(action.__name__, None)
+            action_item.connect("activate", action)
+            self.add_action(action_item)
 
         self.menu_button.set_menu_model(menu)
 
-        # Add other existing options in the hamburger menu
-        for label, action in self.hamburger_actions:
-            menu.append(label, f"win.{action.__name__}")
-            action_item = Gio.SimpleAction.new(action.__name__, None)
-            action_item.connect("activate", action)
-            self.window.add_action(action_item)
-
-        # Create actions for sorting options
-        self.create_sort_actions()
-
-        # Rest of the UI setup...
         self.vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.vbox.set_margin_start(10)
         self.vbox.set_margin_end(10)
@@ -648,6 +610,7 @@ class WineCharmApp(Gtk.Application):
         self.open_button_box.set_halign(Gtk.Align.CENTER)
         open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
         open_label = Gtk.Label(label="Open")
+
         self.open_button_box.append(open_icon)
         self.open_button_box.append(open_label)
 
@@ -670,6 +633,7 @@ class WineCharmApp(Gtk.Application):
 
         self.main_frame = Gtk.Frame()
         self.main_frame.set_margin_top(0)
+        
         self.vbox.append(self.main_frame)
 
         self.scrolled = Gtk.ScrolledWindow()  # Make scrolled an instance variable
@@ -681,7 +645,7 @@ class WineCharmApp(Gtk.Application):
         self.flowbox = Gtk.FlowBox()
         self.flowbox.set_valign(Gtk.Align.START)
         self.flowbox.set_halign(Gtk.Align.FILL)
-
+        
         if self.icon_view:
             self.flowbox.set_max_children_per_line(8)
         else:
@@ -696,74 +660,6 @@ class WineCharmApp(Gtk.Application):
 
         GLib.timeout_add_seconds(0.5, self.create_script_list)
 
-    def create_sort_actions(self):
-        """
-        Create actions for the sorting options in the Sort submenu.
-        """
-        sort_az_action = Gio.SimpleAction.new("sort_az", None)
-        sort_az_action.connect("activate", self.on_sort_az)
-        self.window.add_action(sort_az_action)
-
-        sort_za_action = Gio.SimpleAction.new("sort_za", None)  # Updated name to match menu
-        sort_za_action.connect("activate", self.on_sort_za)
-        self.window.add_action(sort_za_action)
-
-        sort_wineprefix_action = Gio.SimpleAction.new("sort_wineprefix", None)
-        sort_wineprefix_action.connect("activate", self.on_sort_wineprefix)
-        self.window.add_action(sort_wineprefix_action)
-
-        sort_wineprefix_reverse_action = Gio.SimpleAction.new("sort_wineprefix_reverse", None)  # New action for Wineprefix reverse
-        sort_wineprefix_reverse_action.connect("activate", self.on_sort_wineprefix_reverse)
-        self.window.add_action(sort_wineprefix_reverse_action)
-
-        sort_mtime_action = Gio.SimpleAction.new("sort_mtime", None)
-        sort_mtime_action.connect("activate", self.on_sort_mtime)
-        self.window.add_action(sort_mtime_action)
-
-        sort_mtime_oldest_action = Gio.SimpleAction.new("sort_mtime_oldest", None)  # New action for mtime oldest
-        sort_mtime_oldest_action.connect("activate", self.on_sort_mtime_oldest)
-        self.window.add_action(sort_mtime_oldest_action)
-
-
-    def on_sort_az(self, action, param):
-        print("Sorting Name (A-Z)")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get('progname', '').lower())
-        self.script_list = {key: value for key, value in sorted_scripts}
-        self.update_ui()
-
-    def on_sort_wineprefix(self, action, param):
-        print("Sorting Wineprefix (A-Z)")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get('wineprefix', ''))
-        self.script_list = {key: value for key, value in sorted_scripts}
-        self.update_ui()
-
-    def on_sort_mtime(self, action, param):
-        print("Sorting by Time (Newest First)")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get('mtime', 0), reverse=True)
-        self.script_list = {key: value for key, value in sorted_scripts}
-        self.update_ui()
-
-    def on_sort_za(self, action, param):
-        print("Sorting Name (Z-A)")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get('progname', '').lower(), reverse=True)
-        self.script_list = {key: value for key, value in sorted_scripts}
-        self.update_ui()
-
-    def on_sort_wineprefix_reverse(self, action, param):
-        print("Sorting Wineprefix (Z-A)")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get('wineprefix', ''), reverse=True)
-        self.script_list = {key: value for key, value in sorted_scripts}
-        self.update_ui()
-
-    def on_sort_mtime_oldest(self, action, param):
-        print("Sorting by Time (Oldest First)")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get('mtime', 0))
-        self.script_list = {key: value for key, value in sorted_scripts}
-        self.update_ui()
-
-    def update_ui(self):
-        self.create_script_list()
-        
     def on_key_pressed(self, controller, keyval, keycode, state):
         if keyval == Gdk.KEY_Escape:
             self.search_button.set_active(False)
@@ -899,7 +795,8 @@ class WineCharmApp(Gtk.Application):
 
 
         # Reset the header bar title and visibility of buttons
-        self.headerbar.set_title_widget(self.title_box)
+        self.window.set_title("Wine Charm")
+        self.headerbar.set_title_widget(None)
         self.menu_button.set_visible(True)
         self.search_button.set_visible(True)
         self.view_toggle_button.set_visible(True)
@@ -1184,11 +1081,11 @@ class WineCharmApp(Gtk.Application):
                 self.hide_buttons(row_play_button, row_options_button)
 
         # Check if the script is running and update the play button and row highlight accordingly
-        if script_key in self.running_processes:
+        if self.script_ui_data[script_key]['is_running']:
             # Script is running: set play button to 'Stop' and add 'highlighted' class to the row
             self.set_play_stop_button_state(play_button, True)
             play_button.set_tooltip_text("Stop")
-            #button.add_css_class("highlighted")  # Ensure 'highlighted' for running scripts
+            button.add_css_class("highlighted")  # Ensure 'highlighted' for running scripts
             print(f"Script {script_key} is running. Setting play button to 'Stop' and adding 'highlighted'.")
         else:
             # Script is not running: set play button to 'Play' and remove 'highlighted' class from the row
@@ -1290,15 +1187,12 @@ class WineCharmApp(Gtk.Application):
             return
 
         exe_file = Path(script_data['exe_file']).expanduser().resolve()
+        script = Path(script_data['script_path']).resolve()
         progname = script_data['progname']
         script_args = script_data['args']
         runner = script_data['runner'] or "wine"
         
-        # Ensure the wineprefix, runner path is valid and resolve it
-        script = Path(script_data['script_path']).expanduser().resolve()
-        wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
-        runner = Path(runner).expanduser().resolve() if runner else Path("wine")
-        runner_dir = runner.parent.resolve()
+        wineprefix = script.parent.resolve()
         
         # Check if the script is already running
         if script_key in self.running_processes:
@@ -1418,9 +1312,8 @@ class WineCharmApp(Gtk.Application):
 
             # Clear the currently clicked row information
             self.current_clicked_row = None
-            #print("All UI elements reset to default state.")
-        # Optionally, clear the running processes dictionary
-        self.running_processes.clear()
+        #print("All UI elements reset to default state.")
+
 
         
     def launch_script(self, script_key, play_stop_button, row):
@@ -1442,7 +1335,7 @@ class WineCharmApp(Gtk.Application):
         runner = script_data.get('runner', 'wine')
         if runner:
             runner = Path(runner).expanduser().resolve()
-            runner_dir = runner.parent.expanduser().resolve()
+            runner_dir = runner.papath_envrent.resolve()
             path_env = f'export PATH={runner_dir}:$PATH'
         else:
             runner = "wine"
@@ -1689,6 +1582,9 @@ class WineCharmApp(Gtk.Application):
         else:
             print(f"Script key {script_key} not found in running processes.")
 
+
+
+
     def terminate_script(self, script_key):
         script_data = self.extract_yaml_info(script_key)
         if not script_data:
@@ -1702,16 +1598,16 @@ class WineCharmApp(Gtk.Application):
             return
 
         runner = script_data['runner'] or "wine"
-
+        script = process_info.get('script')
+        # Retrieve wineprefix without extra quotes
+        wineprefix = Path(process_info.get('wineprefix')).expanduser().resolve()
+        
+        #print("#"*100)
+        #print(wineprefix)
+        
         pids = process_info.get("pids", [])
         exe_name = process_info.get('exe_name')
 
-        # Ensure the wineprefix, runner path is valid and resolve it
-        script = Path(script_data['script_path']).expanduser().resolve()
-        wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
-        runner = Path(runner).expanduser().resolve() if runner else Path("wine")
-        runner_dir = runner.parent.resolve()
-        
         print(f"Terminating script {script_key} with wineprefix {wineprefix}, runner {runner}, and PIDs: {pids}")
 
         wineprefix_process_count = 0
@@ -1728,6 +1624,7 @@ class WineCharmApp(Gtk.Application):
 
         try:
             if wineprefix_process_count == 1 and existing_running_script:
+                runner_dir = Path(runner).parent
                 # Apply shlex.quote() only when needed for shell execution
                 command = f"export PATH={shlex.quote(str(runner_dir))}:$PATH; WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k"
                 print("=======wineserver -k==========")
@@ -1934,7 +1831,9 @@ class WineCharmApp(Gtk.Application):
 
 
     def extract_yaml_info(self, script_key):
+        #print(f" ===== > script key = {script_key}")
         script_data = self.script_list.get(script_key)
+        print(f"===== > script_data = {script_data}")
         if script_data:
             return script_data
         else:
@@ -2295,64 +2194,30 @@ class WineCharmApp(Gtk.Application):
         print(f"Completed processing .reg files in {wineprefix}")
 
 
-    def backup_prefix(self, script, script_key, backup_path):
-        """
-        Backs up the Wine prefix in a stepwise manner, indicating progress via spinner and label updates.
-        """
+    def backup_prefix(self, script, backup_path):
         wineprefix = Path(script).parent
 
-        # Step 1: Disconnect the UI elements and initialize the spinner
-        self.disconnect_open_button()
-        self.set_open_button_label("Exporting...")
-        self.show_processing_spinner("Preparing backup...")
+        try:
+            # Step 3: Reverse `process_reg_files` changes
+            self.reverse_process_reg_files(wineprefix)
 
-        # Step 2: Define the steps for the backup process
-        def perform_backup_steps():
-            steps = [
-                ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
-                ("Creating backup archive", lambda: self.create_backup_archive(wineprefix, backup_path)),
-                ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
-            ]
+            # Step 4: Create the backup archive using `tar` with `zstd` compression
+            self.create_backup_archive(wineprefix, backup_path)
+
+            # Notify the user that the backup is complete
+            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Backup Complete", f"Backup saved to {backup_path}")
+
+        except Exception as e:
+            print(f"Error during backup: {e}")
+            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Backup Failed", str(e))
             
-            for step_text, step_func in steps:
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    # Execute the step
-                    step_func()
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                except Exception as e:
-                    print(f"Error during step '{step_text}': {e}")
-                    GLib.idle_add(self.show_info_dialog, "Backup Failed", f"Error during '{step_text}': {str(e)}")
-                    break
 
-            # Step 3: Once all steps are completed, reset the UI
-            GLib.idle_add(self.on_backup_prefix_completed, script_key, backup_path)
+        finally:
+            # Step 5: Re-apply the `process_reg_files` changes
+            self.process_reg_files(wineprefix)
 
-        # Step 4: Run the backup steps in a separate thread to keep the UI responsive
-        threading.Thread(target=perform_backup_steps).start()
 
-    def on_backup_prefix_completed(self, script_key,backup_path):
-        """
-        Called when the backup process is complete. Updates the UI accordingly.
-        """
-        # Reset the button label and remove the spinner
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)
-        self.reconnect_open_button()
-        self.hide_processing_spinner()
-        
-        # Notify the user that the backup is complete
-        self.show_info_dialog("Backup Complete", f"Backup saved to {backup_path}")
-        print("Backup process completed successfully.")
-       # GLib.idle_add(self.show_options_for_script, self.script_data, self.selected_row, self.current_script_key)
-        # Iterate over all script buttons and update the UI based on `is_clicked_row`
-        for key, data in self.script_ui_data.items():
-            row_button = data['row']
-            row_play_button = data['play_button']
-            row_options_button = data['options_button']
-        self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
-
-    def show_backup_prefix_dialog(self, script, script_key, button):
+    def show_backup_prefix_dialog(self, script, button):
         # Step 1: Suggest the backup file name
         default_backup_name = f"{script.stem} prefix backup.tar.zst"
 
@@ -2363,22 +2228,20 @@ class WineCharmApp(Gtk.Application):
         file_dialog.set_initial_name(default_backup_name)
 
         # Open the dialog asynchronously to select the save location
-        file_dialog.save(self.window, None, self.on_backup_prefix_dialog_response, script, script_key)
+        file_dialog.save(self.window, None, self.on_backup_prefix_dialog_response, script)
 
         print("FileDialog presented for saving the backup.")
 
-    def on_backup_prefix_dialog_response(self, dialog, result, script, script_key):
+    def on_backup_prefix_dialog_response(self, dialog, result, script):
         try:
             # Retrieve the selected file (save location) using save_finish()
             backup_file = dialog.save_finish(result)
             if backup_file:
-                self.on_back_button_clicked(None)
-                self.flowbox.remove_all()
                 backup_path = backup_file.get_path()  # Get the backup file path
                 print(f"Backup will be saved to: {backup_path}")
                 
                 # Start the backup process in a separate thread
-                threading.Thread(target=self.backup_prefix, args=(script, script_key,  backup_path)).start()
+                threading.Thread(target=self.backup_prefix, args=(script, backup_path)).start()
 
         except GLib.Error as e:
             # Handle any errors, such as cancellation
@@ -2525,102 +2388,44 @@ class WineCharmApp(Gtk.Application):
 
     def restore_wzt_backup(self, file_path):
         """
-        Restore from a .wzt backup file in steps, showing progress for each step.
+        Restore from a .wzt backup file.
         """
         # Clear the flowbox and show a progress spinner
         GLib.idle_add(self.flowbox.remove_all)
         self.show_processing_spinner(f"Extracting WZT from {Path(file_path).name}")
         self.disconnect_open_button()
 
-        # Start the WZT extraction process in steps
-        self.perform_wzt_restore_steps(file_path)
-
-
-    def perform_wzt_restore_steps(self, wzt_file):
-        """
-        Perform the WZT extraction process in steps, showing progress for each.
-        """
-        steps = [
-            ("Checking Disk Space", lambda: self.check_disk_space_and_show_step(wzt_file)),
-            ("Extracting WZT Backup File", lambda: self.extract_wzt_file(wzt_file)),
-            ("Performing Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(wzt_file))),
-            ("Processing Shell Files", lambda: self.process_sh_files(self.extract_prefix_dir(wzt_file))),
-            ("Finding and Saving LNK Files", lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(wzt_file))),
-        ]
-
-        def perform_steps():
-            for step_text, step_func in steps:
-                # Queue the UI update safely in the main thread
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    # Perform the restore step and check the result
-                    result = step_func()
-                    if result is False:
-                        # Stop further steps if a step fails
-                        print(f"Step '{step_text}' failed, aborting restore process.")
-                        break
-
-                    # Mark the step as done in the main thread
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                except Exception as e:
-                    print(f"Error during step '{step_text}': {e}")
-                    GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
-                    break
-
-            # Once complete, update the UI in the main thread
-            GLib.idle_add(self.on_restore_completed)
-
-        # Start the restore process in a new thread
-        threading.Thread(target=perform_steps).start()
-
-
+        # Start the WZT extraction in a separate thread
+        threading.Thread(target=self.extract_wzt_file, args=(file_path,), daemon=True).start()
 
     def extract_wzt_file(self, wzt_file):
         """
-        Extract the .wzt file to the Wine prefixes directory and process the files.
+        Extract the .wzt file to the Wine prefixes directory.
         """
-        extract_dir = Path(self.prefixes_dir)                           
+        extract_dir = Path(self.prefixes_dir)
         extract_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            # Extract the first directory (prefix) inside the WZT archive
+            # Extract the wzt_prefix
             wzt_prefix = subprocess.check_output(
-                ["bash", "-c", f"tar -tf '{wzt_file}' | grep '/$' | head -n1 | cut -f1 -d '/'"]
+                ["bash", "-c", f"tar -tf '{wzt_file}' | head -n2 | grep '/' | cut -f1 -d '/'"]
             ).decode('utf-8').strip()
             
-            if not wzt_prefix:
-                raise Exception("Unable to determine WZT prefix directory")
-
             extracted_wzt_prefix = extract_dir / wzt_prefix
             
-            # Extract the entire WZT archive into the correct prefix directory
             subprocess.run(
                 ["tar", "-xvf", wzt_file, "-C", extract_dir],
                 check=True
             )
-            
-            # Perform replacements, process .sh files, and find .lnk files
-            GLib.idle_add(self.show_initializing_step, f"Performing user related replacements...")
             self.perform_replacements(extracted_wzt_prefix)
-            GLib.idle_add(self.mark_step_as_done, f"Performing user related replacements...")
-
-            GLib.idle_add(self.show_initializing_step, f"Processing WineZGUI script files...")
             self.process_sh_files(extracted_wzt_prefix)
-            GLib.idle_add(self.mark_step_as_done, f"Processing WineZGUI script files...")
-            
-            GLib.idle_add(self.show_initializing_step, f"Search lnk files and append to found list...")
             self.find_and_save_lnk_files(extracted_wzt_prefix)
-            GLib.idle_add(self.mark_step_as_done, f"Search lnk files and append to found list...")
-            
-            # Mark extraction as complete
+
             self.on_extraction_complete(success=True, message=f"Extracted all files to {extracted_wzt_prefix}")
-            self.extracted_dir = extracted_wzt_prefix  # Update the extracted directory reference
+            self.extracted_dir = extract_dir
         except subprocess.CalledProcessError as e:
             print(f"Error extracting file: {e}")
             self.on_extraction_complete(success=False, message=f"Error extracting file: {e}")
-        except Exception as e:
-            print(f"Error: {e}")
-            self.on_extraction_complete(success=False, message=f"Error: {e}")
 
     def on_extraction_complete(self, success, message):
         """
@@ -2715,8 +2520,6 @@ class WineCharmApp(Gtk.Application):
         Process all .sh files and convert them to .charm files.
         """
         sh_files = self.find_sh_files(directory)
-        created_charm_files = False  # Track whether any .charm file is created
-
         for sh_file in sh_files:
             variables = self.extract_infofile_path_from_sh(sh_file)
             exe_file = variables.get('EXE_FILE', '')
@@ -2741,27 +2544,13 @@ class WineCharmApp(Gtk.Application):
                             'args': args,
                         }, yml_path)
 
-                        # Add the new script data directly to self.script_list
-                        self.new_scripts.add(Path(yml_path).stem)
                         print(f"Created {yml_path}")
-                        created_charm_files = True  # Mark that at least one .charm file was created
-
                     except Exception as e:
                         print(f"Error parsing INFOFILE {info_file_path}: {e}")
                 else:
                     print(f"INFOFILE {info_file_path} not found")
             else:
                 print(f"No INFOFILE found in {sh_file}")
-
-        # If no .charm files were created, proceed to create scripts for .lnk and .exe files
-        if not created_charm_files:
-            print(f"No .charm files created. Proceeding to create scripts for .lnk and .exe files in {directory}")
-            self.create_scripts_for_lnk_files(directory)
-            print(f"Scripts created for .lnk files in {directory}")
-
-            self.create_scripts_for_exe_files(directory)
-            print(f"Scripts created for .exe files in {directory}")
-
 
     def create_charm_file(self, info_data, yml_path):
         # Print to confirm the function is being executed
@@ -2896,10 +2685,6 @@ class WineCharmApp(Gtk.Application):
                     self.script_list[script_key] = script_data
                     print(f"Added {charm_file} to script_list with key {script_key}")
 
-                    # Update the timestamp of the .charm file
-                    charm_file.touch()
-                    print(f"Updated timestamp for {charm_file}")
-                    
             except Exception as e:
                 print(f"Error loading .charm file {charm_file}: {e}")
         
@@ -3032,8 +2817,101 @@ class WineCharmApp(Gtk.Application):
         # If enough space, update the UI and log the success
         GLib.idle_add(self.show_initializing_step, f"Uncompressed size check passed: {uncompressed_size / (1024 * 1024):.2f} MB")
         print(f"Uncompressed size check passed: {uncompressed_size / (1024 * 1024)} MB")
-        GLib.idle_add(self.mark_step_as_done, f"Uncompressed size check passed: {uncompressed_size / (1024 * 1024):.2f} MB")
+
         return True  # Return True to indicate success
+###########################3
+    def restore_wzt_backup(self, file_path):
+        """
+        Restore from a .wzt backup file in steps, showing progress for each step.
+        """
+        # Clear the flowbox and show a progress spinner
+        GLib.idle_add(self.flowbox.remove_all)
+        self.show_processing_spinner(f"Extracting WZT from {Path(file_path).name}")
+        self.disconnect_open_button()
+
+        # Start the WZT extraction process in steps
+        self.perform_wzt_restore_steps(file_path)
+
+
+    def perform_wzt_restore_steps(self, wzt_file):
+        """
+        Perform the WZT extraction process in steps, showing progress for each.
+        """
+        steps = [
+            ("Checking Disk Space", lambda: self.check_disk_space_and_show_step(wzt_file)),
+            ("Extracting WZT Backup File", lambda: self.extract_wzt_file(wzt_file)),
+            ("Performing Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(wzt_file))),
+            ("Processing Shell Files", lambda: self.process_sh_files(self.extract_prefix_dir(wzt_file))),
+            ("Finding and Saving LNK Files", lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(wzt_file))),
+        ]
+
+        def perform_steps():
+            for step_text, step_func in steps:
+                # Queue the UI update safely in the main thread
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    # Perform the restore step and check the result
+                    result = step_func()
+                    if result is False:
+                        # Stop further steps if a step fails
+                        print(f"Step '{step_text}' failed, aborting restore process.")
+                        break
+
+                    # Mark the step as done in the main thread
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except Exception as e:
+                    print(f"Error during step '{step_text}': {e}")
+                    GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
+                    break
+
+            # Once complete, update the UI in the main thread
+            GLib.idle_add(self.on_restore_completed)
+
+        # Start the restore process in a new thread
+        threading.Thread(target=perform_steps).start()
+
+
+    def extract_wzt_file(self, wzt_file):
+        """
+        Extract the .wzt file to the Wine prefixes directory and process the files.
+        """
+        extract_dir = Path(self.prefixes_dir)                           
+        extract_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            # Extract the first directory (prefix) inside the WZT archive
+            wzt_prefix = subprocess.check_output(
+                ["bash", "-c", f"tar -tf '{wzt_file}' | grep '/$' | head -n1 | cut -f1 -d '/'"]
+            ).decode('utf-8').strip()
+            
+            if not wzt_prefix:
+                raise Exception("Unable to determine WZT prefix directory")
+
+            extracted_wzt_prefix = extract_dir / wzt_prefix
+            
+            # Extract the entire WZT archive into the correct prefix directory
+            subprocess.run(
+                ["tar", "-xvf", wzt_file, "-C", extract_dir],
+                check=True
+            )
+            
+            # Perform replacements, process .sh files, and find .lnk files
+            self.perform_replacements(extracted_wzt_prefix)
+            self.process_sh_files(extracted_wzt_prefix)
+            self.find_and_save_lnk_files(extracted_wzt_prefix)
+
+            # Mark extraction as complete
+            self.on_extraction_complete(success=True, message=f"Extracted all files to {extracted_wzt_prefix}")
+            self.extracted_dir = extracted_wzt_prefix  # Update the extracted directory reference
+        except subprocess.CalledProcessError as e:
+            print(f"Error extracting file: {e}")
+            self.on_extraction_complete(success=False, message=f"Error extracting file: {e}")
+        except Exception as e:
+            print(f"Error: {e}")
+            self.on_extraction_complete(success=False, message=f"Error: {e}")
+
+
+    #####################
 
     def show_options_for_script(self, ui_state, row, script_key):
         """
@@ -3159,7 +3037,7 @@ class WineCharmApp(Gtk.Application):
         #wineprefix = Path(script).parent.resolve()
 
         exe_file = Path(script_data['exe_file']).expanduser().resolve()
-        #script = Path(script_data['script_path'])
+        script = Path(script_data['script_path'])
         progname = script_data['progname']
         script_args = script_data['args']
         runner = script_data['runner'] or "wine"
@@ -3170,7 +3048,7 @@ class WineCharmApp(Gtk.Application):
         
         
         #wineprefix = Path(script).parent
-#        wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
+        wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
 
 
 
@@ -3183,9 +3061,7 @@ class WineCharmApp(Gtk.Application):
         #wine_debug = yaml_info.get('wine_debug', '')
         #exe_name = exe_file.name
 
-        # Ensure the wineprefix, runner path is valid and resolve it
-        script = Path(script_data['script_path']).expanduser().resolve()
-        wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
+        # Ensure the runner path is valid and resolve it
         runner = Path(runner).expanduser().resolve() if runner else Path("wine")
         runner_dir = runner.parent.resolve()
 
@@ -3354,7 +3230,7 @@ class WineCharmApp(Gtk.Application):
         """
         script_keys = []
         for script_key, script_data in self.script_list.items():
-            script_path = Path(script_data['script_path']).expanduser().resolve()
+            script_path = Path(script_data['script_path'])
             if script_path.parent == wineprefix:
                 script_keys.append(script_key)
         return script_keys
@@ -3492,7 +3368,7 @@ class WineCharmApp(Gtk.Application):
             The corresponding script_key from script_list, if found.
         """
         for script_key, script_data in self.script_list.items():
-            script_path = Path(script_data['script_path']).expanduser().resolve()
+            script_path = Path(script_data['script_path'])
             if script_path == shortcut_file:
                 return script_key
         return None
@@ -3512,7 +3388,7 @@ class WineCharmApp(Gtk.Application):
         # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
         if script_data:
-            script_path = Path(script_data['script_path']).expanduser().resolve()
+            script_path = Path(script_data['script_path'])
         else:
             print(f"Error: Script key {script_key} not found in script_list.")
             return
@@ -3583,7 +3459,7 @@ class WineCharmApp(Gtk.Application):
                 self.script_list[script_key]['args'] = new_args
 
                 # Get the script path from the script info
-                script_path = Path(script_data['script_path']).expanduser().resolve()
+                script_path = Path(script_data['script_path'])
 
                 # Write the updated info back to the YAML file
                 with open(script_path, 'w') as file:
@@ -3619,7 +3495,7 @@ class WineCharmApp(Gtk.Application):
         # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
         if script_data:
-            script_path = Path(script_data['script_path']).expanduser().resolve()
+            script_path = Path(script_data['script_path'])
         else:
             print(f"Error: Script key {script_key} not found in script_list.")
             return
@@ -3680,19 +3556,15 @@ class WineCharmApp(Gtk.Application):
                 script_data['progname'] = new_name
 
                 # Get the script path from the script info
-                script_path = Path(script_data['script_path']).expanduser().resolve()
+                script_path = Path(script_data['script_path'])
 
-                print("*"*100)
-                print("writing script_path = {script_path}")
+                # Write the updated info back to the YAML file
+                with open(script_path, 'w') as file:
+                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
 
                 # Rename the .charm file and associated icon
                 new_script_path = self.rename_script_and_icon(script_path, old_progname, new_name)
                 
-                # Write the updated info back to the YAML file
-                with open(new_script_path, 'w') as file:
-                    script_data['script_path'] = str(new_script_path).replace(str(Path.home()), "~")
-                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
-                    
                 # Ensure that script_data still contains the same sha256sum
                 existing_sha256sum = script_data.get('sha256sum')
 
@@ -3710,7 +3582,6 @@ class WineCharmApp(Gtk.Application):
                     
                     # Update the script path with the new script path
                     script_data['script_path'] = str(new_script_path)
-                    script_data['mtime'] = new_script_path.stat().st_mtime
                     print(script_data['script_path'])
 
 
@@ -3769,7 +3640,7 @@ class WineCharmApp(Gtk.Application):
         # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
         if script_data:
-            script_path = Path(script_data['script_path']).expanduser().resolve()
+            script_path = Path(script_data['script_path'])
         else:
             print(f"Error: Script key {script_key} not found in script_list.")
             return
@@ -3794,19 +3665,9 @@ class WineCharmApp(Gtk.Application):
         """
         try:
             # Rename the icon file if it exists
-            old_icon = script_path.stem
-            old_icon_name = f"{old_icon.replace(' ', '_')}.png"
+            old_icon_name = f"{old_progname.replace(' ', '_')}.png"
             new_icon_name = f"{new_name.replace(' ', '_')}.png"
             icon_path = script_path.parent / old_icon_name
-            print("@"*100)
-            print(f"""
-            script_path = {script_path}
-            script_path.stem = {script_path.stem}
-            old_icon = {old_icon}
-            old_icon_name = {old_icon_name}
-            new_icon_name = {new_icon_name}
-            icon_path = {icon_path}
-            """)
             if icon_path.exists():
                 new_icon_path = script_path.parent / new_icon_name
                 icon_path.rename(new_icon_path)
@@ -3828,7 +3689,7 @@ class WineCharmApp(Gtk.Application):
         # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
         if script_data:
-            script_path = Path(script_data['script_path']).expanduser().resolve()
+            script_path = Path(script_data['script_path'])
         else:
             print(f"Error: Script key {script_key} not found in script_list.")
             return
@@ -4316,12 +4177,6 @@ class WineCharmApp(Gtk.Application):
         icon_path = icon_dir / icon_name
         default_icon_path = self.get_default_icon_path()
 
-#        print(f"""
-#        script = {script}
-#        script.stem = {script.stem}
-#        script.stem + '.png' = 
-#        icon_name = {icon_name}
-#        """)
         try:
             # Load the icon at a higher resolution
             pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(icon_path), 128, 128)
@@ -4339,32 +4194,20 @@ class WineCharmApp(Gtk.Application):
 
                 
     def create_icon_title_widget(self, script):
-        # Find the matching script data from self.script_list
-        script_data = next((data for key, data in self.script_list.items() if Path(data['script_path']) == script), None)
-
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        
-        # Load the icon associated with the script
+
         icon = self.load_icon(script, 24, 24)
         if icon:
             icon_image = Gtk.Image.new_from_paintable(icon)
             icon_image.set_pixel_size(24)
             hbox.append(icon_image)
 
-        # Use the progname from script_data if available, otherwise fallback to script stem
-        if script_data and 'progname' in script_data:
-            label_text = f"<b>{script_data['progname'].replace('_', ' ')}</b>"
-        else:
-            label_text = f"<b>{script.stem.replace('_', ' ')}</b>"
-
-        # Create and append the label
-        label = Gtk.Label(label=label_text)
+        label = Gtk.Label(label=f"<b>{script.stem.replace('_', ' ')}</b>")
         label.set_use_markup(True)
         label.set_ellipsize(Pango.EllipsizeMode.END)
         hbox.append(label)
 
         return hbox
-
 
     def on_view_toggle_button_clicked(self, button):
         self.icon_view = button.get_active()
@@ -4505,8 +4348,8 @@ class WineCharmApp(Gtk.Application):
             
             # Delete the existing directory and start the import process
             try:
-                #shutil.rmtree(dest_dir)  # Remove the directory
-                #print(f"Deleted existing directory: {dest_dir}")
+                shutil.rmtree(dest_dir)  # Remove the directory
+                print(f"Deleted existing directory: {dest_dir}")
                 # Start the import process after deletion
                 threading.Thread(target=self.import_wine_directory, args=(src, dest_dir)).start()
             except Exception as e:
@@ -4674,49 +4517,17 @@ class WineCharmApp(Gtk.Application):
         print(f"Completed processing .reg files in {wineprefix}")
 
     def custom_copytree(self, src, dst):
-        """
-        Custom recursive copy function that ensures no overwriting of files or symlinks.
-        Args:
-            src (str): The source directory path.
-            dst (str): The destination directory path.
-        """
-        self.ensure_directory_exists(dst)  # Ensure the destination directory exists
-
-        # Iterate over all items in the source directory
+        self.ensure_directory_exists(dst)
         for item in os.listdir(src):
-            s = os.path.join(src, item)  # Source item path
-            d = os.path.join(dst, item)  # Destination item path
-
-            # If the item is a symlink, replicate the symlink in the destination
+            s = os.path.join(src, item)
+            d = os.path.join(dst, item)
             if os.path.islink(s):
                 linkto = os.readlink(s)
-                # Create a symlink in the destination pointing to the same location as the source
-                if not os.path.exists(d):  # Avoid overwriting existing symlinks
-                    try:
-                        os.symlink(linkto, d)
-                    except FileExistsError:
-                        print(f"Symlink already exists: {d}, skipping.")
-                else:
-                    # Log or print a message if the symlink already exists
-                    print(f"Skipping existing symlink: {d}")
-
-            # If the item is a directory, call custom_copytree recursively
+                os.symlink(linkto, d)
             elif os.path.isdir(s):
                 self.custom_copytree(s, d)
-
-            # If the item is a file, copy it only if it doesn't already exist
-            elif os.path.isfile(s):
-                if not os.path.exists(d):  # Only copy if the file does not exist
-                    try:
-                        shutil.copy2(s, d)
-                    except FileExistsError:
-                        print(f"File already exists: {d}, skipping.")
-                else:
-                    # Optional: Print a message or log that the file already exists and is being skipped
-                    print(f"Skipping existing file: {d}")
-
-
-
+            else:
+                shutil.copy2(s, d)
                 
     def disable_open_button(self):
         if self.open_button:
@@ -4758,18 +4569,11 @@ class WineCharmApp(Gtk.Application):
 
                     # Add script path to script_data
                     script_data['script_path'] = str(script_file)
-                    
-                    # Add modification time (mtime) to script_data
-                    script_data['mtime'] = script_file.stat().st_mtime
-
 
                     # Use 'sha256sum' as the key in script_list
                     script_key = script_data.get('sha256sum')
                     if script_key:
-                        if prefixdir == self.prefixes_dir:
-                            self.script_list[script_key] = script_data
-                        else:  #Add the scripts from a single prefix to the top
-                            self.script_list = {script_key: script_data, **self.script_list}
+                        self.script_list[script_key] = script_data
                     else:
                         print(f"Warning: Script {script_file} missing 'sha256sum'. Skipping.")
 
@@ -4780,6 +4584,7 @@ class WineCharmApp(Gtk.Application):
 
         # Print the total number of loaded scripts
         print(f"Loaded {len(self.script_list)} scripts.")
+
 
 
 
