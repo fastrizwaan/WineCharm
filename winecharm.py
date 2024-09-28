@@ -2298,30 +2298,64 @@ class WineCharmApp(Gtk.Application):
         print(f"Completed processing .reg files in {wineprefix}")
 
 
-    def backup_prefix(self, script, backup_path):
+    def backup_prefix(self, script, script_key, backup_path):
+        """
+        Backs up the Wine prefix in a stepwise manner, indicating progress via spinner and label updates.
+        """
         wineprefix = Path(script).parent
 
-        try:
-            # Step 3: Reverse `process_reg_files` changes
-            self.reverse_process_reg_files(wineprefix)
+        # Step 1: Disconnect the UI elements and initialize the spinner
+        self.disconnect_open_button()
+        self.set_open_button_label("Exporting...")
+        self.show_processing_spinner("Preparing backup...")
 
-            # Step 4: Create the backup archive using `tar` with `zstd` compression
-            self.create_backup_archive(wineprefix, backup_path)
-
-            # Notify the user that the backup is complete
-            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Backup Complete", f"Backup saved to {backup_path}")
-
-        except Exception as e:
-            print(f"Error during backup: {e}")
-            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Backup Failed", str(e))
+        # Step 2: Define the steps for the backup process
+        def perform_backup_steps():
+            steps = [
+                ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
+                ("Creating backup archive", lambda: self.create_backup_archive(wineprefix, backup_path)),
+                ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
+            ]
             
+            for step_text, step_func in steps:
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    # Execute the step
+                    step_func()
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except Exception as e:
+                    print(f"Error during step '{step_text}': {e}")
+                    GLib.idle_add(self.show_info_dialog, "Backup Failed", f"Error during '{step_text}': {str(e)}")
+                    break
 
-        finally:
-            # Step 5: Re-apply the `process_reg_files` changes
-            self.process_reg_files(wineprefix)
+            # Step 3: Once all steps are completed, reset the UI
+            GLib.idle_add(self.on_backup_prefix_completed, script_key, backup_path)
 
+        # Step 4: Run the backup steps in a separate thread to keep the UI responsive
+        threading.Thread(target=perform_backup_steps).start()
 
-    def show_backup_prefix_dialog(self, script, button):
+    def on_backup_prefix_completed(self, script_key,backup_path):
+        """
+        Called when the backup process is complete. Updates the UI accordingly.
+        """
+        # Reset the button label and remove the spinner
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)
+        self.reconnect_open_button()
+        self.hide_processing_spinner()
+        
+        # Notify the user that the backup is complete
+        self.show_info_dialog("Backup Complete", f"Backup saved to {backup_path}")
+        print("Backup process completed successfully.")
+       # GLib.idle_add(self.show_options_for_script, self.script_data, self.selected_row, self.current_script_key)
+        # Iterate over all script buttons and update the UI based on `is_clicked_row`
+        for key, data in self.script_ui_data.items():
+            row_button = data['row']
+            row_play_button = data['play_button']
+            row_options_button = data['options_button']
+        self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
+
+    def show_backup_prefix_dialog(self, script, script_key, button):
         # Step 1: Suggest the backup file name
         default_backup_name = f"{script.stem} prefix backup.tar.zst"
 
@@ -2332,20 +2366,22 @@ class WineCharmApp(Gtk.Application):
         file_dialog.set_initial_name(default_backup_name)
 
         # Open the dialog asynchronously to select the save location
-        file_dialog.save(self.window, None, self.on_backup_prefix_dialog_response, script)
+        file_dialog.save(self.window, None, self.on_backup_prefix_dialog_response, script, script_key)
 
         print("FileDialog presented for saving the backup.")
 
-    def on_backup_prefix_dialog_response(self, dialog, result, script):
+    def on_backup_prefix_dialog_response(self, dialog, result, script, script_key):
         try:
             # Retrieve the selected file (save location) using save_finish()
             backup_file = dialog.save_finish(result)
             if backup_file:
+                self.on_back_button_clicked(None)
+                self.flowbox.remove_all()
                 backup_path = backup_file.get_path()  # Get the backup file path
                 print(f"Backup will be saved to: {backup_path}")
                 
                 # Start the backup process in a separate thread
-                threading.Thread(target=self.backup_prefix, args=(script, backup_path)).start()
+                threading.Thread(target=self.backup_prefix, args=(script, script_key,  backup_path)).start()
 
         except GLib.Error as e:
             # Handle any errors, such as cancellation
@@ -2492,44 +2528,102 @@ class WineCharmApp(Gtk.Application):
 
     def restore_wzt_backup(self, file_path):
         """
-        Restore from a .wzt backup file.
+        Restore from a .wzt backup file in steps, showing progress for each step.
         """
         # Clear the flowbox and show a progress spinner
         GLib.idle_add(self.flowbox.remove_all)
         self.show_processing_spinner(f"Extracting WZT from {Path(file_path).name}")
         self.disconnect_open_button()
 
-        # Start the WZT extraction in a separate thread
-        threading.Thread(target=self.extract_wzt_file, args=(file_path,), daemon=True).start()
+        # Start the WZT extraction process in steps
+        self.perform_wzt_restore_steps(file_path)
+
+
+    def perform_wzt_restore_steps(self, wzt_file):
+        """
+        Perform the WZT extraction process in steps, showing progress for each.
+        """
+        steps = [
+            ("Checking Disk Space", lambda: self.check_disk_space_and_show_step(wzt_file)),
+            ("Extracting WZT Backup File", lambda: self.extract_wzt_file(wzt_file)),
+            ("Performing Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(wzt_file))),
+            ("Processing Shell Files", lambda: self.process_sh_files(self.extract_prefix_dir(wzt_file))),
+            ("Finding and Saving LNK Files", lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(wzt_file))),
+        ]
+
+        def perform_steps():
+            for step_text, step_func in steps:
+                # Queue the UI update safely in the main thread
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    # Perform the restore step and check the result
+                    result = step_func()
+                    if result is False:
+                        # Stop further steps if a step fails
+                        print(f"Step '{step_text}' failed, aborting restore process.")
+                        break
+
+                    # Mark the step as done in the main thread
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except Exception as e:
+                    print(f"Error during step '{step_text}': {e}")
+                    GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
+                    break
+
+            # Once complete, update the UI in the main thread
+            GLib.idle_add(self.on_restore_completed)
+
+        # Start the restore process in a new thread
+        threading.Thread(target=perform_steps).start()
+
+
 
     def extract_wzt_file(self, wzt_file):
         """
-        Extract the .wzt file to the Wine prefixes directory.
+        Extract the .wzt file to the Wine prefixes directory and process the files.
         """
-        extract_dir = Path(self.prefixes_dir)
+        extract_dir = Path(self.prefixes_dir)                           
         extract_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            # Extract the wzt_prefix
+            # Extract the first directory (prefix) inside the WZT archive
             wzt_prefix = subprocess.check_output(
-                ["bash", "-c", f"tar -tf '{wzt_file}' | head -n2 | grep '/' | cut -f1 -d '/'"]
+                ["bash", "-c", f"tar -tf '{wzt_file}' | grep '/$' | head -n1 | cut -f1 -d '/'"]
             ).decode('utf-8').strip()
             
+            if not wzt_prefix:
+                raise Exception("Unable to determine WZT prefix directory")
+
             extracted_wzt_prefix = extract_dir / wzt_prefix
             
+            # Extract the entire WZT archive into the correct prefix directory
             subprocess.run(
                 ["tar", "-xvf", wzt_file, "-C", extract_dir],
                 check=True
             )
+            
+            # Perform replacements, process .sh files, and find .lnk files
+            GLib.idle_add(self.show_initializing_step, f"Performing user related replacements...")
             self.perform_replacements(extracted_wzt_prefix)
-            self.process_sh_files(extracted_wzt_prefix)
-            self.find_and_save_lnk_files(extracted_wzt_prefix)
+            GLib.idle_add(self.mark_step_as_done, f"Performing user related replacements...")
 
+            GLib.idle_add(self.show_initializing_step, f"Processing WineZGUI script files...")
+            self.process_sh_files(extracted_wzt_prefix)
+            GLib.idle_add(self.mark_step_as_done, f"Processing WineZGUI script files...")
+            
+            GLib.idle_add(self.show_initializing_step, f"Search lnk files and append to found list...")
+            self.find_and_save_lnk_files(extracted_wzt_prefix)
+            GLib.idle_add(self.mark_step_as_done, f"Search lnk files and append to found list...")
+            
+            # Mark extraction as complete
             self.on_extraction_complete(success=True, message=f"Extracted all files to {extracted_wzt_prefix}")
-            self.extracted_dir = extract_dir
+            self.extracted_dir = extracted_wzt_prefix  # Update the extracted directory reference
         except subprocess.CalledProcessError as e:
             print(f"Error extracting file: {e}")
             self.on_extraction_complete(success=False, message=f"Error extracting file: {e}")
+        except Exception as e:
+            print(f"Error: {e}")
+            self.on_extraction_complete(success=False, message=f"Error: {e}")
 
     def on_extraction_complete(self, success, message):
         """
@@ -2943,107 +3037,6 @@ class WineCharmApp(Gtk.Application):
         print(f"Uncompressed size check passed: {uncompressed_size / (1024 * 1024)} MB")
         GLib.idle_add(self.mark_step_as_done, f"Uncompressed size check passed: {uncompressed_size / (1024 * 1024):.2f} MB")
         return True  # Return True to indicate success
-###########################3
-    def restore_wzt_backup(self, file_path):
-        """
-        Restore from a .wzt backup file in steps, showing progress for each step.
-        """
-        # Clear the flowbox and show a progress spinner
-        GLib.idle_add(self.flowbox.remove_all)
-        self.show_processing_spinner(f"Extracting WZT from {Path(file_path).name}")
-        self.disconnect_open_button()
-
-        # Start the WZT extraction process in steps
-        self.perform_wzt_restore_steps(file_path)
-
-
-    def perform_wzt_restore_steps(self, wzt_file):
-        """
-        Perform the WZT extraction process in steps, showing progress for each.
-        """
-        steps = [
-            ("Checking Disk Space", lambda: self.check_disk_space_and_show_step(wzt_file)),
-            ("Extracting WZT Backup File", lambda: self.extract_wzt_file(wzt_file)),
-            ("Performing Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(wzt_file))),
-            ("Processing Shell Files", lambda: self.process_sh_files(self.extract_prefix_dir(wzt_file))),
-            ("Finding and Saving LNK Files", lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(wzt_file))),
-        ]
-
-        def perform_steps():
-            for step_text, step_func in steps:
-                # Queue the UI update safely in the main thread
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    # Perform the restore step and check the result
-                    result = step_func()
-                    if result is False:
-                        # Stop further steps if a step fails
-                        print(f"Step '{step_text}' failed, aborting restore process.")
-                        break
-
-                    # Mark the step as done in the main thread
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                except Exception as e:
-                    print(f"Error during step '{step_text}': {e}")
-                    GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
-                    break
-
-            # Once complete, update the UI in the main thread
-            GLib.idle_add(self.on_restore_completed)
-
-        # Start the restore process in a new thread
-        threading.Thread(target=perform_steps).start()
-
-
-    def extract_wzt_file(self, wzt_file):
-        """
-        Extract the .wzt file to the Wine prefixes directory and process the files.
-        """
-        extract_dir = Path(self.prefixes_dir)                           
-        extract_dir.mkdir(parents=True, exist_ok=True)
-
-        try:
-            # Extract the first directory (prefix) inside the WZT archive
-            wzt_prefix = subprocess.check_output(
-                ["bash", "-c", f"tar -tf '{wzt_file}' | grep '/$' | head -n1 | cut -f1 -d '/'"]
-            ).decode('utf-8').strip()
-            
-            if not wzt_prefix:
-                raise Exception("Unable to determine WZT prefix directory")
-
-            extracted_wzt_prefix = extract_dir / wzt_prefix
-            
-            # Extract the entire WZT archive into the correct prefix directory
-            subprocess.run(
-                ["tar", "-xvf", wzt_file, "-C", extract_dir],
-                check=True
-            )
-            
-            # Perform replacements, process .sh files, and find .lnk files
-            GLib.idle_add(self.show_initializing_step, f"Performing user related replacements...")
-            self.perform_replacements(extracted_wzt_prefix)
-            GLib.idle_add(self.mark_step_as_done, f"Performing user related replacements...")
-
-            GLib.idle_add(self.show_initializing_step, f"Processing WineZGUI script files...")
-            self.process_sh_files(extracted_wzt_prefix)
-            GLib.idle_add(self.mark_step_as_done, f"Processing WineZGUI script files...")
-            
-            GLib.idle_add(self.show_initializing_step, f"Search lnk files and append to found list...")
-            self.find_and_save_lnk_files(extracted_wzt_prefix)
-            GLib.idle_add(self.mark_step_as_done, f"Search lnk files and append to found list...")
-            
-            # Mark extraction as complete
-            self.on_extraction_complete(success=True, message=f"Extracted all files to {extracted_wzt_prefix}")
-            self.extracted_dir = extracted_wzt_prefix  # Update the extracted directory reference
-        except subprocess.CalledProcessError as e:
-            print(f"Error extracting file: {e}")
-            self.on_extraction_complete(success=False, message=f"Error extracting file: {e}")
-        except Exception as e:
-            print(f"Error: {e}")
-            self.on_extraction_complete(success=False, message=f"Error: {e}")
-
-
-    #####################
 
     def show_options_for_script(self, ui_state, row, script_key):
         """
