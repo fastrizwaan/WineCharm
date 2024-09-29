@@ -4144,7 +4144,7 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error copying template: {e}")
 
-    def create_desktop_entry(self, progname, script_path, icon_path, wineprefix):
+    def create_desktop_entry(self, progname, script_path, icon_path, wineprefix, category = "Game"):
 #        return; # do not create
         # Create desktop shortcut based on flatpak sandbox or system
         if shutil.which("flatpak-spawn"):
@@ -4161,7 +4161,7 @@ class WineCharmApp(Gtk.Application):
     NoDisplay=false
     StartupNotify=true
     Terminal=false
-    Categories=Game;Utility;
+    Categories={category};;
     """
         desktop_file_path = wineprefix / f"{progname}.desktop"
         
@@ -4857,6 +4857,25 @@ class WineCharmApp(Gtk.Application):
             # Store the checkbox and associated file in the dictionary
             checkbox_dict[checkbox] = charm_file
 
+        # Add a label for the category selection
+        category_label = Gtk.Label(label="Select Category:")
+        category_label.set_xalign(0)
+        vbox.append(category_label)
+
+        # Create a ComboBoxText widget for selecting categories
+        category_combo = Gtk.ComboBoxText()
+        categories = [
+            "AudioVideo", "Audio", "Video", "Development", "Education",
+            "Game", "Graphics", "Network", "Office", "Science",
+            "Settings", "System", "Utility"
+        ]
+        for category in categories:
+            category_combo.append_text(category)
+
+        # Set default selection to "Game"
+        category_combo.set_active(categories.index("Game"))
+        vbox.append(category_combo)
+
         # Add the vertical box to the dialog
         dialog.set_extra_child(vbox)
 
@@ -4867,13 +4886,12 @@ class WineCharmApp(Gtk.Application):
         dialog.set_default_response("cancel")
 
         # Connect the response signal to handle desktop shortcut creation
-        dialog.connect("response", self.on_add_desktop_shortcut_response, checkbox_dict)
+        dialog.connect("response", self.on_add_desktop_shortcut_response, checkbox_dict, category_combo)
 
         # Present the dialog
         dialog.present()
 
-
-    def on_add_desktop_shortcut_response(self, dialog, response_id, checkbox_dict):
+    def on_add_desktop_shortcut_response(self, dialog, response_id, checkbox_dict, category_combo):
         """
         Handle the response from the create desktop shortcut dialog.
         
@@ -4881,8 +4899,12 @@ class WineCharmApp(Gtk.Application):
             dialog: The Adw.MessageDialog instance.
             response_id: The ID of the response clicked by the user.
             checkbox_dict: Dictionary mapping checkboxes to charm files.
+            category_combo: The ComboBoxText widget for selecting the category.
         """
         if response_id == "create":
+            # Get the selected category from the combo box
+            selected_category = category_combo.get_active_text()
+
             # Iterate through the checkboxes and create shortcuts for selected files
             for checkbox, charm_file in checkbox_dict.items():
                 if checkbox.get_active():  # Check if the checkbox is selected
@@ -4902,8 +4924,8 @@ class WineCharmApp(Gtk.Application):
                         icon_dir = script_path.parent
                         icon_path = icon_dir / icon_name
 
-                        # Create the desktop entry using the existing method
-                        self.create_desktop_entry(progname, script_path, icon_path, wineprefix)
+                        # Create the desktop entry using the existing method, including the selected category
+                        self.create_desktop_entry(progname, script_path, icon_path, wineprefix, selected_category)
                         print(f"Desktop shortcut created for: {charm_file}")
 
                     except Exception as e:
@@ -4917,6 +4939,7 @@ class WineCharmApp(Gtk.Application):
 
         # Close the dialog
         dialog.close()
+
 
     def remove_desktop_shortcut(self, script, script_key, *args):
         """
