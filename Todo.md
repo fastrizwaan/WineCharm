@@ -65,6 +65,27 @@ is not resetting the play functionality.
  - 3. [] update all scripts
      - [ ] repair 
      
-     
-     
+- 4. Script (options)
+    - [ ] Run Other Exe in wineprefix  (open other exe)
+    - [ ] Import Game directory
+    - [ ] Winetricks CLI (install dxvk vkd3d)
+    - [ ] Import Runner inside prefix
+    - [ ] Set Environment Variable
+    - [ ] Save drive_c/user directory to file (with %USERNAME%)
+    - [ ] Load file for drive_c/user directory
+    - [ ] About
+        - [ ] Name, Size, Gamedir size, Prefix size, if gamedir in prefix then combined.
+    - [ ] Change Runner
+    - [ ] Rename prefix directory
+    - [ ] Set Wine Arch
+    - [ ] Set Application Category
+    - [ ] winecfg
+    - [ ] regedit
+    - [ ] wine explorer
+    - [ ] wine control panel
+    - [ ] wine taskmgr
+    - [ ] wine add/remove programs
+    - [ ] wine notepad
+    - [ ] wine wordpad
+
 WineZGUI bug: Downloading and setting runner (say wine-9.0) and creating a script's bundle with a different runner (say wine-7.0) will create bundle with Global runner (9.0) instead of local runner (7.0); perhaps global runner variable needs fixing for local runner in create prefix and create bundle.
