@@ -2727,7 +2727,7 @@ class WineCharmApp(Gtk.Application):
         
     def replace_strings_in_specific_files(self, directory, find_replace_pairs):
         # Define the patterns of the files you want to modify
-        file_patterns = ["*.charm", "*.yaml", "*.yml"]
+        file_patterns = ["*.charm", "*.yaml", "*.yml", "*.txt", "*.desktop", "*.sh"]
 
         # Collect all the files matching the patterns
         files_to_modify = []
