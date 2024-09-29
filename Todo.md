@@ -26,8 +26,45 @@ Refactoring winecharm
 
 
 # Current issue
-- [ ] if the process has ended, the launch_button is not reverted to stop and highlight is not removed
-- [ ]  Error terminating script f427f2d354acd78f2177aaeb78a677d34d7825751dc3abe70d40fd537b70c4d8: Command 'bash -c 'export PATH=.:$PATH; WINEPREFIX=/var/home/rizvan/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Prefixes/ReShade_Setup_6.1.1-f427f2d354 wineserver -k'' returned non-zero exit status 1.
+- 1. [ ] if the process has ended, the launch_button is not reverted to stop and highlight is not removed
+- 2. [ ]  Error terminating script f427f2d354acd78f2177aaeb78a677d34d7825751dc3abe70d40fd537b70c4d8: Command 'bash -c 'export PATH=.:$PATH; WINEPREFIX=/var/home/rizvan/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Prefixes/ReShade_Setup_6.1.1-f427f2d354 wineserver -k'' returned non-zero exit status 1. this is related to 1.
 
 is not resetting the play functionality.
  
+ # Todo WineCharm 0.97
+ - 1. [ ] Runner Support
+     - [ ] Check working runner before launch (this will help when freedesktop runtime has changed or on system)
+     - [ ] On startup, do a working runner check; 
+           (runner_ver=runner --version, if not runner_ver: report user that runner is not compatible, and let the user choose other runner.)
+     - [ ] Script level
+        - [ ] Create Bundle Bottle (Game_dir + Runner + Prefix) = bottle (Hello-Bundle.bottle)
+        - [ ] Import Runner
+        - [ ] Import Game Directory
+     - [ ] Settings level
+         - [ ] Download
+             - List
+             - [ ] Proton
+             - [ ] Wine Stable ones
+             - [ ] Wine Latest
+             - [ ] Wine multi lib supported
+         - [ ] Default
+         - [ ] Change
+         - [ ] List all Runners even from prefixes_dir/*/Runner/runner_dir/bin/wine
+
+ - 2. [ ] Settings support (like show_options_for_script)
+     - [ ] Arch 
+     - [ ] Runner
+         - [ ] same as Settings level above
+     - [ ] Template
+        - [ ] Configure
+        - [ ] New
+        - [ ] Copy
+        - [ ] Delete
+
+
+ - 3. [] update all scripts
+     - [ ] repair 
+     
+     
+     
+WineZGUI bug: Downloading and setting runner (say wine-9.0) and creating a script's bundle with a different runner (say wine-7.0) will create bundle with Global runner (9.0) instead of local runner (7.0); perhaps global runner variable needs fixing for local runner in create prefix and create bundle.
