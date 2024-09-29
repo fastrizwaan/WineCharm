@@ -5068,10 +5068,19 @@ def main():
                     sys.exit(1)
 
                 # Extract additional environment and arguments
-                wineprefix = script_data.get('script_path')
+                
+                # if .charm file has script_path use it
+                wineprefix_path_candidate = script_data.get('script_path')
 
-                if not wineprefix:
-                    wineprefix = Path(file_path).parent.expanduser().resolve()
+                if not wineprefix_path_candidate:  # script_path not found
+                    # if .charm file has wineprefix in it, then use it
+                    wineprefix_path_candidate = script_data.get('wineprefix')
+                    if not wineprefix_path_candidate:  # if wineprefix not found
+                        wineprefix_path_candidate = file_path  # use the current .charm file's path
+
+                # Resolve the final wineprefix path
+                wineprefix = Path(wineprefix_path_candidate).parent.expanduser().resolve()
+                
                 env_vars = script_data.get("env_vars", "").strip()
                 script_args = script_data.get("args", "").strip()
                 runner = script_data.get("runner", "wine")
