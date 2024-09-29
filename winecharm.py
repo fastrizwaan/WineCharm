@@ -299,6 +299,33 @@ class WineCharmApp(Gtk.Application):
         focus_controller.connect("leave", self.on_focus_out)
         self.window.add_controller(focus_controller)
 
+    def remove_symlinks_and_create_directories(self, wineprefix):
+        """
+        Remove all symbolic link files in the specified directory (drive_c/users/{user}) and 
+        create normal directories in their place.
+        
+        Args:
+            wineprefix: The path to the Wine prefix where symbolic links will be removed.
+        """
+        userhome = os.getenv("USER") or os.getenv("USERNAME")
+        if not userhome:
+            print("Error: Unable to determine the current user from environment.")
+            return
+        
+        user_dir = Path(wineprefix) / "drive_c" / "users"
+        print(f"Removing symlinks from: {user_dir}")
+
+        # Iterate through all symbolic links in the user's directory
+        for item in user_dir.rglob("*"):
+            if item.is_symlink():
+                try:
+                    # Remove the symlink and create a directory in its place
+                    item.unlink()
+                    item.mkdir(parents=True, exist_ok=True)
+                    print(f"Replaced symlink with directory: {item}")
+                except Exception as e:
+                    print(f"Error processing {item}: {e}")
+
     def initialize_template(self, template_dir, callback):
         self.create_required_directories()
         self.initializing_template = True
@@ -317,6 +344,7 @@ class WineCharmApp(Gtk.Application):
 
         steps = [
             ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
+            ("Removing symlinks from wineprefix", lambda: self.remove_symlinks_and_create_directories(template_dir)),
             ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
             ("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
             ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
@@ -329,7 +357,12 @@ class WineCharmApp(Gtk.Application):
             for step_text, command in steps:
                 GLib.idle_add(self.show_initializing_step, step_text)
                 try:
-                    subprocess.run(command, shell=True, check=True)
+                    if callable(command):
+                        # If the command is a callable, invoke it directly
+                        command()
+                    else:
+                        # Run the command in the shell
+                        subprocess.run(command, shell=True, check=True)
                     GLib.idle_add(self.mark_step_as_done, step_text)
                 except subprocess.CalledProcessError as e:
                     print(f"Error initializing template: {e}")
@@ -2213,10 +2246,23 @@ class WineCharmApp(Gtk.Application):
         dialog.present()
 
     def create_backup_archive(self, wineprefix, backup_path):
-        # Prepare the tar command
+        # Get the current username from the environment
+        current_username = os.getenv("USER") or os.getenv("USERNAME")
+        if not current_username:
+            raise Exception("Unable to determine the current username from the environment.")
+
+        # Escape the wineprefix name for the transform pattern to handle special characters
+        #escaped_prefix_name = re.escape(wineprefix.name)
+
+        # Prepare the transform pattern to rename the user's directory to '%username%'
+        # The pattern must be expanded to include anything under the user's folder
+        #transform_pattern = f"s|{escaped_prefix_name}/drive_c/users/{current_username}|{escaped_prefix_name}/drive_c/users/%username%|g"
+
+        # Prepare the tar command with --transform option
         tar_command = [
             'tar',
             '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
+            '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%username%|g",  # Rename the directory and its contents
             '-cf', backup_path,
             '-C', str(wineprefix.parent),
             wineprefix.name
@@ -2231,8 +2277,6 @@ class WineCharmApp(Gtk.Application):
             raise Exception(f"Backup failed: {result.stderr}")
 
         print(f"Backup archive created at {backup_path}")
-
-
 
 
     def reverse_process_reg_files(self, wineprefix):
@@ -2315,7 +2359,7 @@ class WineCharmApp(Gtk.Application):
         # Step 2: Define the steps for the backup process
         def perform_backup_steps():
             steps = [
-                (f"Replace <b>\"{usershome}\"</b> with '~' in all files", lambda: self.replace_strings_in_files(wineprefix, find_replace_pairs)),
+                (f"Replace \"{usershome}\" with '~' in all files", lambda: self.replace_strings_in_files(wineprefix, find_replace_pairs)),
                 ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
                 ("Creating backup archive", lambda: self.create_backup_archive(wineprefix, backup_path)),
                 ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
@@ -2552,6 +2596,8 @@ class WineCharmApp(Gtk.Application):
             ("Extracting WZT Backup File", lambda: self.extract_wzt_file(wzt_file)),
             ("Performing Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(wzt_file))),
             ("Processing Shell Files", lambda: self.process_sh_files(self.extract_prefix_dir(wzt_file))),
+            ("Replacing Symbolic Links with Directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(wzt_file))),
+            ("Renaming and merging user directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(wzt_file))),
             ("Finding and Saving LNK Files", lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(wzt_file))),
         ]
 
@@ -2588,7 +2634,8 @@ class WineCharmApp(Gtk.Application):
         """
         extract_dir = Path(self.prefixes_dir)                           
         extract_dir.mkdir(parents=True, exist_ok=True)
-
+        user = os.getenv('USER')
+        
         try:
             # Extract the first directory (prefix) inside the WZT archive
             wzt_prefix = subprocess.check_output(
@@ -2602,7 +2649,7 @@ class WineCharmApp(Gtk.Application):
             
             # Extract the entire WZT archive into the correct prefix directory
             subprocess.run(
-                ["tar", "-xvf", wzt_file, "-C", extract_dir],
+                ["tar", "-xvf", wzt_file, "-C", extract_dir, "--transform", f"s|XOUSERXO|{user}|g"],
                 check=True
             )
             
@@ -2933,6 +2980,9 @@ class WineCharmApp(Gtk.Application):
         """
         Extract the .tar.zst backup to the Wine prefixes directory.
         """
+        current_username = os.getenv("USER") or os.getenv("USERNAME")
+        if not current_username:
+            raise Exception("Unable to determine the current username from the environment.")
         # Step 2: Extract the prefix name from the .tar.zst file
         extracted_prefix_name = subprocess.check_output(
             ['tar', '-tf', file_path],
@@ -2945,7 +2995,7 @@ class WineCharmApp(Gtk.Application):
 
         # Step 3: Extract the archive to self.prefixes_dir
         subprocess.run(
-            ['tar', '-I', 'zstd -T0', '-xf', file_path, '-C', self.prefixes_dir],
+            ['tar', '-I', 'zstd -T0', '-xf', file_path, '-C', self.prefixes_dir, "--transform", f"s|%username%|{current_username}|g"],
             check=True
         )
 
@@ -2987,6 +3037,8 @@ class WineCharmApp(Gtk.Application):
             ("Checking Uncompressed Size", lambda: self.check_disk_space_and_show_step(file_path)),
             ("Extracting Backup File", lambda: self.extract_backup(file_path)),
             ("Processing Registry Files", lambda: self.process_reg_files(self.extract_prefix_dir(file_path))),
+            ("Replacing Symbolic Links with Directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
+            ("Renaming and merging user directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
             ("Add Shortcuts to Script List", lambda: self.add_charm_files_to_script_list(self.extract_prefix_dir(file_path))),
 
         ]
@@ -4397,6 +4449,77 @@ class WineCharmApp(Gtk.Application):
         # Recreate the script list with the new view
         self.create_script_list()
 
+
+    def rename_and_merge_user_directories(self, wineprefix):
+        # Get the current username from the environment
+        current_username = os.getenv("USER") or os.getenv("USERNAME")
+        if not current_username:
+            raise Exception("Unable to determine the current username from the environment.")
+        
+        # Define the path to the "drive_c/users/" directory within the wineprefix
+        users_dir = Path(wineprefix) / 'drive_c' / 'users'
+        
+        if not users_dir.exists() or not users_dir.is_dir():
+            raise Exception(f"The directory '{users_dir}' does not exist or is not a directory.")
+
+        # Iterate over all directories in "drive_c/users/"
+        for user_dir in users_dir.iterdir():
+            if user_dir.is_dir() and user_dir.name not in ['Public', 'steamuser', current_username]:
+                # This is a directory that belongs to a different user and needs to be renamed/merged
+                
+                current_user_dir = users_dir / current_username
+
+                if not current_user_dir.exists():
+                    # If the current user's directory does not exist, simply rename the directory
+                    shutil.move(str(user_dir), str(current_user_dir))
+                    print(f"Renamed directory {user_dir} to {current_user_dir}")
+                else:
+                    # If the current user's directory exists, merge the contents
+                    print(f"Merging contents of {user_dir} into {current_user_dir}")
+
+                    for item in user_dir.iterdir():
+                        target_path = current_user_dir / item.name
+                        
+                        if target_path.exists():
+                            if target_path.is_dir() and item.is_dir():
+                                # Recursively merge directories
+                                self.merge_directories(item, target_path)
+                            elif target_path.is_file() and item.is_file():
+                                # Handle file conflicts by renaming
+                                new_name = target_path.with_suffix(target_path.suffix + ".old")
+                                shutil.move(str(target_path), new_name)
+                                shutil.move(str(item), target_path)
+                        else:
+                            # If the target path does not exist, simply move the item
+                            shutil.move(str(item), target_path)
+                    
+                    # Remove the old directory after merging
+                    user_dir.rmdir()
+                    print(f"Merged and removed directory: {user_dir}")
+
+    def merge_directories(self, source_dir, target_dir):
+        """
+        Recursively merge contents of source_dir into target_dir.
+        """
+        for item in source_dir.iterdir():
+            target_path = target_dir / item.name
+
+            if target_path.exists():
+                if target_path.is_dir() and item.is_dir():
+                    # Recursively merge sub-directories
+                    self.merge_directories(item, target_path)
+                elif target_path.is_file() and item.is_file():
+                    # Handle file conflicts by renaming existing files
+                    new_name = target_path.with_suffix(target_path.suffix + ".old")
+                    shutil.move(str(target_path), new_name)
+                    shutil.move(str(item), target_path)
+            else:
+                # If the target path does not exist, simply move the item
+                shutil.move(str(item), target_path)
+
+        # Remove the source directory after merging its contents
+        source_dir.rmdir()
+
     def on_import_wine_directory_clicked(self, action, param):
         # Create a new Gtk.FileDialog for selecting a directory
         file_dialog = Gtk.FileDialog.new()
@@ -4445,6 +4568,10 @@ class WineCharmApp(Gtk.Application):
         except GLib.Error as e:
             # Handle any errors that occurred during folder selection
             print(f"An error occurred: {e}")
+        finally:
+            print("renaming and merging other user directories")
+            self.remove_symlinks_and_create_directories(dest_dir)
+            self.rename_and_merge_user_directories(dest_dir)
 
         print("FileDialog operation complete.")
 
@@ -4473,7 +4600,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Creating scripts for .lnk files in {dst}")
             self.create_scripts_for_lnk_files(dst)
             print(f"Scripts created for .lnk files in {dst}")
-
+            
             print(f"Creating scripts for .exe files in {dst}")
             self.create_scripts_for_exe_files(dst)
             print(f"Scripts created for .exe files in {dst}")
