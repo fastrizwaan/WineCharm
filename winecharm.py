@@ -1597,7 +1597,7 @@ class WineCharmApp(Gtk.Application):
                 if path_env:
                     winedbg_command_with_grep = (
                     f"export PATH={shlex.quote(str(runner_dir))}:$PATH;"
-                    f"WINEPREFIX={wineprefix} winedbg --command 'info proc' | "
+                    f"WINEPREFIX={shlex.quote(str(wineprefix))} winedbg --command 'info proc' | "
                     f"grep -A9 \"{exe_name}\" | grep -v 'grep' | grep '_' | "
                     f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
                     f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
@@ -1606,7 +1606,7 @@ class WineCharmApp(Gtk.Application):
                     )
                 else:
                     winedbg_command_with_grep = (
-                    f"WINEPREFIX={wineprefix} winedbg --command 'info proc' | "
+                    f"WINEPREFIX={shlex.quote(str(wineprefix))} winedbg --command 'info proc' | "
                     f"grep -A9 \"{exe_name}\" | grep -v 'grep' | grep '_' | "
                     f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
                     f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
