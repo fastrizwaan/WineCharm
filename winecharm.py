@@ -35,7 +35,7 @@ class WineCharmApp(Gtk.Application):
         Adw.init()
         
         # Move the global variables to instance attributes
-        self.debug = False
+        self.debug = True
         self.version = "0.96"
         
         # Paths and directories
@@ -797,7 +797,7 @@ class WineCharmApp(Gtk.Application):
         self.update_ui()
 
     def update_ui(self):
-        self.create_script_list()
+        GLib.idle_add(self.create_script_list)
         
     def on_key_pressed(self, controller, keyval, keycode, state):
         if keyval == Gdk.KEY_Escape:
@@ -1629,7 +1629,7 @@ class WineCharmApp(Gtk.Application):
                 # Prepare command to filter processes using winedbg
                 if path_env:
                     winedbg_command_with_grep = (
-                    f"export PATH={shlex.quote(str(runner_dir))}:$PATH;"
+                    f"export PATH={shlex.quote(str(runner_dir))}:$PATH; "
                     f"WINEPREFIX={shlex.quote(str(wineprefix))} winedbg --command 'info proc' | "
                     f"grep -A9 \"{exe_name}\" | grep -v 'grep' | grep '_' | "
                     f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
@@ -2254,15 +2254,15 @@ class WineCharmApp(Gtk.Application):
         # Escape the wineprefix name for the transform pattern to handle special characters
         #escaped_prefix_name = re.escape(wineprefix.name)
 
-        # Prepare the transform pattern to rename the user's directory to '%username%'
+        # Prepare the transform pattern to rename the user's directory to '%USERNAME%'
         # The pattern must be expanded to include anything under the user's folder
-        #transform_pattern = f"s|{escaped_prefix_name}/drive_c/users/{current_username}|{escaped_prefix_name}/drive_c/users/%username%|g"
+        #transform_pattern = f"s|{escaped_prefix_name}/drive_c/users/{current_username}|{escaped_prefix_name}/drive_c/users/%USERNAME%|g"
 
         # Prepare the tar command with --transform option
         tar_command = [
             'tar',
             '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
-            '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%username%|g",  # Rename the directory and its contents
+            '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%USERNAME%|g",  # Rename the directory and its contents
             '-cf', backup_path,
             '-C', str(wineprefix.parent),
             wineprefix.name
@@ -2354,12 +2354,14 @@ class WineCharmApp(Gtk.Application):
 
         # Get the user's home directory to replace with `~`
         usershome = os.path.expanduser('~')
-        find_replace_pairs = {usershome: "~"}
-
+        find_replace_pairs = {usershome: '~'}
+        user = os.getenv('USER')
+        #home_to_userhome = {user: "%USERNAME%"}
+        #userhome_to_home = {"%USERNAME%": user}
         # Step 2: Define the steps for the backup process
         def perform_backup_steps():
             steps = [
-                (f"Replace \"{usershome}\" with '~' in all files", lambda: self.replace_strings_in_files(wineprefix, find_replace_pairs)),
+                (f"Replace \"{usershome}\" with '~' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
                 ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
                 ("Creating backup archive", lambda: self.create_backup_archive(wineprefix, backup_path)),
                 ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
@@ -2723,7 +2725,40 @@ class WineCharmApp(Gtk.Application):
         self.replace_strings_in_files(directory, find_replace_pairs)
         
         
-        
+    def replace_strings_in_specific_files(self, directory, find_replace_pairs):
+        # Define the patterns of the files you want to modify
+        file_patterns = ["*.charm", "*.yaml", "*.yml"]
+
+        # Collect all the files matching the patterns
+        files_to_modify = []
+        for pattern in file_patterns:
+            files_to_modify.extend(glob.glob(os.path.join(directory, pattern)))
+
+        for file_path in files_to_modify:
+            # Skip binary files
+            if self.is_binary_file(file_path):
+                print(f"Skipping binary file: {file_path}")
+                continue
+
+            # Skip files where permission is denied
+            if not os.access(file_path, os.R_OK | os.W_OK):
+                print(f"Skipping file: {file_path} (Permission denied)")
+                continue
+
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+
+                # Replace strings based on the provided dictionary
+                for find, replace in find_replace_pairs.items():
+                    content = content.replace(find, replace)
+
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+
+                print(f"Replacements applied to file: {file_path}")
+            except (UnicodeDecodeError, FileNotFoundError, PermissionError) as e:
+                print(f"Skipping file: {file_path} ({e})")
 
     def replace_strings_in_files(self, directory, find_replace_pairs):
         for root, dirs, files in os.walk(directory):
@@ -2995,7 +3030,7 @@ class WineCharmApp(Gtk.Application):
 
         # Step 3: Extract the archive to self.prefixes_dir
         subprocess.run(
-            ['tar', '-I', 'zstd -T0', '-xf', file_path, '-C', self.prefixes_dir, "--transform", f"s|%username%|{current_username}|g"],
+            ['tar', '-I', 'zstd -T0', '-xf', file_path, '-C', self.prefixes_dir, "--transform", f"s|%USERNAME%|{current_username}|g"],
             check=True
         )
 
@@ -4745,11 +4780,15 @@ class WineCharmApp(Gtk.Application):
         exe_files_found = []
 
         for root, dirs, files in os.walk(drive_c):
-            dirs[:] = [d for d in dirs if not fnmatch.fnmatch(d, "windows")]
+            # Exclude "windows" directory in a case-insensitive way
+            dirs[:] = [d for d in dirs if not fnmatch.fnmatchcase(d.lower(), "windows")]
+
             for file in files:
-                file_path = Path(root) / file
-                if any(fnmatch.fnmatch(file, pattern) for pattern in exclude_patterns):
+                # Check if file matches any exclude pattern
+                if any(fnmatch.fnmatch(file.lower(), pattern.lower()) for pattern in exclude_patterns):
                     continue
+                
+                file_path = Path(root) / file
                 if file_path.suffix.lower() == ".exe" and file_path.is_file():
                     exe_files_found.append(file_path)
 
