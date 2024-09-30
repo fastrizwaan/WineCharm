@@ -1827,12 +1827,16 @@ class WineCharmApp(Gtk.Application):
             if ui_state:
                 row = ui_state.get('row')
                 if row and row.get_parent():
-                    self.update_ui_for_running_process(script_key, row, current_running_processes)
+                    self.update_ui_for_running_process(current_running_processes)
 
         #if not current_running_processes:
         #    self.stop_monitoring()
 
     def get_running_processes(self):
+        """
+        Get a list of currently running processes by checking the system's process list,
+        and update self.running_processes to reflect the current state.
+        """
         current_running_processes = {}
         exe_name_count = {}
 
@@ -1842,6 +1846,8 @@ class WineCharmApp(Gtk.Application):
         # Count occurrences of each exe_name
         for script_key, script_data in script_list_copy.items():
             exe_name = Path(script_data['exe_file']).expanduser().resolve().name
+            # Remove quotes if present
+            exe_name = exe_name.strip("'").strip('"')
             exe_name_count[exe_name] = exe_name_count.get(exe_name, 0) + 1
 
         try:
@@ -1850,10 +1856,10 @@ class WineCharmApp(Gtk.Application):
 
             # Filter out any processes that match self.do_not_kill
             pgrep_output = [line for line in pgrep_output if self.do_not_kill not in line]
-            
+
             for script_key, script_data in script_list_copy.items():
                 script = Path(script_data['script_path'])
-                exe_name = Path(script_data['exe_file']).name
+                exe_name = Path(script_data['exe_file']).name.strip("'").strip('"')  # Remove extra quotes
                 unix_exe_dir_name = Path(script_data['exe_file']).parent.name
                 wineprefix = Path(script).parent
 
@@ -1875,32 +1881,25 @@ class WineCharmApp(Gtk.Application):
                 # If the process is still running
                 if matching_processes:
                     for pid, cmd in matching_processes:
-                        row_info = self.script_buttons.get(script_key)
-                        if row_info:
-                            row = row_info.get("row")
-                            if row:
-                                if script_key not in current_running_processes:
-                                    current_running_processes[script_key] = {
-                                        "row": row,
-                                        "script": script,
-                                        "exe_name": exe_name,
-                                        "pids": [],
-                                        "command": cmd,
-                                        "wineprefix": wineprefix
-                                    }
-                                if pid not in current_running_processes[script_key]["pids"]:
-                                    current_running_processes[script_key]["pids"].append(pid)
-
-                # If no matching process is found, mark it as ended
+                        if script_key not in current_running_processes:
+                            current_running_processes[script_key] = {
+                                "row": self.script_ui_data.get(script_key, {}).get("row"),
+                                "script": script,
+                                "exe_name": exe_name,
+                                "pids": [],
+                                "command": cmd,
+                                "wineprefix": wineprefix
+                            }
+                        if pid not in current_running_processes[script_key]["pids"]:
+                            current_running_processes[script_key]["pids"].append(pid)
                 else:
                     self.process_ended(script_key)
 
         except subprocess.CalledProcessError:
-            pgrep_output = []
-            self.stop_monitoring()
-            self.count = 0
+            # If `pgrep` fails, treat it as no processes running
+            pass
 
-        # Merge new running processes with existing ones
+        # Merge new running processes with existing ones to avoid duplicates
         for script_key, process_info in current_running_processes.items():
             if script_key in self.running_processes:
                 # Merge PIDs to avoid duplicates
@@ -1910,58 +1909,92 @@ class WineCharmApp(Gtk.Application):
             else:
                 self.running_processes[script_key] = process_info
 
-        return self.running_processes
+        # Ensure `self.running_processes` is updated to match actual running state
+        self.update_running_processes(current_running_processes)
 
+        return current_running_processes
 
-
-        
-    def update_ui_for_running_process(self, script_key, row, current_running_processes):
+    def update_running_processes(self, current_running_processes):
         """
-        Update the UI to reflect the state of a running process.
+        Update `self.running_processes` to match `current_running_processes`.
+        Remove processes that have ended externally.
+        """
+        ended_keys = [key for key in self.running_processes if key not in current_running_processes]
+
+        for script_key in ended_keys:
+            self.monitoring_active = True
+            self.start_monitoring()
+            self.process_ended(script_key)
+
+        # Update `self.running_processes` to reflect currently running processes
+        self.running_processes = current_running_processes
+
+    def update_ui_for_running_process(self, current_running_processes):
+        """
+        Update the UI to reflect the state of running processes.
         
         Args:
-            script_key (str): The sha256sum used as a unique identifier for the script.
-            row (Gtk.Widget): The corresponding row widget in the UI.
             current_running_processes (dict): A dictionary containing details of the current running processes.
         """
-        # Get the script info from script_data_two
-        ui_state = self.script_ui_data.get(script_key)
-        if not ui_state:
-            print(f"No script data found for script_key: {script_key}")
-            return
+        # Iterate over all scripts in script_ui_data to update the UI state
+        for script_key, ui_state in self.script_ui_data.items():
+            if not ui_state:
+                print(f"No script data found for script_key: {script_key}")
+                continue
 
-        # Check if the script is running
-        if script_key not in current_running_processes:
-            # Script is not running, remove 'highlighted' class
-            self.update_row_highlight(row, False)
-            row.remove_css_class("highlighted")
-            row.remove_css_class("blue")
-            ui_state['is_running'] = False
-            ui.state['is_clicked_row'] = False
-            print(f"Removed 'highlighted' from row for script_key: {script_key}")
-#        else:
-#            # Script is running, ensure the 'highlighted' class is added
-#            self.update_row_highlight(row, True)
-#            #row.remove_css_class("blue")  # Ensure 'blue' is removed
-#            row.add_css_class("highlighted")  # Add 'highlighted' for running scripts
-#            ui_state['is_running'] = True
-#            print(f"Added 'highlighted' to row for script_key: {script_key}")
-
-        # Update the play/stop button if the script is currently clicked
-        if ui_state.get('is_clicked_row', False):
+            # Retrieve row, play_button, and options_button
+            row = ui_state.get('row')
             play_button = ui_state.get('play_button')
             options_button = ui_state.get('options_button')
-            if play_button and options_button:
-                self.show_buttons(play_button, options_button)
-                self.set_play_stop_button_state(play_button, True)
-                print(f"Updated play/stop button for script_key: {script_key}")
 
-        # Update the launch button state if it matches the script_key
-        if self.launch_button and getattr(self, 'launch_button_exe_name', None) == script_key:
-            self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
-            self.launch_button.set_tooltip_text("Stop")
-            print(f"Updated launch button for script_key: {script_key}")
+            if script_key in current_running_processes:
+                # If the script is running, add the highlighted class and update button states
+                if not ui_state['is_running']:  # Only update if the current state is not already running
+                    if row:
+                        self.update_row_highlight(row, True)
+                        row.add_css_class("highlighted")
+                        print(f"Added 'highlighted' to row for script_key: {script_key}")
 
+                    # Set the play button to 'Stop' since the script is running
+                    if play_button:
+                        self.set_play_stop_button_state(play_button, True)
+
+                    # Update internal running state
+                    ui_state['is_running'] = True
+
+            else:
+                # If the script is not running, remove highlight and reset buttons, but only if it's marked as running
+                if ui_state['is_running']:  # Only update if the current state is marked as running
+                    if row:
+                        self.update_row_highlight(row, False)
+                        row.remove_css_class("highlighted")
+                        #row.remove_css_class("blue")
+                        print(f"Removed 'highlighted' from row for script_key: {script_key}")
+
+                    # Set play button back to 'Play'
+                    if play_button:
+                        self.set_play_stop_button_state(play_button, False)
+
+                    # Update internal state to not running
+                    ui_state['is_running'] = False
+                    ui_state['is_clicked_row'] = False
+
+            # Update the play/stop button visibility if the script row is currently clicked
+            if ui_state.get('is_clicked_row', False):
+                if play_button and options_button:
+                    self.show_buttons(play_button, options_button)
+                    self.set_play_stop_button_state(play_button, True)
+                    print(f"Updated play/stop button for clicked row with script_key: {script_key}")
+
+            # Update the launch button state if it matches the script_key
+            if self.launch_button and getattr(self, 'launch_button_exe_name', None) == script_key:
+                if script_key in current_running_processes:
+                    self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
+                    self.launch_button.set_tooltip_text("Stop")
+                else:
+                    self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+                    self.launch_button.set_tooltip_text("Play")
+                print(f"Updated launch button for script_key: {script_key}")
 
     def cleanup_ended_processes(self, current_running_processes):
         #print("- - - current_running_processes - - -  cleanup_ended_processes - - -")
