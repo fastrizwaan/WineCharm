@@ -575,10 +575,9 @@ class WineCharmApp(Gtk.Application):
             if not self.monitoring_active:
                 return False  # Stop the monitoring if it is no longer active
 
-            if self.monitoring_count >= 10:
+            if self.monitoring_count >= 5:
                 print("Monitoring reached 10 iterations. Stopping.")
                 self.stop_monitoring()
-                self.monitoring_active = False
                 return False
 
             # Perform the monitoring task
@@ -614,7 +613,7 @@ class WineCharmApp(Gtk.Application):
         self.quit()
 
     def create_main_window(self):
-
+        self.stop_monitoring()
         self.window = Gtk.ApplicationWindow(application=self)
         self.window.set_title("Wine Charm")
         self.window.set_default_size(420, 560)
@@ -930,6 +929,7 @@ class WineCharmApp(Gtk.Application):
                 file_path = file.get_path()
                 print("- - - - - - - - - - - - - -self.show_processing_spinner")
                 #self.monitoring_active = False
+                self.stop_monitoring()
                 self.show_processing_spinner("Processing...")
 
                 # Start a background thread to process the file
@@ -1056,6 +1056,7 @@ class WineCharmApp(Gtk.Application):
         return label1, label2, label3
         
     def create_script_list(self):
+        self.stop_monitoring()
         # Clear the flowbox
         self.flowbox.remove_all()
 
@@ -1197,7 +1198,7 @@ class WineCharmApp(Gtk.Application):
         options_button.connect("clicked", lambda btn: self.show_options_for_script(self.script_ui_data[script_key], overlay, script_key))
 
         # Event handler for button click (handles row highlighting)
-        button.connect("clicked", lambda *args: self.on_script_row_clicked(button, play_button, options_button))
+        button.connect("clicked", lambda *args: self.on_script_row_clicked(script_key))
 
         return overlay
 
@@ -1253,18 +1254,19 @@ class WineCharmApp(Gtk.Application):
                 self.show_buttons(row_play_button, row_options_button)
 
                 if is_running:
-                    row_button.add_css_class("highlighted")  # Add highlighted for running scripts
+                    #row_button.add_css_class("highlighted")  # Add highlighted for running scripts
                     self.set_play_stop_button_state(row_play_button, True)
                     row_play_button.set_tooltip_text("Stop")
                     print(f"Script {key} is running. Setting play button to 'Stop' and adding 'highlighted'.")
-#                else:
-#                    row_button.remove_css_class("highlighted")  # Not running, no highlighted
-#                    self.set_play_stop_button_state(row_play_button, False)
-#                    row_play_button.set_tooltip_text("Play")
-#                    print(f"Script {key} is not running but clicked. Preserving 'blue' highlight.")
-
+                else:
+                    row_button.remove_css_class("highlighted")  # Not running, no highlighted
+                    self.set_play_stop_button_state(row_play_button, False)
+                    row_play_button.set_tooltip_text("Play")
+                    print(f"Script {key} is not running but clicked. Preserving 'blue' highlight.")
+                    return
             else:
 #                # Set this row as not clicked: remove highlight and hide buttons
+                print("else: removing blue highlight and hiding buttons")
                 row_button.remove_css_class("blue")
                 self.hide_buttons(row_play_button, row_options_button)
 #
@@ -1272,6 +1274,212 @@ class WineCharmApp(Gtk.Application):
                 if not is_running:
                     row_button.remove_css_class("highlighted")
                     print(f"Script {key} is not clicked and not running. Removing 'highlighted'.")
+
+#############
+    def on_script_row_clicked(self, button, play_button, options_button):
+        # Clear previous overlays
+        if self.current_clicked_row:
+            prev_button, prev_play_button, prev_options_button = self.current_clicked_row
+            self.hide_buttons(prev_play_button, prev_options_button)
+            prev_button.remove_css_class("blue")
+
+        # Toggle the highlight class
+        if self.current_clicked_row == (button, play_button, options_button):
+            self.current_clicked_row = None
+            button.remove_css_class("blue")
+        else:
+            self.current_clicked_row = (button, play_button, options_button)
+            button.add_css_class("blue")
+            self.show_buttons(play_button, options_button)
+
+        # Retrieve the script key associated with this button
+        script_key = None
+        for key, row in self.script_buttons.items():
+            if row == button.get_parent():  # Assuming row is the parent of the button
+                script_key = key
+                break
+
+        # Ensure the overlay buttons are hidden when the process ends
+        if script_key in self.running_processes:
+            self.set_play_stop_button_state(play_button, True)  # Set to "Stop" if running
+        else:
+            self.set_play_stop_button_state(play_button, False)  # Reset to "Play" otherwise
+######################### new
+
+    def on_script_row_clicked(self, script_key):
+        """
+        Handles the click event on a script row, manages row highlighting, and play/stop button state.
+        
+        Args:
+            script_key (str): The unique key for the script (e.g., sha256sum).
+        """
+        # Update `is_clicked_row` for all script rows, marking only the current one as True
+        for key, data in self.script_ui_data.items():
+            data['is_clicked_row'] = (key == script_key)  # Set to True if it is the current key, otherwise False
+            print(f"script_key = {key} is set to data['is_clicked_row'] = {data['is_clicked_row']}")
+
+        # Iterate over all script buttons and update the UI based on `is_clicked_row`
+        for key, data in self.script_ui_data.items():
+            row = data['row']
+            play_button = data['play_button']
+            options_button = data['options_button']
+            is_running = data['is_running']
+            is_clicked = data['is_clicked_row']
+
+            if is_clicked:
+                # Set this row as clicked: highlight it and show the play/stop buttons
+                row.add_css_class("blue")
+                self.show_buttons(play_button, options_button)
+            else:
+                # Set this row as not clicked: remove highlight and hide buttons
+                row.remove_css_class("blue")
+                self.hide_buttons(play_button, options_button)
+
+            # Update the play/stop button state
+            if is_running:
+                # If the script is running: set play button to 'Stop' and add 'highlighted' class
+                self.set_play_stop_button_state(play_button, True)
+                play_button.set_tooltip_text("Stop")
+                row.add_css_class("highlighted")
+                print(f"Script {key} is running. Setting play button to 'Stop' and adding 'highlighted'.")
+            else:
+                # If the script is not running and not clicked, reset play button and highlight
+                if not is_clicked:
+                    self.set_play_stop_button_state(play_button, False)
+                    play_button.set_tooltip_text("Play")
+                    row.remove_css_class("highlighted")
+                    print(f"Script {key} is not running. Setting play button to 'Play' and removing 'highlighted'.")
+
+                # If the script is not running but clicked, ensure it stays highlighted in blue
+                if is_clicked and not is_running:
+                    row.add_css_class("blue")
+                    print(f"Preserving 'blue' highlight for clicked but not running script_key: {key}")
+
+####################### aain
+
+    def on_script_row_clicked(self, script_key):
+        """
+        Handles the click event on a script row, manages row highlighting, and play/stop button state.
+        
+        Args:
+            script_key (str): The unique key for the script (e.g., sha256sum).
+        """
+        # Retrieve the current script data for the clicked row
+        current_data = self.script_ui_data.get(script_key)
+        if not current_data:
+            print(f"No script data found for script_key: {script_key}")
+            return
+
+        # Toggle the `is_clicked_row` state for the clicked row
+        current_data['is_clicked_row'] = not current_data['is_clicked_row']
+        print(f"script_key = {script_key} is set to data['is_clicked_row'] = {current_data['is_clicked_row']}")
+
+        # Iterate over all script buttons and update the UI based on `is_clicked_row`
+        for key, data in self.script_ui_data.items():
+            row = data['row']
+            play_button = data['play_button']
+            options_button = data['options_button']
+            is_running = data['is_running']
+            is_clicked = data['is_clicked_row']
+
+            if is_clicked:
+                # Set this row as clicked: highlight it and show the play/stop buttons
+                row.add_css_class("blue")
+                self.show_buttons(play_button, options_button)
+            else:
+                # Set this row as not clicked: remove highlight and hide buttons
+                row.remove_css_class("blue")
+                self.hide_buttons(play_button, options_button)
+
+            # Update the play/stop button state
+            if is_running:
+                # If the script is running: set play button to 'Stop' and add 'highlighted' class
+                self.set_play_stop_button_state(play_button, True)
+                play_button.set_tooltip_text("Stop")
+                row.add_css_class("highlighted")
+                print(f"Script {key} is running. Setting play button to 'Stop' and adding 'highlighted'.")
+            else:
+                # If the script is not running and not clicked, reset play button and highlight
+                if not is_clicked:
+                    self.set_play_stop_button_state(play_button, False)
+                    play_button.set_tooltip_text("Play")
+                    row.remove_css_class("highlighted")
+                    print(f"Script {key} is not running. Setting play button to 'Play' and removing 'highlighted'.")
+
+                # If the script is not running but clicked, ensure it stays highlighted in blue
+                if is_clicked and not is_running:
+                    row.add_css_class("blue")
+                    print(f"Preserving 'blue' highlight for clicked but not running script_key: {key}")
+
+######################## 4
+    def on_script_row_clicked(self, script_key):
+        """
+        Handles the click event on a script row, manages row highlighting, and play/stop button state.
+        
+        Args:
+            script_key (str): The unique key for the script (e.g., sha256sum).
+        """
+        # Retrieve the current script data for the clicked row
+        current_data = self.script_ui_data.get(script_key)
+        if not current_data:
+            print(f"No script data found for script_key: {script_key}")
+            return
+
+        # Track the previously clicked row and update the `is_clicked_row` state
+        for key, data in self.script_ui_data.items():
+            if data['is_clicked_row']:
+                # If the previously clicked row is not the current one, remove the blue highlight
+                if key != script_key:
+                    data['is_clicked_row'] = False
+                    data['row'].remove_css_class("blue")
+                    self.hide_buttons(data['play_button'], data['options_button'])
+                    print(f"Removing 'blue' highlight for previously clicked row with script_key: {key}")
+
+        # Toggle the `is_clicked_row` state for the currently clicked row
+        current_data['is_clicked_row'] = not current_data['is_clicked_row']
+        print(f"script_key = {script_key} is set to data['is_clicked_row'] = {current_data['is_clicked_row']}")
+
+        # Update the UI based on the new `is_clicked_row` state
+        row = current_data['row']
+        play_button = current_data['play_button']
+        options_button = current_data['options_button']
+        is_running = current_data['is_running']
+        is_clicked = current_data['is_clicked_row']
+
+        if is_clicked:
+            # Highlight the current row in blue and show the buttons
+            row.remove_css_class("highlight")
+            row.add_css_class("blue")
+            self.show_buttons(play_button, options_button)
+            print(f"Highlighting clicked row for script_key: {script_key} with 'blue'")
+        else:
+            # Remove highlight and hide buttons for the current row if it's not running
+            row.remove_css_class("blue")
+            self.hide_buttons(play_button, options_button)
+            print(f"Removing 'blue' highlight for clicked row with script_key: {script_key}")
+
+        # Update the play/stop button state
+        if is_running:
+            # If the script is running: set play button to 'Stop' and add 'highlighted' class
+            self.set_play_stop_button_state(play_button, True)
+            play_button.set_tooltip_text("Stop")
+            row.add_css_class("highlighted")
+            print(f"Script {script_key} is running. Setting play button to 'Stop' and adding 'highlighted'.")
+        else:
+            # If the script is not running and not clicked, reset play button and highlight
+            if not is_clicked:
+                self.set_play_stop_button_state(play_button, False)
+                play_button.set_tooltip_text("Play")
+                row.remove_css_class("highlighted")
+                print(f"Script {script_key} is not running. Setting play button to 'Play' and removing 'highlighted'.")
+
+            # If the script is not running but clicked, ensure it stays highlighted in blue
+            if is_clicked and not is_running:
+                row.add_css_class("blue")
+                print(f"Preserving 'blue' highlight for clicked but not running script_key: {script_key}")
+
+
+
 
 
 
@@ -3185,6 +3393,7 @@ class WineCharmApp(Gtk.Application):
         return True  # Return True to indicate success
 
     def show_options_for_script(self, ui_state, row, script_key):
+        self.stop_monitoring()
         """
         Display the options for a specific script.
         
@@ -5380,11 +5589,11 @@ class WineCharmApp(Gtk.Application):
                     if play_button and options_button:
                         self.hide_buttons(play_button, options_button)
 
-                else:
-                    row.add_css_class("blue")
-                    print(f"Preserving 'blue' highlight for clicked row for script_key: {script_key}")
-                    if play_button and options_button:
-                        self.show_buttons(play_button, options_button)
+#                else:
+                    #row.add_css_class("blue")
+                    #print(f"Preserving 'blue' highlight for clicked row for script_key: {script_key}")
+                    #if play_button and options_button:
+                    #    self.show_buttons(play_button, options_button)
 
             #if play_button and options_button:
             #    self.hide_buttons(play_button, options_button)
