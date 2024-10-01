@@ -1,0 +1,18 @@
+asif@debian:~/WineCharm$ time WINEPREFIX=/home/asif/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Prefixes/Sexual_Void-8c17e7b96b /home/asif/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Prefixes/Sexual_Void-8c17e7b96b/Runner/wine-9.0-amd64/bin/winedbg --command 'info proc'
+ pid      threads  executable (all id:s are in hex)
+ 000002e0 1        'start.exe'
+ 000002f0 1        \_ 'winedbg.exe'
+=000002f8 1           \_ 'winedbg.exe'
+ 000002e8 1        \_ 'conhost.exe'
+ 000000cc 3        'explorer.exe'
+ 00000038 8        'services.exe'
+ 000000e8 6        \_ 'rpcss.exe'
+ 000000a4 3        \_ 'svchost.exe'
+ 0000008c 6        \_ 'plugplay.exe'
+ 00000068 7        \_ 'winedevice.exe'
+ 00000044 8        \_ 'winedevice.exe'
+ 00000020 1        'start.exe'
+ 00000154 1        \_ 'Sexual_Void.exe'
+ 0000015c 59          \_ 'Sexual_Void-Win64-Shipping.exe'
+ 0000014c 1        \_ 'conhost.exe'
+
