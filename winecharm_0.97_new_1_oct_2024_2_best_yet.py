@@ -1299,87 +1299,17 @@ class WineCharmApp(Gtk.Application):
             self.update_row_highlight(row, True)
 
     def process_ended(self, script_key):
-        # Get UI elements for the script
+        # Get UI elements
         print(f"--> I'm called by {script_key}")
         ui_state = self.script_ui_data.get(script_key)
         if not ui_state:
-            print(f"No script data found for script_key: {script_key}")
+            print(f"No UI state found for script_key: {script_key}")
             return
 
         row = ui_state.get('row')
         play_button = ui_state.get('play_button')
         options_button = ui_state.get('options_button')
-        is_clicked = ui_state.get('is_clicked_row', False)
 
-        # Handle wineprefix and process linked files if necessary
-        process_info = self.running_processes.pop(script_key, None)
-        
-        # Initialize exe_name to None
-        exe_name = None
-        if process_info:
-            script = process_info.get("script")
-            exe_name = process_info.get("exe_name")
-            if script and script.exists():
-                wineprefix = script.parent
-                print(f"Processing wineprefix: {wineprefix}")
-                if wineprefix:
-                    self.create_scripts_for_lnk_files(wineprefix)
-
-        # Only proceed if exe_name is defined
-        if exe_name:
-            # Check if any processes with the same exe_name are still running
-            is_still_running = False
-            new_pid = None
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                try:
-                    proc_name = proc.info['name']
-                    proc_cmdline = proc.info['cmdline'] or []  # Default to empty list if None
-
-                    # Check if process name matches the target executable name
-                    if proc_name == exe_name or any(exe_name in arg for arg in proc_cmdline):
-                        is_still_running = True
-                        new_pid = proc.pid
-                        break
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                    continue
-
-            if is_still_running:
-                # The process has respawned or is still running
-                # Re-add to running_processes with the new PID under the same script_key
-                self.running_processes[script_key] = {
-                    "process": None,
-                    "wineprefix": process_info.get("wineprefix") if process_info else None,
-                    "runner": process_info.get("runner") if process_info else None,
-                    "row": row,
-                    "script": script if process_info else None,
-                    "exe_name": exe_name,
-                    "pid": new_pid  # Update with the new PID
-                }
-                print(f"Process with exe_name {exe_name} is still running (respawned).")
-
-                # Start monitoring the new process
-                threading.Thread(target=self.monitor_external_process, args=(script_key, new_pid), daemon=True).start()
-
-                # Update UI elements
-                ui_state['is_running'] = True
-
-                if row:
-                    self.update_row_highlight(row, True)
-                    row.add_css_class("highlighted")
-
-                if play_button:
-                    self.set_play_stop_button_state(play_button, True)
-                    play_button.set_tooltip_text("Stop")
-
-                # Maintain the clicked state if it was clicked
-                if is_clicked:
-                    row.add_css_class("blue")
-                    self.show_buttons(play_button, options_button)
-                    print(f"Maintaining 'blue' highlight and buttons for script_key: {script_key}")
-
-                return  # Exit early since we have re-added the process under the same script_key
-
-        # No exe_name or process not still running, proceed to reset UI for the script
         # Update UI elements
         if row:
             # Remove both 'highlighted' and 'blue' classes
@@ -1389,6 +1319,7 @@ class WineCharmApp(Gtk.Application):
         if play_button:
             self.set_play_stop_button_state(play_button, False)
             play_button.set_tooltip_text("Play")
+            ui_state['is_running'] = False
 
         # Hide play and options buttons
         if options_button:
@@ -1396,16 +1327,26 @@ class WineCharmApp(Gtk.Application):
 
         # Reset the 'is_clicked_row' state
         ui_state['is_clicked_row'] = False
-        ui_state['is_running'] = False
+        # Update the launch button state if applicable
+        if self.launch_button and getattr(self, 'launch_button_exe_name', None) == script_key:
+            self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+            self.launch_button.set_tooltip_text("Play")
+
+        # Handle wineprefix and process linked files if necessary
+        process_info = self.running_processes.pop(script_key, None)
+        if process_info:
+            script = process_info.get("script")
+            if script and script.exists():
+                wineprefix = script.parent
+                print(f"Processing wineprefix: {wineprefix}")
+                if wineprefix:
+                    self.create_scripts_for_lnk_files(wineprefix)
 
         # Check if there are any remaining running processes
         if not self.running_processes:
             print("All processes ended.")
 
-        # Call check_running_processes_on_startup to update UI
         self.check_running_processes_on_startup()
-
-
 
     def reset_all_ui_elements(self):
         """
@@ -1594,9 +1535,8 @@ class WineCharmApp(Gtk.Application):
 
         unique_id = process_info.get("unique_id")
         wineprefix = process_info.get("wineprefix")
-        runner = process_info.get("runner") or "wine"  # Ensure runner is not None
+        runner = process_info.get("runner", "wine")
         runner_dir = Path(runner).expanduser().resolve().parent
-        pids = process_info.get("pids", [])  # Get the list of PIDs
 
         if unique_id:
             # Existing logic to terminate processes using unique_id
@@ -1613,30 +1553,15 @@ class WineCharmApp(Gtk.Application):
                 print(f"No processes found with unique ID {unique_id}")
                 return
 
-            pids = pids_to_terminate
-
-        if pids:
-            # Terminate all PIDs
-            for pid in pids:
+            # Terminate processes
+            for pid in pids_to_terminate:
                 try:
                     os.kill(pid, signal.SIGTERM)
-                    print(f"Successfully sent SIGTERM to process with PID {pid}")
                 except Exception as e:
-                    print(f"Error sending SIGTERM to process with PID {pid}: {e}")
+                    print(f"Error terminating PID {pid}: {e}")
 
-            # Wait for a short time to see if the processes terminate
-            #time.sleep(1)
-            for pid in pids:
-                if psutil.pid_exists(pid):
-                    # If the process is still running, send SIGKILL
-                    try:
-                        os.kill(pid, signal.SIGKILL)
-                        print(f"Successfully sent SIGKILL to process with PID {pid}")
-                    except Exception as e:
-                        print(f"Error sending SIGKILL to process with PID {pid}: {e}")
         else:
-            print(f"No PIDs found to terminate for script_key: {script_key}")
-            # Fallback to wineserver -k to terminate all processes in the Wine prefix
+            # Use wineserver -k to terminate all processes in the wineprefix
             try:
                 command = (
                     f"export PATH={shlex.quote(str(runner_dir))}:$PATH; "
@@ -1653,8 +1578,6 @@ class WineCharmApp(Gtk.Application):
 
         # Update the UI
         GLib.idle_add(self.process_ended, script_key)
-
-
 
     def monitor_external_process(self, script_key, pid):
         try:
@@ -1674,35 +1597,17 @@ class WineCharmApp(Gtk.Application):
             runner = script_data.get('runner', 'wine')
 
             is_running = False
-            running_pids = []  # List to store all PIDs associated with the script
-
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline', 'environ']):
+            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                 try:
                     proc_name = proc.info['name']
-                    proc_cmdline = proc.cmdline() or []
-                    proc_environ = proc.environ()
-                    proc_wineprefix = proc_environ.get('WINEPREFIX', '')
-
-                    # Check if the process is using the same wineprefix
-                    if Path(proc_wineprefix).expanduser().resolve() != wineprefix:
-                        continue
+                    proc_cmdline = proc.cmdline()
 
                     # Check if process name matches the target executable name
                     if proc_name == target_exe_name or any(target_exe_name in arg for arg in proc_cmdline):
                         is_running = True
-                        # Collect the PID of the process
-                        running_pids.append(proc.pid)
-                        # Also collect PIDs of child processes
-                        child_pids = [child.pid for child in proc.children(recursive=True)]
-                        running_pids.extend(child_pids)
-                        # Continue to find all processes matching the criteria
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess, KeyError):
+                        break
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     continue
-
-            if running_pids:
-                # Remove duplicates
-                running_pids = list(set(running_pids))
-                print(f"Found running PIDs for script_key {script_key}: {running_pids}")
 
             ui_state = self.script_ui_data.get(script_key)
             if ui_state:
@@ -1711,7 +1616,7 @@ class WineCharmApp(Gtk.Application):
 
                 if is_running:
                     if script_key not in self.running_processes:
-                        # Store the list of PIDs and start monitoring the processes
+                        # Store the PID and start monitoring the process
                         self.running_processes[script_key] = {
                             "process": None,
                             "wineprefix": str(wineprefix),
@@ -1719,11 +1624,11 @@ class WineCharmApp(Gtk.Application):
                             "row": row,
                             "script": Path(script_data['script_path']),
                             "exe_name": target_exe_name,
-                            "pids": running_pids  # Store the list of PIDs
+                            "pid": proc.pid  # Store the PID
                         }
                         self.update_ui_for_running_script_on_startup(script_key)
-                        # Start a thread to monitor the processes
-                        threading.Thread(target=self.monitor_multiple_processes, args=(script_key, running_pids), daemon=True).start()
+                        # Start a thread to monitor the process
+                        threading.Thread(target=self.monitor_external_process, args=(script_key, proc.pid), daemon=True).start()
                 else:
                     # Remove script from running processes and reset UI
                     if script_key in self.running_processes:
@@ -1738,17 +1643,34 @@ class WineCharmApp(Gtk.Application):
                         self.set_play_stop_button_state(play_button, False)
                         play_button.set_tooltip_text("Play")
 
-    def monitor_multiple_processes(self, script_key, pids):
+    def list_wine_processes(self, wineprefix, runner_dir):
         try:
-            procs = [psutil.Process(pid) for pid in pids if psutil.pid_exists(pid)]
-            psutil.wait_procs(procs)
-        except Exception as e:
-            print(f"Error monitoring processes for script_key {script_key}: {e}")
-        finally:
-            # Processes have ended; update the UI in the main thread
-            GLib.idle_add(self.process_ended, script_key)
+            # Use system wineserver if runner_dir does not contain wineserver
+            wineserver_path = Path(runner_dir) / 'wineserver'
+            if not wineserver_path.exists():
+                wineserver_path = 'wineserver'  # Assume it's in the system PATH
 
-       
+            command = (
+                f"WINEPREFIX={shlex.quote(str(wineprefix))} {shlex.quote(str(wineserver_path))} -p"
+            )
+            bash_command = f"bash -c {shlex.quote(command)}"
+            output = subprocess.check_output(bash_command, shell=True, text=True)
+            return output.strip().split()
+        except subprocess.CalledProcessError as e:
+            if e.returncode == 1:
+                # No processes running in the Wine prefix
+                return []
+            else:
+                print(f"Error executing command: {e}")
+                return []
+
+    def parse_wine_processes(self, process_list_output):
+        processes = []
+        pids = process_list_output.strip().split()
+        for pid in pids:
+            processes.append({'pid': pid, 'exe_name': None})
+        return processes
+        
     def update_ui_for_running_script_on_startup(self, script_key):
         ui_state = self.script_ui_data.get(script_key)
         if not ui_state:
