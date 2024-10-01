@@ -37,7 +37,7 @@ class WineCharmApp(Gtk.Application):
         
         # Move the global variables to instance attributes
         self.debug = True
-        self.version = "0.96"
+        self.version = "0.97"
         
         # Paths and directories
         self.winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
@@ -1314,32 +1314,47 @@ class WineCharmApp(Gtk.Application):
         # Handle wineprefix and process linked files if necessary
         process_info = self.running_processes.pop(script_key, None)
         
-        # Initialize exe_name to None
+        # Initialize variables
         exe_name = None
+        exe_parent_name = None
+        unique_id = None
         if process_info:
             script = process_info.get("script")
             exe_name = process_info.get("exe_name")
+            exe_parent_name = process_info.get("exe_parent_name")
+            unique_id = process_info.get("unique_id")
             if script and script.exists():
                 wineprefix = script.parent
                 print(f"Processing wineprefix: {wineprefix}")
                 if wineprefix:
                     self.create_scripts_for_lnk_files(wineprefix)
 
-        # Only proceed if exe_name is defined
-        if exe_name:
-            # Check if any processes with the same exe_name are still running
+        # Only proceed if exe_name and exe_parent_name are defined
+        if exe_name and exe_parent_name:
+            # Check if any processes with the same exe_name and exe_parent_name are still running
             is_still_running = False
             new_pid = None
             for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                 try:
                     proc_name = proc.info['name']
-                    proc_cmdline = proc.info['cmdline'] or []  # Default to empty list if None
+                    proc_cmdline = proc.info['cmdline'] or []
 
                     # Check if process name matches the target executable name
-                    if proc_name == exe_name or any(exe_name in arg for arg in proc_cmdline):
-                        is_still_running = True
-                        new_pid = proc.pid
-                        break
+                    if proc_name.lower() == exe_name.lower() or any(exe_name.lower() in arg.lower() for arg in proc_cmdline):
+                        # Extract parent directory names from command-line arguments
+                        for arg in proc_cmdline:
+                            if exe_name.lower() in arg.lower():
+                                proc_exe_path = Path(arg)
+                                proc_exe_parent_name = proc_exe_path.parent.name
+
+                                # Compare parent directory names
+                                if proc_exe_parent_name == exe_parent_name:
+                                    # Process matches
+                                    is_still_running = True
+                                    new_pid = proc.pid
+                                    break
+                        if is_still_running:
+                            break
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     continue
 
@@ -1353,9 +1368,11 @@ class WineCharmApp(Gtk.Application):
                     "row": row,
                     "script": script if process_info else None,
                     "exe_name": exe_name,
-                    "pid": new_pid  # Update with the new PID
+                    "exe_parent_name": exe_parent_name,
+                    "pid": new_pid,  # Update with the new PID
+                    "unique_id": unique_id
                 }
-                print(f"Process with exe_name {exe_name} is still running (respawned).")
+                print(f"Process with exe_name {exe_name} and parent directory '{exe_parent_name}' is still running (respawned).")
 
                 # Start monitoring the new process
                 threading.Thread(target=self.monitor_external_process, args=(script_key, new_pid), daemon=True).start()
@@ -1379,7 +1396,7 @@ class WineCharmApp(Gtk.Application):
 
                 return  # Exit early since we have re-added the process under the same script_key
 
-        # No exe_name or process not still running, proceed to reset UI for the script
+        # No matching process found; reset UI elements
         # Update UI elements
         if row:
             # Remove both 'highlighted' and 'blue' classes
