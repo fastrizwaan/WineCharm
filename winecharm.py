@@ -1407,6 +1407,11 @@ class WineCharmApp(Gtk.Application):
             self.set_play_stop_button_state(play_button, False)
             play_button.set_tooltip_text("Play")
 
+        # Reset the launch button if it exists
+        if self.launch_button:
+            self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+            self.launch_button.set_tooltip_text("Play")
+
         # Hide play and options buttons
         if options_button:
             self.hide_buttons(play_button, options_button)
@@ -1422,41 +1427,6 @@ class WineCharmApp(Gtk.Application):
         # Call check_running_processes_on_startup to update UI
         self.check_running_processes_on_startup()
 
-
-
-    def reset_all_ui_elements(self):
-        """
-        Resets all UI elements (row highlights, button states) to their default state.
-        """
-        # Reset row highlights and button states for all scripts in script_ui_data
-        for script_key, ui_state in self.script_ui_data.items():
-            row = ui_state.get('row')
-            play_button = ui_state.get('play_button')
-            options_button = ui_state.get('options_button')
-
-            # Reset row highlight
-            if row:
-                row.remove_css_class("highlighted")
-                row.remove_css_class("blue")
-                ui_state['highlighted'] = False
-                ui_state['is_clicked_row'] = False
-
-            # Hide play and options buttons
-            if play_button and options_button:
-                self.hide_buttons(play_button, options_button)
-
-            # Reset the play button state to "Play"
-            if play_button:
-                self.set_play_stop_button_state(play_button, False)
-
-        # Reset the launch button if it exists
-        if self.launch_button:
-            self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-            self.launch_button.set_tooltip_text("Play")
-
-        # Clear the currently clicked row information
-        self.current_clicked_row = None
-        
     def launch_script(self, script_key, play_stop_button, row):
         script_data = self.script_list.get(script_key)
         if not script_data:
@@ -1571,8 +1541,8 @@ class WineCharmApp(Gtk.Application):
                     "row": row,
                     "script": script,
                     "exe_file": exe_file,
-                    "exe_name": exe_name,
-                    "runner": runner,
+                    "exe_name": exe_name.strip("'"),
+                    "runner": runner.strip("'"),
                     "wineprefix": wineprefix.strip("'")
                 }
 
@@ -2024,19 +1994,6 @@ class WineCharmApp(Gtk.Application):
                     self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
                     self.launch_button.set_tooltip_text("Play")
                 print(f"Updated launch button for script_key: {script_key}")
-
-    def xcleanup_ended_processes(self, current_running_processes):
-        #print("- - - current_running_processes - - -  cleanup_ended_processes - - -")
-        #print(current_running_processes)
-        for script_key in list(self.running_processes.keys()):
-            if script_key not in current_running_processes:
-                self.process_ended(script_key)
-
-        if not current_running_processes:
-            #print(" - - "*50)
-            #print("Calling self.reset_all_ui_elements()")
-            self.reset_all_ui_elements()
-
 
     def extract_yaml_info(self, script_key):
         script_data = self.script_list.get(script_key)
