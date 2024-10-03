@@ -1570,10 +1570,24 @@ class WineCharmApp(Gtk.Application):
                     "pgid": os.getpgid(process.pid),  # Get the process group ID
                     "row": row,
                     "script": script,
+                    "exe_file": exe_file,
                     "exe_name": exe_name,
+                    "runner": runner,
                     "wineprefix": wineprefix.strip("'")
                 }
 
+                print("."*100)
+                print(f"""
+                process = {process}
+                unique_id = {unique_id}
+                pgid = {os.getpgid(process.pid)}
+                row = {row}
+                script = {script}
+                exe_file = {exe_file}
+                exe_name = {exe_name}
+                runner = {runner}
+                wineprefix = {wineprefix}
+                """)
                 # Update UI
                 self.set_play_stop_button_state(play_stop_button, True)
                 self.update_row_highlight(row, True)
@@ -1584,6 +1598,9 @@ class WineCharmApp(Gtk.Application):
 
                 # Start a thread to monitor the process
                 threading.Thread(target=self.monitor_process, args=(script_key,), daemon=True).start()
+    
+                # Call get_child_pid_async after a delay to ensure that child processes have time to start
+                GLib.timeout_add_seconds(5, self.get_child_pid_async, script_key)
 
         except Exception as e:
             print(f"Error launching script: {e}")
@@ -1602,6 +1619,144 @@ class WineCharmApp(Gtk.Application):
 
         # Process has ended; update the UI in the main thread
         GLib.idle_add(self.process_ended, script_key)
+
+
+    def get_child_pid_async(self, script_key):
+        # Run get_child_pid in a separate thread
+        if script_key not in self.running_processes:
+            print("Process already ended, nothing to get child PID for")
+            return False
+
+        process_info = self.running_processes[script_key]
+        pid = process_info.get('pid')
+        script = process_info.get('script')
+        wineprefix = Path(process_info.get('wineprefix')).expanduser().resolve()
+        exe_file = Path(process_info.get('exe_file', '')).expanduser().resolve()        
+        exe_name = script = process_info.get('exe_name')
+
+        runner = process_info.get('runner', 'wine')
+        
+
+        if runner:
+            runner = Path(runner).expanduser().resolve()
+            runner_dir = runner.parent.resolve()
+            path_env = f'export PATH={runner_dir}:$PATH'
+        else:
+            runner = "wine"
+            runner_dir = ""  # Or set a specific default if required
+            path_env = ""
+        
+        
+        exe_name = shlex.quote(str(exe_name))
+        runner_dir = shlex.quote(str(runner_dir))
+
+        print("="*100)
+        print(f"runner = {runner}")
+        print(f"exe_file = {exe_file}")
+        print(f"exe_name = {exe_name}")
+        
+        def run_get_child_pid():
+            try:
+                print("---------------------------------------------")
+                print(f"Looking for child processes of: {exe_name}")
+
+                # Prepare command to filter processes using winedbg
+                if path_env:
+                    winedbg_command_with_grep = (
+                    f"export PATH={shlex.quote(str(runner_dir))}:$PATH; "
+                    f"WINEPREFIX={shlex.quote(str(wineprefix))} winedbg --command 'info proc' | "
+                    f"grep -A9 \"{exe_name}\" | grep -v 'grep' | grep '_' | "
+                    f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
+                    f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
+                    f"grep -v 'svchost.exe'   | grep -v 'plugplay.exe' | grep -v 'winedevice.exe' | "
+                    f"cut -f2- -d '_' | tr \"'\" ' '"
+                    )
+                else:
+                    winedbg_command_with_grep = (
+                    f"WINEPREFIX={shlex.quote(str(wineprefix))} winedbg --command 'info proc' | "
+                    f"grep -A9 \"{exe_name}\" | grep -v 'grep' | grep '_' | "
+                    f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
+                    f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
+                    f"grep -v 'svchost.exe'   | grep -v 'plugplay.exe' | grep -v 'winedevice.exe' | "
+                    f"cut -f2- -d '_' | tr \"'\" ' '"
+                    )
+                if self.debug:    
+                    print("---------run_get_child_pid's winedbg_command_with_grep---------------")
+                    print(winedbg_command_with_grep)
+                    print("--------/run_get_child_pid's winedbg_command_with_grep---------------")
+            
+                winedbg_output_filtered = subprocess.check_output(winedbg_command_with_grep, shell=True, text=True).strip().splitlines()
+                if self.debug:    
+                    print("--------- run_get_child_pid's winedbg_output_filtered ---------------")
+                    print(winedbg_output_filtered)
+                    print("---------/run_get_child_pid's winedbg_output_filtered ---------------")
+
+
+                # Retrieve the parent directory name and search for processes
+                exe_parent = exe_file.parent.name
+                child_pids = set()
+
+                for filtered_exe in winedbg_output_filtered:
+                    filtered_exe = filtered_exe.strip()
+                    cleaned_exe_parent_name = re.escape(exe_parent)
+
+                    # Command to get PIDs for matching processes
+                    pgrep_command = (
+                    f"ps -ax --format pid,command | grep \"{filtered_exe}\" | "
+                    f"grep \"{cleaned_exe_parent_name}\" | grep -v 'grep' | "
+                    f"sed 's/^ *//g' | cut -f1 -d ' '"
+                    )
+                    if self.debug:    
+                        print("--------- run_get_child_pid's pgrep_command ---------------")
+                        print(f"{pgrep_command}")
+                        print("---------/run_get_child_pid's pgrep_command ---------------")
+                        pgrep_output = subprocess.check_output(pgrep_command, shell=True, text=True).strip()
+                        child_pids.update(pgrep_output.splitlines())
+                        
+                    if self.debug:    
+                        print("--------- run_get_child_pid's pgrep_output ---------------")
+                        print(f"{pgrep_output}")
+                        print("---------/run_get_child_pid's pgrep_output ---------------")
+                        
+                    if self.debug:    
+                        print("--------- run_get_child_pid's child_pids pgrep_output.splitlines() ---------------")
+                        print(f"{pgrep_output.splitlines()}")
+                        print("---------/run_get_child_pid's child_pids pgrep_output.splitlines() ---------------")
+                    
+                if child_pids:
+                    print(f"Found child PIDs: {child_pids}\n")
+                    GLib.idle_add(self.add_child_pids_to_running_processes, script_key, child_pids)
+                else:
+                    print(f"No child process found for {exe_name}")
+
+            except subprocess.CalledProcessError as e:
+                print(f"Error executing command: {e}")
+            except Exception as e:
+                print(f"Unexpected error: {e}")
+
+        # Start the background thread
+        threading.Thread(target=run_get_child_pid, daemon=True).start()
+
+        return False
+
+
+    def add_child_pids_to_running_processes(self, script_key, child_pids):
+        # Add the child PIDs to the running_processes dictionary
+        if script_key in self.running_processes:
+            process_info = self.running_processes.get(script_key)
+
+            # Merge the existing PIDs with the new child PIDs, ensuring uniqueness
+            current_pids = set(process_info.get('pids', []))  # Convert existing PIDs to a set for uniqueness
+            current_pids.update([int(pid) for pid in child_pids])  # Update with child PIDs
+
+            # Update the running processes with the merged PIDs
+            self.running_processes[script_key]["pids"] = list(current_pids)
+
+            print(f"Updated {script_key} with child PIDs: {self.running_processes[script_key]['pids']}")
+        else:
+            print(f"Script key {script_key} not found in running processes.")
+
+
 
     def terminate_script(self, script_key):
         process_info = self.running_processes.get(script_key)

@@ -1800,7 +1800,9 @@ class WineCharmApp(Gtk.Application):
                 self.running_processes[script_key] = {
                     "row": row,
                     "script": script,
+                    "exe_file": exe_file,
                     "exe_name": exe_name,
+                    "runner": runner,
                     "pids": [process.pid],
                     "wineprefix": wineprefix.strip("'")
                 }
@@ -1817,7 +1819,7 @@ class WineCharmApp(Gtk.Application):
             print("------------------/Launch Script's self.running_processes--------------------")
             
             
-    def get_child_pid_async(self, script_key, exe_name, wineprefix):
+    def get_child_pid_async(self, script_key):
         # Run get_child_pid in a separate thread
         if script_key not in self.running_processes:
             print("Process already ended, nothing to get child PID for")
@@ -1834,12 +1836,13 @@ class WineCharmApp(Gtk.Application):
         if not script_data:
             return None
 
-        script_key = script_data.get('sha256sum', script_key)        
+        #script_key = script_data.get('sha256sum', script_key)        
         exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()        
         exe_name = Path(exe_file).name
         unix_exe_dir_name = exe_file.parent.name
         wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
-        
+
+
         runner = script_data.get('runner', 'wine')
         if runner:
             runner = Path(runner).expanduser().resolve()
