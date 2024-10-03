@@ -36,7 +36,7 @@ class WineCharmApp(Gtk.Application):
         Adw.init()
         
         # Move the global variables to instance attributes
-        self.debug = True
+        self.debug = False
         self.version = "0.97"
         
         # Paths and directories
@@ -2154,12 +2154,13 @@ class WineCharmApp(Gtk.Application):
         return icon_path if icon_path.exists() else None
 
     def find_lnk_files(self, wineprefix):
-        drive_c = wineprefix / "drive_c"
+        drive_c = wineprefix / "drive_c" / "ProgramData"
         lnk_files = []
 
         for root, dirs, files in os.walk(drive_c):
             for file in files:
                 file_path = Path(root) / file
+
                 if file_path.suffix.lower() == ".lnk" and file_path.is_file():
                     lnk_files.append(file_path)
 
@@ -2932,13 +2933,14 @@ class WineCharmApp(Gtk.Application):
         return sh_files
 
     def find_and_save_lnk_files(self, wineprefix):
-        drive_c = wineprefix / "drive_c"
+        drive_c = wineprefix / "drive_c" / "ProgramData"
         found_lnk_files_path = wineprefix / "found_lnk_files.yaml"
         lnk_files = []
 
         for root, dirs, files in os.walk(drive_c):
             for file in files:
                 file_path = Path(root) / file
+
                 if file_path.suffix.lower() == ".lnk" and file_path.is_file():
                     print(f"Found .lnk file: {file_path}")
                     lnk_files.append(file_path.name)

@@ -2,8 +2,8 @@ id: io.github.fastrizwaan.WineCharm
 sdk: org.gnome.Sdk
 runtime: org.gnome.Platform
 base: org.winehq.Wine
-base-version: stable-23.08
-runtime-version: &runtime-version '46'
+base-version: stable-24.08
+runtime-version: &runtime-version '47'
 command: winecharm
 
 #rename-icon: winezgui
@@ -207,8 +207,8 @@ modules:
       - pip3 install --prefix=/app PyYAML*.whl
     sources:
       - type: file
-        url: https://files.pythonhosted.org/packages/7b/5e/efd033ab7199a0b2044dab3b9f7a4f6670e6a52c089de572e928d2873b06/PyYAML-6.0.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
-        sha256: d2b04aac4d386b172d5b9692e2d2da8de7bfb6c387fa4f801fbf6fb2e6ba4673
+        url: https://files.pythonhosted.org/packages/b9/2b/614b4752f2e127db5cc206abc23a8c19678e92b23c3db30fc86ab731d3bd/PyYAML-6.0.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+        sha256: 80bab7bfc629882493af4aa31a4cfa43a4c57c83813253626916b8c7ada83476
         only-arches:
           - x86_64
         x-checker-data:
