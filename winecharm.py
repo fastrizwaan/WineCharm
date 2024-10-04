@@ -345,8 +345,8 @@ class WineCharmApp(Gtk.Application):
             ("Removing symlinks from wineprefix", lambda: self.remove_symlinks_and_create_directories(template_dir)),
             ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
             ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
-            #("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-            #("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+            ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+            ("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
             #("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
             #("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
         ]
@@ -5033,7 +5033,8 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Extract the Wine prefix directory associated with this script
-        wine_prefix_dir = Path(script_data['script_path']).parent
+        wine_prefix_dir = Path(script_data['script_path']).parent.expanduser().resolve()
+        script_path = Path(script_data['script_path']).expanduser().resolve()
 
         # Fetch the list of charm files only in the specific Wine prefix directory
         charm_files = list(wine_prefix_dir.rglob("*.charm"))
@@ -5177,7 +5178,8 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Extract the Wine prefix directory associated with this script
-        wine_prefix_dir = Path(script_data['script_path']).parent
+        wine_prefix_dir = Path(script_data['script_path']).parent.expanduser().resolve()
+        script_path = Path(script_data['script_path']).expanduser().resolve()
 
         # Fetch the list of desktop files in the specific Wine prefix directory
         desktop_files = list(wine_prefix_dir.glob("*.desktop"))
