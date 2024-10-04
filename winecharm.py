@@ -4940,6 +4940,13 @@ class WineCharmApp(Gtk.Application):
             self.open_button.set_sensitive(True)
         print("Open button enabled.")
 
+    def replace_home_with_tilde_in_path(self, path_str):
+        """Replace the user's home directory with '~' in the given path string."""
+        user_home = os.getenv("HOME")
+        if path_str.startswith(user_home):
+            return path_str.replace(user_home, "~", 1)
+        return path_str
+
     def load_script_list(self, prefixdir=None):
         """
         Loads all .charm files from the specified directory (or the default self.prefixes_dir)
@@ -4959,6 +4966,7 @@ class WineCharmApp(Gtk.Application):
         # Process each .charm file
         for script_file in scripts:
             try:
+                # Open the original script file to read its content
                 with open(script_file, 'r') as f:
                     # Load the YAML data from the .charm file
                     script_data = yaml.safe_load(f)
@@ -4968,19 +4976,35 @@ class WineCharmApp(Gtk.Application):
                         print(f"Warning: Invalid format in {script_file}, skipping.")
                         continue
 
-                    # Add script path to script_data
-                    script_data['script_path'] = str(script_file)
+                    # Flag to track if any changes are needed
+                    updated = False
+
+                    # Replace any paths in the script data with '~' if applicable
+                    for key, value in script_data.items():
+                        if isinstance(value, str) and value.startswith(os.getenv("HOME")):
+                            new_value = self.replace_home_with_tilde_in_path(value)
+                            if new_value != value:
+                                script_data[key] = new_value
+                                updated = True  # Mark that an update is needed
+
+                    # If updates are needed, rewrite the file with updated paths
+                    if updated:
+                        with open(script_file, 'w') as f:
+                            yaml.safe_dump(script_data, f)
+                        print(f"Updated script file: {script_file}")
+
+                    # Add the updated or original script path with '~' in script_data for internal use
+                    script_data['script_path'] = self.replace_home_with_tilde_in_path(str(script_file))
                     
                     # Add modification time (mtime) to script_data
                     script_data['mtime'] = script_file.stat().st_mtime
-
 
                     # Use 'sha256sum' as the key in script_list
                     script_key = script_data.get('sha256sum')
                     if script_key:
                         if prefixdir == self.prefixes_dir:
                             self.script_list[script_key] = script_data
-                        else:  #Add the scripts from a single prefix to the top
+                        else:  # Add the scripts from a single prefix to the top
                             self.script_list = {script_key: script_data, **self.script_list}
                     else:
                         print(f"Warning: Script {script_file} missing 'sha256sum'. Skipping.")
@@ -4992,6 +5016,7 @@ class WineCharmApp(Gtk.Application):
 
         # Print the total number of loaded scripts
         print(f"Loaded {len(self.script_list)} scripts.")
+
 
     def add_desktop_shortcut(self, script, script_key, *args):
         """
