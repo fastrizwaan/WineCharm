@@ -343,10 +343,10 @@ class WineCharmApp(Gtk.Application):
         steps = [
             ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
             ("Removing symlinks from wineprefix", lambda: self.remove_symlinks_and_create_directories(template_dir)),
-            ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-            ("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
             ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
             ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+            #("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+            #("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
             #("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
             #("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
         ]
