@@ -342,7 +342,7 @@ class WineCharmApp(Gtk.Application):
 
         steps = [
             ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-            ("Removing symlinks from wineprefix", lambda: self.remove_symlinks_and_create_directories(template_dir)),
+            ("Replace symbolic links with directories", lambda: self.remove_symlinks_and_create_directories(template_dir)),
             ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
             ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
             ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
@@ -2252,27 +2252,26 @@ class WineCharmApp(Gtk.Application):
             print(f"Cannot show dialog: window is not available.")
             return
 
-        # Create the dialog
-        dialog = Adw.MessageDialog()
-
-        # Attach the dialog to the main window and make it modal
-        dialog.set_transient_for(self.window)
-        dialog.set_modal(True)
-
-        # Set the heading and body text for the dialog
+        # Create an instance of AdwAlertDialog
+        dialog = Adw.AlertDialog()
+        
+        # Set the title and message for the alert dialog
         dialog.set_heading(title)
         dialog.set_body(message)
 
-        # Add "OK" button and set it as the default response
+        # Add an "OK" button as a response
         dialog.add_response("ok", "OK")
-        dialog.set_default_response("ok")
 
-        # Connect the response signal to destroy the dialog when the user clicks "OK"
+        # Set the default response and close response to "ok"
+        dialog.set_default_response("ok")
+        dialog.set_close_response("ok")
+
+        # Connect the response signal to destroy the dialog
         dialog.connect("response", lambda d, r: d.destroy())
 
-        # Present the dialog to the user
-        dialog.present()
-
+        # Present the dialog attached to the parent window
+        dialog.present(self.window)
+        
     def create_backup_archive(self, wineprefix, backup_path):
         # Get the current username from the environment
         current_username = os.getenv("USER") or os.getenv("USERNAME")
@@ -3204,7 +3203,9 @@ class WineCharmApp(Gtk.Application):
             ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
             ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
             ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog),
-            ("Backup Prefix", "document-save-symbolic", self.show_backup_prefix_dialog),  
+            ("Backup Prefix", "document-save-symbolic", self.show_backup_prefix_dialog),
+            ("Save Wine User Directories", "document-save-symbolic", self.show_save_user_dirs_dialog),
+            ("Load Wine User Directories", "document-revert-symbolic", self.show_load_user_dirs_dialog),
             ("Reset Shortcut", "view-refresh-symbolic", self.reset_shortcut_confirmation),
             ("Add Desktop Shortcut", "user-bookmarks-symbolic", self.add_desktop_shortcut),
             ("Remove Desktop Shortcut", "action-unavailable-symbolic", self.remove_desktop_shortcut)
@@ -5274,6 +5275,152 @@ class WineCharmApp(Gtk.Application):
 
         # Close the dialog
         dialog.close()
+
+########################
+    def show_save_user_dirs_dialog(self, script, script_key, button):
+        default_backup_name = f"{script.stem}_user_dirs_backup.tar.zst"
+
+        file_dialog = Gtk.FileDialog.new()
+        file_dialog.set_initial_name(default_backup_name)
+
+        file_dialog.save(self.window, None, lambda dlg, res: self.on_save_user_dirs_dialog_response(dlg, res, script, script_key))
+
+    def on_save_user_dirs_dialog_response(self, dialog, result, script, script_key):
+        try:
+            backup_file = dialog.save_finish(result)
+            if backup_file:
+                backup_path = backup_file.get_path()
+                print(f"Backup will be saved to: {backup_path}")
+
+                # Start the backup process in a separate thread
+                threading.Thread(target=self.save_user_dirs, args=(script, script_key, backup_path)).start()
+
+        except GLib.Error as e:
+            print(f"An error occurred while saving the backup: {e}")
+
+    def save_user_dirs(self, script, script_key, backup_path):
+        wineprefix = Path(script).parent
+
+        # Define the user's directory in Wineprefix (usually found at drive_c/users)
+        users_dir = wineprefix / "drive_c" / "users"
+
+        if not users_dir.exists():
+            print(f"Error: User directories not found in Wineprefix {wineprefix}.")
+            return
+
+        current_username = os.getenv("USER") or os.getenv("USERNAME")
+        if not current_username:
+            print("Error: Unable to determine the current username.")
+            return
+
+        try:
+            # Backup command with zstd compression and path transformation
+            tar_command = [
+                'tar', '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
+                '--transform', f"s|{current_username}|%USERNAME%|g",  # Rename directory
+                '-cf', backup_path,
+                '-C', str(users_dir.parent),  # Change directory to parent of 'users'
+                'users'  # Archive the 'users' directory
+            ]
+
+            print(f"Running backup command: {' '.join(tar_command)}")
+            result = subprocess.run(tar_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+            if result.returncode != 0:
+                raise Exception(f"Backup failed: {result.stderr}")
+
+            print(f"Backup archive created at {backup_path}")
+            GLib.idle_add(self.show_info_dialog, "Saved", f"User directory Saved to {backup_path}")
+        except Exception as e:
+            print(f"Error during backup: {e}")
+
+
+
+
+    def show_load_user_dirs_dialog(self, script, script_key, button):
+        # Create a Gtk.FileDialog instance for loading the file
+        file_dialog = Gtk.FileDialog.new()
+
+        # Set filter to only allow tar.zst files
+        file_filter = Gtk.FileFilter()
+        file_filter.set_name("Backup Files (*.tar.zst)")
+        file_filter.add_pattern("*.tar.zst")
+
+        # Create a Gio.ListStore to hold the file filter (required by Gtk.FileDialog)
+        filter_list_store = Gio.ListStore.new(Gtk.FileFilter)
+        filter_list_store.append(file_filter)
+
+        # Set the filters on the file dialog
+        file_dialog.set_filters(filter_list_store)
+
+        # Open the dialog asynchronously to select the file to load
+        file_dialog.open(self.window, None, lambda dlg, res: self.on_load_user_dirs_dialog_response(dlg, res, script, script_key))
+
+
+    def on_load_user_dirs_dialog_response(self, dialog, result, script, script_key):
+        try:
+            backup_file = dialog.open_finish(result)
+            if backup_file:
+                backup_path = backup_file.get_path()
+                print(f"Backup will be loaded from: {backup_path}")
+
+                # Start the load process in a separate thread
+                threading.Thread(target=self.load_user_dirs, args=(script, script_key, backup_path)).start()
+
+        except GLib.Error as e:
+            print(f"An error occurred while loading the backup: {e}")
+
+    def load_user_dirs(self, script, script_key, backup_path):
+        wineprefix = Path(script).parent
+        users_dir = wineprefix / "drive_c" / "users"
+        if not wineprefix.exists():
+            print(f"Error: Wineprefix not found at {wineprefix}.")
+            return
+
+        current_username = os.getenv("USER") or os.getenv("USERNAME")
+        if not current_username:
+            print("Error: Unable to determine the current username.")
+            return
+            
+
+        try:
+            # Extraction command
+            tar_command = [
+                'tar', '-I', 'zstd -d',  # Decompress with zstd
+                '-xf', backup_path,
+                '--transform', f"s|%USERNAME%|{current_username}|g",
+                '-C', str(wineprefix / "drive_c")  # Extract in the drive_c directory
+            ]
+            print(f"Running load command: {' '.join(tar_command)}")
+            result = subprocess.run(tar_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+            if result.returncode != 0:
+                raise Exception(f"Restore failed: {result.stderr}")
+
+            print(f"Backup loaded from {backup_path}")
+            
+            GLib.idle_add(self.show_info_dialog, "Loaded", f"User directory extracted to {backup_path}")
+
+        except Exception as e:
+            print(f"Error during restore: {e}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 def parse_args():
