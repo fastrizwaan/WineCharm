@@ -3502,7 +3502,9 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Extract the Wine prefix directory associated with this script
-        wine_prefix_dir = Path(script_data['script_path']).parent
+        wine_prefix_dir = Path(script_data['script_path']).parent.expanduser().resolve()
+        script_path = Path(script_data['script_path']).expanduser().resolve()
+
 
         # Fetch the list of charm files only in the specific Wine prefix directory
         charm_files = list(wine_prefix_dir.rglob("*.charm"))
