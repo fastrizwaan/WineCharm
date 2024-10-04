@@ -3208,7 +3208,8 @@ class WineCharmApp(Gtk.Application):
             ("Load Wine User Directories", "document-revert-symbolic", self.show_load_user_dirs_dialog),
             ("Reset Shortcut", "view-refresh-symbolic", self.reset_shortcut_confirmation),
             ("Add Desktop Shortcut", "user-bookmarks-symbolic", self.add_desktop_shortcut),
-            ("Remove Desktop Shortcut", "action-unavailable-symbolic", self.remove_desktop_shortcut)
+            ("Remove Desktop Shortcut", "action-unavailable-symbolic", self.remove_desktop_shortcut),
+            ("Import Game Directory", "folder-download-symbolic", self.import_game_directory)
         ]
 
         for label, icon_name, callback in options:
@@ -5408,9 +5409,137 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error during restore: {e}")
 
+########################
+    def import_game_directory(self, script, script_key, *args):
+        script_data = self.script_list.get(script_key)
+        if not script_data:
+            print(f"Error: Script key {script_key} not found in script_list.")
+            return
+
+        # Extract exe_file and wineprefix from script_data
+        exe_file = Path(script_data['exe_file']).expanduser().resolve()
+        script_path = Path(script_data['script_path']).expanduser().resolve()
+        wineprefix = script_path.parent
+
+        exe_path = exe_file.parent
+        exe_name = exe_file.name
+        game_dir = wineprefix / "drive_c" / "GAMEDIR"
+
+        print("=======")
+        print(exe_path)
+        print(exe_file)
+        print(exe_name)
+        
+        # Check if the game directory is in DO_NOT_BUNDLE_FROM directories
+        if str(exe_path) in self.get_do_not_bundle_directories():
+            msg1 = "Cannot copy the selected game directory"
+            msg2 = "Please move the files to a different directory to create a bundle."
+            self.show_info_dialog(msg1, msg2)
+            return
+
+        # Check disk space in the source and destination directories
+        if not self.has_enough_disk_space(exe_path, wineprefix):
+            self.show_info_dialog("Insufficient Disk Space", "There is not enough space to import the game directory.")
+            return
+
+        # Proceed with copying if conditions are met
+        self.show_processing_spinner(f"Importing {exe_path.name}")
+
+        # Copy the game directory in a new thread and update script_path
+        threading.Thread(target=self.copy_game_directory, args=(exe_path, exe_name, game_dir, script_path)).start()
+
+    def has_enough_disk_space(self, source, destination):
+        # Get the size of the source directory
+        source_size = sum(f.stat().st_size for f in source.glob('**/*') if f.is_file())
+
+        # Get the available free space in the destination directory
+        destination_free_space = shutil.disk_usage(destination).free
+
+        # Check if destination has enough space for the source
+        return destination_free_space > source_size
+
+    def copy_game_directory(self, src, exe_name, dst, script_path):
+        dst_path = dst / src.name
+
+        # Create the destination directory if it doesn't exist
+        dst_path.mkdir(parents=True, exist_ok=True)
+
+        dst_path = dst / src.name
+        new_exe_file = dst_path / exe_name
+
+        print("-----------------")
+        print(dst_path)
+        print(exe_name)
+        print(new_exe_file)
+        
+        steps = [
+            ("Copying Game Directory", lambda: shutil.copytree(src, dst_path, dirs_exist_ok=True)),
+            ("Updating Script Path", lambda: self.update_script_path(script_path, dst_path / exe_name))
+        ]
+
+        def perform_import_steps():
+            for step_text, step_func in steps:
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    step_func()
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except Exception as e:
+                    print(f"Error during step '{step_text}': {e}")
+                    break
+
+            GLib.idle_add(self.on_import_wine_directory_completed)
+
+        threading.Thread(target=perform_import_steps).start()
 
 
 
+    def update_script_path(self, script_path, new_exe_file):
+        """
+        Update the .charm file to point to the new location of exe_file.
+        """
+        try:
+            # Read the script file
+            with open(script_path, "r") as file:
+                script_content = file.readlines()
+
+            # Update the exe_file path with the new location
+            updated_content = []
+            for line in script_content:
+                if line.startswith("exe_file:"):
+                    updated_content.append(f"exe_file: '{new_exe_file}'\n")
+                else:
+                    updated_content.append(line)
+
+            # Write the updated content back to the file
+            with open(script_path, "w") as file:
+                file.writelines(updated_content)
+
+            print(f"Updated exe_file in {script_path} to {new_exe_file}")
+
+        except Exception as e:
+            print(f"Error updating script path: {e}")
+
+
+
+    def get_do_not_bundle_directories(self):
+        # Return a list of directories that should not be bundled
+        return [
+            "/", "/boot", "/dev", "/etc", "/home", "/media", "/mnt", "/opt",
+            "/proc", "/root", "/run", "/srv", "/sys", "/tmp", "/usr", "/var",
+            f"{os.getenv('HOME')}/Desktop", f"{os.getenv('HOME')}/Documents",
+            f"{os.getenv('HOME')}/Downloads", f"{os.getenv('HOME')}/Music",
+            f"{os.getenv('HOME')}/Pictures", f"{os.getenv('HOME')}/Public",
+            f"{os.getenv('HOME')}/Templates", f"{os.getenv('HOME')}/Videos"
+        ]
+
+    def has_enough_disk_space(self, source, destination):
+        source_size = sum(f.stat().st_size for f in source.glob('**/*') if f.is_file())
+        destination_free_space = shutil.disk_usage(destination.parent).free
+        return destination_free_space > source_size
+
+
+
+###########
 
 
 
