@@ -4269,19 +4269,20 @@ class WineCharmApp(Gtk.Application):
         if shutil.which("flatpak-spawn"):
             exec_command = f"flatpak run io.github.fastrizwaan.WineCharm '{script_path}'"
         else: #system
-            exec_command = f"winecharm '{script_path}'"
+            exec_command = f'winecharm "{script_path}"'
             
-        desktop_file_content = f"""[Desktop Entry]
-    Name={progname}
-    Type=Application
-    Exec={exec_command}
-    Icon={icon_path if icon_path else 'wine'}
-    Keywords=winecharm; game; {progname};
-    NoDisplay=false
-    StartupNotify=true
-    Terminal=false
-    Categories={category};;
-    """
+        desktop_file_content = (
+            f"[Desktop Entry]\n"
+            f"Name={progname}\n"
+            f"Type=Application\n"
+            f"Exec={exec_command}\n"
+            f"Icon={icon_path if icon_path else 'wine'}\n"
+            f"Keywords=winecharm;game;{progname};\n"
+            f"NoDisplay=false\n"
+            f"StartupNotify=true\n"
+            f"Terminal=false\n"
+            f"Categories={category};\n"
+        )
         desktop_file_path = wineprefix / f"{progname}.desktop"
         
         try:
