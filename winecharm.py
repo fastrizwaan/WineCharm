@@ -4283,7 +4283,7 @@ class WineCharmApp(Gtk.Application):
             f"Terminal=false\n"
             f"Categories={category};\n"
         )
-        desktop_file_path = wineprefix / f"{progname}.desktop"
+        desktop_file_path = script_path.with_suffix(".desktop")
         
         try:
             # Write the desktop entry to the specified path
@@ -5210,7 +5210,8 @@ class WineCharmApp(Gtk.Application):
         # Iterate through the desktop files and create checkboxes with icons and labels
         for desktop_file in desktop_files:
             # Create the icon and title widget (icon + label) for each desktop file
-            icon_title_widget = self.create_icon_title_widget(desktop_file)
+            desktop_script_file = desktop_file.with_suffix(".charm")
+            icon_title_widget = self.create_icon_title_widget(desktop_script_file)
 
             # Create a horizontal box to hold the checkbox and the icon/label widget
             hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
