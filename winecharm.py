@@ -548,7 +548,6 @@ class WineCharmApp(Gtk.Application):
 
         # Create a box to hold the app icon and the title label
         self.title_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        #title_box.set_margin_start(0)
 
         # App icon
         app_icon = Gtk.Image.new_from_icon_name("io.github.fastrizwaan.WineCharm")
@@ -608,12 +607,12 @@ class WineCharmApp(Gtk.Application):
 
         # Create a "Sort" submenu and add sorting options
         sort_submenu = Gio.Menu()
-        sort_submenu.append("Name (A-Z)", "win.sort_az")
-        sort_submenu.append("Name (Z-A)", "win.sort_za")
-        sort_submenu.append("Wineprefix (A-Z)", "win.sort_wineprefix")
-        sort_submenu.append("Wineprefix (Z-A)", "win.sort_wineprefix_reverse")
-        sort_submenu.append("Time (Newest First)", "win.sort_mtime")
-        sort_submenu.append("Time (Oldest First)", "win.sort_mtime_oldest")
+        sort_submenu.append("Name (A-Z)", "win.sort::progname::False")
+        sort_submenu.append("Name (Z-A)", "win.sort::progname::True")
+        sort_submenu.append("Wineprefix (A-Z)", "win.sort::wineprefix::False")
+        sort_submenu.append("Wineprefix (Z-A)", "win.sort::wineprefix::True")
+        sort_submenu.append("Time (Newest First)", "win.sort::mtime::True")
+        sort_submenu.append("Time (Oldest First)", "win.sort::mtime::False")
 
         # Add the sort submenu to the main menu
         menu.append_submenu("🔠 Sort", sort_submenu)
@@ -693,71 +692,31 @@ class WineCharmApp(Gtk.Application):
 
     def create_sort_actions(self):
         """
-        Create actions for the sorting options in the Sort submenu.
+        Create a single sorting action for the sorting options in the Sort submenu.
         """
-        sort_az_action = Gio.SimpleAction.new("sort_az", None)
-        sort_az_action.connect("activate", self.on_sort_az)
-        self.window.add_action(sort_az_action)
-
-        sort_za_action = Gio.SimpleAction.new("sort_za", None)  # Updated name to match menu
-        sort_za_action.connect("activate", self.on_sort_za)
-        self.window.add_action(sort_za_action)
-
-        sort_wineprefix_action = Gio.SimpleAction.new("sort_wineprefix", None)
-        sort_wineprefix_action.connect("activate", self.on_sort_wineprefix)
-        self.window.add_action(sort_wineprefix_action)
-
-        sort_wineprefix_reverse_action = Gio.SimpleAction.new("sort_wineprefix_reverse", None)  # New action for Wineprefix reverse
-        sort_wineprefix_reverse_action.connect("activate", self.on_sort_wineprefix_reverse)
-        self.window.add_action(sort_wineprefix_reverse_action)
-
-        sort_mtime_action = Gio.SimpleAction.new("sort_mtime", None)
-        sort_mtime_action.connect("activate", self.on_sort_mtime)
-        self.window.add_action(sort_mtime_action)
-
-        sort_mtime_oldest_action = Gio.SimpleAction.new("sort_mtime_oldest", None)  # New action for mtime oldest
-        sort_mtime_oldest_action.connect("activate", self.on_sort_mtime_oldest)
-        self.window.add_action(sort_mtime_oldest_action)
+        # Use 's' to denote that the action expects a string type parameter
+        sort_action = Gio.SimpleAction.new("sort", GLib.VariantType('s'))
+        sort_action.connect("activate", self.on_sort)
+        self.window.add_action(sort_action)
 
 
-    def on_sort_az(self, action, param):
-        print("Sorting Name (A-Z)")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get('progname', '').lower())
+    def on_sort(self, action, param):
+        """
+        Handle sorting by parsing the parameter to determine the sorting key and order.
+        """
+        if param is None:
+            return
+
+        param_str = param.get_string()
+        # Parse the parameter in the format "key::reverse"
+        key, reverse_str = param_str.split("::")
+        reverse = reverse_str == "True"
+
+        print(f"Sorting by {key} {'descending' if reverse else 'ascending'}")
+        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get(key, '').lower() if isinstance(x[1].get(key, ''), str) else x[1].get(key, ''), reverse=reverse)
         self.script_list = {key: value for key, value in sorted_scripts}
-        self.update_ui()
-
-    def on_sort_wineprefix(self, action, param):
-        print("Sorting Wineprefix (A-Z)")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get('wineprefix', ''))
-        self.script_list = {key: value for key, value in sorted_scripts}
-        self.update_ui()
-
-    def on_sort_mtime(self, action, param):
-        print("Sorting by Time (Newest First)")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get('mtime', 0), reverse=True)
-        self.script_list = {key: value for key, value in sorted_scripts}
-        self.update_ui()
-
-    def on_sort_za(self, action, param):
-        print("Sorting Name (Z-A)")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get('progname', '').lower(), reverse=True)
-        self.script_list = {key: value for key, value in sorted_scripts}
-        self.update_ui()
-
-    def on_sort_wineprefix_reverse(self, action, param):
-        print("Sorting Wineprefix (Z-A)")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get('wineprefix', ''), reverse=True)
-        self.script_list = {key: value for key, value in sorted_scripts}
-        self.update_ui()
-
-    def on_sort_mtime_oldest(self, action, param):
-        print("Sorting by Time (Oldest First)")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get('mtime', 0))
-        self.script_list = {key: value for key, value in sorted_scripts}
-        self.update_ui()
-
-    def update_ui(self):
         GLib.idle_add(self.create_script_list)
+
         
     def on_key_pressed(self, controller, keyval, keycode, state):
         if keyval == Gdk.KEY_Escape:
