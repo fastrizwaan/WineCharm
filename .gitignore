@@ -2,3 +2,5 @@ flatpak/.flatpak-builder
 flatpak/repo
 flatpak/build-dir
 .flatpak-builder
+flatpak/repo
+flatpak/*.flatpak
