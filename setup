@@ -3,6 +3,14 @@
 INSTALL_PATH="/usr/local"
 FORCE_INSTALL=false
 
+# List of required Python modules
+REQUIRED_PYTHON_MODULES=(
+    "gi"
+    "PyYAML"
+    "psutil"
+    "argparse"  # argparse is part of standard library (Python >= 2.7) but including for safety
+)
+
 show_help() {
     echo "Usage: ./setup.sh [OPTION]..."
     echo "Install or uninstall WineCharm."
@@ -44,6 +52,30 @@ check_dependencies() {
         done
         echo ""
         echo "Please install them before proceeding or use the -f or --force option to install WineCharm anyway."
+        return 1
+    fi
+
+    return 0
+}
+
+check_python_dependencies() {
+    local missing_modules=()
+
+    for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
+        python3 -c "import $module" &> /dev/null
+        if [ $? -ne 0 ]; then
+            missing_modules+=("$module")
+        fi
+    done
+
+    if [ ${#missing_modules[@]} -ne 0 ]; then
+        echo "The following required Python modules are missing:"
+        for module in "${missing_modules[@]}"; do
+            echo "  - $module"
+        done
+        echo ""
+        echo "You can install them using pip:"
+        echo "  pip3 install ${missing_modules[*]}"
         return 1
     fi
 
@@ -115,6 +147,12 @@ if [ "$ACTION" == "install" ]; then
         echo "Dependencies are not satisfied. Use -f or --force to force the installation."
         exit 1
     fi
+
+    if ! check_python_dependencies && [ "$FORCE_INSTALL" = false ]; then
+        echo "Python dependencies are not satisfied. Use -f or --force to force the installation."
+        exit 1
+    fi
+
     install_files
 elif [ "$ACTION" == "uninstall" ]; then
     uninstall_files
