@@ -1450,8 +1450,8 @@ class WineCharmApp(Gtk.Application):
         runner = script_data.get('runner', 'wine')
         if runner:
             runner = Path(runner).expanduser().resolve()
-            runner_dir = runner.parent.expanduser().resolve()
-            path_env = f'export PATH={runner_dir}:$PATH'
+            runner_dir = str(runner.parent.expanduser().resolve())
+            path_env = f'export PATH="{runner_dir}:$PATH"'
         else:
             runner = "wine"
             runner_dir = ""  # Or set a specific default if required
@@ -1609,8 +1609,8 @@ class WineCharmApp(Gtk.Application):
 
         if runner:
             runner = Path(runner).expanduser().resolve()
-            runner_dir = runner.parent.resolve()
-            path_env = f'export PATH={runner_dir}:$PATH'
+            runner_dir = str(runner.parent.expanduser().resolve())
+            path_env = f'export PATH="{runner_dir}:$PATH"'
         else:
             runner = "wine"
             runner_dir = ""  # Or set a specific default if required
@@ -2154,7 +2154,7 @@ class WineCharmApp(Gtk.Application):
         return icon_path if icon_path.exists() else None
 
     def find_lnk_files(self, wineprefix):
-        drive_c = wineprefix / "drive_c" / "ProgramData"
+        drive_c = wineprefix / "drive_c" 
         lnk_files = []
 
         for root, dirs, files in os.walk(drive_c):
@@ -5614,8 +5614,8 @@ def main():
                 # Resolve runner path
                 if runner:
                     runner = Path(runner).expanduser().resolve()
-                    runner_dir = runner.parent.expanduser().resolve()
-                    path_env = f'export PATH={runner_dir}:$PATH'
+                    runner_dir = str(runner.parent.expanduser().resolve())
+                    path_env = f'export PATH="{runner_dir}:$PATH"'
                 else:
                     runner = "wine"
                     runner_dir = ""  # Or set a specific default if required
