@@ -3656,108 +3656,77 @@ class WineCharmApp(Gtk.Application):
 
     def show_wine_arguments_entry(self, script, script_key, *args):
         """
-        Show an Adw.MessageDialog to allow the user to edit Wine arguments.
-
-        Args:
-            script_key: The sha256sum key for the script.
-            button: The button that triggered the edit request.
+        Show an Adw.Dialog to allow the user to edit Wine arguments.
         """
-        # Retrieve script_data directly from self.script_list using the sha256sum as script_key
-        print("--=---------------------------========-------------")
-        print(f"script_key = {script_key}")
-        print(f"self.script_list:\n{self.script_list}")
-        # Ensure we're using the updated script path
+        # Retrieve script_data
         script_data = self.script_list.get(script_key)
-        if script_data:
-            script_path = Path(script_data['script_path']).expanduser().resolve()
-        else:
+        if not script_data:
             print(f"Error: Script key {script_key} not found in script_list.")
             return
-        
-        #script = Path(script_data['script_path'])
-        print("--=---------------------------========-------------")
-        
-        print(script_data)
-        # Handle case where the script_key is not found
-        if not script_data:
-            print(f"Error: Script with key {script_key} not found.")
-            return
 
-        # Get the current arguments or set a default value
         current_args = script_data.get('args')
-        if not current_args:  # This checks if args is None, empty string, or any falsy value
-            current_args = "-opengl -SkipBuildPatchPrereq"
 
-        # Create an Adw.MessageDialog
-        dialog = Adw.MessageDialog(
-            modal=True,
-            transient_for=self.window,  # Assuming self.window is the main application window
-            title="Edit Wine Arguments",
-            body="Modify the Wine arguments for this script:"
-        )
+        dialog = Adw.Dialog(title="Edit Wine Arguments")
+        dialog.present(self.window)
 
-        # Create an entry field and set the current arguments or default
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content_box.set_margin_top(20)
+        content_box.set_margin_bottom(20)
+        content_box.set_margin_start(20)
+        content_box.set_margin_end(20)
+
+        # Add a label
+        label = Gtk.Label(label="Modify the Wine arguments for this script:")
+        label.set_xalign(0)
+        content_box.append(label)
+
+        # Create an entry field
         entry = Gtk.Entry()
+        entry.set_placeholder_text("-opengl -SkipBuildPatchPrereq")
         entry.set_text(current_args)
+        content_box.append(entry)
 
-        # Add the entry field to the dialog
-        dialog.set_extra_child(entry)
+        # Create button box
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        button_box.set_margin_top(20)
+        button_box.set_halign(Gtk.Align.END)
 
-        # Add "OK" and "Cancel" buttons
-        dialog.add_response("ok", "OK")
-        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
-        dialog.add_response("cancel", "Cancel")
-        dialog.set_default_response("cancel")
+        # Cancel Button
+        cancel_button = Gtk.Button(label="Cancel")
+        cancel_button.connect("clicked", self.on_wine_arguments_cancel_clicked, dialog)
 
-        # Connect the response signal to handle the user's input
-        dialog.connect("response", self.on_wine_arguments_dialog_response, entry, script_key)
+        # OK Button
+        ok_button = Gtk.Button(label="OK")
+        ok_button.add_css_class("suggested-action")
+        ok_button.connect("clicked", self.on_wine_arguments_ok_clicked, dialog, entry, script_key)
 
-        # Present the dialog
-        dialog.present()
+        # Add buttons to button box
+        button_box.append(cancel_button)
+        button_box.append(ok_button)
+
+        content_box.append(button_box)
+        dialog.set_child(content_box)
+
+    def on_wine_arguments_cancel_clicked(self, button, dialog):
+        print("Wine arguments modification canceled")
+        dialog.close()
 
 
-    def on_wine_arguments_dialog_response(self, dialog, response_id, entry, script_key):
-        """
-        Handle the response from the Wine arguments dialog.
-        
-        Args:
-            dialog: The Adw.MessageDialog instance.
-            response_id: The ID of the response clicked by the user.
-            entry: The Gtk.Entry widget where the user modified the Wine arguments.
-            script_key: The key for the script in the script_list.
-        """
-        if response_id == "ok":
-            # Get the new Wine arguments from the entry
-            new_args = entry.get_text().strip()
+    def on_wine_arguments_ok_clicked(self, button, dialog, entry, script_key):
+        new_args = entry.get_text().strip()
+        # Update the script data
+        try:
+            script_data = self.extract_yaml_info(script_key)
+            script_data['args'] = new_args
+            self.script_list[script_key]['args'] = new_args
+            script_path = Path(script_data['script_path']).expanduser().resolve()
+            with open(script_path, 'w') as file:
+                yaml.dump(script_data, file, default_flow_style=False, width=1000)
+            print(f"Updated Wine arguments for {script_path}: {new_args}")
+        except Exception as e:
+            print(f"Error updating Wine arguments for {script_key}: {e}")
 
-            # Update the script data in both the YAML file and self.script_list
-            try:
-                # Update the in-memory script data
-                script_data = self.extract_yaml_info(script_key)
-                script_data['args'] = new_args
 
-                # Update the in-memory representation
-                self.script_list[script_key]['args'] = new_args
-
-                # Get the script path from the script info
-                script_path = Path(script_data['script_path']).expanduser().resolve()
-
-                # Write the updated info back to the YAML file
-                with open(script_path, 'w') as file:
-                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
-
-                print(f"Updated Wine arguments for {script_path}: {new_args}")
-
-                ## Optionally refresh the script list or UI to reflect the changes
-                ##self.create_script_list()
-
-            except Exception as e:
-                print(f"Error updating Wine arguments for {script_key}: {e}")
-
-        else:
-            print("Wine arguments modification canceled")
-
-        # Close the dialog
         dialog.close()
 
 
