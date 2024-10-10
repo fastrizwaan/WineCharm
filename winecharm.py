@@ -3488,11 +3488,6 @@ class WineCharmApp(Gtk.Application):
     def show_delete_shortcut_confirmation(self, script, script_key, button, *args):
         """
         Show a dialog with checkboxes to allow the user to select shortcuts for deletion.
-        
-        Args:
-            script: The script that contains information about the shortcut.
-            script_key: The unique identifier for the script in the script_list.
-            button: The button that triggered the deletion request.
         """
         # Ensure we're using the updated script path from the script_data
         script_data = self.script_list.get(script_key)
@@ -3504,7 +3499,6 @@ class WineCharmApp(Gtk.Application):
         wine_prefix_dir = Path(script_data['script_path']).parent.expanduser().resolve()
         script_path = Path(script_data['script_path']).expanduser().resolve()
 
-
         # Fetch the list of charm files only in the specific Wine prefix directory
         charm_files = list(wine_prefix_dir.rglob("*.charm"))
 
@@ -3514,12 +3508,21 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Create a new dialog for selecting shortcuts
-        dialog = Adw.MessageDialog(
-            modal=True,
-            transient_for=self.window,
-            title="Delete Shortcuts",
-            body=f"Select the shortcuts you want to delete for {wine_prefix_dir.name}:"
-        )
+        dialog = Adw.Dialog(title="Delete Shortcuts")
+        dialog.present(self.window)
+
+        # Create a vertical box for the dialog content
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content_box.set_margin_top(20)
+        content_box.set_margin_bottom(20)
+        content_box.set_margin_start(20)
+        content_box.set_margin_end(20)
+
+        # Add a label to the dialog
+        title_label = Gtk.Label(label=f"Select the shortcuts to delete from {wine_prefix_dir.name}:")
+        #title_label.set_wrap(True)
+        title_label.set_xalign(0)
+        content_box.append(title_label)
 
         # A dictionary to store the checkboxes and corresponding charm files
         checkbox_dict = {}
@@ -3548,62 +3551,65 @@ class WineCharmApp(Gtk.Application):
             # Store the checkbox and associated file in the dictionary
             checkbox_dict[checkbox] = charm_file
 
-        # Add the vertical box to the dialog
-        dialog.set_extra_child(vbox)
+        # Add the vertical box to the content box
+        content_box.append(vbox)
 
-        # Add "Delete" and "Cancel" buttons
-        dialog.add_response("delete", "Delete")
-        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
-        dialog.add_response("cancel", "Cancel")
-        dialog.set_default_response("cancel")
+        # Create a horizontal box for the buttons
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        button_box.set_margin_top(20)
+        button_box.set_halign(Gtk.Align.END)
 
-        # Connect the response signal to handle deletion
-        dialog.connect("response", self.on_delete_shortcuts_response, checkbox_dict)
+        # Create the "Cancel" button
+        cancel_button = Gtk.Button(label="Cancel")
+        cancel_button.connect("clicked", self.on_delete_shortcuts_cancel_clicked, dialog)
 
-        # Present the dialog
-        dialog.present()
+        # Create the "Delete" button
+        delete_button = Gtk.Button(label="Delete")
+        delete_button.add_css_class("destructive-action")
+        delete_button.connect("clicked", self.on_delete_shortcuts_delete_clicked, dialog, checkbox_dict)
+
+        # Add buttons to the button box
+        button_box.append(cancel_button)
+        button_box.append(delete_button)
+
+        # Add the button box to the content box
+        content_box.append(button_box)
+
+        # Set the dialog's child
+        dialog.set_child(content_box)
+
+    def on_delete_shortcuts_cancel_clicked(self, button, dialog):
+        dialog.close()
 
 
-    def on_delete_shortcuts_response(self, dialog, response_id, checkbox_dict):
-        """
-        Handle the response from the delete shortcut dialog.
-        
-        Args:
-            dialog: The Adw.MessageDialog instance.
-            response_id: The ID of the response clicked by the user.
-            checkbox_dict: Dictionary mapping checkboxes to charm files.
-        """
-        if response_id == "delete":
-            # Iterate through the checkboxes and delete selected files
-            for checkbox, charm_file in checkbox_dict.items():
-                if checkbox.get_active():  # Check if the checkbox is selected
-                    try:
-                        if charm_file.exists():
-                            # Delete the shortcut file
-                            charm_file.unlink()
-                            print(f"Deleted shortcut: {charm_file}")
+    def on_delete_shortcuts_delete_clicked(self, button, dialog, checkbox_dict):
+        # Iterate through the checkboxes and delete selected files
+        for checkbox, charm_file in checkbox_dict.items():
+            if checkbox.get_active():  # Check if the checkbox is selected
+                try:
+                    if charm_file.exists():
+                        # Delete the shortcut file
+                        charm_file.unlink()
+                        print(f"Deleted shortcut: {charm_file}")
 
-                            # Remove the script_key from self.script_list
-                            script_key = self.get_script_key_from_shortcut(charm_file)
-                            if script_key in self.script_list:
-                                del self.script_list[script_key]
-                                print(f"Removed script {script_key} from script_list")
+                        # Remove the script_key from self.script_list
+                        script_key = self.get_script_key_from_shortcut(charm_file)
+                        if script_key in self.script_list:
+                            del self.script_list[script_key]
+                            print(f"Removed script {script_key} from script_list")
 
-                            # Optionally, remove from ui_data if applicable
-                            if hasattr(self, 'ui_data') and script_key in self.ui_data:
-                                del self.ui_data[script_key]
-                                print(f"Removed script {script_key} from ui_data")
+                        # Optionally, remove from ui_data if applicable
+                        if hasattr(self, 'ui_data') and script_key in self.ui_data:
+                            del self.ui_data[script_key]
+                            print(f"Removed script {script_key} from ui_data")
 
-                            # Optionally update the UI (e.g., refresh the script list or view)
-                            self.create_script_list()  # Update the UI to reflect changes
-                        else:
-                            print(f"Shortcut file does not exist: {charm_file}")
-                    except Exception as e:
-                        print(f"Error deleting shortcut: {e}")
-        else:
-            print("Deletion canceled")
+                        # Optionally update the UI (e.g., refresh the script list or view)
+                        self.create_script_list()  # Update the UI to reflect changes
+                    else:
+                        print(f"Shortcut file does not exist: {charm_file}")
+                except Exception as e:
+                    print(f"Error deleting shortcut: {e}")
 
-        # Close the dialog
         dialog.close()
 
 
