@@ -5349,6 +5349,7 @@ class WineCharmApp(Gtk.Application):
                 'tar', '-I', 'zstd -d',  # Decompress with zstd
                 '-xf', backup_path,
                 '--transform', f"s|%USERNAME%|{current_username}|g",
+                '--transform', f"s|XOUSERXO|{current_username}|g",
                 '-C', str(wineprefix / "drive_c" / "users")  # Extract in the drive_c directory
             ]
             print(f"Running load command: {' '.join(tar_command)}")
