@@ -86,6 +86,7 @@ class WineCharmApp(Gtk.Application):
         self.create_required_directories() # Create Required Directories
         self.icon_view = False
         self.script_list = {}
+        self.import_steps_ui = {}
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
         self.script_buttons = {}
@@ -2211,49 +2212,25 @@ class WineCharmApp(Gtk.Application):
             print(f"Cannot show dialog: window is not available.")
             return
 
-        # Create an instance of Adw.Dialog
-        dialog = Adw.Dialog()
+        # Create an instance of AdwAlertDialog
+        dialog = Adw.AlertDialog()
+        
+        # Set the title and message for the alert dialog
+        dialog.set_heading(title)
+        dialog.set_body(message)
+
+        # Add an "OK" button as a response
+        dialog.add_response("ok", "OK")
+
+        # Set the default response and close response to "ok"
+        dialog.set_default_response("ok")
+        dialog.set_close_response("ok")
+
+        # Connect the response signal to close the dialog
+        dialog.connect("response", lambda d, r: d.close())
+
+        # Present the dialog attached to the parent window
         dialog.present(self.window)
-
-        # Create a content box for the dialog
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        content_box.set_margin_top(20)
-        content_box.set_margin_bottom(20)
-        content_box.set_margin_start(20)
-        content_box.set_margin_end(20)
-
-        # Add a label for the title
-        title_label = Gtk.Label()
-        title_label.set_markup(f"<b>{title}</b>")  # Make the text bold
-        title_label.set_margin_bottom(10)
-        title_label.set_halign(Gtk.Align.CENTER)   # Center the title horizontally
-        content_box.append(title_label)
-
-        # Add a label for the message
-        message_label = Gtk.Label(label=message)
-        #message_label.set_wrap(True)
-        message_label.set_xalign(0)  # Align text to the left
-        content_box.append(message_label)
-
-        # Create a button box
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        button_box.set_margin_top(20)
-        button_box.set_halign(Gtk.Align.END)
-
-        # Create an "OK" button
-        ok_button = Gtk.Button(label="OK")
-        ok_button.add_css_class("suggested-action")
-        ok_button.connect("clicked", lambda btn: dialog.close())
-
-        # Add the button to the button box
-        button_box.append(ok_button)
-
-        # Add the button box to the content box
-        content_box.append(button_box)
-
-        # Set the content box as the dialog's child
-        dialog.set_child(content_box)
-
         
     def create_backup_archive(self, wineprefix, backup_path):
         # Get the current username from the environment
@@ -3355,10 +3332,10 @@ class WineCharmApp(Gtk.Application):
             subprocess.Popen(command)
         except Exception as e:
             print(f"Error opening file manager: {e}")
-                
+            
     def show_delete_wineprefix_confirmation(self, script, button):
         """
-        Show an Adw.Dialog to confirm the deletion of the Wine prefix.
+        Show an Adw.MessageDialog to confirm the deletion of the Wine prefix.
         
         Args:
             script: The script that contains information about the Wine prefix.
@@ -3369,122 +3346,83 @@ class WineCharmApp(Gtk.Application):
         # Get all charm files associated with the wineprefix
         charm_files = list(wineprefix.rglob("*.charm"))
 
-        # Create the dialog
-        dialog = Adw.Dialog(title="Delete Wine Prefix")
+        # Create a confirmation dialog
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,  # Assuming self.window is the main application window
+            title="Delete Wine Prefix",
+            body=f"Deleting {wineprefix.name} will remove:"
+        )
 
-        # Create a vertical box for the dialog content
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        content_box.set_margin_start(20)
-        content_box.set_margin_end(20)
-        content_box.set_margin_top(20)
-        content_box.set_margin_bottom(20)
-
-        # Add a label with the message
-        message_label = Gtk.Label(label=f"Deleting '{wineprefix.name}' will remove:")
-        message_label.set_xalign(0)  # Align text to the left
-        content_box.append(message_label)
-
-        # Create a box to hold the list of programs
-        program_list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        # Create a vertical box to hold the program list (without checkboxes)
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
 
         if not charm_files:
             # No charm files found, display a message
             no_programs_label = Gtk.Label(label="No programs found in this Wine prefix.")
-            no_programs_label.set_xalign(0)
-            program_list_box.append(no_programs_label)
+            vbox.append(no_programs_label)
         else:
             # Add each charm file's icon and program name to the dialog
             for charm_file in charm_files:
-                # Create an icon + label widget (assuming self.create_icon_title_widget)
+                # Create an icon + label widget (reusing the function for consistency)
                 icon_title_widget = self.create_icon_title_widget(charm_file)
-                program_list_box.append(icon_title_widget)
+                vbox.append(icon_title_widget)
 
-        # Add the program list to the content box
-        content_box.append(program_list_box)
+        # Add the program list to the dialog
+        dialog.set_extra_child(vbox)
 
-        # Create a separator
-        separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
-        separator.set_margin_top(12)
-        content_box.append(separator)
+        # Add the "Delete" and "Cancel" buttons
+        dialog.add_response("delete", "Delete")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
 
-        # Create a horizontal box for the buttons
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        button_box.set_halign(Gtk.Align.END)
-        button_box.set_margin_top(12)
+        # Show the dialog and connect the response signal
+        dialog.connect("response", self.on_delete_wineprefix_confirmation_response, wineprefix)
 
-        # Create the "Cancel" button
-        cancel_button = Gtk.Button(label="Cancel")
-        cancel_button.connect("clicked", self.on_delete_wineprefix_cancel_clicked, dialog)
-
-        # Create the "Delete" button
-        delete_button = Gtk.Button(label="Delete")
-        delete_button.add_css_class("destructive-action")  # Updated method
-        delete_button.connect("clicked", self.on_delete_wineprefix_delete_clicked, dialog, wineprefix)
-
-        # Add buttons to the button box
-        button_box.append(cancel_button)
-        button_box.append(delete_button)
-
-        # Add the button box to the content box
-        content_box.append(button_box)
-
-        # Set the dialog's child
-        dialog.set_child(content_box)
-
-        # Present the dialog with the parent window specified
-        dialog.present(self.window)
+        # Present the dialog (use present instead of show to avoid deprecation warning)
+        dialog.present()
 
 
-
-
-    def on_delete_wineprefix_cancel_clicked(self, button, dialog):
+    def on_delete_wineprefix_confirmation_response(self, dialog, response_id, wineprefix):
         """
-        Handle the Cancel button click in the delete confirmation dialog.
+        Handle the response from the delete Wine prefix confirmation dialog.
         
         Args:
-            button: The button that was clicked.
-            dialog: The Adw.Dialog instance.
+            dialog: The Adw.MessageDialog instance.
+            response_id: The ID of the response clicked by the user.
+            wineprefix: The path to the Wine prefix that is potentially going to be deleted.
         """
-        print("Deletion canceled")
-        dialog.close()
+        if response_id == "delete":
+            # Get all script_keys associated with the wineprefix
+            script_keys = self.get_script_keys_from_wineprefix(wineprefix)
 
-    def on_delete_wineprefix_delete_clicked(self, button, dialog, wineprefix):
-        """
-        Handle the Delete button click in the delete confirmation dialog.
-        
-        Args:
-            button: The button that was clicked.
-            dialog: The Adw.Dialog instance.
-            wineprefix: The path to the Wine prefix that is going to be deleted.
-        """
-        # Get all script_keys associated with the wineprefix
-        script_keys = self.get_script_keys_from_wineprefix(wineprefix)
+            if not script_keys:
+                print(f"No scripts found for Wine prefix: {wineprefix}")
+                return
 
-        if not script_keys:
-            print(f"No scripts found for Wine prefix: {wineprefix}")
-            dialog.close()
-            return
+            # Perform the deletion of the Wine prefix
+            try:
+                if wineprefix.exists() and wineprefix.is_dir():
+                    shutil.rmtree(wineprefix)
+                    print(f"Deleted Wine prefix: {wineprefix}")
+                    
+                    # Remove all script_keys associated with this Wine prefix from script_list
+                    for script_key in script_keys:
+                        if script_key in self.script_list:
+                            del self.script_list[script_key]
+                            print(f"Removed script {script_key} from script_list")
+                        else:
+                            print(f"Script {script_key} not found in script_list for Wine prefix: {wineprefix}")
 
-        # Perform the deletion of the Wine prefix
-        try:
-            if wineprefix.exists() and wineprefix.is_dir():
-                shutil.rmtree(wineprefix)
-                print(f"Deleted Wine prefix: {wineprefix}")
-                
-                # Remove all script_keys associated with this Wine prefix from script_list
-                for script_key in script_keys:
-                    if script_key in self.script_list:
-                        del self.script_list[script_key]
-                        print(f"Removed script {script_key} from script_list")
-                    else:
-                        print(f"Script {script_key} not found in script_list for Wine prefix: {wineprefix}")
-
-                # Trigger the back button to return to the previous view
-                self.on_back_button_clicked(None)
-            else:
-                print(f"Wine prefix does not exist: {wineprefix}")
-        except Exception as e:
-            print(f"Error deleting Wine prefix: {e}")
+                    # Trigger the back button to return to the previous view
+                    self.on_back_button_clicked(None)
+                else:
+                    print(f"Wine prefix does not exist: {wineprefix}")
+            except Exception as e:
+                print(f"Error deleting Wine prefix: {e}")
+        else:
+            print("Deletion canceled")
 
         # Close the dialog
         dialog.close()
@@ -3512,6 +3450,11 @@ class WineCharmApp(Gtk.Application):
     def show_delete_shortcut_confirmation(self, script, script_key, button, *args):
         """
         Show a dialog with checkboxes to allow the user to select shortcuts for deletion.
+        
+        Args:
+            script: The script that contains information about the shortcut.
+            script_key: The unique identifier for the script in the script_list.
+            button: The button that triggered the deletion request.
         """
         # Ensure we're using the updated script path from the script_data
         script_data = self.script_list.get(script_key)
@@ -3523,6 +3466,7 @@ class WineCharmApp(Gtk.Application):
         wine_prefix_dir = Path(script_data['script_path']).parent.expanduser().resolve()
         script_path = Path(script_data['script_path']).expanduser().resolve()
 
+
         # Fetch the list of charm files only in the specific Wine prefix directory
         charm_files = list(wine_prefix_dir.rglob("*.charm"))
 
@@ -3532,21 +3476,12 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Create a new dialog for selecting shortcuts
-        dialog = Adw.Dialog(title="Delete Shortcuts")
-
-
-        # Create a vertical box for the dialog content
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        content_box.set_margin_top(20)
-        content_box.set_margin_bottom(20)
-        content_box.set_margin_start(20)
-        content_box.set_margin_end(20)
-
-        # Add a label to the dialog
-        title_label = Gtk.Label(label=f"Select the shortcuts to delete from {wine_prefix_dir.name}:")
-        #title_label.set_wrap(True)
-        title_label.set_xalign(0)
-        content_box.append(title_label)
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,
+            title="Delete Shortcuts",
+            body=f"Select the shortcuts you want to delete for {wine_prefix_dir.name}:"
+        )
 
         # A dictionary to store the checkboxes and corresponding charm files
         checkbox_dict = {}
@@ -3575,66 +3510,62 @@ class WineCharmApp(Gtk.Application):
             # Store the checkbox and associated file in the dictionary
             checkbox_dict[checkbox] = charm_file
 
-        # Add the vertical box to the content box
-        content_box.append(vbox)
+        # Add the vertical box to the dialog
+        dialog.set_extra_child(vbox)
 
-        # Create a horizontal box for the buttons
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        button_box.set_margin_top(20)
-        button_box.set_halign(Gtk.Align.END)
+        # Add "Delete" and "Cancel" buttons
+        dialog.add_response("delete", "Delete")
+        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
 
-        # Create the "Cancel" button
-        cancel_button = Gtk.Button(label="Cancel")
-        cancel_button.connect("clicked", self.on_delete_shortcuts_cancel_clicked, dialog)
+        # Connect the response signal to handle deletion
+        dialog.connect("response", self.on_delete_shortcuts_response, checkbox_dict)
 
-        # Create the "Delete" button
-        delete_button = Gtk.Button(label="Delete")
-        delete_button.add_css_class("destructive-action")
-        delete_button.connect("clicked", self.on_delete_shortcuts_delete_clicked, dialog, checkbox_dict)
+        # Present the dialog
+        dialog.present()
 
-        # Add buttons to the button box
-        button_box.append(cancel_button)
-        button_box.append(delete_button)
 
-        # Add the button box to the content box
-        content_box.append(button_box)
-
-        # Set the dialog's child
-        dialog.set_child(content_box)
-        dialog.present(self.window)
+    def on_delete_shortcuts_response(self, dialog, response_id, checkbox_dict):
+        """
+        Handle the response from the delete shortcut dialog.
         
-    def on_delete_shortcuts_cancel_clicked(self, button, dialog):
-        dialog.close()
+        Args:
+            dialog: The Adw.MessageDialog instance.
+            response_id: The ID of the response clicked by the user.
+            checkbox_dict: Dictionary mapping checkboxes to charm files.
+        """
+        if response_id == "delete":
+            # Iterate through the checkboxes and delete selected files
+            for checkbox, charm_file in checkbox_dict.items():
+                if checkbox.get_active():  # Check if the checkbox is selected
+                    try:
+                        if charm_file.exists():
+                            # Delete the shortcut file
+                            charm_file.unlink()
+                            print(f"Deleted shortcut: {charm_file}")
 
+                            # Remove the script_key from self.script_list
+                            script_key = self.get_script_key_from_shortcut(charm_file)
+                            if script_key in self.script_list:
+                                del self.script_list[script_key]
+                                print(f"Removed script {script_key} from script_list")
 
-    def on_delete_shortcuts_delete_clicked(self, button, dialog, checkbox_dict):
-        # Iterate through the checkboxes and delete selected files
-        for checkbox, charm_file in checkbox_dict.items():
-            if checkbox.get_active():  # Check if the checkbox is selected
-                try:
-                    if charm_file.exists():
-                        # Delete the shortcut file
-                        charm_file.unlink()
-                        print(f"Deleted shortcut: {charm_file}")
+                            # Optionally, remove from ui_data if applicable
+                            if hasattr(self, 'ui_data') and script_key in self.ui_data:
+                                del self.ui_data[script_key]
+                                print(f"Removed script {script_key} from ui_data")
 
-                        # Remove the script_key from self.script_list
-                        script_key = self.get_script_key_from_shortcut(charm_file)
-                        if script_key in self.script_list:
-                            del self.script_list[script_key]
-                            print(f"Removed script {script_key} from script_list")
+                            # Optionally update the UI (e.g., refresh the script list or view)
+                            self.create_script_list()  # Update the UI to reflect changes
+                        else:
+                            print(f"Shortcut file does not exist: {charm_file}")
+                    except Exception as e:
+                        print(f"Error deleting shortcut: {e}")
+        else:
+            print("Deletion canceled")
 
-                        # Optionally, remove from ui_data if applicable
-                        if hasattr(self, 'ui_data') and script_key in self.ui_data:
-                            del self.ui_data[script_key]
-                            print(f"Removed script {script_key} from ui_data")
-
-                        # Optionally update the UI (e.g., refresh the script list or view)
-                        self.create_script_list()  # Update the UI to reflect changes
-                    else:
-                        print(f"Shortcut file does not exist: {charm_file}")
-                except Exception as e:
-                    print(f"Error deleting shortcut: {e}")
-
+        # Close the dialog
         dialog.close()
 
 
@@ -3657,221 +3588,261 @@ class WineCharmApp(Gtk.Application):
 
     def show_wine_arguments_entry(self, script, script_key, *args):
         """
-        Show an Adw.Dialog to allow the user to edit Wine arguments.
+        Show an Adw.MessageDialog to allow the user to edit Wine arguments.
+
+        Args:
+            script_key: The sha256sum key for the script.
+            button: The button that triggered the edit request.
         """
-        # Retrieve script_data
+        # Retrieve script_data directly from self.script_list using the sha256sum as script_key
+        print("--=---------------------------========-------------")
+        print(f"script_key = {script_key}")
+        print(f"self.script_list:\n{self.script_list}")
+        # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
-        if not script_data:
+        if script_data:
+            script_path = Path(script_data['script_path']).expanduser().resolve()
+        else:
             print(f"Error: Script key {script_key} not found in script_list.")
             return
-
-        current_args = script_data.get('args')
-
-        dialog = Adw.Dialog(title="Edit Wine Arguments")
-
-
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        content_box.set_margin_top(20)
-        content_box.set_margin_bottom(20)
-        content_box.set_margin_start(20)
-        content_box.set_margin_end(20)
-
-        # Add a label
-        label = Gtk.Label(label="Modify the Wine arguments for this script:")
-        label.set_xalign(0)
-        content_box.append(label)
-
-        # Create an entry field
-        entry = Gtk.Entry()
-        entry.set_placeholder_text("-opengl -SkipBuildPatchPrereq")
-        entry.set_text(current_args)
-        content_box.append(entry)
-
-        # Create button box
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        button_box.set_margin_top(20)
-        button_box.set_halign(Gtk.Align.END)
-
-        # Cancel Button
-        cancel_button = Gtk.Button(label="Cancel")
-        cancel_button.connect("clicked", self.on_wine_arguments_cancel_clicked, dialog)
-
-        # OK Button
-        ok_button = Gtk.Button(label="OK")
-        ok_button.add_css_class("suggested-action")
-        ok_button.connect("clicked", self.on_wine_arguments_ok_clicked, dialog, entry, script_key)
-
-        # Add buttons to button box
-        button_box.append(cancel_button)
-        button_box.append(ok_button)
-
-        content_box.append(button_box)
-        dialog.set_child(content_box)
-        dialog.present(self.window)
         
-    def on_wine_arguments_cancel_clicked(self, button, dialog):
-        print("Wine arguments modification canceled")
-        dialog.close()
+        #script = Path(script_data['script_path'])
+        print("--=---------------------------========-------------")
+        
+        print(script_data)
+        # Handle case where the script_key is not found
+        if not script_data:
+            print(f"Error: Script with key {script_key} not found.")
+            return
+
+        # Get the current arguments or set a default value
+        current_args = script_data.get('args')
+        if not current_args:  # This checks if args is None, empty string, or any falsy value
+            current_args = "-opengl -SkipBuildPatchPrereq"
+
+        # Create an Adw.MessageDialog
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,  # Assuming self.window is the main application window
+            title="Edit Wine Arguments",
+            body="Modify the Wine arguments for this script:"
+        )
+
+        # Create an entry field and set the current arguments or default
+        entry = Gtk.Entry()
+        entry.set_text(current_args)
+
+        # Add the entry field to the dialog
+        dialog.set_extra_child(entry)
+
+        # Add "OK" and "Cancel" buttons
+        dialog.add_response("ok", "OK")
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+
+        # Connect the response signal to handle the user's input
+        dialog.connect("response", self.on_wine_arguments_dialog_response, entry, script_key)
+
+        # Present the dialog
+        dialog.present()
 
 
-    def on_wine_arguments_ok_clicked(self, button, dialog, entry, script_key):
-        new_args = entry.get_text().strip()
-        # Update the script data
-        try:
-            script_data = self.extract_yaml_info(script_key)
-            script_data['args'] = new_args
-            self.script_list[script_key]['args'] = new_args
-            script_path = Path(script_data['script_path']).expanduser().resolve()
-            with open(script_path, 'w') as file:
-                yaml.dump(script_data, file, default_flow_style=False, width=1000)
-            print(f"Updated Wine arguments for {script_path}: {new_args}")
-        except Exception as e:
-            print(f"Error updating Wine arguments for {script_key}: {e}")
+    def on_wine_arguments_dialog_response(self, dialog, response_id, entry, script_key):
+        """
+        Handle the response from the Wine arguments dialog.
+        
+        Args:
+            dialog: The Adw.MessageDialog instance.
+            response_id: The ID of the response clicked by the user.
+            entry: The Gtk.Entry widget where the user modified the Wine arguments.
+            script_key: The key for the script in the script_list.
+        """
+        if response_id == "ok":
+            # Get the new Wine arguments from the entry
+            new_args = entry.get_text().strip()
 
+            # Update the script data in both the YAML file and self.script_list
+            try:
+                # Update the in-memory script data
+                script_data = self.extract_yaml_info(script_key)
+                script_data['args'] = new_args
 
+                # Update the in-memory representation
+                self.script_list[script_key]['args'] = new_args
+
+                # Get the script path from the script info
+                script_path = Path(script_data['script_path']).expanduser().resolve()
+
+                # Write the updated info back to the YAML file
+                with open(script_path, 'w') as file:
+                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
+
+                print(f"Updated Wine arguments for {script_path}: {new_args}")
+
+                ## Optionally refresh the script list or UI to reflect the changes
+                ##self.create_script_list()
+
+            except Exception as e:
+                print(f"Error updating Wine arguments for {script_key}: {e}")
+
+        else:
+            print("Wine arguments modification canceled")
+
+        # Close the dialog
         dialog.close()
 
 
 
     def show_rename_shortcut_entry(self, script, script_key, *args):
         """
-        Show an Adw.Dialog to allow the user to rename a shortcut.
+        Show an Adw.MessageDialog to allow the user to rename a shortcut.
+
+        Args:
+            script_key: The sha256sum key for the script.
+            button: The button that triggered the rename request.
         """
+        # Retrieve script_data directly from self.script_list using the sha256sum as script_key
+        print(f"script_key = {script_key}")
+        print(f"self.script_list:\n{self.script_list}")
+        # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
-        if not script_data:
+        if script_data:
+            script_path = Path(script_data['script_path']).expanduser().resolve()
+        else:
             print(f"Error: Script key {script_key} not found in script_list.")
             return
 
-        current_name = script_data.get('progname', "New Shortcut")
+        # Get the current name of the shortcut
+        current_name = script_data.get('progname')
+        if not current_name:  # In case the current name is missing
+            current_name = "New Shortcut"
 
-        dialog = Adw.Dialog(title="Rename Shortcut")
+        # Create an Adw.MessageDialog for renaming
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,  # Assuming self.window is the main application window
+            title="Rename Shortcut",
+            body="Enter the new name for the shortcut:"
+        )
 
-
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        content_box.set_margin_top(20)
-        content_box.set_margin_bottom(20)
-        content_box.set_margin_start(20)
-        content_box.set_margin_end(20)
-
-        label = Gtk.Label(label="Enter the new name for the shortcut:")
-        label.set_xalign(0)
-        content_box.append(label)
-
+        # Create an entry field and set the current name
         entry = Gtk.Entry()
         entry.set_text(current_name)
-        content_box.append(entry)
 
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        button_box.set_margin_top(20)
-        button_box.set_halign(Gtk.Align.END)
+        # Add the entry field to the dialog
+        dialog.set_extra_child(entry)
 
-        cancel_button = Gtk.Button(label="Cancel")
-        cancel_button.connect("clicked", self.on_rename_shortcut_cancel_clicked, dialog)
+        # Add "OK" and "Cancel" buttons
+        dialog.add_response("ok", "OK")
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
 
-        ok_button = Gtk.Button(label="OK")
-        ok_button.add_css_class("suggested-action")
-#        ok_button.connect("clicked", self.on_rename_shortcut_ok_clicked, dialog, entry, script_key)
-        ok_button.connect("clicked", lambda btn: self.on_rename_shortcut_ok_clicked(dialog, entry, script_key))
+        # Connect the response signal to handle the user's input
+        dialog.connect("response", self.on_show_rename_shortcut_dialog_response, entry, script_key)
 
-        button_box.append(cancel_button)
-        button_box.append(ok_button)
+        # Present the dialog
+        dialog.present()
 
-        content_box.append(button_box)
-        dialog.set_child(content_box)
-        dialog.present(self.window)
-        
-    def on_rename_shortcut_cancel_clicked(self, button, dialog):
-        print("Shortcut rename canceled")
-        dialog.close()
+    def on_show_rename_shortcut_dialog_response(self, dialog, response_id, entry, script_key):
+        """
+        Handle the response from the Rename Shortcut dialog.
 
-    def on_rename_shortcut_ok_clicked(self, dialog, entry, script_key):
+        Args:
+            dialog: The Adw.MessageDialog instance.
+            response_id: The ID of the response clicked by the user.
+            entry: The Gtk.Entry widget where the user entered the new shortcut name.
+            script_key: The key for the script in the script_list.
+        """
+        if response_id == "ok":
+            # Get the new shortcut name from the entry
+            new_name = entry.get_text().strip()
 
+            # Update the script data in both the YAML file and self.script_list
+            try:
+                # Update the in-memory script data
+                script_data = self.extract_yaml_info(script_key)
+                old_progname = script_data.get('progname', '')
 
-        # Get the new shortcut name from the entry
-        new_name = entry.get_text().strip()
+                # Update the in-memory representation
+                script_data['progname'] = new_name
 
-        # Update the script data in both the YAML file and self.script_list
-        try:
-            # Update the in-memory script data
-            script_data = self.extract_yaml_info(script_key)
-            old_progname = script_data.get('progname', '')
+                # Get the script path from the script info
+                script_path = Path(script_data['script_path']).expanduser().resolve()
 
-            # Update the in-memory representation
-            script_data['progname'] = new_name
+                print("*"*100)
+                print("writing script_path = {script_path}")
 
-            # Get the script path from the script info
-            script_path = Path(script_data['script_path']).expanduser().resolve()
-
-            print("*"*100)
-            print("writing script_path = {script_path}")
-
-            # Rename the .charm file and associated icon
-            new_script_path = self.rename_script_and_icon(script_path, old_progname, new_name)
-            
-            # Write the updated info back to the YAML file
-            with open(new_script_path, 'w') as file:
-                script_data['script_path'] = str(new_script_path).replace(str(Path.home()), "~")
-                yaml.dump(script_data, file, default_flow_style=False, width=1000)
+                # Rename the .charm file and associated icon
+                new_script_path = self.rename_script_and_icon(script_path, old_progname, new_name)
                 
-            # Ensure that script_data still contains the same sha256sum
-            existing_sha256sum = script_data.get('sha256sum')
+                # Write the updated info back to the YAML file
+                with open(new_script_path, 'w') as file:
+                    script_data['script_path'] = str(new_script_path).replace(str(Path.home()), "~")
+                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
+                    
+                # Ensure that script_data still contains the same sha256sum
+                existing_sha256sum = script_data.get('sha256sum')
 
-            # Extract icon and create desktop entry
-            exe_file = Path(script_data['exe_file'])  # Assuming exe_file exists in script_data
-            icon_path = new_script_path.with_suffix(".png")  # Correct the icon path generation
-            print("#" * 100)
-            print(icon_path)
-
-            # Remove the old script_key and update script data with the new path
-            if script_key in self.script_list:
-                # Load the script data first
-                script_data = self.script_list[script_key]
-                #print(script_data['script_path'])
-                
-                # Update the script path with the new script path
-                script_data['script_path'] = str(new_script_path)
-                script_data['mtime'] = new_script_path.stat().st_mtime
-                print(script_data['script_path'])
-
-
-
-                # Update the script_list with the updated script_data
-                self.script_list[script_key] = script_data
-
-                # Update the UI row for the renamed script
-                row = self.create_script_row(script_key, script_data)
-                if row:
-                    self.flowbox.prepend(row)
-
-                print(f"Removed old script_key {script_key} from script_list")
-
-            if script_key in self.script_ui_data:
-                # Update the script_path for the given script_key
-                self.script_ui_data[script_key]['script_path'] = str(new_script_path)
-                print(f"Updated script_path for {script_key} to {new_script_path}")
-            else:
-                print(f"Error: script_key {script_key} not found in script_data_two")   
+                # Extract icon and create desktop entry
+                exe_file = Path(script_data['exe_file'])  # Assuming exe_file exists in script_data
+                icon_path = new_script_path.with_suffix(".png")  # Correct the icon path generation
                 print("#" * 100)
+                print(icon_path)
+
+                # Remove the old script_key and update script data with the new path
+                if script_key in self.script_list:
+                    # Load the script data first
+                    script_data = self.script_list[script_key]
+                    #print(script_data['script_path'])
+                    
+                    # Update the script path with the new script path
+                    script_data['script_path'] = str(new_script_path)
+                    script_data['mtime'] = new_script_path.stat().st_mtime
+                    print(script_data['script_path'])
+
+
+
+                    # Update the script_list with the updated script_data
+                    self.script_list[script_key] = script_data
+
+                    # Update the UI row for the renamed script
+                    row = self.create_script_row(script_key, script_data)
+                    if row:
+                        self.flowbox.prepend(row)
+
+                    print(f"Removed old script_key {script_key} from script_list")
+
+                if script_key in self.script_ui_data:
+                    # Update the script_path for the given script_key
+                    self.script_ui_data[script_key]['script_path'] = str(new_script_path)
+                    print(f"Updated script_path for {script_key} to {new_script_path}")
+                else:
+                    print(f"Error: script_key {script_key} not found in script_data_two")   
+                    print("#" * 100)
+                    
+                # Add the updated script data to self.script_list using the existing sha256sum
+                self.script_list[existing_sha256sum] = script_data
                 
-            # Add the updated script data to self.script_list using the existing sha256sum
-            self.script_list[existing_sha256sum] = script_data
-            
-            row = self.create_script_row(existing_sha256sum, script_data)
-            
-            # Mark the script as new and update the UI
-            self.new_scripts.add(new_script_path.stem)
+                row = self.create_script_row(existing_sha256sum, script_data)
+                
+                # Mark the script as new and update the UI
+                self.new_scripts.add(new_script_path.stem)
 
-            # Add or update script row in UI
-            self.script_list = {existing_sha256sum: script_data, **self.script_list}
+                # Add or update script row in UI
+                self.script_list = {existing_sha256sum: script_data, **self.script_list}
 
-            # Refresh the UI to load the renamed script
-            # self.create_script_list()
+                # Refresh the UI to load the renamed script
+                # self.create_script_list()
 
-            print(f"Renamed and loaded script: {new_script_path}")
+                print(f"Renamed and loaded script: {new_script_path}")
 
-        except Exception as e:
-            print(f"Error updating shortcut name for {script_key}: {e}")
+            except Exception as e:
+                print(f"Error updating shortcut name for {script_key}: {e}")
 
+        else:
+            print("Shortcut rename canceled")
 
         # Close the dialog
         dialog.close()
@@ -4016,51 +3987,38 @@ class WineCharmApp(Gtk.Application):
         if script_data:
             exe_file = Path(script_data.get('exe_file'))
 
-        dialog = Adw.Dialog(title="Reset Shortcut")
-
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        content_box.set_margin_top(20)
-        content_box.set_margin_bottom(20)
-        content_box.set_margin_start(20)
-        content_box.set_margin_end(20)
-
-        label = Gtk.Label(
-            label=f"Reset and recreate the shortcut for {exe_file.name}?"
+        # Create a confirmation dialog
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,  # Assuming self.window is the main application window
+            title="Reset Shortcut",
+            body=f"This will reset all changes and recreate the shortcut for {exe_file.name}. Do you want to proceed?"
         )
-        label.set_wrap(True)
-        label.set_xalign(0)
-        content_box.append(label)
+        
+        # Add the "Reset" and "Cancel" buttons
+        dialog.add_response("reset", "Reset")
+        dialog.set_response_appearance("reset", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+        
+        # Show the dialog and connect the response signal to handle the reset
+        dialog.connect("response", self.on_reset_shortcut_confirmation_response, script_key)
 
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        button_box.set_margin_top(20)
-        button_box.set_halign(Gtk.Align.END)
+        # Present the dialog
+        dialog.present()
 
-        cancel_button = Gtk.Button(label="Cancel")
-        cancel_button.connect("clicked", self.on_reset_shortcut_cancel_clicked, dialog)
 
-        reset_button = Gtk.Button(label="Reset")
-        reset_button.add_css_class("destructive-action")
-        reset_button.connect("clicked", self.on_reset_shortcut_reset_clicked, dialog, script_key)
-
-        button_box.append(cancel_button)
-        button_box.append(reset_button)
-
-        content_box.append(button_box)
-        dialog.set_child(content_box)
-        dialog.present(self.window)
-
-    def on_reset_shortcut_cancel_clicked(self, button, dialog):
-        print("Reset canceled")
-        dialog.close()
-    
-    def on_reset_shortcut_reset_clicked(self, button, dialog, script_key):
-        # Proceed with resetting the shortcut
-        script_data = self.script_list.get(script_key)
-        if script_data:
-            script = script_data['script_path']
-            self.reset_shortcut(script, script_key)
+    def on_reset_shortcut_confirmation_response(self, dialog, response_id, script_key):
+        if response_id == "reset":
+            # Proceed with resetting the shortcut
+            script_data = self.script_list.get(script_key)
+            if script_data:
+                script = script_data['script_path']
+                self.reset_shortcut(script, script_key)
+            else:
+                print(f"Error: Script key {script_key} not found in script_list.")
         else:
-            print(f"Error: Script key {script_key} not found in script_list.")
+            print("Reset canceled")
 
         # Close the dialog
         dialog.close()
@@ -4628,22 +4586,15 @@ class WineCharmApp(Gtk.Application):
                         # Show confirmation dialog for overwriting
                         GLib.idle_add(self.show_import_wine_directory_overwrite_confirmation_dialog, directory, dest_dir)
                     else:
-                        # Clear the flowbox for non-existing directories
-                        GLib.idle_add(self.flowbox.remove_all)
-                        
                         # Proceed with copying if the directory doesn't exist
                         threading.Thread(target=self.import_wine_directory, args=(directory, dest_dir)).start()
                 else:
                     print(f"Invalid directory selected: {directory}")
                     GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
-        
+
         except GLib.Error as e:
             # Handle any errors that occurred during folder selection
             print(f"An error occurred: {e}")
-        finally:
-            print("renaming and merging other user directories")
-            self.remove_symlinks_and_create_directories(dest_dir)
-            self.rename_and_merge_user_directories(dest_dir)
 
         print("FileDialog operation complete.")
 
@@ -4687,23 +4638,22 @@ class WineCharmApp(Gtk.Application):
         """
         Show a confirmation dialog asking the user whether to overwrite the existing directory.
         """
-        # Don't clear the flowbox here — only clear it after the user selects "Overwrite"
         dialog = Adw.MessageDialog(
             modal=True,
             transient_for=self.window,
-            title="Overwrite Existing Directory?",
+            heading="Overwrite Existing Directory?",
             body=f"The directory {dest_dir.name} already exists. Do you want to overwrite it?"
         )
-        
+
         # Add overwrite and cancel buttons
         dialog.add_response("overwrite", "Overwrite")
         dialog.set_response_appearance("overwrite", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.add_response("cancel", "Cancel")
         dialog.set_default_response("cancel")
-        
+
         # Connect the dialog response to the overwrite handler
         dialog.connect("response", self.on_import_wine_directory_overwrite_response, src, dest_dir)
-        
+
         # Show the dialog
         dialog.present()
 
@@ -4738,6 +4688,9 @@ class WineCharmApp(Gtk.Application):
         """
         Import the Wine directory in steps: copy the directory, process registry files, and create scripts for executables.
         """
+        # Clear the flowbox and initialize the steps UI
+        GLib.idle_add(self.flowbox.remove_all)
+
         steps = [
             ("Copying Wine directory", lambda: self.custom_copytree(src, dst)),
             ("Processing registry files", lambda: self.process_reg_files(dst)),
@@ -4752,13 +4705,13 @@ class WineCharmApp(Gtk.Application):
                     GLib.idle_add(self.mark_step_as_done, step_text)
                 except Exception as e:
                     print(f"Error during step '{step_text}': {e}")
+                    GLib.idle_add(self.show_info_dialog, "Error", f"An error occurred during '{step_text}': {e}")
                     break
-            
+
             # Re-enable UI elements and restore the script list after the import process
             GLib.idle_add(self.on_import_wine_directory_completed)
 
         threading.Thread(target=perform_import_steps).start()
-
 
 
 
@@ -5431,7 +5384,18 @@ class WineCharmApp(Gtk.Application):
         print(exe_path)
         print(exe_file)
         print(exe_name)
-        
+
+        # Check if exe_file already exists inside the wineprefix
+        existing_game_dir = wineprefix / "drive_c"
+        existing_exe_files = list(existing_game_dir.rglob(exe_name))
+
+        if existing_exe_files:
+            self.show_info_dialog(
+                "Game Directory Already Exists",
+                f"The game directory for '{exe_name}' is already in the Wine prefix. No action is needed."
+)
+            return
+
         # Check if the game directory is in DO_NOT_BUNDLE_FROM directories
         if str(exe_path) in self.get_do_not_bundle_directories():
             msg1 = "Cannot copy the selected game directory"
@@ -5445,22 +5409,16 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Proceed with copying if conditions are met
+        # Step 1: Disconnect the UI elements and initialize the spinner
+        self.on_back_button_clicked(None)
+        self.disconnect_open_button()
         self.show_processing_spinner(f"Importing {exe_path.name}")
 
         # Copy the game directory in a new thread and update script_path
-        threading.Thread(target=self.copy_game_directory, args=(exe_path, exe_name, game_dir, script_path)).start()
+        threading.Thread(target=self.copy_game_directory, args=(exe_path, exe_name, game_dir, script_path, script_key)).start()
 
-    def has_enough_disk_space(self, source, destination):
-        # Get the size of the source directory
-        source_size = sum(f.stat().st_size for f in source.glob('**/*') if f.is_file())
 
-        # Get the available free space in the destination directory
-        destination_free_space = shutil.disk_usage(destination).free
-
-        # Check if destination has enough space for the source
-        return destination_free_space > source_size
-
-    def copy_game_directory(self, src, exe_name, dst, script_path):
+    def copy_game_directory(self, src, exe_name, dst, script_path, script_key):
         dst_path = dst / src.name
 
         # Create the destination directory if it doesn't exist
@@ -5489,11 +5447,28 @@ class WineCharmApp(Gtk.Application):
                     print(f"Error during step '{step_text}': {e}")
                     break
 
-            GLib.idle_add(self.on_import_wine_directory_completed)
+            GLib.idle_add(self.on_import_game_directory_completed, script_key)
 
         threading.Thread(target=perform_import_steps).start()
 
+    def on_import_game_directory_completed(self, script_key):
+        """
+        Called when the import process is complete. Updates UI, restores scripts, and resets the open button.
+        """
+        # Reconnect open button and reset its label
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)
+        self.reconnect_open_button()
+        self.hide_processing_spinner()
 
+        for key, data in self.script_ui_data.items():
+            row_button = data['row']
+            row_play_button = data['play_button']
+            row_options_button = data['options_button']
+        self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
+
+
+        print("Game directory import completed.")
 
     def update_script_path(self, script_path, new_exe_file):
         """
@@ -5541,18 +5516,7 @@ class WineCharmApp(Gtk.Application):
 
 
 
-###########
-
-
-
-
-
-
-
-
-
-
-
+########### 
 
 
 
@@ -5686,7 +5650,7 @@ def main():
             # If no instance is running, start WineCharmApp and show the error dialog directly
             if not app.SOCKET_FILE.exists():
                 app.start_socket_server()
-                GLib.timeout_add_seconds(1.5, app.show_info_dialog, "Invalid File Type", f"Only .exe, .msi, or .charm files are allowed.\nYou provided: {file_extension}")
+                GLib.timeout_add_seconds(1.5, app.show_info_dialog, "Invalid File Type", f"Only .exe, .msi, or .charm files are allowed. You provided: {file_extension}")
                 app.run(sys.argv)
 
                 # Clean up the socket file
