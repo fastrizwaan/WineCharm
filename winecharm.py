@@ -3331,10 +3331,10 @@ class WineCharmApp(Gtk.Application):
             subprocess.Popen(command)
         except Exception as e:
             print(f"Error opening file manager: {e}")
-            
+                
     def show_delete_wineprefix_confirmation(self, script, button):
         """
-        Show an Adw.MessageDialog to confirm the deletion of the Wine prefix.
+        Show an Adw.Dialog to confirm the deletion of the Wine prefix.
         
         Args:
             script: The script that contains information about the Wine prefix.
@@ -3345,83 +3345,122 @@ class WineCharmApp(Gtk.Application):
         # Get all charm files associated with the wineprefix
         charm_files = list(wineprefix.rglob("*.charm"))
 
-        # Create a confirmation dialog
-        dialog = Adw.MessageDialog(
-            modal=True,
-            transient_for=self.window,  # Assuming self.window is the main application window
-            title="Delete Wine Prefix",
-            body=f"Deleting {wineprefix.name} will remove:"
-        )
+        # Create the dialog
+        dialog = Adw.Dialog(title="Delete Wine Prefix")
 
-        # Create a vertical box to hold the program list (without checkboxes)
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        # Create a vertical box for the dialog content
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content_box.set_margin_start(20)
+        content_box.set_margin_end(20)
+        content_box.set_margin_top(20)
+        content_box.set_margin_bottom(20)
+
+        # Add a label with the message
+        message_label = Gtk.Label(label=f"Deleting '{wineprefix.name}' will remove:")
+        message_label.set_xalign(0)  # Align text to the left
+        content_box.append(message_label)
+
+        # Create a box to hold the list of programs
+        program_list_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
 
         if not charm_files:
             # No charm files found, display a message
             no_programs_label = Gtk.Label(label="No programs found in this Wine prefix.")
-            vbox.append(no_programs_label)
+            no_programs_label.set_xalign(0)
+            program_list_box.append(no_programs_label)
         else:
             # Add each charm file's icon and program name to the dialog
             for charm_file in charm_files:
-                # Create an icon + label widget (reusing the function for consistency)
+                # Create an icon + label widget (assuming self.create_icon_title_widget)
                 icon_title_widget = self.create_icon_title_widget(charm_file)
-                vbox.append(icon_title_widget)
+                program_list_box.append(icon_title_widget)
 
-        # Add the program list to the dialog
-        dialog.set_extra_child(vbox)
+        # Add the program list to the content box
+        content_box.append(program_list_box)
 
-        # Add the "Delete" and "Cancel" buttons
-        dialog.add_response("delete", "Delete")
-        dialog.set_response_appearance("delete", Adw.ResponseAppearance.DESTRUCTIVE)
-        dialog.add_response("cancel", "Cancel")
-        dialog.set_default_response("cancel")
+        # Create a separator
+        separator = Gtk.Separator(orientation=Gtk.Orientation.HORIZONTAL)
+        separator.set_margin_top(12)
+        content_box.append(separator)
 
-        # Show the dialog and connect the response signal
-        dialog.connect("response", self.on_delete_wineprefix_confirmation_response, wineprefix)
+        # Create a horizontal box for the buttons
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        button_box.set_halign(Gtk.Align.END)
+        button_box.set_margin_top(12)
 
-        # Present the dialog (use present instead of show to avoid deprecation warning)
-        dialog.present()
+        # Create the "Cancel" button
+        cancel_button = Gtk.Button(label="Cancel")
+        cancel_button.connect("clicked", self.on_delete_wineprefix_cancel_clicked, dialog)
+
+        # Create the "Delete" button
+        delete_button = Gtk.Button(label="Delete")
+        delete_button.add_css_class("destructive-action")  # Updated method
+        delete_button.connect("clicked", self.on_delete_wineprefix_delete_clicked, dialog, wineprefix)
+
+        # Add buttons to the button box
+        button_box.append(cancel_button)
+        button_box.append(delete_button)
+
+        # Add the button box to the content box
+        content_box.append(button_box)
+
+        # Set the dialog's child
+        dialog.set_child(content_box)
+
+        # Present the dialog with the parent window specified
+        dialog.present(self.window)
 
 
-    def on_delete_wineprefix_confirmation_response(self, dialog, response_id, wineprefix):
+
+
+    def on_delete_wineprefix_cancel_clicked(self, button, dialog):
         """
-        Handle the response from the delete Wine prefix confirmation dialog.
+        Handle the Cancel button click in the delete confirmation dialog.
         
         Args:
-            dialog: The Adw.MessageDialog instance.
-            response_id: The ID of the response clicked by the user.
-            wineprefix: The path to the Wine prefix that is potentially going to be deleted.
+            button: The button that was clicked.
+            dialog: The Adw.Dialog instance.
         """
-        if response_id == "delete":
-            # Get all script_keys associated with the wineprefix
-            script_keys = self.get_script_keys_from_wineprefix(wineprefix)
+        print("Deletion canceled")
+        dialog.close()
 
-            if not script_keys:
-                print(f"No scripts found for Wine prefix: {wineprefix}")
-                return
+    def on_delete_wineprefix_delete_clicked(self, button, dialog, wineprefix):
+        """
+        Handle the Delete button click in the delete confirmation dialog.
+        
+        Args:
+            button: The button that was clicked.
+            dialog: The Adw.Dialog instance.
+            wineprefix: The path to the Wine prefix that is going to be deleted.
+        """
+        # Get all script_keys associated with the wineprefix
+        script_keys = self.get_script_keys_from_wineprefix(wineprefix)
 
-            # Perform the deletion of the Wine prefix
-            try:
-                if wineprefix.exists() and wineprefix.is_dir():
-                    shutil.rmtree(wineprefix)
-                    print(f"Deleted Wine prefix: {wineprefix}")
-                    
-                    # Remove all script_keys associated with this Wine prefix from script_list
-                    for script_key in script_keys:
-                        if script_key in self.script_list:
-                            del self.script_list[script_key]
-                            print(f"Removed script {script_key} from script_list")
-                        else:
-                            print(f"Script {script_key} not found in script_list for Wine prefix: {wineprefix}")
+        if not script_keys:
+            print(f"No scripts found for Wine prefix: {wineprefix}")
+            dialog.close()
+            return
 
-                    # Trigger the back button to return to the previous view
-                    self.on_back_button_clicked(None)
-                else:
-                    print(f"Wine prefix does not exist: {wineprefix}")
-            except Exception as e:
-                print(f"Error deleting Wine prefix: {e}")
-        else:
-            print("Deletion canceled")
+        # Perform the deletion of the Wine prefix
+        try:
+            if wineprefix.exists() and wineprefix.is_dir():
+                shutil.rmtree(wineprefix)
+                print(f"Deleted Wine prefix: {wineprefix}")
+                
+                # Remove all script_keys associated with this Wine prefix from script_list
+                for script_key in script_keys:
+                    if script_key in self.script_list:
+                        del self.script_list[script_key]
+                        print(f"Removed script {script_key} from script_list")
+                    else:
+                        print(f"Script {script_key} not found in script_list for Wine prefix: {wineprefix}")
+
+                # Trigger the back button to return to the previous view
+                self.on_back_button_clicked(None)
+            else:
+                print(f"Wine prefix does not exist: {wineprefix}")
+        except Exception as e:
+            print(f"Error deleting Wine prefix: {e}")
 
         # Close the dialog
         dialog.close()
