@@ -4016,38 +4016,51 @@ class WineCharmApp(Gtk.Application):
         if script_data:
             exe_file = Path(script_data.get('exe_file'))
 
-        # Create a confirmation dialog
-        dialog = Adw.MessageDialog(
-            modal=True,
-            transient_for=self.window,  # Assuming self.window is the main application window
-            title="Reset Shortcut",
-            body=f"This will reset all changes and recreate the shortcut for {exe_file.name}. Do you want to proceed?"
+        dialog = Adw.Dialog(title="Reset Shortcut")
+
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content_box.set_margin_top(20)
+        content_box.set_margin_bottom(20)
+        content_box.set_margin_start(20)
+        content_box.set_margin_end(20)
+
+        label = Gtk.Label(
+            label=f"Reset and recreate the shortcut for {exe_file.name}?"
         )
-        
-        # Add the "Reset" and "Cancel" buttons
-        dialog.add_response("reset", "Reset")
-        dialog.set_response_appearance("reset", Adw.ResponseAppearance.DESTRUCTIVE)
-        dialog.add_response("cancel", "Cancel")
-        dialog.set_default_response("cancel")
-        
-        # Show the dialog and connect the response signal to handle the reset
-        dialog.connect("response", self.on_reset_shortcut_confirmation_response, script_key)
+        label.set_wrap(True)
+        label.set_xalign(0)
+        content_box.append(label)
 
-        # Present the dialog
-        dialog.present()
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        button_box.set_margin_top(20)
+        button_box.set_halign(Gtk.Align.END)
 
+        cancel_button = Gtk.Button(label="Cancel")
+        cancel_button.connect("clicked", self.on_reset_shortcut_cancel_clicked, dialog)
 
-    def on_reset_shortcut_confirmation_response(self, dialog, response_id, script_key):
-        if response_id == "reset":
-            # Proceed with resetting the shortcut
-            script_data = self.script_list.get(script_key)
-            if script_data:
-                script = script_data['script_path']
-                self.reset_shortcut(script, script_key)
-            else:
-                print(f"Error: Script key {script_key} not found in script_list.")
+        reset_button = Gtk.Button(label="Reset")
+        reset_button.add_css_class("destructive-action")
+        reset_button.connect("clicked", self.on_reset_shortcut_reset_clicked, dialog, script_key)
+
+        button_box.append(cancel_button)
+        button_box.append(reset_button)
+
+        content_box.append(button_box)
+        dialog.set_child(content_box)
+        dialog.present(self.window)
+
+    def on_reset_shortcut_cancel_clicked(self, button, dialog):
+        print("Reset canceled")
+        dialog.close()
+    
+    def on_reset_shortcut_reset_clicked(self, button, dialog, script_key):
+        # Proceed with resetting the shortcut
+        script_data = self.script_list.get(script_key)
+        if script_data:
+            script = script_data['script_path']
+            self.reset_shortcut(script, script_key)
         else:
-            print("Reset canceled")
+            print(f"Error: Script key {script_key} not found in script_list.")
 
         # Close the dialog
         dialog.close()
