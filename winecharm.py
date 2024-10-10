@@ -3169,7 +3169,15 @@ class WineCharmApp(Gtk.Application):
             ("Reset Shortcut", "view-refresh-symbolic", self.reset_shortcut_confirmation),
             ("Add Desktop Shortcut", "user-bookmarks-symbolic", self.add_desktop_shortcut),
             ("Remove Desktop Shortcut", "action-unavailable-symbolic", self.remove_desktop_shortcut),
-            ("Import Game Directory", "folder-download-symbolic", self.import_game_directory)
+            ("Import Game Directory", "folder-download-symbolic", self.import_game_directory),
+            ("Run Other Exe", "system-run-symbolic", self.run_other_exe),
+            ("Set Environment Variables", "preferences-system-symbolic", self.set_environment_variables),
+            ("Change Runner", "preferences-desktop-apps-symbolic", self.change_runner),
+            ("Rename Prefix Directory", "folder-rename-symbolic", self.rename_prefix_directory),
+            ("Set Wine Arch", "preferences-system-symbolic", self.set_wine_arch),
+            ("Wine Config (winecfg)", "preferences-system-symbolic", self.wine_config),
+            ("Wine Registry Editor (regedit)", "applications-accessories-symbolic", self.wine_registry_editor)
+
         ]
 
         for label, icon_name, callback in options:
@@ -5518,6 +5526,202 @@ class WineCharmApp(Gtk.Application):
 
 
 ########### 
+    def run_other_exe(self, script, script_key, *args):
+        """
+        Open a file dialog to allow the user to select an EXE or MSI file and run it.
+        """
+        file_dialog = Gtk.FileDialog.new()
+        file_filter = self.create_file_filter()  # Use the same filter for EXE/MSI
+        filter_model = Gio.ListStore.new(Gtk.FileFilter)
+        filter_model.append(file_filter)
+        file_dialog.set_filters(filter_model)
+
+        # Open the file dialog and pass the selected file to on_run_other_exe_response
+        file_dialog.open(self.window, None, lambda dlg, res: self.on_run_other_exe_response(dlg, res, script, script_key))
+
+    def on_run_other_exe_response(self, dialog, result, script, script_key):
+        script_data = self.script_list.get(script_key)
+        if not script_data:
+            return None
+        
+        unique_id = str(uuid.uuid4())
+        env = os.environ.copy()
+        env['WINECHARM_UNIQUE_ID'] = unique_id
+        
+        exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
+        script = Path(script_data.get('script_path', '')).expanduser().resolve()
+        progname = script_data.get('progname', '')
+        script_args = script_data.get('args', '')
+        script_key = script_data.get('sha256sum', script_key)
+        env_vars = script_data.get('env_vars', '')
+        wine_debug = script_data.get('wine_debug', '')
+        exe_name = Path(exe_file).name
+        wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
+        #print("*"*100)
+        #print(wineprefix)
+        runner = script_data.get('runner', 'wine')
+        if runner:
+            runner = Path(runner).expanduser().resolve()
+            runner_dir = str(runner.parent.expanduser().resolve())
+            path_env = f'export PATH="{runner_dir}:$PATH"'
+        else:
+            runner = "wine"
+            runner_dir = ""  # Or set a specific default if required
+            path_env = ""
+            
+        try:
+            file = dialog.open_finish(result)
+            if file:
+                exe_path = Path(file.get_path()).expanduser().resolve()
+                exe_parent = shlex.quote(str(exe_path.parent.resolve())) 
+                runner = shlex.quote(str(runner))
+                runner_dir = shlex.quote(str(runner_dir))
+                exe_name = Path(exe_path).name
+                exe_name = shlex.quote(str(exe_name))
+                
+                # Get wineprefix and other environment settings from the script data
+                script_data = self.script_list.get(script_key)
+
+                # Formulate the command to run the selected executable
+                # Command to launch
+                if path_env:
+                    command = (f"{path_env}; cd {exe_parent} && "
+                               f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} "
+                               f"{runner} {exe_name} {script_args}" )
+                else:
+                    command = (f"cd {exe_parent} && "
+                               f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} "
+                               f"{runner} {exe_name} {script_args}" )
+
+                print(f"Running command: {command}")
+
+                if self.debug:
+                    print(f"Running command: {command}")
+
+                # Execute the command
+                subprocess.Popen(command, shell=True)
+                print(f"Running {exe_path} from Wine prefix {wineprefix}")
+
+        except Exception as e:
+            print(f"Error running EXE: {e}")
+
+    def set_environment_variables(self, script, script_key, *args):
+        """
+        Show a dialog to allow the user to set environment variables for a script.
+        Ensures that the variables follow the 'X=Y' pattern, where X is a valid
+        variable name and Y is its value.
+        """
+        # Retrieve script data
+        script_data = self.script_list.get(script_key)
+        if not script_data:
+            print(f"Error: Script key {script_key} not found in script_list.")
+            return
+
+        # Get current environment variables or set default
+        current_env_vars = script_data.get('env_vars', '')
+
+        # Create a dialog for editing environment variables
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,  # Assuming self.window is the main application window
+            title="Set Environment Variables",
+            body="Modify the environment variables for this script (X=Y;Z=W format):"
+        )
+
+        # Create an entry field and set the current environment variables
+        entry = Gtk.Entry()
+        entry.set_text(current_env_vars)
+
+        # Add the entry field to the dialog
+        dialog.set_extra_child(entry)
+
+        # Add "OK" and "Cancel" buttons
+        dialog.add_response("ok", "OK")
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+
+        # Connect the response signal to handle the user's input
+        dialog.connect("response", self.on_env_vars_dialog_response, entry, script_key)
+
+        # Present the dialog
+        dialog.present()
+
+
+    def on_env_vars_dialog_response(self, dialog, response_id, entry, script_key):
+        """
+        Handle the response from the environment variables dialog.
+        Ensure the variables follow the 'X=Y' format and are separated by semicolons.
+        """
+        if response_id == "ok":
+            # Get the new environment variables from the entry
+            new_env_vars = entry.get_text().strip()
+
+            # Validate the environment variables
+            if self.validate_environment_variables(new_env_vars):
+                # Update the script data
+                script_data = self.script_list.get(script_key)
+                script_data['env_vars'] = new_env_vars
+
+                # Write the updated data back to the YAML file
+                script_path = Path(script_data['script_path']).expanduser().resolve()
+                with open(script_path, 'w') as file:
+                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
+
+                print(f"Updated environment variables for {script_path}: {new_env_vars}")
+            else:
+                print(f"Invalid environment variables format: {new_env_vars}")
+                self.show_info_dialog("Invalid Environment Variables", "Please use the correct format: X=Y;Z=W.")
+
+        else:
+            print("Environment variable modification canceled")
+
+        # Close the dialog
+        dialog.close()
+
+
+    def validate_environment_variables(self, env_vars):
+        """
+        Validate the environment variables string to ensure it follows the 'X=Y' pattern.
+        Multiple variables should be separated by semicolons.
+        
+        Args:
+            env_vars (str): The string containing environment variables.
+
+        Returns:
+            bool: True if the variables are valid, False otherwise.
+        """
+        # Regular expression to match a valid environment variable (bash-compliant)
+        env_var_pattern = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*=[^;]+$')
+
+        # Split the variables by semicolons and validate each one
+        variables = env_vars.split(';')
+        for var in variables:
+            var = var.strip()  # Remove any leading/trailing whitespace
+            if not var or not env_var_pattern.match(var):
+                return False  # If any variable is invalid, return False
+
+        return True
+
+    def change_runner(self, script, script_key, *args):
+        print(f"Changing the runner for {script} with script_key {script_key}")
+        # Add functionality to change the Wine runner for the given script.
+
+    def rename_prefix_directory(self, script, script_key, *args):
+        print(f"Renaming Wine prefix directory for {script} with script_key {script_key}")
+        # Add functionality to rename the Wine prefix directory.
+
+    def set_wine_arch(self, script, script_key, *args):
+        print(f"Setting Wine architecture for {script} with script_key {script_key}")
+        # Add functionality to set Wine architecture (e.g., 32-bit or 64-bit).
+
+    def wine_config(self, script, script_key, *args):
+        print(f"Opening Wine Config for {script} with script_key {script_key}")
+        # Add functionality to launch Wine's winecfg.
+
+    def wine_registry_editor(self, script, script_key, *args):
+        print(f"Opening Wine Registry Editor for {script} with script_key {script_key}")
+        # Add functionality to launch Wine's regedit (Wine Registry Editor).
 
 
 
