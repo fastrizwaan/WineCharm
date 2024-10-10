@@ -3533,7 +3533,7 @@ class WineCharmApp(Gtk.Application):
 
         # Create a new dialog for selecting shortcuts
         dialog = Adw.Dialog(title="Delete Shortcuts")
-        dialog.present(self.window)
+
 
         # Create a vertical box for the dialog content
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -3601,7 +3601,8 @@ class WineCharmApp(Gtk.Application):
 
         # Set the dialog's child
         dialog.set_child(content_box)
-
+        dialog.present(self.window)
+        
     def on_delete_shortcuts_cancel_clicked(self, button, dialog):
         dialog.close()
 
@@ -3667,7 +3668,7 @@ class WineCharmApp(Gtk.Application):
         current_args = script_data.get('args')
 
         dialog = Adw.Dialog(title="Edit Wine Arguments")
-        dialog.present(self.window)
+
 
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         content_box.set_margin_top(20)
@@ -3706,7 +3707,8 @@ class WineCharmApp(Gtk.Application):
 
         content_box.append(button_box)
         dialog.set_child(content_box)
-
+        dialog.present(self.window)
+        
     def on_wine_arguments_cancel_clicked(self, button, dialog):
         print("Wine arguments modification canceled")
         dialog.close()
@@ -3733,153 +3735,143 @@ class WineCharmApp(Gtk.Application):
 
     def show_rename_shortcut_entry(self, script, script_key, *args):
         """
-        Show an Adw.MessageDialog to allow the user to rename a shortcut.
-
-        Args:
-            script_key: The sha256sum key for the script.
-            button: The button that triggered the rename request.
+        Show an Adw.Dialog to allow the user to rename a shortcut.
         """
-        # Retrieve script_data directly from self.script_list using the sha256sum as script_key
-        print(f"script_key = {script_key}")
-        print(f"self.script_list:\n{self.script_list}")
-        # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
-        if script_data:
-            script_path = Path(script_data['script_path']).expanduser().resolve()
-        else:
+        if not script_data:
             print(f"Error: Script key {script_key} not found in script_list.")
             return
 
-        # Get the current name of the shortcut
-        current_name = script_data.get('progname')
-        if not current_name:  # In case the current name is missing
-            current_name = "New Shortcut"
+        current_name = script_data.get('progname', "New Shortcut")
 
-        # Create an Adw.MessageDialog for renaming
-        dialog = Adw.MessageDialog(
-            modal=True,
-            transient_for=self.window,  # Assuming self.window is the main application window
-            title="Rename Shortcut",
-            body="Enter the new name for the shortcut:"
-        )
+        dialog = Adw.Dialog(title="Rename Shortcut")
 
-        # Create an entry field and set the current name
+
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content_box.set_margin_top(20)
+        content_box.set_margin_bottom(20)
+        content_box.set_margin_start(20)
+        content_box.set_margin_end(20)
+
+        label = Gtk.Label(label="Enter the new name for the shortcut:")
+        label.set_xalign(0)
+        content_box.append(label)
+
         entry = Gtk.Entry()
         entry.set_text(current_name)
+        content_box.append(entry)
 
-        # Add the entry field to the dialog
-        dialog.set_extra_child(entry)
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        button_box.set_margin_top(20)
+        button_box.set_halign(Gtk.Align.END)
 
-        # Add "OK" and "Cancel" buttons
-        dialog.add_response("ok", "OK")
-        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
-        dialog.add_response("cancel", "Cancel")
-        dialog.set_default_response("cancel")
+        cancel_button = Gtk.Button(label="Cancel")
+        cancel_button.connect("clicked", self.on_rename_shortcut_cancel_clicked, dialog)
 
-        # Connect the response signal to handle the user's input
-        dialog.connect("response", self.on_show_rename_shortcut_dialog_response, entry, script_key)
+        ok_button = Gtk.Button(label="OK")
+        ok_button.add_css_class("suggested-action")
+#        ok_button.connect("clicked", self.on_rename_shortcut_ok_clicked, dialog, entry, script_key)
+        ok_button.connect("clicked", lambda btn: self.on_rename_shortcut_ok_clicked(dialog, entry, script_key))
 
-        # Present the dialog
-        dialog.present()
+        button_box.append(cancel_button)
+        button_box.append(ok_button)
 
-    def on_show_rename_shortcut_dialog_response(self, dialog, response_id, entry, script_key):
-        """
-        Handle the response from the Rename Shortcut dialog.
+        content_box.append(button_box)
+        dialog.set_child(content_box)
+        dialog.present(self.window)
+        
+    def on_rename_shortcut_cancel_clicked(self, button, dialog):
+        print("Shortcut rename canceled")
+        dialog.close()
 
-        Args:
-            dialog: The Adw.MessageDialog instance.
-            response_id: The ID of the response clicked by the user.
-            entry: The Gtk.Entry widget where the user entered the new shortcut name.
-            script_key: The key for the script in the script_list.
-        """
-        if response_id == "ok":
-            # Get the new shortcut name from the entry
-            new_name = entry.get_text().strip()
+    def on_rename_shortcut_ok_clicked(self, dialog, entry, script_key):
 
-            # Update the script data in both the YAML file and self.script_list
-            try:
-                # Update the in-memory script data
-                script_data = self.extract_yaml_info(script_key)
-                old_progname = script_data.get('progname', '')
 
-                # Update the in-memory representation
-                script_data['progname'] = new_name
+        # Get the new shortcut name from the entry
+        new_name = entry.get_text().strip()
 
-                # Get the script path from the script info
-                script_path = Path(script_data['script_path']).expanduser().resolve()
+        # Update the script data in both the YAML file and self.script_list
+        try:
+            # Update the in-memory script data
+            script_data = self.extract_yaml_info(script_key)
+            old_progname = script_data.get('progname', '')
 
-                print("*"*100)
-                print("writing script_path = {script_path}")
+            # Update the in-memory representation
+            script_data['progname'] = new_name
 
-                # Rename the .charm file and associated icon
-                new_script_path = self.rename_script_and_icon(script_path, old_progname, new_name)
+            # Get the script path from the script info
+            script_path = Path(script_data['script_path']).expanduser().resolve()
+
+            print("*"*100)
+            print("writing script_path = {script_path}")
+
+            # Rename the .charm file and associated icon
+            new_script_path = self.rename_script_and_icon(script_path, old_progname, new_name)
+            
+            # Write the updated info back to the YAML file
+            with open(new_script_path, 'w') as file:
+                script_data['script_path'] = str(new_script_path).replace(str(Path.home()), "~")
+                yaml.dump(script_data, file, default_flow_style=False, width=1000)
                 
-                # Write the updated info back to the YAML file
-                with open(new_script_path, 'w') as file:
-                    script_data['script_path'] = str(new_script_path).replace(str(Path.home()), "~")
-                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
-                    
-                # Ensure that script_data still contains the same sha256sum
-                existing_sha256sum = script_data.get('sha256sum')
+            # Ensure that script_data still contains the same sha256sum
+            existing_sha256sum = script_data.get('sha256sum')
 
-                # Extract icon and create desktop entry
-                exe_file = Path(script_data['exe_file'])  # Assuming exe_file exists in script_data
-                icon_path = new_script_path.with_suffix(".png")  # Correct the icon path generation
+            # Extract icon and create desktop entry
+            exe_file = Path(script_data['exe_file'])  # Assuming exe_file exists in script_data
+            icon_path = new_script_path.with_suffix(".png")  # Correct the icon path generation
+            print("#" * 100)
+            print(icon_path)
+
+            # Remove the old script_key and update script data with the new path
+            if script_key in self.script_list:
+                # Load the script data first
+                script_data = self.script_list[script_key]
+                #print(script_data['script_path'])
+                
+                # Update the script path with the new script path
+                script_data['script_path'] = str(new_script_path)
+                script_data['mtime'] = new_script_path.stat().st_mtime
+                print(script_data['script_path'])
+
+
+
+                # Update the script_list with the updated script_data
+                self.script_list[script_key] = script_data
+
+                # Update the UI row for the renamed script
+                row = self.create_script_row(script_key, script_data)
+                if row:
+                    self.flowbox.prepend(row)
+
+                print(f"Removed old script_key {script_key} from script_list")
+
+            if script_key in self.script_ui_data:
+                # Update the script_path for the given script_key
+                self.script_ui_data[script_key]['script_path'] = str(new_script_path)
+                print(f"Updated script_path for {script_key} to {new_script_path}")
+            else:
+                print(f"Error: script_key {script_key} not found in script_data_two")   
                 print("#" * 100)
-                print(icon_path)
-
-                # Remove the old script_key and update script data with the new path
-                if script_key in self.script_list:
-                    # Load the script data first
-                    script_data = self.script_list[script_key]
-                    #print(script_data['script_path'])
-                    
-                    # Update the script path with the new script path
-                    script_data['script_path'] = str(new_script_path)
-                    script_data['mtime'] = new_script_path.stat().st_mtime
-                    print(script_data['script_path'])
-
-
-
-                    # Update the script_list with the updated script_data
-                    self.script_list[script_key] = script_data
-
-                    # Update the UI row for the renamed script
-                    row = self.create_script_row(script_key, script_data)
-                    if row:
-                        self.flowbox.prepend(row)
-
-                    print(f"Removed old script_key {script_key} from script_list")
-
-                if script_key in self.script_ui_data:
-                    # Update the script_path for the given script_key
-                    self.script_ui_data[script_key]['script_path'] = str(new_script_path)
-                    print(f"Updated script_path for {script_key} to {new_script_path}")
-                else:
-                    print(f"Error: script_key {script_key} not found in script_data_two")   
-                    print("#" * 100)
-                    
-                # Add the updated script data to self.script_list using the existing sha256sum
-                self.script_list[existing_sha256sum] = script_data
                 
-                row = self.create_script_row(existing_sha256sum, script_data)
-                
-                # Mark the script as new and update the UI
-                self.new_scripts.add(new_script_path.stem)
+            # Add the updated script data to self.script_list using the existing sha256sum
+            self.script_list[existing_sha256sum] = script_data
+            
+            row = self.create_script_row(existing_sha256sum, script_data)
+            
+            # Mark the script as new and update the UI
+            self.new_scripts.add(new_script_path.stem)
 
-                # Add or update script row in UI
-                self.script_list = {existing_sha256sum: script_data, **self.script_list}
+            # Add or update script row in UI
+            self.script_list = {existing_sha256sum: script_data, **self.script_list}
 
-                # Refresh the UI to load the renamed script
-                # self.create_script_list()
+            # Refresh the UI to load the renamed script
+            # self.create_script_list()
 
-                print(f"Renamed and loaded script: {new_script_path}")
+            print(f"Renamed and loaded script: {new_script_path}")
 
-            except Exception as e:
-                print(f"Error updating shortcut name for {script_key}: {e}")
+        except Exception as e:
+            print(f"Error updating shortcut name for {script_key}: {e}")
 
-        else:
-            print("Shortcut rename canceled")
 
         # Close the dialog
         dialog.close()
