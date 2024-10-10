@@ -5279,8 +5279,8 @@ class WineCharmApp(Gtk.Application):
                 'tar', '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
                 '--transform', f"s|{current_username}|%USERNAME%|g",  # Rename directory
                 '-cf', backup_path,
-                '-C', str(users_dir.parent),  # Change directory to parent of 'users'
-                'users'  # Archive the 'users' directory
+                '-C', str(users_dir),  # Change directory to parent of 'users'
+                '.'  # Archive all directories in the 'users' directory
             ]
 
             print(f"Running backup command: {' '.join(tar_command)}")
@@ -5349,7 +5349,7 @@ class WineCharmApp(Gtk.Application):
                 'tar', '-I', 'zstd -d',  # Decompress with zstd
                 '-xf', backup_path,
                 '--transform', f"s|%USERNAME%|{current_username}|g",
-                '-C', str(wineprefix / "drive_c")  # Extract in the drive_c directory
+                '-C', str(wineprefix / "drive_c" / "users")  # Extract in the drive_c directory
             ]
             print(f"Running load command: {' '.join(tar_command)}")
             result = subprocess.run(tar_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
