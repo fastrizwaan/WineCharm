@@ -5716,13 +5716,116 @@ class WineCharmApp(Gtk.Application):
         # Add functionality to set Wine architecture (e.g., 32-bit or 64-bit).
 
     def wine_config(self, script, script_key, *args):
-        print(f"Opening Wine Config for {script} with script_key {script_key}")
-        # Add functionality to launch Wine's winecfg.
+        script_data = self.script_list.get(script_key)
+        if not script_data:
+            return None
+        
+        unique_id = str(uuid.uuid4())
+        env = os.environ.copy()
+        env['WINECHARM_UNIQUE_ID'] = unique_id
+        
+        exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
+        script = Path(script_data.get('script_path', '')).expanduser().resolve()
+        progname = script_data.get('progname', '')
+        script_args = script_data.get('args', '')
+        script_key = script_data.get('sha256sum', script_key)
+        env_vars = script_data.get('env_vars', '')
+        wine_debug = script_data.get('wine_debug', '')
+        exe_name = Path(exe_file).name
+        wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
+        #print("*"*100)
+        #print(wineprefix)
+        runner = script_data.get('runner', 'wine')
+        if runner:
+            runner = Path(runner).expanduser().resolve()
+            runner_dir = str(runner.parent.expanduser().resolve())
+            path_env = f'export PATH="{runner_dir}:$PATH"'
+        else:
+            runner = "wine"
+            runner_dir = ""  # Or set a specific default if required
+            path_env = ""
+            
+        try:
+                runner = shlex.quote(str(runner))
+                runner_dir = shlex.quote(str(runner_dir))
+                
+                # Get wineprefix and other environment settings from the script data
+                script_data = self.script_list.get(script_key)
+
+                # Formulate the command to run the selected executable
+                # Command to launch
+                if path_env:
+                    command = (f"{path_env}; WINEPREFIX={wineprefix} winecfg")
+                else:
+                    command = (f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} winecfg")
+
+                print(f"Running command: {command}")
+
+                if self.debug:
+                    print(f"Running command: {command}")
+
+                # Execute the command
+                subprocess.Popen(command, shell=True)
+                print(f"Running {exe_path} from Wine prefix {wineprefix}")
+
+        except Exception as e:
+            print(f"Error running EXE: {e}")
 
     def wine_registry_editor(self, script, script_key, *args):
-        print(f"Opening Wine Registry Editor for {script} with script_key {script_key}")
-        # Add functionality to launch Wine's regedit (Wine Registry Editor).
+        script_data = self.script_list.get(script_key)
+        if not script_data:
+            return None
+        
+        unique_id = str(uuid.uuid4())
+        env = os.environ.copy()
+        env['WINECHARM_UNIQUE_ID'] = unique_id
+        
+        exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
+        script = Path(script_data.get('script_path', '')).expanduser().resolve()
+        progname = script_data.get('progname', '')
+        script_args = script_data.get('args', '')
+        script_key = script_data.get('sha256sum', script_key)
+        env_vars = script_data.get('env_vars', '')
+        wine_debug = script_data.get('wine_debug', '')
+        exe_name = Path(exe_file).name
+        wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
+        #print("*"*100)
+        #print(wineprefix)
+        runner = script_data.get('runner', 'wine')
+        if runner:
+            runner = Path(runner).expanduser().resolve()
+            runner_dir = str(runner.parent.expanduser().resolve())
+            path_env = f'export PATH="{runner_dir}:$PATH"'
+        else:
+            runner = "wine"
+            runner_dir = ""  # Or set a specific default if required
+            path_env = ""
+            
+        try:
+                runner = shlex.quote(str(runner))
+                runner_dir = shlex.quote(str(runner_dir))
+                
+                # Get wineprefix and other environment settings from the script data
+                script_data = self.script_list.get(script_key)
 
+                # Formulate the command to run the selected executable
+                # Command to launch
+                if path_env:
+                    command = (f"{path_env}; WINEPREFIX={wineprefix} regedit")
+                else:
+                    command = (f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} regedit")
+
+                print(f"Running command: {command}")
+
+                if self.debug:
+                    print(f"Running command: {command}")
+
+                # Execute the command
+                subprocess.Popen(command, shell=True)
+                print(f"Running {exe_path} from Wine prefix {wineprefix}")
+
+        except Exception as e:
+            print(f"Error running EXE: {e}")
 
 
 
