@@ -2211,25 +2211,49 @@ class WineCharmApp(Gtk.Application):
             print(f"Cannot show dialog: window is not available.")
             return
 
-        # Create an instance of AdwAlertDialog
-        dialog = Adw.AlertDialog()
-        
-        # Set the title and message for the alert dialog
-        dialog.set_heading(title)
-        dialog.set_body(message)
-
-        # Add an "OK" button as a response
-        dialog.add_response("ok", "OK")
-
-        # Set the default response and close response to "ok"
-        dialog.set_default_response("ok")
-        dialog.set_close_response("ok")
-
-        # Connect the response signal to destroy the dialog
-        dialog.connect("response", lambda d, r: d.destroy())
-
-        # Present the dialog attached to the parent window
+        # Create an instance of Adw.Dialog
+        dialog = Adw.Dialog()
         dialog.present(self.window)
+
+        # Create a content box for the dialog
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        content_box.set_margin_top(20)
+        content_box.set_margin_bottom(20)
+        content_box.set_margin_start(20)
+        content_box.set_margin_end(20)
+
+        # Add a label for the title
+        title_label = Gtk.Label()
+        title_label.set_markup(f"<b>{title}</b>")  # Make the text bold
+        title_label.set_margin_bottom(10)
+        title_label.set_halign(Gtk.Align.CENTER)   # Center the title horizontally
+        content_box.append(title_label)
+
+        # Add a label for the message
+        message_label = Gtk.Label(label=message)
+        #message_label.set_wrap(True)
+        message_label.set_xalign(0)  # Align text to the left
+        content_box.append(message_label)
+
+        # Create a button box
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        button_box.set_margin_top(20)
+        button_box.set_halign(Gtk.Align.END)
+
+        # Create an "OK" button
+        ok_button = Gtk.Button(label="OK")
+        ok_button.add_css_class("suggested-action")
+        ok_button.connect("clicked", lambda btn: dialog.close())
+
+        # Add the button to the button box
+        button_box.append(ok_button)
+
+        # Add the button box to the content box
+        content_box.append(button_box)
+
+        # Set the content box as the dialog's child
+        dialog.set_child(content_box)
+
         
     def create_backup_archive(self, wineprefix, backup_path):
         # Get the current username from the environment
@@ -5688,7 +5712,7 @@ def main():
             # If no instance is running, start WineCharmApp and show the error dialog directly
             if not app.SOCKET_FILE.exists():
                 app.start_socket_server()
-                GLib.timeout_add_seconds(1.5, app.show_info_dialog, "Invalid File Type", f"Only .exe, .msi, or .charm files are allowed. You provided: {file_extension}")
+                GLib.timeout_add_seconds(1.5, app.show_info_dialog, "Invalid File Type", f"Only .exe, .msi, or .charm files are allowed.\nYou provided: {file_extension}")
                 app.run(sys.argv)
 
                 # Clean up the socket file
