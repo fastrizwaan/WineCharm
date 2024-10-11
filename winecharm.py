@@ -20,6 +20,8 @@ import psutil
 import inspect
 import argparse
 import uuid
+import urllib.request
+import json
 
 from datetime import datetime
 
@@ -5915,7 +5917,7 @@ class WineCharmApp(Gtk.Application):
         # Options list for settings
         options = [
             ("Runner Set Default", "preferences-desktop-apps-symbolic", self.set_default_runner),
-            ("Runner Download", "emblem-downloads-symbolic", self.download_runner),
+            ("Runner Download", "emblem-downloads-symbolic", self.on_settings_download_runner_clicked),
             ("Runner Import", "folder-download-symbolic", self.import_runner),
             ("Runner Backup", "document-save-symbolic", self.backup_runner),
             ("Runner Restore", "document-revert-symbolic", self.restore_runner),
@@ -5976,9 +5978,240 @@ class WineCharmApp(Gtk.Application):
         print("Setting the default runner...")
         # Add functionality to set the default runner.
 
-    def download_runner(self, button):
-        print("Downloading a new runner...")
-        # Add functionality to download a new runner.
+    def fetch_runner_urls(self):
+        """
+        Fetch the runner URLs dynamically from the GitHub API.
+        Categorize them into Proton, Stable, Devel, TKG, and WoW64 based on naming conventions.
+        """
+        url = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"
+
+        try:
+            # Fetch the response from the GitHub API
+            with urllib.request.urlopen(url) as response:
+                if response.status != 200:
+                    print(f"Failed to fetch runner URLs: {response.status}")
+                    return None
+
+                # Parse the response JSON
+                release_data = json.loads(response.read().decode('utf-8'))
+
+        except Exception as e:
+            print(f"Error fetching runner URLs: {e}")
+            return None
+
+        # Initialize categories
+        proton_files = []
+        stable_files = []
+        devel_files = []
+        tkg_files = []
+        wow64_files = []
+
+        # Filter out the URLs based on the naming conventions
+        for release in release_data:
+            for asset in release.get('assets', []):
+                download_url = asset.get('browser_download_url')
+                if download_url and download_url.endswith(".tar.xz"):
+                    # Use the correct URL directly from the API
+                    if "proton" in download_url:
+                        proton_files.append({
+                            "name": download_url.split('/')[-1].replace(".tar.xz", ""),
+                            "url": download_url
+                        })
+                    elif "wow64" in download_url:
+                        wow64_files.append({
+                            "name": download_url.split('/')[-1].replace(".tar.xz", ""),
+                            "url": download_url
+                        })
+                    elif "tkg" in download_url:
+                        tkg_files.append({
+                            "name": download_url.split('/')[-1].replace(".tar.xz", ""),
+                            "url": download_url
+                        })
+                    elif "staging" not in download_url:
+                        stable_files.append({
+                            "name": download_url.split('/')[-1].replace(".tar.xz", ""),
+                            "url": download_url
+                        })
+                    else:
+                        devel_files.append({
+                            "name": download_url.split('/')[-1].replace(".tar.xz", ""),
+                            "url": download_url
+                        })
+
+        return {
+            "proton": proton_files,
+            "stable": stable_files,
+            "devel": devel_files,
+            "tkg": tkg_files,
+            "wow64": wow64_files
+        }
+        
+    def on_settings_download_runner_clicked(self):
+        """
+        Handle the "Runner Download" option click.
+        Dynamically fetch the runners and show 5 dropdowns for Wine versions, allowing the user to download the selected runner.
+        """
+        # Fetch runners dynamically
+        runner_data = self.fetch_runner_urls()
+
+        if not runner_data:
+            self.show_info_dialog("Error", "Unable to fetch runner URLs. Please check your internet connection.")
+            return
+
+        # Get the active window to set as transient parent
+        active_window = self.get_active_window()
+        if not active_window:
+            print("No active window found. Using default parent.")
+            active_window = None  # Or set to a default window if necessary
+
+        # Create the dialog
+        dialog = Gtk.Dialog(title="Download Wine Runner", transient_for=active_window)
+        dialog.set_modal(True)
+        dialog.set_default_size(400, 300)
+
+        # Create a box for dialog content
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        content_box.set_margin_top(10)
+        content_box.set_margin_bottom(10)
+        content_box.set_margin_start(10)
+        content_box.set_margin_end(10)
+        dialog.set_child(content_box)
+
+        # Labels and ComboBoxes for different Wine categories
+        dropdown_data = [
+            ("Wine Proton", runner_data.get("proton", [])),
+            ("Wine Stable", runner_data.get("stable", [])),
+            ("Wine Devel", runner_data.get("devel", [])),
+            ("Wine-tkg", runner_data.get("tkg", [])),
+            ("Wine-WoW64", runner_data.get("wow64", []))
+        ]
+
+        # Create a dictionary to hold the comboboxes for easy access
+        combo_boxes = {}
+
+        for label_text, file_list in dropdown_data:
+            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+            label = Gtk.Label(label=label_text)
+            label.set_xalign(0)
+            label.set_width_chars(12)  # Set fixed width for label alignment
+            combo_box = Gtk.ComboBoxText()
+            combo_box.append_text("Choose...")  # Default "Choose..." option
+            for file in file_list:
+                combo_box.append_text(file['name'])  # Add the runner name to the combobox
+            combo_box.set_active(0)  # Set default to "Choose..."
+            combo_boxes[label_text] = {
+                "combo_box": combo_box, 
+                "file_list": file_list  # Keep track of the original data
+            }
+
+            # Add label and combobox to the horizontal box
+            hbox.append(label)
+            hbox.append(combo_box)
+
+            # Add the hbox to the content box
+            content_box.append(hbox)
+
+        # Create an hbox for the buttons
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        button_box.set_halign(Gtk.Align.END)
+
+        # Add "Cancel" and "Download" buttons
+        cancel_button = Gtk.Button(label="Cancel")
+        download_button = Gtk.Button(label="Download")
+
+        # Connect buttons to their actions
+        cancel_button.connect("clicked", lambda btn: dialog.response(Gtk.ResponseType.CANCEL))
+        download_button.connect("clicked", lambda btn: dialog.response(Gtk.ResponseType.OK))
+
+        button_box.append(cancel_button)
+        button_box.append(download_button)
+
+        # Add the button_box to the dialog's content_box
+        content_box.append(button_box)
+
+        # Present the dialog
+        dialog.present()
+
+        # Connect the response signal to handle the dialog's response
+        dialog.connect("response", self.on_download_runner_response, combo_boxes)
+
+    def on_download_runner_response(self, dialog, response_id, combo_boxes):
+        """
+        Handle the response from the download runner dialog.
+        Only download selected runners (not "Choose...").
+        """
+        if response_id == Gtk.ResponseType.OK:
+            # Extract selected runners from each combo box
+            selected_runners = {}
+            for label, data in combo_boxes.items():
+                combo_box = data['combo_box']
+                file_list = data['file_list']
+                selected_runner_name = combo_box.get_active_text()
+                if selected_runner_name != "Choose...":  # Only add valid selections
+                    # Find the corresponding runner data (name and url) for the selected runner
+                    selected_runner = next((runner for runner in file_list if runner['name'] == selected_runner_name), None)
+                    if selected_runner:
+                        selected_runners[label] = selected_runner
+
+            if selected_runners:
+                # Show a message indicating that the download is starting
+                self.show_info_dialog("Downloading...", "Please wait while the selected runners are downloaded.")
+
+                # Perform the downloads
+                try:
+                    for label, runner in selected_runners.items():
+                        self.download_and_extract_runner(runner['name'], runner['url'])
+                    self.show_info_dialog("Download Complete", "The runners have been successfully downloaded and extracted.")
+                except Exception as e:
+                    print(f"Error downloading or extracting runner: {e}")
+                    self.show_info_dialog("Download Error", f"Failed to download or extract runner: {e}")
+            else:
+                print("No runners selected for download")
+
+        else:
+            print("Runner download canceled")
+
+        # Close the dialog
+        dialog.close()
+
+
+    def download_and_extract_runner(self, runner_name, download_url):
+        """
+        Download and extract the selected runner.
+        Args:
+            runner_name: The name of the runner.
+            download_url: The full URL to download the runner.
+        """
+        runner_tar_path = self.runners_dir / f"{runner_name}.tar.xz"
+        runner_extract_path = self.runners_dir
+
+        # Ensure the runners directory exists
+        self.runners_dir.mkdir(parents=True, exist_ok=True)
+
+        # Download the file
+        import subprocess
+
+        try:
+            print(f"Downloading {runner_name} from {download_url}")
+            subprocess.run(["curl", "-L", "-o", str(runner_tar_path), download_url], check=True)
+            print(f"Download complete: {runner_tar_path}")
+
+            # Extract the .tar.xz file
+            print(f"Extracting {runner_tar_path} to {runner_extract_path}")
+            runner_extract_path.mkdir(exist_ok=True)
+            subprocess.run(["tar", "-xf", str(runner_tar_path), "-C", str(runner_extract_path)], check=True)
+            print(f"Extraction complete: {runner_extract_path}")
+
+            # Clean up the downloaded .tar.xz file if desired
+            runner_tar_path.unlink()
+            print(f"Removed downloaded archive: {runner_tar_path}")
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error downloading or extracting {runner_name}: {e}")
+            raise
+
+        print(f"Runner {runner_name} is ready in {runner_extract_path}")
+
 
     def import_runner(self, button):
         print("Importing a runner...")
