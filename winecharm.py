@@ -1388,7 +1388,9 @@ class WineCharmApp(Gtk.Application):
         self.check_running_processes_on_startup()
 
     def launch_script(self, script_key, play_stop_button, row):
-        script_data = self.script_list.get(script_key)
+        #script_data = self.script_list.get(script_key)
+        # Reload the script_data from the .charm file before launching
+        script_data = self.reload_script_data_from_charm(script_key)
         if not script_data:
             return None
         
@@ -1534,6 +1536,37 @@ class WineCharmApp(Gtk.Application):
 
         except Exception as e:
             print(f"Error launching script: {e}")
+
+    def reload_script_data_from_charm(self, script_key):
+        script_data = self.script_list.get(script_key)
+        if not script_data:
+            print(f"Error: Script with key {script_key} not found in script_list.")
+            return None
+
+        script_path = Path(script_data.get('script_path', '')).expanduser().resolve()
+
+        if not script_path.exists():
+            print(f"Error: Script path {script_path} does not exist.")
+            return None
+
+        try:
+            # Load the script data from the .charm file
+            with open(script_path, 'r') as f:
+                new_script_data = yaml.safe_load(f)
+
+            # Update the script_list with the new data
+            if isinstance(new_script_data, dict):
+                self.script_list[script_key] = new_script_data
+                print(f"Reloaded script data from {script_path}")
+                return new_script_data
+            else:
+                print(f"Error: Invalid data format in {script_path}")
+                return None
+
+        except Exception as e:
+            print(f"Error reloading script from {script_path}: {e}")
+            return None
+
             
     def monitor_process(self, script_key):
         process_info = self.running_processes.get(script_key)
