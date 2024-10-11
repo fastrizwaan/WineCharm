@@ -92,7 +92,7 @@ class WineCharmApp(Gtk.Application):
         self.script_buttons = {}
         self.current_clicked_row = None  # Initialize current clicked row
         self.hamburger_actions = [
-            ("🛠️ Settings...", self.on_settings_clicked),
+            ("🛠️ Settings...", self.show_options_for_settings),
             ("☠️ Kill all...", self.on_kill_all_clicked),
             ("🍾 Restore...", self.restore_from_backup),
             ("📂 Import Wine Directory", self.on_import_wine_directory_clicked),
@@ -3164,25 +3164,25 @@ class WineCharmApp(Gtk.Application):
             ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
             ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog),
             ("Backup Prefix", "document-save-symbolic", self.show_backup_prefix_dialog),
-            ("Save Wine User Directories", "document-save-symbolic", self.show_save_user_dirs_dialog),
-            ("Load Wine User Directories", "document-revert-symbolic", self.show_load_user_dirs_dialog),
+            ("Save Wine User Dirs", "document-save-symbolic", self.show_save_user_dirs_dialog),
+            ("Load Wine User Dirs", "document-revert-symbolic", self.show_load_user_dirs_dialog),
             ("Reset Shortcut", "view-refresh-symbolic", self.reset_shortcut_confirmation),
             ("Add Desktop Shortcut", "user-bookmarks-symbolic", self.add_desktop_shortcut),
             ("Remove Desktop Shortcut", "action-unavailable-symbolic", self.remove_desktop_shortcut),
             ("Import Game Directory", "folder-download-symbolic", self.import_game_directory),
             ("Run Other Exe", "system-run-symbolic", self.run_other_exe),
-            ("Set Environment Variables", "preferences-system-symbolic", self.set_environment_variables),
+            ("Environment Variables", "preferences-system-symbolic", self.set_environment_variables),
             ("Change Runner", "preferences-desktop-apps-symbolic", self.change_runner),
             ("Rename Prefix Directory", "folder-visiting-symbolic", self.rename_prefix_directory),
             ("Set Wine Arch", "preferences-system-symbolic", self.set_wine_arch),
             ("Wine Config (winecfg)", "preferences-system-symbolic", self.wine_config),
-            ("Wine Registry Editor (regedit)", "dialog-password-symbolic", self.wine_registry_editor)
+            ("Registry Editor (regedit)", "dialog-password-symbolic", self.wine_registry_editor)
 
         ]
 
         for label, icon_name, callback in options:
             option_button = Gtk.Button()
-            option_button.set_size_request(390, 36)
+            option_button.set_size_request(150, 36)
             option_button.add_css_class("flat")
             option_button.add_css_class("normal-font")
 
@@ -5827,6 +5827,173 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error running EXE: {e}")
 
+#########   ######
+    def replace_open_button_with_settings(self):
+#        script_data = self.extract_yaml_info(script_key)
+#        if not script_data:
+#            return None
+            
+        if self.open_button.get_parent():
+            self.vbox.remove(self.open_button)
+
+        self.launch_button = Gtk.Button(label="Setttings")
+        self.launch_button.set_size_request(390, 36)
+        launch_label = "Settings"
+        #yaml_info = self.extract_yaml_info(script)
+ #       script_key = script_data['sha256sum']  # Use sha256sum as the key
+
+        #self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, self.launch_button, row))
+
+        # Store the script_key associated with this launch button
+        #self.launch_button_exe_name = script_key
+
+        self.vbox.prepend(self.launch_button)
+        self.launch_button.set_visible(True)
+        self.open_button_handler_id = None
+        
+        
+    def show_options_for_settings(self, action=None, param=None):
+        """
+        Display the settings options without hiding the open button.
+        """
+        # Set the title to "WineCharm"
+        #self.headerbar.set_title("WineCharm")
+
+        # Ensure the search button is toggled off and the search entry is cleared
+        self.search_button.set_active(False)
+        self.main_frame.set_child(None)
+
+        # Create a scrolled window for settings options
+        scrolled_window = Gtk.ScrolledWindow()
+        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scrolled_window.set_vexpand(True)
+
+        options_flowbox = Gtk.FlowBox()
+        options_flowbox.set_valign(Gtk.Align.START)
+        options_flowbox.set_halign(Gtk.Align.FILL)
+        options_flowbox.set_max_children_per_line(4)
+        options_flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        options_flowbox.set_vexpand(True)
+        options_flowbox.set_hexpand(True)
+        scrolled_window.set_child(options_flowbox)
+
+        self.main_frame.set_child(scrolled_window)
+
+        # Options list for settings
+        options = [
+            ("Runner Set Default", "preferences-desktop-apps-symbolic", self.set_default_runner),
+            ("Runner Download", "emblem-downloads-symbolic", self.download_runner),
+            ("Runner Import", "folder-download-symbolic", self.import_runner),
+            ("Runner Backup", "document-save-symbolic", self.backup_runner),
+            ("Runner Restore", "document-revert-symbolic", self.restore_runner),
+            ("Runner Delete", "user-trash-symbolic", self.delete_runner),
+            ("Template Set Default", "document-new-symbolic", self.set_default_template),
+            ("Template Configure", "preferences-other-symbolic", self.configure_template),
+            ("Template Import", "folder-download-symbolic", self.import_template),
+            ("Template Clone", "folder-copy-symbolic", self.clone_template),
+            ("Template Backup", "document-save-symbolic", self.backup_template),
+            ("Template Restore", "document-revert-symbolic", self.restore_template),
+            ("Template Delete", "user-trash-symbolic", self.delete_template),
+            ("Set Wine Arch", "preferences-system-symbolic", self.set_wine_arch)
+        ]
+
+        for label, icon_name, callback in options:
+            option_button = Gtk.Button()
+            option_button.set_size_request(190, 36)
+            option_button.add_css_class("flat")
+            option_button.add_css_class("normal-font")
+
+            option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+            option_button.set_child(option_hbox)
+
+            option_icon = Gtk.Image.new_from_icon_name(icon_name)
+            option_label = Gtk.Label(label=label)
+            option_label.set_xalign(0)
+            option_label.set_hexpand(True)
+            option_label.set_ellipsize(Pango.EllipsizeMode.END)
+            option_hbox.append(option_icon)
+            option_hbox.append(option_label)
+
+            options_flowbox.append(option_button)
+
+            # Ensure the correct button (`btn`) is passed to the callback
+            option_button.connect(
+                "clicked",
+                lambda btn, cb=callback: cb()
+            )
+
+        # Hide unnecessary UI components
+        self.menu_button.set_visible(False)
+        self.search_button.set_visible(False)
+        self.view_toggle_button.set_visible(False)
+
+        if self.back_button.get_parent() is None:
+            self.headerbar.pack_start(self.back_button)
+        self.back_button.set_visible(True)
+
+        # Remove this line to keep the open button visible:
+        # self.open_button.set_visible(False)
+        self.replace_open_button_with_settings()
+        self.selected_row = None
+
+
+
+    # Implement placeholders for each setting's callback function
+    def set_default_runner(self, button):
+        print("Setting the default runner...")
+        # Add functionality to set the default runner.
+
+    def download_runner(self, button):
+        print("Downloading a new runner...")
+        # Add functionality to download a new runner.
+
+    def import_runner(self, button):
+        print("Importing a runner...")
+        # Add functionality to import a runner.
+
+    def backup_runner(self, button):
+        print("Backing up the current runner...")
+        # Add functionality to back up the current runner.
+
+    def restore_runner(self, button):
+        print("Restoring a runner from backup...")
+        # Add functionality to restore a runner.
+
+    def delete_runner(self, button):
+        print("Deleting the current runner...")
+        # Add functionality to delete a runner.
+
+    def set_default_template(self, button):
+        print("Setting the default template...")
+        # Add functionality to set the default template.
+
+    def configure_template(self, button):
+        print("Configuring the template...")
+        # Add functionality to configure the template.
+
+    def import_template(self, button):
+        print("Importing a template...")
+        # Add functionality to import a template.
+
+    def clone_template(self, button):
+        print("Cloning the template...")
+        # Add functionality to clone the template.
+
+    def backup_template(self, button):
+        print("Backing up the template...")
+        # Add functionality to back up the template.
+
+    def restore_template(self, button):
+        print("Restoring a template from backup...")
+        # Add functionality to restore a template.
+
+    def delete_template(self, button):
+        print("Deleting the template...")
+        # Add functionality to delete the template.
+
+    def set_wine_arch(self, button):
+        print("Setting the Wine architecture...")
+        # Add functionality to set Wine architecture.
 
 
 
