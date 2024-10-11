@@ -61,8 +61,14 @@ check_dependencies() {
 check_python_dependencies() {
     local missing_modules=()
 
+    # Adjust the module name for PyYAML to 'yaml', as that's the correct import name.
     for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
-        python3 -c "import $module" &> /dev/null
+        if [ "$module" == "PyYAML" ]; then
+            python3 -c "import yaml" &> /dev/null
+        else
+            python3 -c "import $module" &> /dev/null
+        fi
+
         if [ $? -ne 0 ]; then
             missing_modules+=("$module")
         fi
@@ -81,6 +87,7 @@ check_python_dependencies() {
 
     return 0
 }
+
 
 install_files() {
     echo "Installing WineCharm to $INSTALL_PATH..."
