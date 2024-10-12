@@ -138,6 +138,10 @@ class WineCharmApp(Gtk.Application):
         self.back_button.connect("clicked", self.on_back_button_clicked)
         self.open_button_handler_id = None
 
+        # Runner cache file
+        self.runner_cache_file = self.winecharmdir / "runner_cache.yaml"
+        self.runner_data = None  # Will hold the runner data after fetching
+
     def ensure_directory_exists(self, directory):
         directory = Path(directory)  # Ensure it's a Path object
         if not directory.exists():
@@ -299,7 +303,11 @@ class WineCharmApp(Gtk.Application):
                     self.process_cli_file_later(self.command_line_file)
         # After loading scripts and building the UI, check for running processes
         self.check_running_processes_on_startup()
-        
+
+        # Start fetching runner URLs asynchronously
+        threading.Thread(target=self.fetch_runner_urls_async).start()
+
+
     def remove_symlinks_and_create_directories(self, wineprefix):
         """
         Remove all symbolic link files in the specified directory (drive_c/users/{user}) and 
@@ -5991,7 +5999,45 @@ class WineCharmApp(Gtk.Application):
         print("Setting the default runner...")
         # Add functionality to set the default runner.
 
+
+    def fetch_runner_urls_async(self):
+        """
+        Fetch the runner URLs asynchronously and cache them.
+        """
+        runner_data = self.fetch_runner_urls_from_github()
+        if runner_data:
+            # Save to cache file using YAML
+            try:
+                with open(self.runner_cache_file, 'w') as f:
+                    yaml.dump(runner_data, f)
+                print(f"Runner data cached to {self.runner_cache_file}")
+            except Exception as e:
+                print(f"Error saving runner cache: {e}")
+
+            # Update self.runner_data
+            self.runner_data = runner_data
+        else:
+            print("Failed to fetch runner data.")
+
     def fetch_runner_urls(self):
+        """
+        Load runner URLs from cache or from self.runner_data.
+        """
+        if self.runner_data is not None:
+            return self.runner_data
+
+        elif self.runner_cache_file.exists():
+            try:
+                with open(self.runner_cache_file, 'r') as f:
+                    self.runner_data = yaml.safe_load(f)
+                return self.runner_data
+            except Exception as e:
+                print(f"Error reading runner cache: {e}")
+                return None
+        else:
+            return None
+
+    def fetch_runner_urls_from_github(self):
         """
         Fetch the runner URLs dynamically from the GitHub API.
         Categorize them into Proton, Stable, Devel, TKG, and WoW64 based on naming conventions.
@@ -6064,11 +6110,11 @@ class WineCharmApp(Gtk.Application):
         Handle the "Runner Download" option click.
         Dynamically fetch the runners and show 5 dropdowns for Wine versions, allowing the user to download the selected runner.
         """
-        # Fetch runners dynamically
+        # Fetch runners from cache
         runner_data = self.fetch_runner_urls()
 
         if not runner_data:
-            self.show_info_dialog("Error", "Unable to fetch runner URLs. Please check your internet connection.")
+            self.show_info_dialog("Runner data not yet available", "Please try again in a moment.")
             return
 
         # Get the active window to set as transient parent
@@ -6077,10 +6123,13 @@ class WineCharmApp(Gtk.Application):
             print("No active window found. Using default parent.")
             active_window = None  # Or set to a default window if necessary
 
-        # Create the dialog
-        dialog = Gtk.Dialog(title="Download Wine Runner", transient_for=active_window)
-        dialog.set_modal(True)
-        dialog.set_default_size(400, 300)
+        # Create the dialog using Adw.Dialog
+        dialog = Adw.MessageDialog(
+            transient_for=active_window,
+            modal=True,
+            heading="Download Wine Runner",
+            body="Select the runners you wish to download."
+        )
 
         # Create a box for dialog content
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -6088,7 +6137,7 @@ class WineCharmApp(Gtk.Application):
         content_box.set_margin_bottom(10)
         content_box.set_margin_start(10)
         content_box.set_margin_end(10)
-        dialog.set_child(content_box)
+        dialog.set_extra_child(content_box)
 
         # Labels and ComboBoxes for different Wine categories
         dropdown_data = [
@@ -6124,23 +6173,11 @@ class WineCharmApp(Gtk.Application):
             # Add the hbox to the content box
             content_box.append(hbox)
 
-        # Create an hbox for the buttons
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        button_box.set_halign(Gtk.Align.END)
-
-        # Add "Cancel" and "Download" buttons
-        cancel_button = Gtk.Button(label="Cancel")
-        download_button = Gtk.Button(label="Download")
-
-        # Connect buttons to their actions
-        cancel_button.connect("clicked", lambda btn: dialog.response(Gtk.ResponseType.CANCEL))
-        download_button.connect("clicked", lambda btn: dialog.response(Gtk.ResponseType.OK))
-
-        button_box.append(cancel_button)
-        button_box.append(download_button)
-
-        # Add the button_box to the dialog's content_box
-        content_box.append(button_box)
+        # Add buttons to the dialog
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("download", "Download")
+        dialog.set_default_response("download")
+        dialog.set_close_response("cancel")
 
         # Present the dialog
         dialog.present()
@@ -6153,7 +6190,7 @@ class WineCharmApp(Gtk.Application):
         Handle the response from the download runner dialog.
         Only download selected runners (not "Choose...").
         """
-        if response_id == Gtk.ResponseType.OK:
+        if response_id == "download":
             # Extract selected runners from each combo box
             selected_runners = {}
             for label, data in combo_boxes.items():
@@ -6167,33 +6204,82 @@ class WineCharmApp(Gtk.Application):
                         selected_runners[label] = selected_runner
 
             if selected_runners:
-                # Show a message indicating that the download is starting
-                self.show_info_dialog("Downloading...", "Please wait while the selected runners are downloaded.")
+                # Create a progress dialog
+                progress_dialog = Adw.MessageDialog(
+                    transient_for=self.window,
+                    modal=True,
+                    heading="Downloading Runners",
+                    body=""
+                )
 
-                # Perform the downloads
-                try:
-                    for label, runner in selected_runners.items():
-                        self.download_and_extract_runner(runner['name'], runner['url'])
-                    self.show_info_dialog("Download Complete", "The runners have been successfully downloaded and extracted.")
-                except Exception as e:
-                    print(f"Error downloading or extracting runner: {e}")
-                    self.show_info_dialog("Download Error", f"Failed to download or extract runner: {e}")
+                content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+                content_box.set_margin_top(10)
+                content_box.set_margin_bottom(10)
+                content_box.set_margin_start(10)
+                content_box.set_margin_end(10)
+                progress_dialog.set_extra_child(content_box)
+
+                progress_label = Gtk.Label(label="Starting download...")
+                content_box.append(progress_label)
+
+                runner_progress_bar = Gtk.ProgressBar()
+                content_box.append(runner_progress_bar)
+
+                total_progress_bar = Gtk.ProgressBar()
+                content_box.append(total_progress_bar)
+
+                progress_dialog.present()
+
+                # Start the download in a separate thread
+                threading.Thread(target=self.download_runners_thread, args=(selected_runners, progress_dialog, total_progress_bar, runner_progress_bar, progress_label)).start()
             else:
                 print("No runners selected for download")
 
         else:
             print("Runner download canceled")
 
-        # Close the dialog
+        # Close the selection dialog
         dialog.close()
 
+    def download_runners_thread(self, selected_runners, progress_dialog, total_progress_bar, runner_progress_bar, progress_label):
+        """
+        Download selected runners and update progress.
+        """
+        total_runners = len(selected_runners)
 
-    def download_and_extract_runner(self, runner_name, download_url):
+        for idx, (label, runner) in enumerate(selected_runners.items()):
+            # Update label with current runner
+            GLib.idle_add(progress_label.set_text, f"Downloading {runner['name']}...")
+
+            # Define progress callback for this runner
+            def runner_progress_callback(progress):
+                GLib.idle_add(runner_progress_bar.set_fraction, progress)
+
+            # Download and extract runner
+            try:
+                self.download_and_extract_runner(runner['name'], runner['url'], progress_callback=runner_progress_callback)
+            except Exception as e:
+                print(f"Error downloading {runner['name']}: {e}")
+                GLib.idle_add(self.show_info_dialog, "Download Error", f"Failed to download {runner['name']}: {e}")
+
+            # Reset runner progress bar
+            GLib.idle_add(runner_progress_bar.set_fraction, 0.0)
+
+            # Update total progress bar
+            total_progress = (idx + 1) / total_runners
+            GLib.idle_add(total_progress_bar.set_fraction, total_progress)
+
+        # When done, close the dialog
+        GLib.idle_add(progress_dialog.close)
+        GLib.idle_add(self.show_info_dialog, "Download Complete", "The runners have been successfully downloaded and extracted.")
+
+    def download_and_extract_runner(self, runner_name, download_url, progress_callback=None):
         """
         Download and extract the selected runner.
         Args:
             runner_name: The name of the runner.
             download_url: The full URL to download the runner.
+            progress_callback: Callback function to update download progress.
         """
         runner_tar_path = self.runners_dir / f"{runner_name}.tar.xz"
         runner_extract_path = self.runners_dir
@@ -6201,12 +6287,15 @@ class WineCharmApp(Gtk.Application):
         # Ensure the runners directory exists
         self.runners_dir.mkdir(parents=True, exist_ok=True)
 
-        # Download the file
-        import subprocess
-
+        def reporthook(block_num, block_size, total_size):
+            if progress_callback:
+                downloaded = block_num * block_size
+                if total_size > 0:
+                    percent = downloaded / total_size
+                    GLib.idle_add(progress_callback, percent)
         try:
             print(f"Downloading {runner_name} from {download_url}")
-            subprocess.run(["curl", "-L", "-o", str(runner_tar_path), download_url], check=True)
+            urllib.request.urlretrieve(download_url, runner_tar_path, reporthook)
             print(f"Download complete: {runner_tar_path}")
 
             # Extract the .tar.xz file
@@ -6219,7 +6308,7 @@ class WineCharmApp(Gtk.Application):
             runner_tar_path.unlink()
             print(f"Removed downloaded archive: {runner_tar_path}")
 
-        except subprocess.CalledProcessError as e:
+        except Exception as e:
             print(f"Error downloading or extracting {runner_name}: {e}")
             raise
 
