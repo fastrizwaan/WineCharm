@@ -23,8 +23,7 @@ import uuid
 import urllib.request
 import json
 
-from datetime import datetime
-
+from datetime import datetime, timedelta
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
@@ -305,7 +304,7 @@ class WineCharmApp(Gtk.Application):
         self.check_running_processes_on_startup()
 
         # Start fetching runner URLs asynchronously
-        threading.Thread(target=self.fetch_runner_urls_async).start()
+        threading.Thread(target=self.maybe_fetch_runner_urls).start()
 
 
     def remove_symlinks_and_create_directories(self, wineprefix):
@@ -5999,53 +5998,44 @@ class WineCharmApp(Gtk.Application):
         print("Setting the default runner...")
         # Add functionality to set the default runner.
 
-
-    def fetch_runner_urls_async(self):
+    def maybe_fetch_runner_urls(self):
         """
-        Fetch the runner URLs asynchronously and cache them.
+        Fetch the runner URLs only if the cache is older than 1 day or missing.
         """
-        runner_data = self.fetch_runner_urls_from_github()
-        if runner_data:
-            # Save to cache file using YAML
-            try:
-                with open(self.runner_cache_file, 'w') as f:
-                    yaml.dump(runner_data, f)
-                print(f"Runner data cached to {self.runner_cache_file}")
-            except Exception as e:
-                print(f"Error saving runner cache: {e}")
-
-            # Update self.runner_data
-            self.runner_data = runner_data
+        if self.cache_is_stale():
+            print("Cache is stale or missing. Fetching new runner data.")
+            runner_data = self.fetch_runner_urls_from_github()
+            if runner_data:
+                self.save_runner_data_to_cache(runner_data)
+            else:
+                print("Failed to fetch runner data.")
         else:
-            print("Failed to fetch runner data.")
+            print("Using cached runner data.")
 
-    def fetch_runner_urls(self):
-        """
-        Load runner URLs from cache or from self.runner_data.
-        """
-        if self.runner_data is not None:
-            return self.runner_data
+        # Load runner data into memory
+        self.runner_data = self.load_runner_data_from_cache()
 
-        elif self.runner_cache_file.exists():
-            try:
-                with open(self.runner_cache_file, 'r') as f:
-                    self.runner_data = yaml.safe_load(f)
-                return self.runner_data
-            except Exception as e:
-                print(f"Error reading runner cache: {e}")
-                return None
-        else:
-            return None
+    def cache_is_stale(self):
+        """
+        Check if the cache file is older than 24 hours or missing.
+        """
+        if not self.runner_cache_file.exists():
+            return True  # Cache file doesn't exist
+
+        # Get the modification time of the cache file
+        mtime = self.runner_cache_file.stat().st_mtime
+        last_modified = datetime.fromtimestamp(mtime)
+        now = datetime.now()
+
+        # Check if it's older than 1 day
+        return (now - last_modified) > timedelta(days=1)
 
     def fetch_runner_urls_from_github(self):
         """
         Fetch the runner URLs dynamically from the GitHub API.
-        Categorize them into Proton, Stable, Devel, TKG, and WoW64 based on naming conventions.
         """
         url = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"
-
         try:
-            # Fetch the response from the GitHub API
             with urllib.request.urlopen(url) as response:
                 if response.status != 200:
                     print(f"Failed to fetch runner URLs: {response.status}")
@@ -6053,77 +6043,93 @@ class WineCharmApp(Gtk.Application):
 
                 # Parse the response JSON
                 release_data = json.loads(response.read().decode('utf-8'))
+                return self.parse_runner_data(release_data)
 
         except Exception as e:
             print(f"Error fetching runner URLs: {e}")
             return None
 
-        # Initialize categories
-        proton_files = []
-        stable_files = []
-        devel_files = []
-        tkg_files = []
-        wow64_files = []
+    def parse_runner_data(self, release_data):
+        """
+        Parse runner data from the GitHub API response.
+        """
+        categories = {
+            "proton": [],
+            "stable": [],
+            "devel": [],
+            "tkg": [],
+            "wow64": []
+        }
 
-        # Filter out the URLs based on the naming conventions
         for release in release_data:
             for asset in release.get('assets', []):
                 download_url = asset.get('browser_download_url')
                 if download_url and download_url.endswith(".tar.xz"):
-                    # Use the correct URL directly from the API
-                    if "proton" in download_url:
-                        proton_files.append({
+                    category = self.get_runner_category(download_url)
+                    if category:
+                        categories[category].append({
                             "name": download_url.split('/')[-1].replace(".tar.xz", ""),
                             "url": download_url
                         })
-                    elif "wow64" in download_url:
-                        wow64_files.append({
-                            "name": download_url.split('/')[-1].replace(".tar.xz", ""),
-                            "url": download_url
-                        })
-                    elif "tkg" in download_url:
-                        tkg_files.append({
-                            "name": download_url.split('/')[-1].replace(".tar.xz", ""),
-                            "url": download_url
-                        })
-                    elif "staging" not in download_url:
-                        stable_files.append({
-                            "name": download_url.split('/')[-1].replace(".tar.xz", ""),
-                            "url": download_url
-                        })
-                    else:
-                        devel_files.append({
-                            "name": download_url.split('/')[-1].replace(".tar.xz", ""),
-                            "url": download_url
-                        })
+        return categories
 
-        return {
-            "proton": proton_files,
-            "stable": stable_files,
-            "devel": devel_files,
-            "tkg": tkg_files,
-            "wow64": wow64_files
-        }
+    def get_runner_category(self, url):
+        """
+        Determine the category of the runner based on its URL.
+        """
+        stable_pattern = r"/\d+\.0/"
+        if "proton" in url:
+            return "proton"
+        elif "wow64" in url:
+            return "wow64"
+        elif "tkg" in url:
+            return "tkg"
+        elif "staging" in url:
+            return "devel"
+        elif re.search(stable_pattern, url):
+            return "stable"
+        else:
+            return "devel"
+
+    def save_runner_data_to_cache(self, runner_data):
+        """
+        Save the runner data to the cache file in YAML format.
+        """
+        try:
+            with open(self.runner_cache_file, 'w') as f:
+                yaml.dump(runner_data, f)
+            print(f"Runner data cached to {self.runner_cache_file}")
+        except Exception as e:
+            print(f"Error saving runner data to cache: {e}")
+
+    def load_runner_data_from_cache(self):
+        """
+        Load runner data from the cache file.
+        """
+        try:
+            with open(self.runner_cache_file, 'r') as f:
+                return yaml.safe_load(f)
+        except Exception as e:
+            print(f"Error loading runner data from cache: {e}")
+            return None
         
     def on_settings_download_runner_clicked(self):
         """
         Handle the "Runner Download" option click.
-        Dynamically fetch the runners and show 5 dropdowns for Wine versions, allowing the user to download the selected runner.
+        Use the cached runners loaded at startup, or notify if not available.
         """
-        # Fetch runners from cache
-        runner_data = self.fetch_runner_urls()
-
-        if not runner_data:
-            self.show_info_dialog("Runner data not yet available", "Please try again in a moment.")
+        # Ensure runner data is loaded
+        if not self.runner_data:
+            self.show_info_dialog(
+                "Runner data not available", 
+                "Please try again in a moment or restart the application."
+            )
             return
 
         # Get the active window to set as transient parent
-        active_window = self.get_active_window()
-        if not active_window:
-            print("No active window found. Using default parent.")
-            active_window = None  # Or set to a default window if necessary
+        active_window = self.get_active_window() or self.window
 
-        # Create the dialog using Adw.Dialog
+        # Create the dialog using Adw.MessageDialog
         dialog = Adw.MessageDialog(
             transient_for=active_window,
             modal=True,
@@ -6141,11 +6147,11 @@ class WineCharmApp(Gtk.Application):
 
         # Labels and ComboBoxes for different Wine categories
         dropdown_data = [
-            ("Wine Proton", runner_data.get("proton", [])),
-            ("Wine Stable", runner_data.get("stable", [])),
-            ("Wine Devel", runner_data.get("devel", [])),
-            ("Wine-tkg", runner_data.get("tkg", [])),
-            ("Wine-WoW64", runner_data.get("wow64", []))
+            ("Wine Proton", self.runner_data.get("proton", [])),
+            ("Wine Stable", self.runner_data.get("stable", [])),
+            ("Wine Devel", self.runner_data.get("devel", [])),
+            ("Wine-tkg", self.runner_data.get("tkg", [])),
+            ("Wine-WoW64", self.runner_data.get("wow64", []))
         ]
 
         # Create a dictionary to hold the comboboxes for easy access
@@ -6184,6 +6190,7 @@ class WineCharmApp(Gtk.Application):
 
         # Connect the response signal to handle the dialog's response
         dialog.connect("response", self.on_download_runner_response, combo_boxes)
+
 
     def on_download_runner_response(self, dialog, response_id, combo_boxes):
         """
@@ -6293,6 +6300,8 @@ class WineCharmApp(Gtk.Application):
                 if total_size > 0:
                     percent = downloaded / total_size
                     GLib.idle_add(progress_callback, percent)
+
+
         try:
             print(f"Downloading {runner_name} from {download_url}")
             urllib.request.urlretrieve(download_url, runner_tar_path, reporthook)
