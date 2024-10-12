@@ -4954,71 +4954,84 @@ class WineCharmApp(Gtk.Application):
         """
         Loads all .charm files from the specified directory (or the default self.prefixes_dir)
         into the self.script_list dictionary.
-        
+
         Args:
             prefixdir (str or Path, optional): The directory to search for .charm files.
                                                Defaults to self.prefixes_dir.
         """
-        # Use the specified prefix directory, or default to self.prefixes_dir
         if prefixdir is None:
             prefixdir = self.prefixes_dir
-        
+
         # Find all .charm files in the directory
         scripts = self.find_charm_files(prefixdir)
 
-        # Process each .charm file
         for script_file in scripts:
             try:
-                # Open the original script file to read its content
                 with open(script_file, 'r') as f:
-                    # Load the YAML data from the .charm file
                     script_data = yaml.safe_load(f)
 
-                    # Ensure script_data is a dictionary
-                    if not isinstance(script_data, dict):
-                        print(f"Warning: Invalid format in {script_file}, skipping.")
-                        continue
+                if not isinstance(script_data, dict):
+                    print(f"Warning: Invalid format in {script_file}, skipping.")
+                    continue
 
-                    # Flag to track if any changes are needed
-                    updated = False
+                # Ensure required keys are present and correctly populated
+                updated = False
+                required_keys = ['exe_file', 'script_path', 'wineprefix', 'sha256sum']
 
-                    # Replace any paths in the script data with '~' if applicable
-                    for key, value in script_data.items():
-                        if isinstance(value, str) and value.startswith(os.getenv("HOME")):
-                            new_value = self.replace_home_with_tilde_in_path(value)
-                            if new_value != value:
-                                script_data[key] = new_value
-                                updated = True  # Mark that an update is needed
-
-                    # If updates are needed, rewrite the file with updated paths
-                    if updated:
-                        with open(script_file, 'w') as f:
-                            yaml.safe_dump(script_data, f)
-                        print(f"Updated script file: {script_file}")
-
-                    # Add the updated or original script path with '~' in script_data for internal use
+                # Initialize script_path to the current .charm file path if missing
+                if 'script_path' not in script_data:
                     script_data['script_path'] = self.replace_home_with_tilde_in_path(str(script_file))
-                    
-                    # Add modification time (mtime) to script_data
-                    script_data['mtime'] = script_file.stat().st_mtime
+                    updated = True
+                    print(f"Warning: script_path missing in {script_file}. Added default value.")
 
-                    # Use 'sha256sum' as the key in script_list
-                    script_key = script_data.get('sha256sum')
-                    if script_key:
-                        if prefixdir == self.prefixes_dir:
-                            self.script_list[script_key] = script_data
-                        else:  # Add the scripts from a single prefix to the top
-                            self.script_list = {script_key: script_data, **self.script_list}
-                    else:
-                        print(f"Warning: Script {script_file} missing 'sha256sum'. Skipping.")
+                # Set wineprefix to the parent directory of script_path if missing
+                if 'wineprefix' not in script_data or not script_data['wineprefix']:
+                    wineprefix = str(Path(script_file).parent)
+                    script_data['wineprefix'] = self.replace_home_with_tilde_in_path(wineprefix)
+                    updated = True
+                    print(f"Warning: wineprefix missing in {script_file}. Set to {wineprefix}.")
+
+                # Replace any $HOME occurrences with ~ in all string paths
+                for key in required_keys:
+                    if isinstance(script_data.get(key), str) and script_data[key].startswith(os.getenv("HOME")):
+                        new_value = self.replace_home_with_tilde_in_path(script_data[key])
+                        if new_value != script_data[key]:
+                            script_data[key] = new_value
+                            updated = True
+
+                # Regenerate sha256sum if missing
+                if 'sha256sum' not in script_data:
+                    sha256_hash = hashlib.sha256()
+                    with open(script_file, "rb") as f:
+                        for byte_block in iter(lambda: f.read(4096), b""):
+                            sha256_hash.update(byte_block)
+                    script_data['sha256sum'] = sha256_hash.hexdigest()
+                    updated = True
+                    print(f"Warning: sha256sum missing in {script_file}. Regenerated hash.")
+
+                # If updates are needed, rewrite the file
+                if updated:
+                    with open(script_file, 'w') as f:
+                        yaml.safe_dump(script_data, f)
+                    print(f"Updated script file: {script_file}")
+
+                # Add modification time (mtime) to script_data
+                script_data['mtime'] = script_file.stat().st_mtime
+
+                # Use 'sha256sum' as the key in script_list
+                script_key = script_data['sha256sum']
+                if prefixdir == self.prefixes_dir:
+                    self.script_list[script_key] = script_data
+                else:
+                    self.script_list = {script_key: script_data, **self.script_list}
 
             except yaml.YAMLError as yaml_err:
                 print(f"YAML error in {script_file}: {yaml_err}")
             except Exception as e:
                 print(f"Error loading script {script_file}: {e}")
 
-        # Print the total number of loaded scripts
         print(f"Loaded {len(self.script_list)} scripts.")
+
 
 
     def add_desktop_shortcut(self, script, script_key, *args):
