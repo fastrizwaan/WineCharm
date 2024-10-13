@@ -2082,9 +2082,9 @@ class WineCharmApp(Gtk.Application):
 
         # Prepare YAML data
         yaml_data = {
-            'exe_file': str(exe_file).replace(str(Path.home()), "~"),
-            'script_path': str(yaml_file_path).replace(str(Path.home()), "~"), 
-            'wineprefix': str(prefix_dir).replace(str(Path.home()), "~"),
+            'exe_file': self.replace_home_with_tilde_in_path(str(exe_file)),
+            'script_path': self.replace_home_with_tilde_in_path(str(yaml_file_path)),
+            'wineprefix': self.replace_home_with_tilde_in_path(str(prefix_dir)),
             'progname': progname,
             'args': "",
             'sha256sum': sha256_hash.hexdigest(),
@@ -2160,13 +2160,20 @@ class WineCharmApp(Gtk.Application):
         lnk_files = []
 
         for root, dirs, files in os.walk(drive_c):
+            current_path = Path(root)
+
+            # Exclude any directory that includes 'Recent' in its path
+            if "Recent" in current_path.parts:
+                continue  # Skip processing .lnk files in 'Recent' directory
+
             for file in files:
-                file_path = Path(root) / file
+                file_path = current_path / file
 
                 if file_path.suffix.lower() == ".lnk" and file_path.is_file():
                     lnk_files.append(file_path)
 
         return lnk_files
+
 
     def add_lnk_file_to_processed(self, wineprefix, lnk_file):
         found_lnk_files_path = wineprefix / "found_lnk_files.yaml"
@@ -2852,11 +2859,14 @@ class WineCharmApp(Gtk.Application):
 
                         yml_path = sh_file.replace('.sh', '.charm')
                         self.create_charm_file({
-                            'exe_file': exe_file,
+                            'exe_file': self.replace_home_with_tilde_in_path(str(exe_file)),
+                            'script_path': self.replace_home_with_tilde_in_path(str(yml_path)),
+                            'wineprefix': self.replace_home_with_tilde_in_path(str(directory)),
                             'progname': progname,
                             'sha256sum': sha256sum,
                             'runner': runner,
                             'args': args,
+                            'env_vars': env_vars
                         }, yml_path)
 
                         # Add the new script data directly to self.script_list
