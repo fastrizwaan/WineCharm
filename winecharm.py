@@ -1426,16 +1426,15 @@ class WineCharmApp(Gtk.Application):
         self.check_running_processes_on_startup()
 
     def launch_script(self, script_key, play_stop_button, row):
-        #script_data = self.script_list.get(script_key)
         # Reload the script_data from the .charm file before launching
         script_data = self.reload_script_data_from_charm(script_key)
         if not script_data:
             return None
-        
+
         unique_id = str(uuid.uuid4())
         env = os.environ.copy()
         env['WINECHARM_UNIQUE_ID'] = unique_id
-        
+
         exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
         script = Path(script_data.get('script_path', '')).expanduser().resolve()
         progname = script_data.get('progname', '')
@@ -1445,8 +1444,7 @@ class WineCharmApp(Gtk.Application):
         wine_debug = script_data.get('wine_debug', '')
         exe_name = Path(exe_file).name
         wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
-        #print("*"*100)
-        #print(wineprefix)
+
         runner = script_data.get('runner', 'wine')
         if runner:
             runner = Path(runner).expanduser().resolve()
@@ -1454,22 +1452,37 @@ class WineCharmApp(Gtk.Application):
             path_env = f'export PATH="{runner_dir}:$PATH"'
         else:
             runner = "wine"
-            runner_dir = ""  # Or set a specific default if required
+            runner_dir = ""
             path_env = ""
 
-        #Logging stderr to {log_file_path}")
+        # Verify if the runner exists and is working
+        if not runner.exists():
+            self.show_info_dialog("Runner Not Found", f"The runner '{runner}' was not found.")
+            return
+
+        try:
+            # Check if the runner is working by running 'runner --version'
+            result = subprocess.run(
+                [str(runner), "--version"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env
+            )
+            if result.returncode != 0:
+                raise Exception(result.stderr.strip())
+        except Exception as e:
+            self.show_info_dialog("Runner Error", f"Failed to run '{runner} --version'.\nError: {e}")
+            return
+
         log_file_path = Path(wineprefix) / f"{script.stem}.log"
-            
-        # shlex quote for bash
+
         exe_parent = shlex.quote(str(exe_file.parent.resolve()))
         wineprefix = shlex.quote(str(wineprefix))
-        #print("="*100)
-        #print(wineprefix)
-        #print(wineprefix.strip("'"))
         runner = shlex.quote(str(runner))
         runner_dir = shlex.quote(str(runner_dir))
         exe_name = shlex.quote(str(exe_name))
-        
+
         if self.debug:
             print("--------------------- launch_script_data ------------------")
             print(f"exe_file = {exe_file}\nscript = {script}\nprogname = {progname}")
@@ -1480,25 +1493,17 @@ class WineCharmApp(Gtk.Application):
             print(f"log_file_path = {log_file_path}")
             print("---------------------/launch_script_data ------------------")
 
-        # Check if any process with the same wineprefix is already running
         self.launching_another_from_same_prefix = False
-        wineprefix_process_count = 0
-       
-        for process_info in self.running_processes.values():
-            if Path(process_info['wineprefix']) == wineprefix:
-                wineprefix_process_count += 1
+        wineprefix_process_count = sum(
+            1 for p in self.running_processes.values()
+            if Path(p['wineprefix']) == Path(wineprefix.strip("'"))
+        )
 
-        # Set self.launching_another_from_same_prefix if >1 process shares the wineprefix.
-        if wineprefix_process_count > 1:
-            self.launching_another_from_same_prefix = True
-        else:
-            self.launching_another_from_same_prefix = False
+        self.launching_another_from_same_prefix = wineprefix_process_count > 1
 
-        # Will be set in Settings
         if wine_debug == "disabled":
             wine_debug = "WINEDEBUG=-all DXVK_LOG_LEVEL=none"
 
-        # If exe_file not found then show info
         if not Path(exe_file).exists():
             GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
             GLib.idle_add(play_stop_button.set_tooltip_text, "Exe Not Found")
@@ -1508,21 +1513,21 @@ class WineCharmApp(Gtk.Application):
         else:
             play_stop_button.remove_css_class("red")
 
-        # Command to launch
         if path_env:
             command = (f"{path_env}; cd {exe_parent} && "
                        f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} "
-                       f"{runner} {exe_name} {script_args}" )
+                       f"{runner} {exe_name} {script_args}")
         else:
             command = (f"cd {exe_parent} && "
                        f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} "
-                       f"{runner} {exe_name} {script_args}" )
+                       f"{runner} {exe_name} {script_args}")
+
         if self.debug:
             print(f"----------------------Launch Command--------------------")
             print(f"{command}")
             print(f"--------------------------------------------------------")
             print("")
-            
+
         try:
             with open(log_file_path, 'w') as log_file:
                 process = subprocess.Popen(
@@ -1537,7 +1542,7 @@ class WineCharmApp(Gtk.Application):
                 self.running_processes[script_key] = {
                     "process": process,
                     "unique_id": unique_id,
-                    "pgid": os.getpgid(process.pid),  # Get the process group ID
+                    "pgid": os.getpgid(process.pid),
                     "row": row,
                     "script": script,
                     "exe_file": exe_file,
@@ -1558,22 +1563,21 @@ class WineCharmApp(Gtk.Application):
                 runner = {runner}
                 wineprefix = {wineprefix}
                 """)
-                # Update UI
+
                 self.set_play_stop_button_state(play_stop_button, True)
                 self.update_row_highlight(row, True)
                 play_stop_button.set_tooltip_text("Stop")
+
                 ui_state = self.script_ui_data.get(script_key)
                 if ui_state:
                     ui_state['is_running'] = True
 
-                # Start a thread to monitor the process
                 threading.Thread(target=self.monitor_process, args=(script_key,), daemon=True).start()
-    
-                # Call get_child_pid_async after a delay to ensure that child processes have time to start
                 GLib.timeout_add_seconds(5, self.get_child_pid_async, script_key)
 
         except Exception as e:
             print(f"Error launching script: {e}")
+
 
     def reload_script_data_from_charm(self, script_key):
         script_data = self.script_list.get(script_key)
