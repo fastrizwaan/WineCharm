@@ -1752,25 +1752,25 @@ class WineCharmApp(Gtk.Application):
         if not process:
             return
 
-        # Wait for the process to complete
-        process.wait()
-
-        # Get the return code
+        process.wait()  # Wait for the process to complete
         return_code = process.returncode
 
-        # Process has ended; update the UI in the main thread
+        # Check if the process was manually stopped
+        manually_stopped = process_info.get("manually_stopped", False)
+
+        # Update the UI in the main thread
         GLib.idle_add(self.process_ended, script_key)
 
-        if return_code != 0:
-            # Process terminated with an error
+        if return_code != 0 and not manually_stopped:
+            # Show error dialog only if the process was not stopped manually
             script = process_info.get('script')
             wineprefix = process_info.get('wineprefix')
             exe_file = process_info.get('exe_file')
 
             log_file_path = Path(wineprefix) / f"{exe_file.stem}.log"
-
             error_message = f"The script failed with error code {return_code}."
-            # Show the error to the user via the new dialog
+
+            # Show the error dialog
             GLib.idle_add(
                 self.show_error_with_log_dialog,
                 "Command Execution Error",
@@ -1923,14 +1923,17 @@ class WineCharmApp(Gtk.Application):
             print(f"No running process found for script_key: {script_key}")
             return
 
+        # Set the manually_stopped flag to True
+        process_info["manually_stopped"] = True
+
         unique_id = process_info.get("unique_id")
         wineprefix = process_info.get("wineprefix")
-        runner = process_info.get("runner") or "wine"  # Ensure runner is not None
+        runner = process_info.get("runner") or "wine"
         runner_dir = Path(runner).expanduser().resolve().parent
-        pids = process_info.get("pids", [])  # Get the list of PIDs
+        pids = process_info.get("pids", [])
 
         if unique_id:
-            # Existing logic to terminate processes using unique_id
+            # Terminate processes by unique_id
             pids_to_terminate = []
             for proc in psutil.process_iter(['pid', 'environ']):
                 try:
@@ -1947,7 +1950,6 @@ class WineCharmApp(Gtk.Application):
             pids = pids_to_terminate
 
         if pids:
-            # Terminate all PIDs
             for pid in pids:
                 try:
                     os.kill(pid, signal.SIGTERM)
@@ -1955,11 +1957,9 @@ class WineCharmApp(Gtk.Application):
                 except Exception as e:
                     print(f"Error sending SIGTERM to process with PID {pid}: {e}")
 
-            # Wait for a short time to see if the processes terminate
-            #time.sleep(1)
+            # If still running, send SIGKILL
             for pid in pids:
                 if psutil.pid_exists(pid):
-                    # If the process is still running, send SIGKILL
                     try:
                         os.kill(pid, signal.SIGKILL)
                         print(f"Successfully sent SIGKILL to process with PID {pid}")
@@ -1967,7 +1967,7 @@ class WineCharmApp(Gtk.Application):
                         print(f"Error sending SIGKILL to process with PID {pid}: {e}")
         else:
             print(f"No PIDs found to terminate for script_key: {script_key}")
-            # Fallback to wineserver -k to terminate all processes in the Wine prefix
+            # Fallback to wineserver -k
             try:
                 command = (
                     f"export PATH={shlex.quote(str(runner_dir))}:$PATH; "
@@ -1979,11 +1979,9 @@ class WineCharmApp(Gtk.Application):
             except Exception as e:
                 print(f"Error terminating processes in Wine prefix {wineprefix}: {e}")
 
-        # Remove the script from running_processes
         self.running_processes.pop(script_key, None)
-
-        # Update the UI
         GLib.idle_add(self.process_ended, script_key)
+
 
 
 
