@@ -1255,6 +1255,34 @@ class WineCharmApp(Gtk.Application):
             #row.remove_css_class("blue")
             row.remove_css_class("highlighted")
 
+    def find_and_remove_wine_created_shortcuts(self):
+        """
+        Searches for .desktop files in self.applicationsdir/wine and deletes any
+        that contain references to self.prefixes_dir.
+        """
+        wine_apps_dir = self.applicationsdir / "wine"
+
+        if not wine_apps_dir.exists():
+            print(f"Directory {wine_apps_dir} does not exist.")
+            return
+
+        # Iterate through all .desktop files under wine-related directories
+        for root, _, files in os.walk(wine_apps_dir):
+            for file in files:
+                if file.endswith(".desktop"):
+                    desktop_file_path = Path(root) / file
+
+                    try:
+                        # Check if the file contains a reference to self.prefixes_dir
+                        with open(desktop_file_path, 'r') as f:
+                            content = f.read()
+
+                        if str(self.prefixes_dir) in content:
+                            print(f"Deleting {desktop_file_path} as it contains {self.prefixes_dir}")
+                            desktop_file_path.unlink()  # Delete the file
+                    except Exception as e:
+                        print(f"Error processing {desktop_file_path}: {e}")
+
     def toggle_play_stop(self, script_key, play_stop_button, row):
         if script_key in self.running_processes:
             # Process is running; terminate it
@@ -1297,6 +1325,7 @@ class WineCharmApp(Gtk.Application):
                 print(f"Processing wineprefix: {wineprefix}")
                 if wineprefix:
                     self.create_scripts_for_lnk_files(wineprefix)
+                    self.find_and_remove_wine_created_shortcuts()
 
         # Only proceed if exe_name and exe_parent_name are defined
         if exe_name and exe_parent_name:
