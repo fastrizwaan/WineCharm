@@ -1426,48 +1426,71 @@ class WineCharmApp(Gtk.Application):
         self.check_running_processes_on_startup()
 
     def launch_script(self, script_key, play_stop_button, row):
-        # Reload the script_data from the .charm file before launching
+        # Reload the script data from the .charm file
         script_data = self.reload_script_data_from_charm(script_key)
         if not script_data:
+            print("Error: Script data could not be reloaded.")
             return None
 
+        self.debug = True  # Enable debugging
+
+        # Generate a unique ID for the process
         unique_id = str(uuid.uuid4())
         env = os.environ.copy()
         env['WINECHARM_UNIQUE_ID'] = unique_id
 
         exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
-        script = Path(script_data.get('script_path', '')).expanduser().resolve()
-        progname = script_data.get('progname', '')
-        script_args = script_data.get('args', '')
-        script_key = script_data.get('sha256sum', script_key)
-        env_vars = script_data.get('env_vars', '')
-        wine_debug = script_data.get('wine_debug', '')
-        exe_name = Path(exe_file).name
         wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
 
-        runner = script_data.get('runner', 'wine')
-        if runner:
-            runner = Path(runner).expanduser().resolve()
-            runner_dir = str(runner.parent.expanduser().resolve())
-            path_env = f'export PATH="{runner_dir}:$PATH"'
-        else:
+        # Get the runner from the script data, fallback to 'wine' if not provided
+        runner = script_data.get('runner', '').strip()
+        if not runner:
+            if self.debug:
+                print("Runner not specified in script data, falling back to 'wine'.")
             runner = "wine"
-            runner_dir = ""
-            path_env = ""
 
-        # Verify if the runner exists and is working
-        if not runner.exists():
-            GLib.idle_add(self.update_row_highlight, row, False)
-            GLib.idle_add(play_stop_button.add_css_class, "red")
-            GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
-            GLib.idle_add(play_stop_button.set_tooltip_text, "Runner Not Found")
-            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Runner Not Found", f"The runner '{runner}' was not found.")
+        if self.debug:
+            print(f"Using runner: {runner}")
+
+        # If the runner is a path (e.g., /usr/bin/wine), resolve it
+        try:
+            if runner != "wine":
+                runner = Path(runner).expanduser().resolve()
+                if self.debug:
+                    print(f"Runner resolved as absolute path: {runner}")
+        except Exception as e:
+            print(f"Error resolving runner path: {e}")
+            self.handle_ui_error(
+                play_stop_button, row,
+                "Runner Error", f"Invalid runner path: {runner}. Error: {e}",
+                "Invalid Runner Path"
+            )
             return
 
+        # Check if the runner is a valid path or command
+        runner_path = None
+        if isinstance(runner, Path) and runner.is_absolute():
+            runner_path = runner
+        else:
+            runner_path = self.find_command_in_path(runner)
+
+        # Verify if the runner exists
+        if not runner_path:
+            print(f"Error: Runner '{runner}' not found.")
+            self.handle_ui_error(
+                play_stop_button, row,
+                "Runner Not Found", f"The runner '{runner}' was not found.",
+                "Runner Not Found"
+            )
+            return
+
+        if self.debug:
+            print(f"Resolved runner path: {runner_path}")
+
         try:
-            # Check if the runner is working by running 'runner --version'
+            # Check if the runner works by running 'runner --version'
             result = subprocess.run(
-                [str(runner), "--version"],
+                [str(runner_path), "--version"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
@@ -1475,70 +1498,34 @@ class WineCharmApp(Gtk.Application):
             )
             if result.returncode != 0:
                 raise Exception(result.stderr.strip())
+            if self.debug:
+                print(f"Runner version: {result.stdout.strip()}")
         except Exception as e:
-            GLib.idle_add(self.update_row_highlight, row, False)
-            GLib.idle_add(play_stop_button.add_css_class, "red")
-            GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
-            GLib.idle_add(play_stop_button.set_tooltip_text, "Runner Error")
-            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Runner Error", f"Failed to run '{runner} --version'.\nError: {e}")
-
+            self.handle_ui_error(
+                play_stop_button, row,
+                "Runner Error", f"Failed to run '{runner_path} --version'. Error: {e}",
+                "Runner Error"
+            )
             return
 
-        log_file_path = Path(wineprefix) / f"{script.stem}.log"
-
-        exe_parent = shlex.quote(str(exe_file.parent.resolve()))
-        wineprefix = shlex.quote(str(wineprefix))
-        runner = shlex.quote(str(runner))
-        runner_dir = shlex.quote(str(runner_dir))
-        exe_name = shlex.quote(str(exe_name))
-
-        if self.debug:
-            print("--------------------- launch_script_data ------------------")
-            print(f"exe_file = {exe_file}\nscript = {script}\nprogname = {progname}")
-            print(f"script_args = {script_args}\nscript_key = {script_key}")
-            print(f"env_vars = {env_vars}\nwine_debug = {wine_debug}")
-            print(f"exe_name = {exe_name}\nwineprefix = {wineprefix}")
-            print(f"runner = {runner}\nrunner_dir = {runner_dir}")
-            print(f"log_file_path = {log_file_path}")
-            print("---------------------/launch_script_data ------------------")
-
-        self.launching_another_from_same_prefix = False
-        wineprefix_process_count = sum(
-            1 for p in self.running_processes.values()
-            if Path(p['wineprefix']) == Path(wineprefix.strip("'"))
-        )
-
-        self.launching_another_from_same_prefix = wineprefix_process_count > 1
-
-        if wine_debug == "disabled":
-            wine_debug = "WINEDEBUG=-all DXVK_LOG_LEVEL=none"
-
-        if not Path(exe_file).exists():
-            GLib.idle_add(self.update_row_highlight, row, False)
-            GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
-            GLib.idle_add(play_stop_button.set_tooltip_text, "Exe Not Found")
-            play_stop_button.add_css_class("red")
-            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Exe Not found", str(Path(exe_file)))
+        # Check if the executable file exists
+        if not exe_file.exists():
+            self.handle_ui_error(
+                play_stop_button, row,
+                "Executable Not Found", str(exe_file),
+                "Exe Not Found"
+            )
             return
-        else:
-            play_stop_button.remove_css_class("red")
 
-        if path_env:
-            command = (f"{path_env}; cd {exe_parent} && "
-                       f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} "
-                       f"{runner} {exe_name} {script_args}")
-        else:
-            command = (f"cd {exe_parent} && "
-                       f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} "
-                       f"{runner} {exe_name} {script_args}")
+        # Prepare the log file and command to execute
+        log_file_path = Path(wineprefix) / f"{exe_file.stem}.log"
+        command = f"cd {shlex.quote(str(exe_file.parent))} && WINEPREFIX={shlex.quote(str(wineprefix))} {shlex.quote(str(runner_path))} {shlex.quote(exe_file.name)}"
 
         if self.debug:
-            print(f"----------------------Launch Command--------------------")
-            print(f"{command}")
-            print(f"--------------------------------------------------------")
-            print("")
+            print(f"Launch command: {command}")
 
         try:
+            # Launch the process
             with open(log_file_path, 'w') as log_file:
                 process = subprocess.Popen(
                     command,
@@ -1554,25 +1541,12 @@ class WineCharmApp(Gtk.Application):
                     "unique_id": unique_id,
                     "pgid": os.getpgid(process.pid),
                     "row": row,
-                    "script": script,
+                    "script": Path(script_data['script_path']),
                     "exe_file": exe_file,
-                    "exe_name": exe_name.strip("'"),
-                    "runner": runner.strip("'"),
-                    "wineprefix": wineprefix.strip("'")
+                    "exe_name": exe_file.name,
+                    "runner": str(runner_path),
+                    "wineprefix": str(wineprefix)
                 }
-
-                print("."*100)
-                print(f"""
-                process = {process}
-                unique_id = {unique_id}
-                pgid = {os.getpgid(process.pid)}
-                row = {row}
-                script = {script}
-                exe_file = {exe_file}
-                exe_name = {exe_name}
-                runner = {runner}
-                wineprefix = {wineprefix}
-                """)
 
                 self.set_play_stop_button_state(play_stop_button, True)
                 self.update_row_highlight(row, True)
@@ -1587,6 +1561,57 @@ class WineCharmApp(Gtk.Application):
 
         except Exception as e:
             print(f"Error launching script: {e}")
+
+
+
+
+    def find_command_in_path(self, command):
+        """
+        Checks if a command exists in the system's PATH.
+        Returns the absolute path if found, otherwise None.
+        """
+        self.debug = True
+        if self.debug:
+            print(f"Looking for command: {command} in PATH")
+
+        try:
+            result = subprocess.run(
+                ["which", command],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            if self.debug:
+                print(f"'which' result for {command}: returncode={result.returncode}, stdout={result.stdout.strip()}, stderr={result.stderr.strip()}")
+
+            if result.returncode == 0:
+                path = Path(result.stdout.strip())
+                if path.exists():
+                    if self.debug:
+                        print(f"Command found: {path}")
+                    return path
+                else:
+                    if self.debug:
+                        print(f"Command found but path does not exist: {path}")
+        except Exception as e:
+            print(f"Error finding command '{command}': {e}")
+
+        if self.debug:
+            print(f"Command '{command}' not found in PATH")
+        
+        self.debug = True
+        return None
+
+
+    def handle_ui_error(self, play_stop_button, row, title, message, tooltip):
+        """
+        Updates the UI to reflect an error state and shows an info dialog.
+        """
+        GLib.idle_add(self.update_row_highlight, row, False)
+        GLib.idle_add(play_stop_button.add_css_class, "red")
+        GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
+        GLib.idle_add(play_stop_button.set_tooltip_text, tooltip)
+        GLib.timeout_add_seconds(0.5, self.show_info_dialog, title, message)
 
 
     def reload_script_data_from_charm(self, script_key):
