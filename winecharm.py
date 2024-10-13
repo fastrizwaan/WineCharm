@@ -2941,7 +2941,7 @@ class WineCharmApp(Gtk.Application):
             "XOUSERSUSERXO": f"/users/{user}",
             "XOMEDIASUSERXO": f"/media/{user}",
             "XOFLATPAKIDXO": "io.github.fastrizwaan.WineCharm",
-            "XOWINEEXEXO": "/app/bin/wine",
+            "XOWINEEXEXO": "",
             "XOWINEVERXO": "wine-9.0",
         }
 
@@ -3042,7 +3042,14 @@ class WineCharmApp(Gtk.Application):
                     try:
                         info_data = self.parse_info_file(info_file_path)
                         runner = info_data.get('Runner', '')
-                        args = info_data.get('Args', '')
+
+                        # Locate environment-variable.yml and cmdline.yml
+                        env_var_file_path = os.path.join(os.path.dirname(sh_file), "environment-variable.yml")
+                        cmdline_file_path = os.path.join(os.path.dirname(sh_file), "cmdline.yml")
+
+                        # Load environment variables and command-line arguments
+                        env_vars = self.load_and_fix_yaml(env_var_file_path, "environment-variable.yml")
+                        args = self.load_and_fix_yaml(cmdline_file_path, "cmdline.yml")
 
                         yml_path = sh_file.replace('.sh', '.charm')
                         self.create_charm_file({
@@ -3052,11 +3059,11 @@ class WineCharmApp(Gtk.Application):
                             'progname': progname,
                             'sha256sum': sha256sum,
                             'runner': runner,
-                            'args': args,
-                            'env_vars': env_vars
+                            'args': args,  # Include command-line arguments
+                            'env_vars': env_vars  # Include environment variables
                         }, yml_path)
 
-                        # Add the new script data directly to self.script_list
+                        # Add the new script data directly to the script list
                         self.new_scripts.add(Path(yml_path).stem)
                         print(f"Created {yml_path}")
                         created_charm_files = True  # Mark that at least one .charm file was created
@@ -3068,7 +3075,7 @@ class WineCharmApp(Gtk.Application):
             else:
                 print(f"No INFOFILE found in {sh_file}")
 
-        # If no .charm files were created, proceed to create scripts for .lnk and .exe files
+        # If no .charm files were created, create scripts for .lnk and .exe files
         if not created_charm_files:
             print(f"No .charm files created. Proceeding to create scripts for .lnk and .exe files in {directory}")
             self.create_scripts_for_lnk_files(directory)
@@ -3077,37 +3084,81 @@ class WineCharmApp(Gtk.Application):
             self.create_scripts_for_exe_files(directory)
             print(f"Scripts created for .exe files in {directory}")
 
+    def load_and_fix_yaml(self, yaml_file_path, filename):
+        """
+        Load data from the specified YAML file, fixing missing spaces around colons.
+        """
+        if not os.path.exists(yaml_file_path):
+            print(f"{filename} not found at {yaml_file_path}")
+            return ""
+
+        try:
+            with open(yaml_file_path, 'r') as f:
+                content = f.read()
+
+            # Fix any missing spaces around colons using regex
+            fixed_content = re.sub(r'(\S):(\S)', r'\1: \2', content)
+
+            # Load the fixed YAML content
+            yaml_data = yaml.safe_load(fixed_content)
+
+            # Log what we found to debug the issue
+            print(f"Loaded data from {filename}: {yaml_data}")
+
+            # Handle different formats gracefully
+            if isinstance(yaml_data, dict):
+                return yaml_data.get('args', '')  # Return the 'args' value
+            else:
+                print(f"Unexpected data format in {filename}: {yaml_data}")
+                return ""
+
+        except Exception as e:
+            print(f"Error reading or parsing {filename} at {yaml_file_path}: {e}")
+            return ""
 
     def create_charm_file(self, info_data, yml_path):
+        """
+        Create a .charm file with the provided information.
+        """
         # Print to confirm the function is being executed
         print(f"Creating .charm file at path: {yml_path}")
 
-        # Prepare the data to be written
+        # Extract data with default empty values to prevent KeyErrors
         exe_file = info_data.get('exe_file', '')
         progname = info_data.get('progname', '')
         args = info_data.get('args', '')
         sha256sum = info_data.get('sha256sum', '')
         runner = info_data.get('runner', '')
+        env_vars = info_data.get('env_vars', '')  # Now treating env_vars as a string
+        script_path = info_data.get('script_path', '')
+        wineprefix = info_data.get('wineprefix', '')
 
-        # Debugging: Print values before writing
+        # Debugging: Print all values before writing
         print(f"exe_file: {exe_file}")
         print(f"progname: {progname}")
         print(f"args: {args}")
         print(f"sha256sum: {sha256sum}")
         print(f"runner: {runner}")
+        print(f"env_vars: {env_vars}")
+        print(f"script_path: {script_path}")
+        print(f"wineprefix: {wineprefix}")
 
-        # Manually write the actual content to the file
         try:
+            # Open the file and write all key-value pairs in YAML format
             with open(yml_path, 'w') as yml_file:
                 yml_file.write(f"exe_file: '{exe_file}'\n")
                 yml_file.write(f"progname: '{progname}'\n")
                 yml_file.write(f"args: '{args}'\n")
                 yml_file.write(f"sha256sum: '{sha256sum}'\n")
                 yml_file.write(f"runner: '{runner}'\n")
-            print(f"Actual content written to {yml_path}")
+                yml_file.write(f"script_path: '{script_path}'\n")
+                yml_file.write(f"wineprefix: '{wineprefix}'\n")
+                yml_file.write(f"env_vars: '{env_vars}'\n")
+
+            print(f"Actual content successfully written to {yml_path}")
+
         except Exception as e:
             print(f"Error writing to file: {e}")
-
 
 
     def extract_infofile_path_from_sh(self, file_path):
