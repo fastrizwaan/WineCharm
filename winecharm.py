@@ -1457,7 +1457,11 @@ class WineCharmApp(Gtk.Application):
 
         # Verify if the runner exists and is working
         if not runner.exists():
-            self.show_info_dialog("Runner Not Found", f"The runner '{runner}' was not found.")
+            GLib.idle_add(self.update_row_highlight, row, False)
+            GLib.idle_add(play_stop_button.add_css_class, "red")
+            GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
+            GLib.idle_add(play_stop_button.set_tooltip_text, "Runner Not Found")
+            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Runner Not Found", f"The runner '{runner}' was not found.")
             return
 
         try:
@@ -1472,7 +1476,12 @@ class WineCharmApp(Gtk.Application):
             if result.returncode != 0:
                 raise Exception(result.stderr.strip())
         except Exception as e:
-            self.show_info_dialog("Runner Error", f"Failed to run '{runner} --version'.\nError: {e}")
+            GLib.idle_add(self.update_row_highlight, row, False)
+            GLib.idle_add(play_stop_button.add_css_class, "red")
+            GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
+            GLib.idle_add(play_stop_button.set_tooltip_text, "Runner Error")
+            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Runner Error", f"Failed to run '{runner} --version'.\nError: {e}")
+
             return
 
         log_file_path = Path(wineprefix) / f"{script.stem}.log"
@@ -1505,6 +1514,7 @@ class WineCharmApp(Gtk.Application):
             wine_debug = "WINEDEBUG=-all DXVK_LOG_LEVEL=none"
 
         if not Path(exe_file).exists():
+            GLib.idle_add(self.update_row_highlight, row, False)
             GLib.idle_add(play_stop_button.set_child, Gtk.Image.new_from_icon_name("action-unavailable-symbolic"))
             GLib.idle_add(play_stop_button.set_tooltip_text, "Exe Not Found")
             play_stop_button.add_css_class("red")
