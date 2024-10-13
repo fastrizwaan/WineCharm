@@ -1430,6 +1430,10 @@ class WineCharmApp(Gtk.Application):
         script_data = self.reload_script_data_from_charm(script_key)
         if not script_data:
             print("Error: Script data could not be reloaded.")
+            self.handle_ui_error(
+                play_stop_button, row, 
+                "Script Error", "Failed to reload script data.", "Script Error"
+            )
             return None
 
         self.debug = True  # Enable debugging
@@ -1560,9 +1564,24 @@ class WineCharmApp(Gtk.Application):
                 GLib.timeout_add_seconds(5, self.get_child_pid_async, script_key)
 
         except Exception as e:
-            print(f"Error launching script: {e}")
+            error_message = f"Error launching script: {e}"
+            print(error_message)
+            traceback_str = traceback.format_exc()
+            with open(log_file_path, 'a') as log_file:
+                log_file.write(f"\n{error_message}\n{traceback_str}\n")
 
-
+            # Show the error to the user via an info dialog
+            GLib.idle_add(
+                self.handle_ui_error,
+                play_stop_button, row,
+                "Launch Error", f"Failed to launch the script. Error: {e}",
+                "Launch Failed"
+            )
+            GLib.idle_add(
+                self.show_info_dialog,
+                "Launch Error",
+                f"Failed to launch the script. Error: {e}"
+            )
 
 
     def find_command_in_path(self, command):
@@ -1644,7 +1663,86 @@ class WineCharmApp(Gtk.Application):
             print(f"Error reloading script from {script_path}: {e}")
             return None
 
-            
+    def show_error_with_log_dialog(self, title, message, log_file_path):
+        # Create the main error message dialog
+        dialog = Adw.MessageDialog(
+            transient_for=self.window,
+            modal=True,
+            heading=title,
+            body=message
+        )
+
+        # Add buttons to the main dialog
+        dialog.add_response("show_log", "Show Log")
+        dialog.add_response("close", "Close")
+
+        # Set default and close responses
+        dialog.set_default_response("close")
+        dialog.set_close_response("close")
+
+        # Variable to store the log content
+        log_content = ""
+
+        # Load the log content asynchronously
+        def load_log_content():
+            nonlocal log_content
+            try:
+                with open(log_file_path, 'r') as log_file:
+                    log_content = log_file.read()
+            except Exception as e:
+                log_content = f"Failed to load log: {e}"
+
+        threading.Thread(target=load_log_content, daemon=True).start()
+
+        # Function to show a separate dialog with the log content
+        def show_log_dialog():
+            # Create a new dialog for the log content
+            log_dialog = Adw.MessageDialog(
+                transient_for=self.window,
+                modal=True,
+                heading="Log Content",
+                body=""
+            )
+
+            # Create a ScrolledWindow for the log content
+            scrolled_window = Gtk.ScrolledWindow()
+            scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+            scrolled_window.set_min_content_width(640)
+            scrolled_window.set_min_content_height(480)
+
+            # Create a TextView to display the log content
+            log_view = Gtk.TextView()
+            log_view.set_editable(False)  # Make it read-only
+            log_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+            scrolled_window.set_child(log_view)
+
+            # Load the log content into the TextView
+            GLib.idle_add(lambda: log_view.get_buffer().set_text(log_content))
+
+            # Add the ScrolledWindow to the log dialog
+            log_dialog.set_extra_child(scrolled_window)
+
+            # Add a close button to the log dialog
+            log_dialog.add_response("close", "Close")
+            log_dialog.set_default_response("close")
+            log_dialog.set_close_response("close")
+
+            # Show the log dialog
+            log_dialog.present()
+
+        # Handle responses from the main dialog
+        def on_response(dialog, response):
+            if response == "show_log":
+                show_log_dialog()  # Show the log content in a new dialog
+            else:
+                dialog.close()  # Close the main dialog
+
+        # Connect the response handler to the main dialog
+        dialog.connect("response", on_response)
+
+        # Show the main dialog
+        dialog.present()
+
     def monitor_process(self, script_key):
         process_info = self.running_processes.get(script_key)
         if not process_info:
@@ -1657,8 +1755,29 @@ class WineCharmApp(Gtk.Application):
         # Wait for the process to complete
         process.wait()
 
+        # Get the return code
+        return_code = process.returncode
+
         # Process has ended; update the UI in the main thread
         GLib.idle_add(self.process_ended, script_key)
+
+        if return_code != 0:
+            # Process terminated with an error
+            script = process_info.get('script')
+            wineprefix = process_info.get('wineprefix')
+            exe_file = process_info.get('exe_file')
+
+            log_file_path = Path(wineprefix) / f"{exe_file.stem}.log"
+
+            error_message = f"The script failed with error code {return_code}."
+            # Show the error to the user via the new dialog
+            GLib.idle_add(
+                self.show_error_with_log_dialog,
+                "Command Execution Error",
+                error_message,
+                log_file_path
+            )
+
 
 
     def get_child_pid_async(self, script_key):
