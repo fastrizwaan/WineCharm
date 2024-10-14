@@ -53,11 +53,11 @@ class WineCharmApp(Gtk.Application):
         self.do_not_kill = "bin/winecharm"
         
         self.SOCKET_FILE = self.winecharmdir / "winecharm_socket"
-
+        self.settings_file = self.winecharmdir / "Settings.yaml"
         # Variables that need to be dynamically updated
         self.runner = ""  # which wine
         self.wine_version = ""  # runner --version
-        self.template = ""  # default: WineCharm-win64, if not found in settings.yaml
+        self.template = ""  # default: WineCharm-win64, if not found in Settings.yaml
         self.arch = ""  # default: win
                 
         self.connect("activate", self.on_activate)
@@ -406,7 +406,9 @@ class WineCharmApp(Gtk.Application):
             self.process_cli_file_later(self.command_line_file)
             self.command_line_file = None  # Reset after processing
 
-
+        #
+        self.set_dynamic_variables()
+    
     def process_cli_file_later(self, file_path):
         # Use GLib.idle_add to ensure this runs after the main loop starts
         GLib.idle_add(self.show_processing_spinner)
@@ -502,25 +504,40 @@ class WineCharmApp(Gtk.Application):
         dialog.present()
         
     def set_dynamic_variables(self):
-        # Set instance attributes instead of globals
-        self.runner = subprocess.getoutput('which wine')
-        self.wine_version = subprocess.getoutput(f"{self.runner} --version")
-        
-        # Check if settings.yml exists and set the template and arch accordingly
-        settings_file = self.winecharmdir / "settings.yml"
-        if settings_file.exists():
+        # Check if Settings.yaml exists and set the template and arch accordingly
+        if self.settings_file.exists():
             settings = self.load_settings()  # Assuming load_settings() returns a dictionary
-            self.template = settings.get('template', "WineCharm-win64")
+            self.template = settings.get('template', self.default_template)
             self.arch = settings.get('arch', "win64")
         else:
-            self.template = "WineCharm-win64"
+            self.template = self.default_template
             self.arch = "win64"
+            self.runner = ""
+            self.template = self.default_template  # Set template to the initialized one
 
+        self.save_settings()
+
+    def save_settings(self):
+        """Save current settings to the Settings.yaml file."""
+        settings = {
+            'template': str(self.template),  # Convert Path to string if needed
+            'arch': self.arch,
+            'runner': self.runner,
+            'wine_debug': "WINEDEBUG=fixme-all DXVK_LOG_LEVEL=none",  # Default or customized
+            'env_vars': ''
+        }
+
+        try:
+            with open(self.settings_file, 'w') as settings_file:
+                yaml.dump(settings, settings_file, default_flow_style=False, indent=4)
+            print(f"Settings saved to {self.settings_file}")
+        except Exception as e:
+            print(f"Error saving settings: {e}")
 
     def load_settings(self):
-        settings_file_path = self.winecharmdir / "settings.yml"
-        if settings_file_path.exists():
-            with open(settings_file_path, 'r') as settings_file:
+        #self.settings_file = self.winecharmdir / "Settings.yaml"
+        if self.settings_file.exists():
+            with open(self.settings_file, 'r') as settings_file:
                 return yaml.safe_load(settings_file)
         return {}
         
@@ -2240,7 +2257,7 @@ class WineCharmApp(Gtk.Application):
         if prefix_dir is None:
             prefix_dir = self.prefixes_dir / f"{exe_no_space}-{sha256sum}"
             if not prefix_dir.exists():
-                if self.default_template.exists():
+                if self.template.exists():
                     self.copy_template(prefix_dir)
                 else:
                     self.ensure_directory_exists(prefix_dir)
@@ -4510,7 +4527,7 @@ class WineCharmApp(Gtk.Application):
                  print(f"Template is being initialized, skipping copy_template!!!!")
                  return
             print(f"Copying default template to {prefix_dir}")
-            shutil.copytree(self.default_template, prefix_dir, symlinks=True)
+            shutil.copytree(self.template, prefix_dir, symlinks=True)
         except shutil.Error as e:
             for src, dst, err in e.args[0]:
                 if not os.path.exists(dst):
