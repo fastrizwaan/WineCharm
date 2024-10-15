@@ -2458,30 +2458,28 @@ class WineCharmApp(Gtk.Application):
         return exe_files
 
 
-    def show_info_dialog(self, title, message):
-        if self.window is None:
-            print(f"Cannot show dialog: window is not available.")
-            return
-
-        # Create an instance of AdwAlertDialog
-        dialog = Adw.AlertDialog()
-        
-        # Set the title and message for the alert dialog
-        dialog.set_heading(title)
-        dialog.set_body(message)
-
-        # Add an "OK" button as a response
+    def show_info_dialog(self, title, message, callback=None):
+        """
+        Show an information dialog with an optional callback when closed.
+        """
+        dialog = Adw.MessageDialog(
+            transient_for=self.window,
+            modal=True,
+            heading=title,
+            body=message
+        )
         dialog.add_response("ok", "OK")
-
-        # Set the default response and close response to "ok"
         dialog.set_default_response("ok")
         dialog.set_close_response("ok")
 
-        # Connect the response signal to close the dialog
-        dialog.connect("response", lambda d, r: d.close())
+        def on_response(d, r):
+            d.close()
+            if callback:
+                callback()
 
-        # Present the dialog attached to the parent window
-        dialog.present(self.window)
+        dialog.connect("response", on_response)
+        dialog.present()
+
         
     def create_backup_archive(self, wineprefix, backup_path):
         # Get the current username from the environment
@@ -6022,9 +6020,207 @@ class WineCharmApp(Gtk.Application):
         return True
 
     def change_runner(self, script, script_key, *args):
-        print(f"Changing the runner for {script} with script_key {script_key}")
-        # Add functionality to change the Wine runner for the given script.
+        """
+        Display a dialog to change the runner for the given script.
+        """
+        # Store the current script and key for reuse
+        self.selected_script = script
+        self.selected_script_key = script_key
 
+        # Gather valid runners
+        all_runners = self.get_valid_runners(self.runners_dir, is_bundled=False)
+
+        # Check for prefix-specific runners
+        wineprefix = Path(script).parent
+        prefix_runners_dir = wineprefix / "Runner"
+        all_runners.extend(self.get_valid_runners(prefix_runners_dir, is_bundled=True))
+
+        # Add System Wine to the list if available
+        system_wine_display, system_wine_path = self.get_system_wine()
+        if system_wine_display:
+            all_runners.insert(0, (system_wine_display, system_wine_path))
+
+        # If no runners are available, show the "no runners" dialog
+        if not all_runners:
+            self.show_no_runners_available_dialog()
+            return
+
+        # Create the MessageDialog
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,
+            heading="Change Runner",
+            body="Select a runner for the script:"
+        )
+
+        # Create a horizontal box for the ComboBox and download icon
+        runner_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+
+        # Create a ComboBoxText and populate with runners
+        runner_combo = Gtk.ComboBoxText()
+        for display_name, _ in all_runners:
+            runner_combo.append_text(display_name)
+        runner_combo.set_active(0)
+        runner_combo.set_hexpand(True)
+
+        # Create a download icon button
+        download_button = Gtk.Button()
+        download_icon = Gtk.Image.new_from_icon_name("emblem-downloads-symbolic")
+        download_button.set_child(download_icon)
+        download_button.set_tooltip_text("Download Runner")
+        download_button.connect("clicked", lambda btn: self.on_download_runner_clicked(dialog))
+
+        # Add the ComboBox and download button to the hbox
+        runner_hbox.append(runner_combo)
+        runner_hbox.append(download_button)
+
+        # Create a vertical box and add the runner_hbox
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        content_box.append(runner_hbox)
+
+        # Set the content of the dialog
+        dialog.set_extra_child(content_box)
+
+        # Add responses (buttons)
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("ok", "OK")
+        dialog.set_default_response("ok")
+        dialog.set_close_response("cancel")
+
+        # Connect response and present the dialog
+        dialog.connect("response", self.on_change_runner_response, runner_combo, all_runners, script_key)
+        dialog.present()
+
+    def on_change_runner_response(self, dialog, response_id, runner_combo, all_runners, script_key):
+        """
+        Handle the response when the user selects a runner or cancels the dialog.
+        """
+        if response_id == "ok":
+            selected_index = runner_combo.get_active()
+            if selected_index < 0:
+                print("No runner selected.")
+                dialog.close()
+                return
+
+            new_runner_display, new_runner_path = all_runners[selected_index]
+            print(f"Selected new runner: {new_runner_display} -> {new_runner_path}")
+
+            # Set to an empty string if System Wine is selected
+            new_runner_value = '' if new_runner_display.startswith("System Wine") else new_runner_path
+            script_data = self.script_list.get(script_key, {})
+            script_data['runner'] = self.replace_home_with_tilde_in_path(new_runner_value)
+
+            script_path = Path(script_data['script_path']).expanduser().resolve()
+            try:
+                with open(script_path, 'w') as file:
+                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
+                print(f"Runner for {script_path} updated to {new_runner_display}")
+            except Exception as e:
+                print(f"Error updating runner: {e}")
+        else:
+            print("Runner change canceled.")
+
+        dialog.close()
+
+
+    def get_valid_runners(self, runners_dir, is_bundled=False):
+        """
+        Get a list of valid runners from a given directory.
+
+        Args:
+            runners_dir: Path to the directory containing runner subdirectories.
+            is_bundled: Boolean indicating if these runners are from a wineprefix/Runner directory.
+
+        Returns:
+            List of tuples: (display_name, runner_path).
+        """
+        valid_runners = []
+        try:
+            for runner_dir in runners_dir.iterdir():
+                runner_path = runner_dir / "bin/wine"
+                if runner_path.exists() and self.validate_runner(runner_path):
+                    display_name = runner_dir.name
+                    if is_bundled:
+                        display_name += " (Bundled)"
+                    valid_runners.append((display_name, str(runner_path)))
+        except FileNotFoundError:
+            print(f"{runners_dir} not found. Ignoring.")
+        return valid_runners
+
+    def validate_runner(self, wine_binary):
+        """
+        Validate the Wine runner by checking if `wine --version` executes successfully.
+
+        Args:
+            wine_binary: Path to the wine binary.
+
+        Returns:
+            True if the runner works, False otherwise.
+        """
+        try:
+            result = subprocess.run([str(wine_binary), "--version"], capture_output=True, text=True, timeout=5)
+            return result.returncode == 0
+        except Exception as e:
+            print(f"Error validating runner {wine_binary}: {e}")
+            return False
+
+
+
+    def on_download_runner_clicked(self, dialog):
+        """
+        Handle the "Download Runner" button click from the change_runner dialog.
+        """
+        dialog.close()
+        # Pass the callback method to handle the completion
+        self.on_settings_download_runner_clicked(callback=self.on_download_complete)
+
+    def on_download_complete(self):
+        """
+        Callback method to handle the completion of the runner download.
+        Reopens the change_runner dialog.
+        """
+        # Reopen the change_runner dialog after the download complete dialog is closed
+        self.change_runner(self.selected_script, self.selected_script_key)
+
+    def get_system_wine(self):
+        """
+        Check if System Wine is available and return its version.
+        """
+        try:
+            result = subprocess.run(["wine", "--version"], capture_output=True, text=True, check=True)
+            version = result.stdout.strip()
+            return f"System Wine ({version})", ""
+        except subprocess.CalledProcessError:
+            print("System Wine not available.")
+            return None, None
+
+    def show_no_runners_available_dialog(self):
+        """
+        Show a dialog when no runners are available, prompting the user to download one.
+        """
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,
+            heading="No Runners Available",
+            body="No runners were found. Please download a runner to proceed."
+        )
+
+        download_button = Gtk.Button(label="Download Runner")
+        download_button.connect("clicked", lambda btn: self.on_download_runner_clicked(dialog))
+
+        cancel_button = Gtk.Button(label="Cancel")
+        cancel_button.connect("clicked", lambda btn: dialog.close())
+
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        button_box.append(cancel_button)
+        button_box.append(download_button)
+
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        content_box.append(button_box)
+
+        dialog.set_extra_child(content_box)
+        dialog.present()
+        
     def rename_prefix_directory(self, script, script_key, *args):
         print(f"Renaming Wine prefix directory for {script} with script_key {script_key}")
         # Add functionality to rename the Wine prefix directory.
@@ -6376,7 +6572,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error loading runner data from cache: {e}")
             return None
         
-    def on_settings_download_runner_clicked(self):
+    def on_settings_download_runner_clicked(self, callback):
         """
         Handle the "Runner Download" option click.
         Use the cached runners loaded at startup, or notify if not available.
@@ -6387,7 +6583,9 @@ class WineCharmApp(Gtk.Application):
                 "Runner data not available", 
                 "Please try again in a moment or restart the application."
             )
-            return
+            # Invoke the callback since data is not available
+            GLib.idle_add(callback)
+            return 
 
         # Get the active window to set as transient parent
         active_window = self.get_active_window() or self.window
@@ -6452,10 +6650,9 @@ class WineCharmApp(Gtk.Application):
         dialog.present()
 
         # Connect the response signal to handle the dialog's response
-        dialog.connect("response", self.on_download_runner_response, combo_boxes)
+        dialog.connect("response", self.on_download_runner_response, combo_boxes, callback)
 
-
-    def on_download_runner_response(self, dialog, response_id, combo_boxes):
+    def on_download_runner_response(self, dialog, response_id, combo_boxes, callback):
         """
         Handle the response from the download runner dialog.
         Only download selected runners (not "Choose...").
@@ -6500,22 +6697,30 @@ class WineCharmApp(Gtk.Application):
 
                 progress_dialog.present()
 
-                # Start the download in a separate thread
-                threading.Thread(target=self.download_runners_thread, args=(selected_runners, progress_dialog, total_progress_bar, runner_progress_bar, progress_label)).start()
+                # Start the download in a separate thread, passing the callback
+                #art the download in a separate thread, passing the callback
+                threading.Thread(
+                    target=self.download_runners_thread,
+                    args=(selected_runners, progress_dialog, total_progress_bar, runner_progress_bar, progress_label, callback)
+                ).start()
             else:
-                print("No runners selected for download")
-
+                print("No runners selected for download.")
+                # Invoke the callback immediately since no download is needed
+                GLib.idle_add(callback)
         else:
-            print("Runner download canceled")
+            print("Runner download canceled.")
+            # Invoke the callback since the download was canceled
+            GLib.idle_add(callback)
 
         # Close the selection dialog
         dialog.close()
 
-    def download_runners_thread(self, selected_runners, progress_dialog, total_progress_bar, runner_progress_bar, progress_label):
+    def download_runners_thread(self, selected_runners, progress_dialog, total_progress_bar, runner_progress_bar, progress_label, callback):
         """
         Download selected runners and update progress.
         """
         total_runners = len(selected_runners)
+        download_success = True  # Flag to track overall download success
 
         for idx, (label, runner) in enumerate(selected_runners.items()):
             # Update label with current runner
@@ -6529,6 +6734,7 @@ class WineCharmApp(Gtk.Application):
             try:
                 self.download_and_extract_runner(runner['name'], runner['url'], progress_callback=runner_progress_callback)
             except Exception as e:
+                download_success = False
                 print(f"Error downloading {runner['name']}: {e}")
                 GLib.idle_add(self.show_info_dialog, "Download Error", f"Failed to download {runner['name']}: {e}")
 
@@ -6541,7 +6747,20 @@ class WineCharmApp(Gtk.Application):
 
         # When done, close the dialog
         GLib.idle_add(progress_dialog.close)
-        GLib.idle_add(self.show_info_dialog, "Download Complete", "The runners have been successfully downloaded and extracted.")
+        if download_success:
+            GLib.idle_add(
+                self.show_info_dialog,
+                "Download Complete",
+                "The runners have been successfully downloaded and extracted.",
+                callback  # Pass the callback here
+            )
+        else:
+            GLib.idle_add(
+                self.show_info_dialog,
+                "Download Incomplete",
+                "Some runners failed to download.",
+                callback  # Pass the callback here
+            )
 
     def download_and_extract_runner(self, runner_name, download_url, progress_callback=None):
         """
@@ -6563,7 +6782,6 @@ class WineCharmApp(Gtk.Application):
                 if total_size > 0:
                     percent = downloaded / total_size
                     GLib.idle_add(progress_callback, percent)
-
 
         try:
             print(f"Downloading {runner_name} from {download_url}")
