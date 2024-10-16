@@ -140,6 +140,7 @@ class WineCharmApp(Gtk.Application):
         # Runner cache file
         self.runner_cache_file = self.winecharmdir / "runner_cache.yaml"
         self.runner_data = None  # Will hold the runner data after fetching
+        self.settings = self.load_settings()  # Add this line
 
     def ensure_directory_exists(self, directory):
         directory = Path(directory)  # Ensure it's a Path object
@@ -520,25 +521,34 @@ class WineCharmApp(Gtk.Application):
     def save_settings(self):
         """Save current settings to the Settings.yaml file."""
         settings = {
-            'template': str(self.template),  # Convert Path to string if needed
+            'template': self.replace_home_with_tilde_in_path(str(self.template)),
             'arch': self.arch,
-            'runner': self.runner,
-            'wine_debug': "WINEDEBUG=fixme-all DXVK_LOG_LEVEL=none",  # Default or customized
+            'runner': self.replace_home_with_tilde_in_path(str(self.settings.get('runner', ''))),
+            'wine_debug': "WINEDEBUG=fixme-all DXVK_LOG_LEVEL=none",
             'env_vars': ''
         }
 
         try:
             with open(self.settings_file, 'w') as settings_file:
                 yaml.dump(settings, settings_file, default_flow_style=False, indent=4)
-            print(f"Settings saved to {self.settings_file}")
+            print(f"Settings saved to {self.settings_file} with content:\n{settings}")
         except Exception as e:
             print(f"Error saving settings: {e}")
 
     def load_settings(self):
-        #self.settings_file = self.winecharmdir / "Settings.yaml"
+        """Load settings from the Settings.yaml file."""
         if self.settings_file.exists():
             with open(self.settings_file, 'r') as settings_file:
-                return yaml.safe_load(settings_file)
+                settings = yaml.safe_load(settings_file) or {}
+
+            # Expand and resolve paths when loading
+            self.template = self.expand_and_resolve_path(settings.get('template', self.default_template))
+            self.runner = self.expand_and_resolve_path(settings.get('runner', ''))
+            self.arch = settings.get('arch', "win64")
+
+            return settings
+
+        # If no settings file, return an empty dictionary
         return {}
         
     def set_open_button_icon_visible(self, visible):
@@ -5219,6 +5229,10 @@ class WineCharmApp(Gtk.Application):
             return path_str.replace(user_home, "~", 1)
         return path_str
 
+    def expand_and_resolve_path(self, path):
+        """Expand '~' to the home directory and resolve the absolute path."""
+        return Path(path).expanduser().resolve()
+        
     def load_script_list(self, prefixdir=None):
         """
         Loads all .charm files from the specified directory (or the default self.prefixes_dir)
@@ -6489,9 +6503,109 @@ class WineCharmApp(Gtk.Application):
 
 
     # Implement placeholders for each setting's callback function
-    def set_default_runner(self, button):
-        print("Setting the default runner...")
-        # Add functionality to set the default runner.
+    def set_default_runner(self, action=None):
+        """
+        Display a dialog to set the default runner for the application.
+        Updates the Settings.yaml file.
+        """
+        # Gather valid runners
+        all_runners = self.get_valid_runners(self.runners_dir, is_bundled=False)
+
+        # Add System Wine to the list if available
+        system_wine_display, _ = self.get_system_wine()
+        if system_wine_display:
+            all_runners.insert(0, (system_wine_display, ""))  # Empty string for System Wine
+
+        if not all_runners:
+            self.show_no_runners_available_dialog()
+            return
+
+        # Get the default runner from settings
+        settings = self.load_settings()
+        default_runner = settings.get('runner', '')
+        default_runner = os.path.abspath(os.path.expanduser(default_runner))
+
+        # Build the list of runner paths in all_runners
+        runner_paths_in_list = [
+            os.path.abspath(os.path.expanduser(runner_path)) for _, runner_path in all_runners
+        ]
+
+        # Check if default_runner is in runner_paths_in_list
+        if default_runner and default_runner not in runner_paths_in_list:
+            if self.validate_runner(default_runner):
+                runner_name = Path(default_runner).parent.name
+                all_runners.append((f"{runner_name} (from settings)", default_runner))
+            else:
+                print(f"Default runner from settings not found or invalid: {default_runner}")
+                default_runner = ''
+
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,
+            heading="Set Default Runner",
+            body="Select the default runner for the application:"
+        )
+
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+
+        # Create the ComboBox for runners
+        runner_combo = Gtk.ComboBoxText()
+        combo_runner_paths = []  # Store runner paths corresponding to indices
+
+        for display_name, runner_path in all_runners:
+            runner_combo.append_text(display_name)
+            combo_runner_paths.append(os.path.abspath(os.path.expanduser(runner_path)))
+
+        # Set the active item to the current default runner
+        selected_index = 0
+        for index, runner_path in enumerate(combo_runner_paths):
+            if runner_path == default_runner:
+                selected_index = index
+                break
+
+        runner_combo.set_active(selected_index)
+        runner_combo.set_hexpand(True)
+        content_box.append(runner_combo)
+
+        # Add OK and Cancel buttons to the dialog
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("ok", "OK")
+        dialog.set_default_response("ok")
+        dialog.set_close_response("cancel")
+        dialog.set_extra_child(content_box)
+
+        dialog.connect("response", self.on_set_default_runner_response, runner_combo, all_runners)
+        dialog.present()
+
+    def on_set_default_runner_response(self, dialog, response_id, runner_combo, all_runners):
+        if response_id == "ok":
+            selected_index = runner_combo.get_active()
+            if selected_index < 0:
+                print("No runner selected.")
+            else:
+                new_runner_display, new_runner_path = all_runners[selected_index]
+                print(f"Selected new default runner: {new_runner_display} -> {new_runner_path}")
+
+                # Set the new runner path in self.settings
+                new_runner_value = '' if new_runner_display.startswith("System Wine") else new_runner_path
+                self.settings['runner'] = self.replace_home_with_tilde_in_path(new_runner_value)
+
+                print(f"Runner path to be saved: {self.settings['runner']}")
+
+                # Save the updated settings
+                self.save_settings()
+
+                # Provide user feedback
+                self.show_info_dialog(
+                    "Default Runner Updated",
+                    f"The default runner has been set to {new_runner_display}."
+                )
+        else:
+            print("Set default runner canceled.")
+
+        dialog.close()
+
+
 
     def maybe_fetch_runner_urls(self):
         """
