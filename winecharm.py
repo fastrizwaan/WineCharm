@@ -2474,8 +2474,9 @@ class WineCharmApp(Gtk.Application):
 
         def on_response(d, r):
             d.close()
-            if callback:
+            if callback is not None:
                 callback()
+
 
         dialog.connect("response", on_response)
         dialog.present()
@@ -6572,7 +6573,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error loading runner data from cache: {e}")
             return None
         
-    def on_settings_download_runner_clicked(self, callback):
+    def on_settings_download_runner_clicked(self, callback=None):
         """
         Handle the "Runner Download" option click.
         Use the cached runners loaded at startup, or notify if not available.
@@ -6652,7 +6653,7 @@ class WineCharmApp(Gtk.Application):
         # Connect the response signal to handle the dialog's response
         dialog.connect("response", self.on_download_runner_response, combo_boxes, callback)
 
-    def on_download_runner_response(self, dialog, response_id, combo_boxes, callback):
+    def on_download_runner_response(self, dialog, response_id, combo_boxes, callback=None):
         """
         Handle the response from the download runner dialog.
         Only download selected runners (not "Choose...").
@@ -6706,12 +6707,13 @@ class WineCharmApp(Gtk.Application):
             else:
                 print("No runners selected for download.")
                 # Invoke the callback immediately since no download is needed
-                GLib.idle_add(callback)
+                if callback is not None:
+                    GLib.idle_add(callback)
         else:
             print("Runner download canceled.")
             # Invoke the callback since the download was canceled
-            GLib.idle_add(callback)
-
+            if callback is not None:
+                GLib.idle_add(callback)
         # Close the selection dialog
         dialog.close()
 
@@ -6759,7 +6761,7 @@ class WineCharmApp(Gtk.Application):
                 self.show_info_dialog,
                 "Download Incomplete",
                 "Some runners failed to download.",
-                callback  # Pass the callback here
+                callback if callback is not None else lambda: None
             )
 
     def download_and_extract_runner(self, runner_name, download_url, progress_callback=None):
