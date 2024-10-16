@@ -6037,16 +6037,39 @@ class WineCharmApp(Gtk.Application):
         all_runners.extend(self.get_valid_runners(prefix_runners_dir, is_bundled=True))
 
         # Add System Wine to the list if available
-        system_wine_display, system_wine_path = self.get_system_wine()
+        system_wine_display, _ = self.get_system_wine()
         if system_wine_display:
-            all_runners.insert(0, (system_wine_display, system_wine_path))
+            all_runners.insert(0, (system_wine_display, ""))  # Empty string for System Wine
 
         # If no runners are available, show the "no runners" dialog
         if not all_runners:
             self.show_no_runners_available_dialog()
             return
 
-        # Create the MessageDialog
+        # Get the runner from the script file
+        script_data = self.script_list.get(script_key, {})
+        runner_from_script = script_data.get('runner', '')
+        runner_from_script = os.path.expanduser(runner_from_script)
+        runner_from_script = os.path.abspath(runner_from_script)
+
+        # Build the list of runner paths in all_runners
+        runner_paths_in_list = [os.path.abspath(os.path.expanduser(runner_path)) for _, runner_path in all_runners]
+
+        # Check if runner_from_script is in runner_paths_in_list
+        if runner_from_script and runner_from_script not in runner_paths_in_list:
+            # Try to validate runner_from_script
+            if self.validate_runner(runner_from_script):
+                # Create a display name for this runner
+                runner_dir = os.path.dirname(os.path.dirname(runner_from_script))
+                runner_name = os.path.basename(runner_dir)
+                runner_display_name = f"{runner_name} (from script)"
+                # Append it to all_runners
+                all_runners.append((runner_display_name, runner_from_script))
+                runner_paths_in_list.append(runner_from_script)
+            else:
+                print(f"Runner specified in script not found or invalid: {runner_from_script}")
+
+        # Now, create the MessageDialog
         dialog = Adw.MessageDialog(
             modal=True,
             transient_for=self.window,
@@ -6059,9 +6082,20 @@ class WineCharmApp(Gtk.Application):
 
         # Create a ComboBoxText and populate with runners
         runner_combo = Gtk.ComboBoxText()
-        for display_name, _ in all_runners:
+        # Keep track of runner paths corresponding to combo box indices
+        combo_runner_paths = []
+        for display_name, runner_path in all_runners:
             runner_combo.append_text(display_name)
-        runner_combo.set_active(0)
+            combo_runner_paths.append(os.path.abspath(os.path.expanduser(runner_path)))
+
+        # Find the index corresponding to runner_from_script
+        selected_index = 0  # default to first item
+        for index, runner_path in enumerate(combo_runner_paths):
+            if runner_path == runner_from_script:
+                selected_index = index
+                break
+
+        runner_combo.set_active(selected_index)
         runner_combo.set_hexpand(True)
 
         # Create a download icon button
@@ -6091,6 +6125,7 @@ class WineCharmApp(Gtk.Application):
         # Connect response and present the dialog
         dialog.connect("response", self.on_change_runner_response, runner_combo, all_runners, script_key)
         dialog.present()
+
 
     def on_change_runner_response(self, dialog, response_id, runner_combo, all_runners, script_key):
         """
