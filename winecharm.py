@@ -6990,51 +6990,43 @@ class WineCharmApp(Gtk.Application):
         print(f"Runner {runner_name} is ready in {runner_extract_path}")
 
 
-    def import_runner(self, button):
+    def import_runner(self, action=None):
         print("Importing a runner...")
         # Add functionality to import a runner.
 
-    def backup_runner(self, button):
-        print("Backing up the current runner...")
-        # Add functionality to back up the current runner.
-
-    def restore_runner(self, button):
-        print("Restoring a runner from backup...")
-        # Add functionality to restore a runner.
-
-    def delete_runner(self, button):
+    def delete_runner(self, action=None):
         print("Deleting the current runner...")
         # Add functionality to delete a runner.
 
-    def set_default_template(self, button):
+    def set_default_template(self, action=None):
         print("Setting the default template...")
         # Add functionality to set the default template.
 
-    def configure_template(self, button):
+    def configure_template(self, action=None):
         print("Configuring the template...")
         # Add functionality to configure the template.
 
-    def import_template(self, button):
+    def import_template(self, action=None):
         print("Importing a template...")
         # Add functionality to import a template.
 
-    def clone_template(self, button):
+    def clone_template(self, action=None):
         print("Cloning the template...")
         # Add functionality to clone the template.
 
-    def backup_template(self, button):
+    def backup_template(self, action=None):
         print("Backing up the template...")
         # Add functionality to back up the template.
 
-    def restore_template(self, button):
+    def restore_template(self, action=None):
         print("Restoring a template from backup...")
         # Add functionality to restore a template.
 
-    def delete_template(self, button):
+    def delete_template(self, action=None):
         print("Deleting the template...")
         # Add functionality to delete the template.
 
-    def set_wine_arch(self, button):
+    def set_wine_arch(self, action=None):
         print("Setting the Wine architecture...")
         # Add functionality to set Wine architecture.
 
