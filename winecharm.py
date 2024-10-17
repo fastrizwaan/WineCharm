@@ -7038,6 +7038,233 @@ class WineCharmApp(Gtk.Application):
         print("Setting the Wine architecture...")
         # Add functionality to set Wine architecture.
 
+################
+    def backup_runner(self, action=None):
+        """
+        Allow the user to backup a runner.
+        """
+        # Gather valid runners from runners_dir
+        all_runners = self.get_valid_runners(self.runners_dir, is_bundled=False)
+
+        # If no runners are available, show a message
+        if not all_runners:
+            self.show_info_dialog("No Runners Available", "No runners found to backup.")
+            return
+
+        # Create the MessageDialog
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,
+            heading="Backup Runner",
+            body="Select a runner to backup:"
+        )
+
+        # Create the ComboBox for runners
+        runner_combo = Gtk.ComboBoxText()
+        combo_runner_paths = []  # Store runner paths corresponding to indices
+
+        for display_name, runner_path in all_runners:
+            runner_combo.append_text(display_name)
+            combo_runner_paths.append(os.path.abspath(os.path.expanduser(runner_path)))
+
+        runner_combo.set_active(0)
+        runner_combo.set_hexpand(True)
+
+        # Add the ComboBox to the content box
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        content_box.append(runner_combo)
+
+        # Add OK and Cancel buttons to the dialog
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("ok", "OK")
+        dialog.set_default_response("ok")
+        dialog.set_close_response("cancel")
+        dialog.set_extra_child(content_box)
+
+        dialog.connect("response", self.on_backup_runner_response, runner_combo, combo_runner_paths)
+        dialog.present()
+
+
+
+    def on_backup_runner_response(self, dialog, response_id, runner_combo, combo_runner_paths):
+        if response_id == "ok":
+            selected_index = runner_combo.get_active()
+            if selected_index < 0:
+                print("No runner selected.")
+                self.show_info_dialog("No Runner Selected", "Please select a runner to backup.")
+                dialog.close()
+                return
+            runner_path = combo_runner_paths[selected_index]
+            runner_name = runner_combo.get_active_text()
+            print(f"Selected runner to backup: {runner_name} -> {runner_path}")
+
+            # Present a Gtk.FileDialog to select the destination to save the backup archive
+            file_dialog = Gtk.FileDialog.new()
+            file_dialog.set_initial_name(f"{runner_name}.tar.zst")
+
+            # Create file filters
+            file_filter = Gtk.FileFilter()
+            file_filter.set_name("Tarball archives (*.tar.gz, *.tar.xz, *.tar.zst)")
+            file_filter.add_pattern("*.tar.gz")
+            file_filter.add_pattern("*.tar.xz")
+            file_filter.add_pattern("*.tar.zst")
+
+            # Create a Gio.ListStore to hold the filters
+            filter_list_store = Gio.ListStore.new(Gtk.FileFilter)
+            filter_list_store.append(file_filter)
+
+            # Set the filters on the dialog
+            file_dialog.set_filters(filter_list_store)
+
+            # Define the callback for when the file dialog is closed
+            def on_save_file_dialog_response(dialog, result):
+                try:
+                    save_file = dialog.save_finish(result)
+                    if save_file:
+                        destination_path = save_file.get_path()
+                        print(f"Backup destination selected: {destination_path}")
+                        # Start the backup process in a separate thread
+                        threading.Thread(target=self.create_runner_backup, args=(runner_path, destination_path)).start()
+                        self.show_info_dialog("Backup Complete", f"Runner backup saved to {destination_path}.")
+                except GLib.Error as e:
+                    print(f"An error occurred: {e}")
+
+            # Show the save dialog
+            file_dialog.save(self.window, None, on_save_file_dialog_response)
+        else:
+            print("Backup runner canceled.")
+
+        dialog.close()
+
+
+    def create_runner_backup(self, runner_path, destination_path):
+        """
+        Create a backup archive of the runner at runner_path, saving it to destination_path.
+        """
+        try:
+            # Determine the compression based on the file extension
+            ext = os.path.splitext(destination_path)[1]
+            if ext == ".gz":
+                compression_option = "-z"  # gzip
+            elif ext == ".xz":
+                compression_option = "-J"  # xz
+            elif ext == ".zst":
+                compression_option = "--zstd"  # zstd
+            else:
+                compression_option = ""  # no compression
+
+            # Use pathlib.Path for path manipulations
+            runner_path = Path(runner_path)
+            runner_dir = runner_path.parent.parent # Get the parent directory of the runner binary
+            runner_name = runner_dir.name  # Get the name of the runner directory
+            print(f"Creating backup of runner: {runner_name} from {runner_dir} to {destination_path}")
+
+            # Use tar to create the archive
+            tar_command = ["tar"]
+            if compression_option:
+                tar_command.append(compression_option)
+            tar_command.extend(["-cvf", destination_path, "-C", str(self.runners_dir), runner_name])
+
+            print(f"Running tar command: {' '.join(tar_command)}")
+
+            subprocess.run(tar_command, check=True)
+
+            print("Backup created successfully.")
+        except Exception as e:
+            print(f"Error creating runner backup: {e}")
+            # Show error dialog from the main thread
+            GLib.idle_add(self.show_info_dialog, "Backup Error", f"Failed to create runner backup: {e}")
+########### Restore RUnner
+    def restore_runner(self, action=None):
+        """
+        Allow the user to restore a runner from a backup archive.
+        """
+        # Present a Gtk.FileDialog to select the archive file
+        file_dialog = Gtk.FileDialog.new()
+
+        # Create file filters
+        file_filter = Gtk.FileFilter()
+        file_filter.set_name("Tarball archives (*.tar.gz, *.tar.xz, *.tar.zst)")
+        file_filter.add_pattern("*.tar.gz")
+        file_filter.add_pattern("*.tar.xz")
+        file_filter.add_pattern("*.tar.zst")
+
+        # Create a Gio.ListStore to hold the filters
+        filter_list_store = Gio.ListStore.new(Gtk.FileFilter)
+        filter_list_store.append(file_filter)
+
+        # Set the filters on the dialog
+        file_dialog.set_filters(filter_list_store)
+
+        # Define the callback for when the file dialog is closed
+        def on_open_file_dialog_response(dialog, result):
+            try:
+                file = dialog.open_finish(result)
+                if file:
+                    archive_path = file.get_path()
+                    print(f"Selected archive to restore: {archive_path}")
+
+                    # Check if the archive contains bin/wine
+                    if self.archive_contains_wine(archive_path):
+                        # Start the extraction in a separate thread
+                        threading.Thread(target=self.extract_runner_archive, args=(archive_path,)).start()
+                        self.show_info_dialog("Restore Complete", "Runner restored successfully.")
+                    else:
+                        print("Selected archive does not contain a valid runner.")
+                        self.show_info_dialog("Invalid Archive", "The selected archive does not contain a valid runner.")
+            except GLib.Error as e:
+                print(f"An error occurred: {e}")
+
+        # Show the open dialog
+        file_dialog.open(self.window, None, on_open_file_dialog_response)
+
+    def extract_runner_archive(self, archive_path):
+        """
+        Extract the runner archive to runners_dir.
+        """
+        try:
+            # Ensure the runners directory exists
+            self.runners_dir.mkdir(parents=True, exist_ok=True)
+
+            # Use tar to extract the archive
+            tar_command = ["tar", "-xvf", archive_path, "-C", str(self.runners_dir)]
+            print(f"Running tar command: {' '.join(tar_command)}")
+            subprocess.run(tar_command, check=True)
+
+            print("Runner restored successfully.")
+        except Exception as e:
+            print(f"Error extracting runner archive: {e}")
+            # Show error dialog from the main thread
+            GLib.idle_add(self.show_info_dialog, "Restore Error", f"Failed to restore runner: {e}")
+
+
+    def archive_contains_wine(self, archive_path):
+        """
+        Check if the archive contains bin/wine.
+        """
+        try:
+            # Use tar -tf to list the contents
+            tar_command = ["tar", "-tf", archive_path]
+            result = subprocess.run(tar_command, check=True, capture_output=True, text=True)
+            file_list = result.stdout.splitlines()
+            for file in file_list:
+                if "bin/wine" in file:
+                    return True
+            return False
+        except Exception as e:
+            print(f"Error checking archive contents: {e}")
+            return False
+
+
+
+
+
+
+
+
+
+
+
 
 
 def parse_args():
