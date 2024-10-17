@@ -6256,7 +6256,7 @@ class WineCharmApp(Gtk.Application):
         )
 
         download_button = Gtk.Button(label="Download Runner")
-        download_button.connect("clicked", lambda btn: self.on_download_runner_clicked(dialog))
+        download_button.connect("clicked", lambda btn: self.on_download_runner_clicked_default(dialog))
 
         cancel_button = Gtk.Button(label="Cancel")
         cancel_button.connect("clicked", lambda btn: dialog.close())
@@ -6270,6 +6270,7 @@ class WineCharmApp(Gtk.Application):
 
         dialog.set_extra_child(content_box)
         dialog.present()
+
         
     def rename_prefix_directory(self, script, script_key, *args):
         print(f"Renaming Wine prefix directory for {script} with script_key {script_key}")
@@ -6330,7 +6331,7 @@ class WineCharmApp(Gtk.Application):
 
                 # Execute the command
                 subprocess.Popen(command, shell=True)
-                print(f"Running {exe_path} from Wine prefix {wineprefix}")
+                print(f"Running winecfg from Wine prefix {wineprefix}")
 
         except Exception as e:
             print(f"Error running EXE: {e}")
@@ -6386,7 +6387,7 @@ class WineCharmApp(Gtk.Application):
 
                 # Execute the command
                 subprocess.Popen(command, shell=True)
-                print(f"Running {exe_path} from Wine prefix {wineprefix}")
+                print(f"Running regedit from Wine prefix {wineprefix}")
 
         except Exception as e:
             print(f"Error running EXE: {e}")
@@ -6546,7 +6547,8 @@ class WineCharmApp(Gtk.Application):
             body="Select the default runner for the application:"
         )
 
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        # Create a horizontal box for the ComboBox and download icon
+        runner_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
 
         # Create the ComboBox for runners
         runner_combo = Gtk.ComboBoxText()
@@ -6565,7 +6567,21 @@ class WineCharmApp(Gtk.Application):
 
         runner_combo.set_active(selected_index)
         runner_combo.set_hexpand(True)
-        content_box.append(runner_combo)
+
+        # Create a download icon button
+        download_button = Gtk.Button()
+        download_icon = Gtk.Image.new_from_icon_name("emblem-downloads-symbolic")
+        download_button.set_child(download_icon)
+        download_button.set_tooltip_text("Download Runner")
+        download_button.connect("clicked", lambda btn: self.on_download_runner_clicked_default(dialog))
+
+        # Add the ComboBox and download button to the hbox
+        runner_hbox.append(runner_combo)
+        runner_hbox.append(download_button)
+
+        # Add the hbox to the content box
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        content_box.append(runner_hbox)
 
         # Add OK and Cancel buttons to the dialog
         dialog.add_response("cancel", "Cancel")
@@ -6604,6 +6620,22 @@ class WineCharmApp(Gtk.Application):
             print("Set default runner canceled.")
 
         dialog.close()
+
+    def on_download_runner_clicked_default(self, dialog):
+        """
+        Handle the "Download Runner" button click from the set_default_runner dialog.
+        """
+        dialog.close()
+        # Start the download process with the appropriate callback
+        self.on_settings_download_runner_clicked(callback=self.on_download_complete_default_runner)
+
+    def on_download_complete_default_runner(self):
+        """
+        Callback method to handle the completion of the runner download.
+        Reopens the set_default_runner dialog.
+        """
+        # Reopen the set_default_runner dialog after the download completes
+        self.set_default_runner()
 
 
 
@@ -6730,12 +6762,13 @@ class WineCharmApp(Gtk.Application):
         # Ensure runner data is loaded
         if not self.runner_data:
             self.show_info_dialog(
-                "Runner data not available", 
+                "Runner data not available",
                 "Please try again in a moment or restart the application."
             )
             # Invoke the callback since data is not available
-            GLib.idle_add(callback)
-            return 
+            if callback is not None:
+                GLib.idle_add(callback)
+            return
 
         # Get the active window to set as transient parent
         active_window = self.get_active_window() or self.window
@@ -6779,7 +6812,7 @@ class WineCharmApp(Gtk.Application):
                 combo_box.append_text(file['name'])  # Add the runner name to the combobox
             combo_box.set_active(0)  # Set default to "Choose..."
             combo_boxes[label_text] = {
-                "combo_box": combo_box, 
+                "combo_box": combo_box,
                 "file_list": file_list  # Keep track of the original data
             }
 
@@ -6848,7 +6881,6 @@ class WineCharmApp(Gtk.Application):
                 progress_dialog.present()
 
                 # Start the download in a separate thread, passing the callback
-                #art the download in a separate thread, passing the callback
                 threading.Thread(
                     target=self.download_runners_thread,
                     args=(selected_runners, progress_dialog, total_progress_bar, runner_progress_bar, progress_label, callback)
@@ -6863,10 +6895,12 @@ class WineCharmApp(Gtk.Application):
             # Invoke the callback since the download was canceled
             if callback is not None:
                 GLib.idle_add(callback)
+
         # Close the selection dialog
         dialog.close()
 
-    def download_runners_thread(self, selected_runners, progress_dialog, total_progress_bar, runner_progress_bar, progress_label, callback):
+
+    def download_runners_thread(self, selected_runners, progress_dialog, total_progress_bar, runner_progress_bar, progress_label, callback=None):
         """
         Download selected runners and update progress.
         """
@@ -6903,14 +6937,14 @@ class WineCharmApp(Gtk.Application):
                 self.show_info_dialog,
                 "Download Complete",
                 "The runners have been successfully downloaded and extracted.",
-                callback  # Pass the callback here
+                callback if callback is not None else None
             )
         else:
             GLib.idle_add(
                 self.show_info_dialog,
                 "Download Incomplete",
                 "Some runners failed to download.",
-                callback if callback is not None else lambda: None
+                callback if callback is not None else None
             )
 
     def download_and_extract_runner(self, runner_name, download_url, progress_callback=None):
