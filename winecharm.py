@@ -38,7 +38,7 @@ class WineCharmApp(Gtk.Application):
         
         # Move the global variables to instance attributes
         self.debug = False
-        self.version = "0.94"
+        self.version = "0.95"
         
         # Paths and directories
         self.winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
