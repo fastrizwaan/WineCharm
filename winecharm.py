@@ -508,10 +508,10 @@ class WineCharmApp(Gtk.Application):
         # Check if Settings.yaml exists and set the template and arch accordingly
         if self.settings_file.exists():
             settings = self.load_settings()  # Assuming load_settings() returns a dictionary
-            self.template = settings.get('template', self.default_template)
+            self.template = self.expand_and_resolve_path(settings.get('template', self.default_template))
             self.arch = settings.get('arch', "win64")
         else:
-            self.template = self.default_template
+            self.template = self.expand_and_resolve_path(self.default_template)
             self.arch = "win64"
             self.runner = ""
             self.template = self.default_template  # Set template to the initialized one
