@@ -427,7 +427,7 @@ class WineCharmApp(Gtk.Application):
 
     def show_initializing_step(self, step_text):
         button = Gtk.Button()
-        button.set_size_request(390, 36)
+        button.set_size_request(450, 36)
         button.add_css_class("flat")
         hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         checkbox = Gtk.CheckButton()
@@ -575,7 +575,7 @@ class WineCharmApp(Gtk.Application):
 
         self.window = Gtk.ApplicationWindow(application=self)
         self.window.set_title("Wine Charm")
-        self.window.set_default_size(420, 560)
+        self.window.set_default_size(480, 640)
         self.window.add_css_class("common-background")
 
         self.headerbar = Gtk.HeaderBar()
@@ -1021,7 +1021,7 @@ class WineCharmApp(Gtk.Application):
             self.vbox.remove(self.open_button)
 
         self.launch_button = Gtk.Button()
-        self.launch_button.set_size_request(390, 36)
+        self.launch_button.set_size_request(450, 36)
 
         #yaml_info = self.extract_yaml_info(script)
         script_key = script_data['sha256sum']  # Use sha256sum as the key
@@ -1117,7 +1117,7 @@ class WineCharmApp(Gtk.Application):
             # Non-icon view mode: Smaller icon size and horizontally oriented layout
             icon = self.load_icon(script, 32, 32)
             icon_image = Gtk.Image.new_from_paintable(icon)
-            button.set_size_request(390, 36)
+            button.set_size_request(450, 36)
             icon_image.set_pixel_size(32)
             hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
 
@@ -2332,6 +2332,8 @@ class WineCharmApp(Gtk.Application):
         #script_data['script_path'] = yaml_data['script_path']
         
         print(f"Created new charm file: {yaml_file_path} with script_key {script_key}")
+        
+        GLib.idle_add(self.create_script_list)
 
 
     def extract_icon(self, exe_file, wineprefix, exe_no_space, progname):
@@ -6402,7 +6404,7 @@ class WineCharmApp(Gtk.Application):
             self.vbox.remove(self.open_button)
 
         self.launch_button = Gtk.Button(label="Setttings")
-        self.launch_button.set_size_request(390, 36)
+        self.launch_button.set_size_request(450, 36)
         launch_label = "Settings"
         #yaml_info = self.extract_yaml_info(script)
  #       script_key = script_data['sha256sum']  # Use sha256sum as the key
