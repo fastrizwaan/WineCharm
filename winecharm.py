@@ -1343,7 +1343,7 @@ class WineCharmApp(Gtk.Application):
         exe_parent_name = None
         unique_id = None
         if process_info:
-            script = process_info.get("script")
+            script = self.expand_and_resolve_path(process_info.get("script"))
             exe_name = process_info.get("exe_name")
             exe_parent_name = process_info.get("exe_parent_name")
             unique_id = process_info.get("unique_id")
