@@ -1789,6 +1789,11 @@ class WineCharmApp(Gtk.Application):
         GLib.idle_add(self.process_ended, script_key)
 
         if return_code != 0 and not manually_stopped:
+            # Handle error code 2 (cancelled by the user) gracefully
+            if return_code == 2:
+                print("Process was cancelled by the user.")
+                return
+
             # Show error dialog only if the process was not stopped manually
             script = process_info.get('script')
             wineprefix = process_info.get('wineprefix')
