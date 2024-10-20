@@ -244,7 +244,7 @@ class WineCharmApp(Gtk.Application):
 
         # Optionally, clear the running processes dictionary
         self.running_processes.clear()
-        GLib.timeout_add_seconds(0.5, self.create_script_list)
+        GLib.timeout_add_seconds(0.5, self.load_script_list)
 
     def on_help_clicked(self, action=None, param=None):
         print("Help action triggered")
@@ -6280,8 +6280,170 @@ class WineCharmApp(Gtk.Application):
 
         
     def rename_prefix_directory(self, script, script_key, *args):
-        print(f"Renaming Wine prefix directory for {script} with script_key {script_key}")
-        # Add functionality to rename the Wine prefix directory.
+        """
+        Show a dialog to allow the user to rename the Wine prefix directory.
+
+        :param script_key: The unique key for identifying the script.
+        """
+        # Retrieve script data using the script key
+        script_data = self.script_list.get(script_key)
+        
+        # Debug: Print all keys to identify possible mismatches
+        if script_data is None:
+            print(f"Error: Script key {script_key} not found in script_list.")
+            print("Available script keys:", list(self.script_list.keys()))
+            return
+
+        # Get the current Wine prefix path
+        wineprefix = Path(script_data.get('wineprefix')).expanduser().resolve()
+        if not wineprefix.exists():
+            print(f"Error: Wine prefix directory '{wineprefix}' does not exist.")
+            return
+
+        # Create a dialog to prompt the user for the new directory name
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,
+            title="Rename Wine Prefix",
+            body=f"Enter a new name for the Wine prefix directory:\n(Current: {wineprefix.name})"
+        )
+
+        # Create an entry field with the current directory name
+        entry = Gtk.Entry()
+        entry.set_text(wineprefix.name)
+
+        # Add the entry field to the dialog
+        dialog.set_extra_child(entry)
+
+        # Add "OK" and "Cancel" buttons
+        dialog.add_response("ok", "OK")
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+
+        # Connect the response signal to handle the user's input
+        dialog.connect("response", self.on_rename_prefix_dialog_response, entry, script_key, wineprefix)
+
+        # Present the dialog
+        dialog.present()
+
+
+    def on_rename_prefix_dialog_response(self, dialog, response, entry, script_key, old_wineprefix):
+        """
+        Handle the user's response to the rename prefix dialog.
+
+        :param dialog: The dialog instance.
+        :param response: The user's response (e.g., "ok" or "cancel").
+        :param entry: The entry widget containing the new directory name.
+        :param script_key: The unique key identifying the script.
+        :param old_wineprefix: The original Wine prefix directory path.
+        """
+        if response != "ok":
+            dialog.destroy()
+            return
+
+        # Get the new directory name from the entry widget
+        new_name = entry.get_text().strip()
+        if not new_name or new_name == old_wineprefix.name:
+            print("No changes made to the Wine prefix directory name.")
+            dialog.destroy()
+            return
+
+        # Define the new Wine prefix path
+        new_wineprefix = old_wineprefix.parent / new_name
+
+        try:
+            # Rename the Wine prefix directory
+            old_wineprefix.rename(new_wineprefix)
+
+            # Update the script data with the new prefix path
+            self.script_list[script_key]['wineprefix'] = str(new_wineprefix)
+
+            print(f"Successfully renamed Wine prefix to '{new_name}'.")
+
+            # Update .charm files within the renamed prefix directory
+            self.update_charm_files_with_new_prefix(new_wineprefix, old_wineprefix)
+
+            # Update any other script data references (e.g., if paths are stored separately)
+            self.update_script_data_references(script_key, str(new_wineprefix))
+
+        except Exception as e:
+            print(f"Error renaming Wine prefix directory: {e}")
+            # Show an error dialog if needed (not implemented here)
+        
+        # Clean up the dialog
+        dialog.destroy()
+
+    def update_charm_files_with_new_prefix(self, new_wineprefix, old_wineprefix):
+        """
+        Update all .charm files within the newly renamed prefix directory to reflect the new prefix path.
+
+        :param new_wineprefix: The new Wine prefix path.
+        :param old_wineprefix: The old Wine prefix path.
+        """
+        # Get the tilde-prefixed versions of the old and new Wine prefixes
+        old_wineprefix_tilde = self.replace_home_with_tilde_in_path(str(old_wineprefix))
+        new_wineprefix_tilde = self.replace_home_with_tilde_in_path(str(new_wineprefix))
+
+        # Iterate through all .charm files within the new prefix directory
+        for charm_file in Path(new_wineprefix).rglob("*.charm"):
+            try:
+                # Read the content of the .charm file
+                with open(charm_file, "r") as file:
+                    content = file.read()
+
+                # Replace occurrences of the old prefix path with the new prefix path using tilde
+                updated_content = content.replace(old_wineprefix_tilde, new_wineprefix_tilde)
+
+                # Write the updated content back to the .charm file
+                with open(charm_file, "w") as file:
+                    file.write(updated_content)
+
+                print(f"Updated .charm file: {charm_file}")
+
+            except Exception as e:
+                print(f"Error updating .charm file {charm_file}: {e}")
+
+    def update_script_data_references(self, script_key, new_wineprefix):
+        """
+        Update internal script data references related to the old prefix.
+
+        :param script_key: The unique key identifying the script.
+        :param new_wineprefix: The new Wine prefix path.
+        """
+        # Get the script data from script_list
+        script_data = self.script_list.get(script_key)
+        if script_data:
+            old_wineprefix = Path(script_data['wineprefix']).expanduser().resolve()
+            new_wineprefix_resolved = Path(new_wineprefix).expanduser().resolve()
+
+            # Update the wineprefix path in the script_data
+            script_data['wineprefix'] = str(new_wineprefix_resolved)
+
+            # Update exe_file, script_path, and any other fields containing the old wineprefix path
+            for key, value in script_data.items():
+                if isinstance(value, str) and str(old_wineprefix) in value:
+                    script_data[key] = value.replace(str(old_wineprefix), str(new_wineprefix_resolved))
+
+            # Special handling for script_path to reflect the new prefix
+            if 'script_path' in script_data:
+                # Extract the filename from the old script path
+                old_script_filename = Path(script_data['script_path']).name
+                # Create the new script path using the new prefix and the old script filename
+                new_script_path = Path(new_wineprefix_resolved) / old_script_filename
+                script_data['script_path'] = str(new_script_path)
+
+            # Print updated script_data for debugging
+            print(f"Updated script data for script key: {script_key}")
+            for key, value in script_data.items():
+                print(f"  {key}: {value}")
+
+            # Update the script list and any other relevant UI data
+            self.script_list[script_key] = script_data
+            self.script_ui_data[script_key]['script_path'] = script_data['script_path']
+
+            # Reload script list from files
+            self.load_script_list()
 
     def set_wine_arch(self, script, script_key, *args):
         print(f"Setting Wine architecture for {script} with script_key {script_key}")
