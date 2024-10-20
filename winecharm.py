@@ -6838,7 +6838,7 @@ class WineCharmApp(Gtk.Application):
         now = datetime.now()
 
         # Check if it's older than 1 day
-        return (now - last_modified) > timedelta(days=1)
+        return (now - last_modified) > timedelta(hours=1)
 
     def fetch_runner_urls_from_github(self):
         """
