@@ -7164,9 +7164,87 @@ class WineCharmApp(Gtk.Application):
         print("Importing a runner...")
         # Add functionality to import a runner.
 
+
     def delete_runner(self, action=None):
-        print("Deleting the current runner...")
-        # Add functionality to delete a runner.
+        """
+        Allow the user to delete a selected runner.
+        """
+
+        # Step 1: Gather valid runners from runners_dir
+        all_runners = self.get_valid_runners(self.runners_dir, is_bundled=False)
+        if not all_runners:
+            # If no runners are available, show an information dialog
+            self.show_info_dialog("No Runners Available", "No runners found to delete.")
+            return
+
+        # Create the MessageDialog
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,
+            heading="Delete Runner",
+            body="Select a runner to delete:"
+        )
+
+        # Create the ComboBox for runners
+        runner_combo = Gtk.ComboBoxText()
+        combo_runner_dirs = []  # Store constructed paths as `runners_dir/{display_name}`
+
+        for display_name, _ in all_runners:
+            runner_combo.append_text(display_name)
+            # Construct the path as `runners_dir/display_name` and store it
+            runner_dir = os.path.join(self.runners_dir, display_name)
+            combo_runner_dirs.append(runner_dir)
+
+        runner_combo.set_active(0)
+        runner_combo.set_hexpand(True)
+
+        # Add the ComboBox to the content box
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        content_box.append(runner_combo)
+
+        # Add OK and Cancel buttons to the dialog
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("delete", "Delete")
+        dialog.set_default_response("delete")
+        dialog.set_close_response("cancel")
+        dialog.set_extra_child(content_box)
+
+        # Connect the response signal to a deletion handler
+        dialog.connect("response", self.on_delete_runner_response, runner_combo, combo_runner_dirs)
+        dialog.present()
+
+    def on_delete_runner_response(self, dialog, response, runner_combo, combo_runner_dirs):
+        """
+        Handle the response from the delete runner dialog.
+        """
+        dialog.destroy()
+
+        if response != "delete":
+            return  # If the user cancels, exit early
+
+        # Get the selected runner directory path
+        selected_index = runner_combo.get_active()
+        if selected_index < 0:
+            self.show_info_dialog("Selection Error", "No runner was selected for deletion.")
+            return
+
+        selected_runner_dir = combo_runner_dirs[selected_index]
+
+        # Attempt to delete the runner directory and notify the user
+        try:
+            # Delete the entire directory and its contents
+            if os.path.isdir(selected_runner_dir):
+                shutil.rmtree(selected_runner_dir)
+            else:
+                raise NotADirectoryError(f"{selected_runner_dir} is not a directory.")
+
+            # Notify the user of successful deletion
+            self.show_info_dialog("Deletion Successful", f"Runner directory '{selected_runner_dir}' and its contents were deleted successfully.")
+
+        except Exception as e:
+            # Handle errors and display error message
+            self.show_info_dialog("Deletion Error", f"Error deleting runner directory '{selected_runner_dir}': {e}")
+
 
     def set_default_template(self, action=None):
         print("Setting the default template...")
