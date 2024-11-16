@@ -3067,6 +3067,18 @@ class WineCharmApp(Gtk.Application):
             progname = variables.get('PROGNAME', '')
             sha256sum = variables.get('CHECKSUM', '')
 
+        # Regenerate sha256sum if missing
+        if exe_file and not sha256sum:
+            sha256_hash = hashlib.sha256()
+            try:
+                with open(exe_file, "rb") as f:
+                    for byte_block in iter(lambda: f.read(4096), b""):
+                        sha256_hash.update(byte_block)
+                sha256sum = sha256_hash.hexdigest()
+                print(f"Warning: sha256sum missing in {exe_file}. Regenerated hash.")
+            except FileNotFoundError:
+                print(f"Error: {exe_file} not found. Cannot compute sha256sum.")
+
             info_file_path = variables.get('INFOFILE')
             if info_file_path:
                 info_file_path = os.path.join(os.path.dirname(sh_file), info_file_path)
