@@ -377,11 +377,14 @@ class WineCharmApp(Gtk.Application):
         self.stop_processing = False
         self.current_arch = arch  # Store current architecture
         
-        # Disconnect open button handler
-        if self.open_button_handler_id is not None:
-            self.open_button.disconnect(self.open_button_handler_id)
-            self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_template_init_clicked)
+        # Disabled Cancel/Interruption
+        ## Disconnect open button handler
+        #if self.open_button_handler_id is not None:
+        #    self.open_button.disconnect(self.open_button_handler_id)
+        #    self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_template_init_clicked)
+        self.disconnect_open_button()
         
+
         # Architecture-specific steps
         steps = [
             ("Initializing wineprefix", 
@@ -390,8 +393,8 @@ class WineCharmApp(Gtk.Application):
             lambda: self.remove_symlinks_and_create_directories(template_dir)),
             #("Installing corefonts", 
             #f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
-            ("Installing openal", 
-            f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+            #("Installing openal", 
+            #f"WINEPREFIX='{template_dir}' winetricks -q openal"),
             #("Installing vkd3d", 
             #f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
             #("Installing dxvk", 
@@ -466,8 +469,9 @@ class WineCharmApp(Gtk.Application):
         self.search_button.set_sensitive(True)
         self.view_toggle_button.set_sensitive(True)
         
-        if self.open_button_handler_id is not None:
-            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
+        # Disabled Cancel/Interruption
+        #if self.open_button_handler_id is not None:
+        #    self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
 
         print("Template initialization completed and UI updated.")
         self.show_initializing_step("Initialization Complete!")
@@ -481,6 +485,7 @@ class WineCharmApp(Gtk.Application):
             self.command_line_file = None  # Reset after processing
 
         self.set_dynamic_variables()
+        self.reconnect_open_button()
     
     def process_cli_file_later(self, file_path):
         # Use GLib.idle_add to ensure this runs after the main loop starts
@@ -5279,7 +5284,6 @@ class WineCharmApp(Gtk.Application):
                     print(f"Valid Wine directory selected: {directory}")
 
                     self.show_processing_spinner(f"Importing {Path(directory).name}")
-                    self.disconnect_open_button()
 
                     # Destination directory
                     dest_dir = self.prefixes_dir / Path(directory).name
@@ -5610,12 +5614,15 @@ class WineCharmApp(Gtk.Application):
         """
         Reconnect the open button's handler and reset its label.
         """
+        # disconnect before reconnecting
+        #self.disconnect_open_button()
+
         if self.open_button_handler_id is not None:
             self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
         
         if self.spinner:
             self.spinner.stop()
-            self.open_button_box.remove(self.spinner)
+            #self.open_button_box.remove(self.spinner)
             self.spinner = None  # Ensure the spinner reference is cleared
 
         self.set_open_button_label("Open")
@@ -9443,6 +9450,22 @@ class WineCharmApp(Gtk.Application):
                 raise
             print(f"Could not check file {file_path} ({e})")
         return False
+
+
+##################################################################################### 
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
