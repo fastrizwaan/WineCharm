@@ -301,10 +301,10 @@ class WineCharmApp(Gtk.Application):
         self.single_prefix = False
         self.load_settings()
         print(f"Single Prefix: {self.single_prefix}")
-
         # Unified template initialization logic
         def initialize_template_if_needed(template_path, arch, single_prefix_dir=None):
             if not template_path.exists():
+                self.set_open_button_label("Initializing")
                 print(f"Initializing {arch} template...")
                 self.initialize_template(template_path, self.on_template_initialized, arch=arch)
                 return True
@@ -487,14 +487,18 @@ class WineCharmApp(Gtk.Application):
         GLib.idle_add(self.show_processing_spinner, "hello world")
         GLib.idle_add(self.process_cli_file, file_path)
 
-    def set_open_button_label(self, text):
+    def set_open_button_label(self, label_text):
+        """Helper method to update the open button's label"""
         box = self.open_button.get_child()
+        if not box:
+            return
+            
         child = box.get_first_child()
         while child:
             if isinstance(child, Gtk.Label):
-                child.set_label(text)
+                child.set_label(label_text)
             elif isinstance(child, Gtk.Image):
-                child.set_visible(False if text == "Initializing" else True)
+                child.set_visible(False)  # Hide the icon during processing
             child = child.get_next_sibling()
 
     def show_initializing_step(self, step_text):
@@ -4979,80 +4983,96 @@ class WineCharmApp(Gtk.Application):
 
 
 
-    def process_cli_file(self, file_path):
-        print(f"Processing CLI file: {file_path}")
-        abs_file_path = str(Path(file_path).resolve())
-        print(f"Resolved absolute CLI file path: {abs_file_path}")
-
+    def process_cli_file_in_thread(self, file_path):
+        """Process CLI file in a background thread with step-based progress"""
+        self.stop_processing = False
+        
+        GLib.idle_add(lambda: self.show_processing_spinner("Processing..."))
+        steps = [
+            ("Creating configuration", lambda: self.create_yaml_file(str(file_path), None)),
+        ]
         try:
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-            self.create_yaml_file(abs_file_path, None)
+            # Show progress bar and initialize UI
+            self.total_steps = len(steps)
+            
+            # Process each step
+            for index, (step_text, step_func) in enumerate(steps, 1):
+                if self.stop_processing:
+                    return
+                    
+                # Update progress bar
+                GLib.idle_add(lambda i=index: self.progress_bar.set_fraction((i-1)/self.total_steps))
+                #GLib.idle_add(lambda t=step_text: self.set_open_button_label(t))
+                
+                try:
+                    # Execute the step
+                    step_func()
+                    # Update progress after step completion
+                    GLib.idle_add(lambda i=index: self.progress_bar.set_fraction(i/self.total_steps))
+                except Exception as e:
+                    print(f"Error during step '{step_text}': {e}")
+                    GLib.idle_add(lambda: self.show_info_dialog("Error", f"An error occurred during '{step_text}': {e}"))
+                    return
 
         except Exception as e:
-            print(f"Error processing file: {e}")
+            print(f"Error during file processing: {e}")
+            GLib.idle_add(lambda: self.show_info_dialog("Error", f"Processing failed: {e}"))
         finally:
-            if self.initializing_template:
-                pass  # Keep showing spinner
-            else:
-                GLib.timeout_add_seconds(1, self.hide_processing_spinner)
-                
-            GLib.timeout_add_seconds(0.5, self.create_script_list)
+            # Clean up and update UI
+            def cleanup():
+                if not self.initializing_template:
+                    self.hide_processing_spinner()
+                self.create_script_list()
+                return False
+            
+            GLib.timeout_add(500, cleanup)
 
 
     def show_processing_spinner(self, label_text):
-        """
-        Initialize progress tracking UI for any step-based process
-        """
-        # Clear the open button box
-        while self.open_button_box.get_first_child():
-            self.open_button_box.remove(self.open_button_box.get_first_child())
+        if hasattr(self, 'progress_bar'):
+            self.vbox.remove(self.progress_bar)
+            del self.progress_bar
+
+        # Ensure main flowbox is visible
+        self.main_frame.set_child(self.scrolled)
         
-        # Create and add progress bar to the open button
+        # Add progress bar
         self.progress_bar = Gtk.ProgressBar()
-        self.progress_bar.set_show_text(True)
-        self.progress_bar.set_text(label_text)
+        self.progress_bar.set_show_text(False)
         self.progress_bar.set_fraction(0.0)
         self.progress_bar.set_size_request(420, -1)
-        self.open_button_box.append(self.progress_bar)
-        
-        # Clear the flowbox for showing steps
+        self.vbox.prepend(self.progress_bar)
         self.flowbox.remove_all()
         
-        # Create a list to store steps
+        # Update button label
+        self.set_open_button_label(label_text)
+        
+        # Initialize steps
         self.step_boxes = []
         
-        # Disable UI elements during processing
+        # Disable UI elements
         self.search_button.set_sensitive(False)
         self.view_toggle_button.set_sensitive(False)
+        self.menu_button.set_sensitive(False)
 
     def hide_processing_spinner(self):
-        """
-        Restore UI state after process completion with safe widget removal
-        """
+        """Restore UI state after process completion with safe widget removal"""
         try:
-            # Safely remove children from open_button_box
-            if hasattr(self, 'open_button_box'):
-                child = self.open_button_box.get_first_child()
-                while child:
-                    next_child = child.get_next_sibling()
-                    self.open_button_box.remove(child)
-                    child = next_child
-            
-            # Safely restore original button content
-            if hasattr(self, 'open_button_box'):
-                open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
-                open_label = Gtk.Label(label="Open")
-                self.open_button_box.append(open_icon)
-                self.open_button_box.append(open_label)
-            
+            if hasattr(self, 'progress_bar'):
+                self.vbox.remove(self.progress_bar)
+                del self.progress_bar
+
+            # Update button back to original state
+            self.set_open_button_label("Open")
+                
             # Safely re-enable UI elements
             if hasattr(self, 'search_button'):
                 self.search_button.set_sensitive(True)
             if hasattr(self, 'view_toggle_button'):
                 self.view_toggle_button.set_sensitive(True)
-            
+            if hasattr(self, 'menu_button'):    
+                self.menu_button.set_sensitive(True)
+
             # Clear step tracking safely
             if hasattr(self, 'step_boxes'):
                 self.step_boxes = []
@@ -8968,8 +8988,8 @@ class WineCharmApp(Gtk.Application):
             # Extract the archive with process tracking
             extract_process = subprocess.Popen(
                 ['tar', '-I', 'zstd -T0', '-xf', file_path, '-C', self.prefixes_dir,
-                 "--transform", f"s|XOUSERXO|{current_username}|g", 
-                 "--transform", f"s|%USERNAME%|{current_username}|g"],
+                 "--transform", rf"s|XOUSERXO|{current_username}|g", 
+                 "--transform", rf"s|%USERNAME%|{current_username}|g"],
                 preexec_fn=preexec_function
             )
             
@@ -9039,7 +9059,7 @@ class WineCharmApp(Gtk.Application):
         try:
             # Extract only directories by filtering those that end with '/'
             extracted_prefix_name = subprocess.check_output(
-                ["bash", "-c", f"tar -tf '{file_path}' | head -n2 | grep '/$' | cut -f1 -d '/'"]
+                ["bash", "-c", f"tar -tf '{file_path}' | head -n2 | grep '/$' |head -n1 | cut -f1 -d '/'"]
             ).decode('utf-8').strip()
 
             if not extracted_prefix_name:
@@ -9048,6 +9068,7 @@ class WineCharmApp(Gtk.Application):
             # Print the correct path for debugging
             extracted_prefix_path = Path(self.prefixes_dir) / extracted_prefix_name
             print("#" * 100)
+            print(extracted_prefix_name)
             print(extracted_prefix_path)
             
             return extracted_prefix_path
@@ -9233,6 +9254,7 @@ class WineCharmApp(Gtk.Application):
             ("Copying Wine directory", lambda: self.custom_copytree(src, dst)),
             ("Processing registry files", lambda: self.process_reg_files(dst)),
             ("Performing Replacements", lambda: self.perform_replacements(dst)),
+            ("Renaming and Merging User Directories", lambda: self.rename_and_merge_user_directories(dst)),
             ("Creating scripts for .exe files", lambda: self.create_scripts_for_exe_files(dst)),
         ]
         
