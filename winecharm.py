@@ -1458,7 +1458,7 @@ class WineCharmApp(Gtk.Application):
         if not script_data:
             print("Error: Script data could not be reloaded.")
             self.handle_ui_error(
-                play_stop_button, row, 
+                play_stop_button, row,
                 "Script Error", "Failed to reload script data.", "Script Error"
             )
             return None
@@ -1473,68 +1473,14 @@ class WineCharmApp(Gtk.Application):
         exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
         wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
 
-        # Get the runner from the script data, fallback to 'wine' if not provided
-        runner = script_data.get('runner', '').strip()
-        if not runner:
-            if self.debug:
-                print("Runner not specified in script data, falling back to 'wine'.")
-            runner = "wine"
-
-        if self.debug:
-            print(f"Using runner: {runner}")
-
-        # If the runner is a path (e.g., /usr/bin/wine), resolve it
         try:
-            if runner != "wine":
-                runner = Path(runner).expanduser().resolve()
-                if self.debug:
-                    print(f"Runner resolved as absolute path: {runner}")
+            # Get the runner from the script data
+            runner_path = self.get_runner(script_data)
         except Exception as e:
-            print(f"Error resolving runner path: {e}")
+            print(f"Error getting runner: {e}")
             self.handle_ui_error(
                 play_stop_button, row,
-                "Runner Error", f"Invalid runner path: {runner}. Error: {e}",
-                "Invalid Runner Path"
-            )
-            return
-
-        # Check if the runner is a valid path or command
-        runner_path = None
-        if isinstance(runner, Path) and runner.is_absolute():
-            runner_path = runner
-        else:
-            runner_path = self.find_command_in_path(runner)
-
-        # Verify if the runner exists
-        if not runner_path:
-            print(f"Error: Runner '{runner}' not found.")
-            self.handle_ui_error(
-                play_stop_button, row,
-                "Runner Not Found", f"The runner '{runner}' was not found.",
-                "Runner Not Found"
-            )
-            return
-
-        if self.debug:
-            print(f"Resolved runner path: {runner_path}")
-
-        try:
-            # Check if the runner works by running 'runner --version'
-            result = subprocess.run(
-                [str(runner_path), "--version"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=env
-            )
-            if result.returncode != 0:
-                raise Exception(result.stderr.strip())
-            if self.debug:
-                print(f"Runner version: {result.stdout.strip()}")
-        except Exception as e:
-            self.handle_ui_error(
-                play_stop_button, row,
-                "Runner Error", f"Failed to run '{runner_path} --version'. Error: {e}",
+                "Runner Error", f"Failed to get runner. Error: {e}",
                 "Runner Error"
             )
             return
@@ -1610,6 +1556,69 @@ class WineCharmApp(Gtk.Application):
                 f"Failed to launch the script. Error: {e}"
             )
 
+    def get_runner(self, script_data):
+        """
+        Extracts and resolves the runner from the script data.
+
+        Args:
+            script_data (dict): The script data containing runner information.
+
+        Returns:
+            Path or str: The resolved runner path or command.
+        """
+        self.debug = True  # Enable debugging
+
+        # Get the runner from the script data, fallback to 'wine' if not provided
+        runner = script_data.get('runner', '').strip()
+        if not runner:
+            if self.debug:
+                print("Runner not specified in script data, falling back to 'wine'.")
+            runner = "wine"
+
+        if self.debug:
+            print(f"Using runner: {runner}")
+
+        # If the runner is a path (e.g., /usr/bin/wine), resolve it
+        try:
+            if runner != "wine":
+                runner = Path(runner).expanduser().resolve()
+                if self.debug:
+                    print(f"Runner resolved as absolute path: {runner}")
+        except Exception as e:
+            print(f"Error resolving runner path: {e}")
+            raise ValueError(f"Invalid runner path: {runner}. Error: {e}")
+
+        # Check if the runner is a valid path or command
+        runner_path = None
+        if isinstance(runner, Path) and runner.is_absolute():
+            runner_path = runner
+        else:
+            runner_path = self.find_command_in_path(runner)
+
+        # Verify if the runner exists
+        if not runner_path:
+            raise FileNotFoundError(f"The runner '{runner}' was not found.")
+
+        if self.debug:
+            print(f"Resolved runner path: {runner_path}")
+
+        try:
+            # Check if the runner works by running 'runner --version'
+            result = subprocess.run(
+                [str(runner_path), "--version"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=os.environ.copy()
+            )
+            if result.returncode != 0:
+                raise Exception(result.stderr.strip())
+            if self.debug:
+                print(f"Runner version: {result.stdout.strip()}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to run '{runner_path} --version'. Error: {e}")
+
+        return runner_path
 
     def find_command_in_path(self, command):
         """
@@ -1822,30 +1831,26 @@ class WineCharmApp(Gtk.Application):
         pid = process_info.get('pid')
         script = process_info.get('script')
         wineprefix = Path(process_info.get('wineprefix')).expanduser().resolve()
-        exe_file = Path(process_info.get('exe_file', '')).expanduser().resolve()        
-        exe_name = script = process_info.get('exe_name')
+        exe_file = Path(process_info.get('exe_file', '')).expanduser().resolve()
+        exe_name = process_info.get('exe_name')
 
-        runner = process_info.get('runner', 'wine')
-        
+        try:
+            # Get the runner from the script data
+            runner_path = self.get_runner(process_info)
+            runner_dir = runner_path.parent.resolve()
+            path_env = f'export PATH="{shlex.quote(str(runner_dir))}:$PATH"'
+        except Exception as e:
+            print(f"Error getting runner: {e}")
+            return False
 
-        if runner:
-            runner = Path(runner).expanduser().resolve()
-            runner_dir = str(runner.parent.expanduser().resolve())
-            path_env = f'export PATH="{runner_dir}:$PATH"'
-        else:
-            runner = "wine"
-            runner_dir = ""  # Or set a specific default if required
-            path_env = ""
-        
-        
         exe_name = shlex.quote(str(exe_name))
         runner_dir = shlex.quote(str(runner_dir))
 
         print("="*100)
-        print(f"runner = {runner}")
+        print(f"runner = {runner_path}")
         print(f"exe_file = {exe_file}")
         print(f"exe_name = {exe_name}")
-        
+
         def run_get_child_pid():
             try:
                 print("---------------------------------------------")
@@ -1854,34 +1859,33 @@ class WineCharmApp(Gtk.Application):
                 # Prepare command to filter processes using winedbg
                 if path_env:
                     winedbg_command_with_grep = (
-                    f"export PATH={shlex.quote(str(runner_dir))}:$PATH; "
-                    f"WINEPREFIX={shlex.quote(str(wineprefix))} winedbg --command 'info proc' | "
-                    f"grep -A9 \"{exe_name}\" | grep -v 'grep' | grep '_' | "
-                    f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
-                    f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
-                    f"grep -v 'svchost.exe'   | grep -v 'plugplay.exe' | grep -v 'winedevice.exe' | "
-                    f"cut -f2- -d '_' | tr \"'\" ' '"
+                        f"export PATH={shlex.quote(str(runner_dir))}:$PATH; "
+                        f"WINEPREFIX={shlex.quote(str(wineprefix))} winedbg --command 'info proc' | "
+                        f"grep -A9 \"{exe_name}\" | grep -v 'grep' | grep '_' | "
+                        f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
+                        f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
+                        f"grep -v 'svchost.exe'   | grep -v 'plugplay.exe' | grep -v 'winedevice.exe' | "
+                        f"cut -f2- -d '_' | tr \"'\" ' '"
                     )
                 else:
                     winedbg_command_with_grep = (
-                    f"WINEPREFIX={shlex.quote(str(wineprefix))} winedbg --command 'info proc' | "
-                    f"grep -A9 \"{exe_name}\" | grep -v 'grep' | grep '_' | "
-                    f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
-                    f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
-                    f"grep -v 'svchost.exe'   | grep -v 'plugplay.exe' | grep -v 'winedevice.exe' | "
-                    f"cut -f2- -d '_' | tr \"'\" ' '"
+                        f"WINEPREFIX={shlex.quote(str(wineprefix))} winedbg --command 'info proc' | "
+                        f"grep -A9 \"{exe_name}\" | grep -v 'grep' | grep '_' | "
+                        f"grep -v 'start.exe'    | grep -v 'winedbg.exe' | grep -v 'conhost.exe' | "
+                        f"grep -v 'explorer.exe' | grep -v 'services.exe' | grep -v 'rpcss.exe' | "
+                        f"grep -v 'svchost.exe'   | grep -v 'plugplay.exe' | grep -v 'winedevice.exe' | "
+                        f"cut -f2- -d '_' | tr \"'\" ' '"
                     )
-                if self.debug:    
+                if self.debug:
                     print("---------run_get_child_pid's winedbg_command_with_grep---------------")
                     print(winedbg_command_with_grep)
                     print("--------/run_get_child_pid's winedbg_command_with_grep---------------")
-            
+
                 winedbg_output_filtered = subprocess.check_output(winedbg_command_with_grep, shell=True, text=True).strip().splitlines()
-                if self.debug:    
+                if self.debug:
                     print("--------- run_get_child_pid's winedbg_output_filtered ---------------")
                     print(winedbg_output_filtered)
                     print("---------/run_get_child_pid's winedbg_output_filtered ---------------")
-
 
                 # Retrieve the parent directory name and search for processes
                 exe_parent = exe_file.parent.name
@@ -1893,27 +1897,26 @@ class WineCharmApp(Gtk.Application):
 
                     # Command to get PIDs for matching processes
                     pgrep_command = (
-                    f"ps -ax --format pid,command | grep \"{filtered_exe}\" | "
-                    f"grep \"{cleaned_exe_parent_name}\" | grep -v 'grep' | "
-                    f"sed 's/^ *//g' | cut -f1 -d ' '"
+                        f"ps -ax --format pid,command | grep \"{filtered_exe}\" | "
+                        f"grep \"{cleaned_exe_parent_name}\" | grep -v 'grep' | "
+                        f"sed 's/^ *//g' | cut -f1 -d ' '"
                     )
-                    if self.debug:    
+                    if self.debug:
                         print("--------- run_get_child_pid's pgrep_command ---------------")
                         print(f"{pgrep_command}")
                         print("---------/run_get_child_pid's pgrep_command ---------------")
-                        pgrep_output = subprocess.check_output(pgrep_command, shell=True, text=True).strip()
-                        child_pids.update(pgrep_output.splitlines())
-                        
-                    if self.debug:    
+                    pgrep_output = subprocess.check_output(pgrep_command, shell=True, text=True).strip()
+                    child_pids.update(pgrep_output.splitlines())
+
+                    if self.debug:
                         print("--------- run_get_child_pid's pgrep_output ---------------")
                         print(f"{pgrep_output}")
                         print("---------/run_get_child_pid's pgrep_output ---------------")
-                        
-                    if self.debug:    
+
                         print("--------- run_get_child_pid's child_pids pgrep_output.splitlines() ---------------")
                         print(f"{pgrep_output.splitlines()}")
                         print("---------/run_get_child_pid's child_pids pgrep_output.splitlines() ---------------")
-                    
+
                 if child_pids:
                     print(f"Found child PIDs: {child_pids}\n")
                     GLib.idle_add(self.add_child_pids_to_running_processes, script_key, child_pids)
@@ -3577,50 +3580,26 @@ class WineCharmApp(Gtk.Application):
         if not script_data:
             return None
 
-#        yaml_info = self.extract_yaml_info(script)
-#        exe_name = Path(yaml_info['exe_file'])
-        #exe_name = Path(script_data['exe_file'])
-        #script = Path(script_data['script_path'])
-        #wineprefix = Path(script).parent
-        #exe_name_quoted = shlex.quote(str(exe_name))
-        #wineprefix = shlex.quote(str(wineprefix))
-        #exe_file = Path(script_data['exe_file']).expanduser().resolve()
-        #wineprefix = Path(script).parent.resolve()
-
         exe_file = Path(script_data['exe_file']).expanduser().resolve()
-        #script = Path(script_data['script_path'])
         progname = script_data['progname']
         script_args = script_data['args']
-        runner = script_data['runner'] or "wine"
         script_key = script_data['sha256sum']  # Use sha256sum as the key
         env_vars = script_data.get('env_vars', '')   # Ensure env_vars is initialized if missing
         wine_debug = script_data.get('wine_debug')
         exe_name = Path(exe_file).name
-        
-        
-        #wineprefix = Path(script).parent
-#        wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
-
-
-
-        #yaml_info = self.extract_yaml_info(script)
-        #progname = script_data.get('progname')
-        #script_args = script_data.get('args')
-        #runner = yaml_info['runner'] or "wine"
-        #script_key = yaml_info['sha256sum']  # Use sha256sum as the key
-        #env_vars = yaml_info.get('env_vars', '')  # Ensure env_vars is initialized if missing
-        #wine_debug = yaml_info.get('wine_debug', '')
-        #exe_name = exe_file.name
 
         # Ensure the wineprefix, runner path is valid and resolve it
         script = Path(script_data['script_path']).expanduser().resolve()
         wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
-        runner = Path(runner).expanduser().resolve() if runner else Path("wine")
-        runner_dir = runner.parent.resolve()
 
-        #print(" - - - - - runner_dir - - - - - ")
-        #print(runner)
-        #print(runner_dir)
+        try:
+            # Get the runner from the script data
+            runner_path = self.get_runner(script_data)
+            runner_dir = runner_path.parent.resolve()
+        except Exception as e:
+            print(f"Error getting runner: {e}")
+            return
+
         print(f"Opening terminal for {wineprefix}")
 
         self.ensure_directory_exists(wineprefix)
@@ -3645,7 +3624,7 @@ class WineCharmApp(Gtk.Application):
             ]
 
         print(f"Running command: {command}")
-        
+
         try:
             subprocess.Popen(command)
         except Exception as e:
@@ -5894,11 +5873,11 @@ class WineCharmApp(Gtk.Application):
         script_data = self.script_list.get(script_key)
         if not script_data:
             return None
-        
+
         unique_id = str(uuid.uuid4())
         env = os.environ.copy()
         env['WINECHARM_UNIQUE_ID'] = unique_id
-        
+
         exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
         script = Path(script_data.get('script_path', '')).expanduser().resolve()
         progname = script_data.get('progname', '')
@@ -5908,41 +5887,29 @@ class WineCharmApp(Gtk.Application):
         wine_debug = script_data.get('wine_debug', '')
         exe_name = Path(exe_file).name
         wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
-        #print("*"*100)
-        #print(wineprefix)
-        runner = script_data.get('runner', 'wine')
-        if runner:
-            runner = Path(runner).expanduser().resolve()
-            runner_dir = str(runner.parent.expanduser().resolve())
-            path_env = f'export PATH="{runner_dir}:$PATH"'
-        else:
-            runner = "wine"
-            runner_dir = ""  # Or set a specific default if required
-            path_env = ""
-            
+
         try:
+            # Get the runner from the script data
+            runner_path = self.get_runner(script_data)
+            runner_dir = runner_path.parent.resolve()
+            path_env = f'export PATH="{shlex.quote(str(runner_dir))}:$PATH"'
+
             file = dialog.open_finish(result)
             if file:
                 exe_path = Path(file.get_path()).expanduser().resolve()
-                exe_parent = shlex.quote(str(exe_path.parent.resolve())) 
-                runner = shlex.quote(str(runner))
-                runner_dir = shlex.quote(str(runner_dir))
-                exe_name = Path(exe_path).name
-                exe_name = shlex.quote(str(exe_name))
-                
-                # Get wineprefix and other environment settings from the script data
-                script_data = self.script_list.get(script_key)
+                exe_parent = shlex.quote(str(exe_path.parent.resolve()))
+                runner = shlex.quote(str(runner_path))
+                exe_name = shlex.quote(str(exe_path.name))
 
                 # Formulate the command to run the selected executable
-                # Command to launch
                 if path_env:
                     command = (f"{path_env}; cd {exe_parent} && "
-                               f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} "
-                               f"{runner} {exe_name} {script_args}" )
+                            f"{wine_debug} {env_vars} WINEPREFIX={shlex.quote(str(wineprefix))} "
+                            f"{runner} {exe_name} {script_args}")
                 else:
                     command = (f"cd {exe_parent} && "
-                               f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} "
-                               f"{runner} {exe_name} {script_args}" )
+                            f"{wine_debug} {env_vars} WINEPREFIX={shlex.quote(str(wineprefix))} "
+                            f"{runner} {exe_name} {script_args}")
 
                 print(f"Running command: {command}")
 
@@ -6466,11 +6433,11 @@ class WineCharmApp(Gtk.Application):
         script_data = self.script_list.get(script_key)
         if not script_data:
             return None
-        
+
         unique_id = str(uuid.uuid4())
         env = os.environ.copy()
         env['WINECHARM_UNIQUE_ID'] = unique_id
-        
+
         exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
         script = Path(script_data.get('script_path', '')).expanduser().resolve()
         progname = script_data.get('progname', '')
@@ -6480,40 +6447,35 @@ class WineCharmApp(Gtk.Application):
         wine_debug = script_data.get('wine_debug', '')
         exe_name = Path(exe_file).name
         wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
-        #print("*"*100)
-        #print(wineprefix)
-        runner = script_data.get('runner', 'wine')
-        if runner:
-            runner = Path(runner).expanduser().resolve()
-            runner_dir = str(runner.parent.expanduser().resolve())
-            path_env = f'export PATH="{runner_dir}:$PATH"'
-        else:
-            runner = "wine"
-            runner_dir = ""  # Or set a specific default if required
-            path_env = ""
-            
+
         try:
-                runner = shlex.quote(str(runner))
-                runner_dir = shlex.quote(str(runner_dir))
-                
-                # Get wineprefix and other environment settings from the script data
-                script_data = self.script_list.get(script_key)
+            # Get the runner from the script data
+            runner_path = self.get_runner(script_data)
 
-                # Formulate the command to run the selected executable
-                # Command to launch
-                if path_env:
-                    command = (f"{path_env}; WINEPREFIX={wineprefix} winecfg")
-                else:
-                    command = (f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} winecfg")
+            # Formulate the command to run the selected executable
+            if isinstance(runner_path, Path):
+                runner_dir = shlex.quote(str(runner_path.parent))
+                path_env = f'export PATH="{runner_dir}:$PATH"'
+            else:
+                runner_dir = ""
+                path_env = ""
 
+            runner = shlex.quote(str(runner_path))
+
+            # Command to launch
+            if path_env:
+                command = (f"{path_env}; WINEPREFIX={shlex.quote(str(wineprefix))} winecfg")
+            else:
+                command = (f"{wine_debug} {env_vars} WINEPREFIX={shlex.quote(str(wineprefix))} {runner} winecfg")
+
+            print(f"Running command: {command}")
+
+            if self.debug:
                 print(f"Running command: {command}")
 
-                if self.debug:
-                    print(f"Running command: {command}")
-
-                # Execute the command
-                subprocess.Popen(command, shell=True)
-                print(f"Running winecfg from Wine prefix {wineprefix}")
+            # Execute the command
+            subprocess.Popen(command, shell=True)
+            print(f"Running winecfg from Wine prefix {wineprefix}")
 
         except Exception as e:
             print(f"Error running EXE: {e}")
@@ -6522,11 +6484,11 @@ class WineCharmApp(Gtk.Application):
         script_data = self.script_list.get(script_key)
         if not script_data:
             return None
-        
+
         unique_id = str(uuid.uuid4())
         env = os.environ.copy()
         env['WINECHARM_UNIQUE_ID'] = unique_id
-        
+
         exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
         script = Path(script_data.get('script_path', '')).expanduser().resolve()
         progname = script_data.get('progname', '')
@@ -6536,40 +6498,35 @@ class WineCharmApp(Gtk.Application):
         wine_debug = script_data.get('wine_debug', '')
         exe_name = Path(exe_file).name
         wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
-        #print("*"*100)
-        #print(wineprefix)
-        runner = script_data.get('runner', 'wine')
-        if runner:
-            runner = Path(runner).expanduser().resolve()
-            runner_dir = str(runner.parent.expanduser().resolve())
-            path_env = f'export PATH="{runner_dir}:$PATH"'
-        else:
-            runner = "wine"
-            runner_dir = ""  # Or set a specific default if required
-            path_env = ""
-            
+
         try:
-                runner = shlex.quote(str(runner))
-                runner_dir = shlex.quote(str(runner_dir))
-                
-                # Get wineprefix and other environment settings from the script data
-                script_data = self.script_list.get(script_key)
+            # Get the runner from the script data
+            runner_path = self.get_runner(script_data)
 
-                # Formulate the command to run the selected executable
-                # Command to launch
-                if path_env:
-                    command = (f"{path_env}; WINEPREFIX={wineprefix} regedit")
-                else:
-                    command = (f"{wine_debug} {env_vars} WINEPREFIX={wineprefix} regedit")
+            # Formulate the command to run the selected executable
+            if isinstance(runner_path, Path):
+                runner_dir = shlex.quote(str(runner_path.parent))
+                path_env = f'export PATH="{runner_dir}:$PATH"'
+            else:
+                runner_dir = ""
+                path_env = ""
 
+            runner = shlex.quote(str(runner_path))
+
+            # Command to launch
+            if path_env:
+                command = (f"{path_env}; WINEPREFIX={shlex.quote(str(wineprefix))} regedit")
+            else:
+                command = (f"{wine_debug} {env_vars} WINEPREFIX={shlex.quote(str(wineprefix))} {runner} regedit")
+
+            print(f"Running command: {command}")
+
+            if self.debug:
                 print(f"Running command: {command}")
 
-                if self.debug:
-                    print(f"Running command: {command}")
-
-                # Execute the command
-                subprocess.Popen(command, shell=True)
-                print(f"Running regedit from Wine prefix {wineprefix}")
+            # Execute the command
+            subprocess.Popen(command, shell=True)
+            print(f"Running regedit from Wine prefix {wineprefix}")
 
         except Exception as e:
             print(f"Error running EXE: {e}")
