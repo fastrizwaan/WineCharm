@@ -510,11 +510,13 @@ class WineCharmApp(Gtk.Application):
             settings = self.load_settings()  # Assuming load_settings() returns a dictionary
             self.template = self.expand_and_resolve_path(settings.get('template', self.default_template))
             self.arch = settings.get('arch', "win64")
+            self.icon_view = settings.get('icon_view', False)
         else:
             self.template = self.expand_and_resolve_path(self.default_template)
             self.arch = "win64"
             self.runner = ""
             self.template = self.default_template  # Set template to the initialized one
+            self.icon_view = False
 
         self.save_settings()
 
@@ -525,7 +527,8 @@ class WineCharmApp(Gtk.Application):
             'arch': self.arch,
             'runner': self.replace_home_with_tilde_in_path(str(self.settings.get('runner', ''))),
             'wine_debug': "WINEDEBUG=fixme-all DXVK_LOG_LEVEL=none",
-            'env_vars': ''
+            'env_vars': '',
+            'icon_view': self.icon_view
         }
 
         try:
@@ -545,7 +548,8 @@ class WineCharmApp(Gtk.Application):
             self.template = self.expand_and_resolve_path(settings.get('template', self.default_template))
             self.runner = self.expand_and_resolve_path(settings.get('runner', ''))
             self.arch = settings.get('arch', "win64")
-
+            self.icon_view = settings.get('icon_view', False)
+            self.env_vars = settings.get('env_vars', '')
             return settings
 
         # If no settings file, return an empty dictionary
@@ -622,7 +626,6 @@ class WineCharmApp(Gtk.Application):
         self.view_toggle_button = Gtk.ToggleButton()
         icon_view_icon = Gtk.Image.new_from_icon_name("view-grid-symbolic")
         list_view_icon = Gtk.Image.new_from_icon_name("view-list-symbolic")
-        #self.icon_view = True
         self.view_toggle_button.set_child(icon_view_icon if self.icon_view else list_view_icon)
         self.view_toggle_button.add_css_class("flat")
         self.view_toggle_button.set_tooltip_text("Toggle Icon/List View")
@@ -4799,6 +4802,7 @@ class WineCharmApp(Gtk.Application):
         self.flowbox.set_max_children_per_line(max_children_per_line)
         # Recreate the script list with the new view
         self.create_script_list()
+        GLib.idle_add(self.save_settings)
 
 
     def rename_and_merge_user_directories(self, wineprefix):
