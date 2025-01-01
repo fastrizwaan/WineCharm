@@ -622,6 +622,7 @@ class WineCharmApp(Gtk.Application):
         self.view_toggle_button = Gtk.ToggleButton()
         icon_view_icon = Gtk.Image.new_from_icon_name("view-grid-symbolic")
         list_view_icon = Gtk.Image.new_from_icon_name("view-list-symbolic")
+        #self.icon_view = True
         self.view_toggle_button.set_child(icon_view_icon if self.icon_view else list_view_icon)
         self.view_toggle_button.add_css_class("flat")
         self.view_toggle_button.set_tooltip_text("Toggle Icon/List View")
@@ -4786,17 +4787,16 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_view_toggle_button_clicked(self, button):
-        self.icon_view = button.get_active()
+        # Toggle the icon view state
+        self.icon_view = not self.icon_view
 
-        # Update the icon for the toggle button
-        icon_view_icon = Gtk.Image.new_from_icon_name("view-grid-symbolic")
-        list_view_icon = Gtk.Image.new_from_icon_name("view-list-symbolic")
-        button.set_child(icon_view_icon if self.icon_view else list_view_icon)
-        
-        if self.icon_view:
-            self.flowbox.set_max_children_per_line(8)
-        else:
-            self.flowbox.set_max_children_per_line(4)
+        # Update the icon for the toggle button based on the current view state
+        icon_name = "view-grid-symbolic" if self.icon_view else "view-list-symbolic"
+        button.set_child(Gtk.Image.new_from_icon_name(icon_name))
+
+        # Update the maximum children per line in the flowbox based on the current view state
+        max_children_per_line = 8 if self.icon_view else 4
+        self.flowbox.set_max_children_per_line(max_children_per_line)
         # Recreate the script list with the new view
         self.create_script_list()
 
