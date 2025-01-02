@@ -3637,8 +3637,27 @@ class WineCharmApp(Gtk.Application):
                 )
             ]
         else:
-            command = [
-                "gnome-terminal", "--wait", "--", "bash", "--norc","-c",
+            # List of terminal commands to check
+            terminal_commands = [
+                ("ptyxis", ["ptyxis", "--"]),
+                ("gnome-terminal", ["gnome-terminal", "--wait", "--"]),
+                ("konsole", ["konsole", "-e"]),
+                ("xfce4-terminal", ["xfce4-terminal", "--disable-server", "-e"]),
+            ]
+
+            # Find the first available terminal
+            terminal_command = None
+            for terminal, command_prefix in terminal_commands:
+                if shutil.which(terminal):
+                    terminal_command = command_prefix
+                    break
+
+            if not terminal_command:
+                print("No suitable terminal emulator found.")
+                return
+
+            command = terminal_command + [
+                "bash", "--norc", "-c",
                 (
                     rf'export PS1="[\u@\h:\w]\\$ "; '
                     f'export {export_env_vars}; '
