@@ -3626,21 +3626,27 @@ class WineCharmApp(Gtk.Application):
 
         if shutil.which("flatpak-spawn"):
             command = [
-                "wcterm",
-                "bash",
-                "--norc",
-                "-c",
-                rf'export PS1="[\u@\h:\w]\\$ ";  export {export_env_vars}; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
+                "wcterm", "bash", "--norc", "-c",
+                (
+                    rf'export PS1="[\u@\h:\w]\\$ "; '
+                    f'export {export_env_vars}; '
+                    f'export WINEPREFIX={shlex.quote(str(wineprefix))}; '
+                    f'export PATH={shlex.quote(str(runner_dir))}:$PATH; '
+                    f'cd {shlex.quote(str(wineprefix))}; '
+                    'exec bash --norc -i'
+                )
             ]
         else:
             command = [
-                "gnome-terminal",
-                "--wait",
-                "--",
-                "bash",
-                "--norc",
-                "-c",
-                rf'export PS1="[\u@\h:\w]\\$ ";  export {export_env_vars}; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
+                "gnome-terminal", "--wait", "--", "bash", "--norc","-c",
+                (
+                    rf'export PS1="[\u@\h:\w]\\$ "; '
+                    f'export {export_env_vars}; '
+                    f'export WINEPREFIX={shlex.quote(str(wineprefix))}; '
+                    f'export PATH={shlex.quote(str(runner_dir))}:$PATH; '
+                    f'cd {shlex.quote(str(wineprefix))}; '
+                    'exec bash --norc -i'
+                )
             ]
 
         print(f"Running command: {command}")
