@@ -1476,6 +1476,7 @@ class WineCharmApp(Gtk.Application):
 
         exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
         wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
+        env_vars = script_data.get('env_vars', '')
 
         try:
             # Get the runner from the script data
@@ -1500,7 +1501,16 @@ class WineCharmApp(Gtk.Application):
 
         # Prepare the log file and command to execute
         log_file_path = Path(wineprefix) / f"{exe_file.stem}.log"
-        command = f"cd {shlex.quote(str(exe_file.parent))} && WINEPREFIX={shlex.quote(str(wineprefix))} {shlex.quote(str(runner_path))} {shlex.quote(exe_file.name)}"
+        command = [
+            "sh", "-c", 
+            (
+            f"cd {shlex.quote(str(exe_file.parent))} && "
+            f"{env_vars} "
+            f"WINEPREFIX={shlex.quote(str(wineprefix))} "
+            f"{shlex.quote(str(runner_path))} "
+            f"{shlex.quote(exe_file.name)}"
+            )
+        ]
 
         if self.debug:
             print(f"Launch command: {command}")
@@ -1510,7 +1520,6 @@ class WineCharmApp(Gtk.Application):
             with open(log_file_path, 'w') as log_file:
                 process = subprocess.Popen(
                     command,
-                    shell=True,
                     preexec_fn=os.setsid,
                     stdout=subprocess.DEVNULL,
                     stderr=log_file,
@@ -6006,6 +6015,7 @@ class WineCharmApp(Gtk.Application):
         """
         Validate the environment variables string to ensure it follows the 'X=Y' pattern.
         Multiple variables should be separated by semicolons.
+        Leading and trailing whitespace will be removed from each variable.
         
         Args:
             env_vars (str): The string containing environment variables.
@@ -6014,10 +6024,10 @@ class WineCharmApp(Gtk.Application):
             bool: True if the variables are valid, False otherwise.
         """
         # Regular expression to match a valid environment variable (bash-compliant)
-        env_var_pattern = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*=[^;]+$')
+        env_var_pattern = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*=.*$')
 
         # Split the variables by semicolons and validate each one
-        variables = env_vars.split(';')
+        variables = [var.strip() for var in env_vars.split(';')]
         for var in variables:
             var = var.strip()  # Remove any leading/trailing whitespace
             if not var or not env_var_pattern.match(var):
