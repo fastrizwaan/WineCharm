@@ -3598,6 +3598,13 @@ class WineCharmApp(Gtk.Application):
         script_args = script_data['args']
         script_key = script_data['sha256sum']  # Use sha256sum as the key
         env_vars = script_data.get('env_vars', '')   # Ensure env_vars is initialized if missing
+        
+        # Split the env_vars string into individual variable assignments
+        env_vars_list = env_vars.split(';')
+
+        # Join the variable assignments with '; export ' to create the export command
+        export_env_vars = '; export '.join(env_vars_list.strip() for env_vars_list in env_vars_list)
+
         wine_debug = script_data.get('wine_debug')
         exe_name = Path(exe_file).name
 
@@ -3623,7 +3630,7 @@ class WineCharmApp(Gtk.Application):
                 "bash",
                 "--norc",
                 "-c",
-                rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
+                rf'export PS1="[\u@\h:\w]\\$ ";  export {export_env_vars}; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
             ]
         else:
             command = [
@@ -3633,7 +3640,7 @@ class WineCharmApp(Gtk.Application):
                 "bash",
                 "--norc",
                 "-c",
-                rf'export PS1="[\u@\h:\w]\\$ "; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
+                rf'export PS1="[\u@\h:\w]\\$ ";  export {export_env_vars}; export WINEPREFIX={shlex.quote(str(wineprefix))}; export PATH={shlex.quote(str(runner_dir))}:$PATH; cd {shlex.quote(str(wineprefix))}; exec bash --norc -i'
             ]
 
         print(f"Running command: {command}")
