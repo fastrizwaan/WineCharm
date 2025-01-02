@@ -3642,7 +3642,7 @@ class WineCharmApp(Gtk.Application):
                 ("ptyxis", ["ptyxis", "--"]),
                 ("gnome-terminal", ["gnome-terminal", "--wait", "--"]),
                 ("konsole", ["konsole", "-e"]),
-                ("xfce4-terminal", ["xfce4-terminal", "--disable-server", "-e"]),
+                ("xfce4-terminal", ["xfce4-terminal", "--disable-server", "-x"]),
             ]
 
             # Find the first available terminal
