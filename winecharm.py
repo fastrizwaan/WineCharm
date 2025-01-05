@@ -870,10 +870,23 @@ class WineCharmApp(Gtk.Application):
                 file_path = file.get_path()
                 print("- - - - - - - - - - - - - -self.show_processing_spinner")
                 self.monitoring_active = False
-                self.show_processing_spinner("Processing...")
+                
+                # If there's already a processing thread, stop it
+                if hasattr(self, 'processing_thread') and self.processing_thread and self.processing_thread.is_alive():
+                    self.stop_processing = True
+                    self.processing_thread.join(timeout=0.5)  # Wait briefly for thread to stop
+                    self.hide_processing_spinner()
+                    self.set_open_button_label("Open")
+                    self.set_open_button_icon_visible(True)
+                    return
 
-                # Start a background thread to process the file
-                threading.Thread(target=self.process_cli_file_in_thread, args=(file_path,)).start()
+                # Show processing spinner
+                self.show_processing_spinner("Processing...")
+                
+                # Start a new background thread to process the file
+                self.stop_processing = False
+                self.processing_thread = threading.Thread(target=self.process_cli_file_in_thread, args=(file_path,))
+                self.processing_thread.start()
 
         except GLib.Error as e:
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
@@ -3010,6 +3023,7 @@ class WineCharmApp(Gtk.Application):
             "XOFLATPAKIDXO": "io.github.fastrizwaan.WineCharm",
             "XOWINEEXEXO": "",
             "XOWINEVERXO": "wine-9.0",
+            "/media/%USERNAME%/": f'/media/{user}/',
         }
 
         self.replace_strings_in_files(directory, find_replace_pairs)
@@ -3533,6 +3547,7 @@ class WineCharmApp(Gtk.Application):
             ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
             ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog),
             ("Backup Prefix", "document-save-symbolic", self.show_backup_prefix_dialog),
+            ("Create Bottle", "package-x-generic-symbolic", self.show_create_bottle_dialog),
             ("Save Wine User Dirs", "document-save-symbolic", self.show_save_user_dirs_dialog),
             ("Load Wine User Dirs", "document-revert-symbolic", self.show_load_user_dirs_dialog),
             ("Reset Shortcut", "view-refresh-symbolic", self.reset_shortcut_confirmation),
@@ -3596,7 +3611,161 @@ class WineCharmApp(Gtk.Application):
         self.update_execute_button_icon(ui_state)
         self.selected_row = None
 
+######################### CREATE BOTTLE
+    def create_bottle(self, script, script_key, backup_path):
+        """
+        Backs up the Wine prefix in a stepwise manner, indicating progress via spinner and label updates.
+        """
+        wineprefix = Path(script).parent
 
+        # Step 1: Disconnect the UI elements and initialize the spinner
+        
+        self.show_processing_spinner("Bottling...")
+        #self.set_open_button_icon_visible(False)
+        #self.disconnect_open_button()
+
+        # Get the user's home directory to replace with `~`
+        usershome = os.path.expanduser('~')
+        
+        user = os.getenv('USER')
+        find_replace_pairs = {usershome: '~', f'/media/{user}/': '/media/%USERNAME%/'}
+        restore_media_username = {'/media/%USERNAME%/': f'/media/{user}/'}
+        # Step 2: Define the steps for the backup process
+        def perform_backup_steps():
+            steps = [
+                (f"Replace \"{usershome}\" with '~' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
+                ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
+                ("Creating Bottle archive", lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
+                ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
+                (f"Revert %USERNAME% with \"{user}\" in script files", lambda: self.replace_strings_in_specific_files(wineprefix, restore_media_username)),
+            ]
+
+            for step_text, step_func in steps:
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    # Execute the step
+                    step_func()
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except Exception as e:
+                    print(f"Error during step '{step_text}': {e}")
+                    GLib.idle_add(self.show_info_dialog, "Backup Failed", f"Error during '{step_text}': {str(e)}")
+                    break
+
+            # Step 3: Once all steps are completed, reset the UI
+            GLib.idle_add(self.on_create_bottle_completed, script_key, backup_path)
+
+        # Step 4: Run the backup steps in a separate thread to keep the UI responsive
+        threading.Thread(target=perform_backup_steps).start()
+
+    def on_create_bottle_completed(self, script_key, backup_path):
+        """
+        Called when the backup process is complete. Updates the UI accordingly.
+        """
+        # Reset the button label and remove the spinner
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)
+        self.reconnect_open_button()
+        self.hide_processing_spinner()
+
+        # Notify the user that the backup is complete
+        self.show_info_dialog("Backup Complete", f"Backup saved to {backup_path}")
+        print("Backup process completed successfully.")
+
+        # Iterate over all script buttons and update the UI based on `is_clicked_row`
+        for key, data in self.script_ui_data.items():
+            row_button = data['row']
+            row_play_button = data['play_button']
+            row_options_button = data['options_button']
+        self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
+
+    def show_create_bottle_dialog(self, script, script_key, button):
+        # Step 1: Suggest the backup file name
+        default_backup_name = f"{script.stem} prefix backup.tar.zst"
+
+        # Create a Gtk.FileDialog instance for saving the file
+        file_dialog = Gtk.FileDialog.new()
+
+        # Set the initial file name using set_initial_name() method
+        file_dialog.set_initial_name(default_backup_name)
+
+        # Open the dialog asynchronously to select the save location
+        file_dialog.save(self.window, None, self.on_create_bottle_dialog_response, script, script_key)
+
+        print("FileDialog presented for saving the backup.")
+
+    def on_create_bottle_dialog_response(self, dialog, result, script, script_key):
+        try:
+            # Retrieve the selected file (save location) using save_finish()
+            backup_file = dialog.save_finish(result)
+            if backup_file:
+                self.on_back_button_clicked(None)
+                self.flowbox.remove_all()
+                backup_path = backup_file.get_path()  # Get the backup file path
+                print(f"Backup will be saved to: {backup_path}")
+
+                # Start the backup process in a separate thread
+                threading.Thread(target=self.create_bottle, args=(script, script_key, backup_path)).start()
+
+        except GLib.Error as e:
+            # Handle any errors, such as cancellation
+            print(f"An error occurred: {e}")
+
+    def create_bottle_archive(self, script_key, wineprefix, backup_path):
+        # Get the current username from the environment
+        current_username = os.getenv("USER") or os.getenv("USERNAME")
+        if not current_username:
+            raise Exception("Unable to determine the current username from the environment.")
+
+        # Escape the wineprefix name for the transform pattern to handle special characters
+        #escaped_prefix_name = re.escape(wineprefix.name)
+
+        # Extract exe_file from script_data
+        script_data = self.extract_yaml_info(script_key)
+        if not script_data:
+            raise Exception("Script data not found.")
+
+        exe_file = Path(script_data['exe_file']).expanduser().resolve()
+        exe_file = Path(str(exe_file).replace("%USERNAME%", current_username))
+        exe_path = exe_file.parent
+
+        # Check if the game directory is in DO_NOT_BUNDLE_FROM directories
+        if str(exe_path) in self.get_do_not_bundle_directories():
+            msg1 = "Cannot copy the selected game directory"
+            msg2 = "Please move the files to a different directory to create a bundle."
+            self.show_info_dialog(msg1, msg2)
+            return
+
+        tar_game_dir_name = exe_path.name
+        tar_game_dir_path = exe_path.parent
+        # Prepare the transform pattern to rename the user's directory to '%USERNAME%'
+        # The pattern must be expanded to include anything under the user's folder
+        #transform_pattern = rf"s|{escaped_prefix_name}/drive_c/users/{current_username}|{escaped_prefix_name}/drive_c/users/%USERNAME%|g"
+        transform_pattern2 = rf"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g"
+
+        print('tar_game_dir_name = {exe_path.name}, tar_game_dir_path = {exe_path.parent}, tar_game_dir_name = {tar_game_dir_name} tar_game_dir_path = {tar_game_dir_path}')
+        # Prepare the tar command with --transform option
+        tar_command = [
+            'tar',
+            '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
+            '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%USERNAME%|g",  # Rename the directory and its contents
+            '--transform', f"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g",
+            '-cf', backup_path,
+            '-C', str(wineprefix.parent),
+            wineprefix.name,
+            '-C', str(tar_game_dir_path),
+            rf"./{tar_game_dir_name}",
+        ]
+
+        print(f"Running backup command: {' '.join(tar_command)}")
+
+        # Execute the tar command
+        result = subprocess.run(tar_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+        if result.returncode != 0:
+            raise Exception(f"Backup failed: {result.stderr}")
+
+        print(f"Backup archive created at {backup_path}")
+#########################/CREATE BOTTLE
 
     def show_log_file(self, script, script_key, *args):
         log_file_path = Path(script.parent) / f"{script.stem}.log"
@@ -5112,7 +5281,7 @@ class WineCharmApp(Gtk.Application):
             self.spinner.start()
             self.open_button_box.append(self.spinner)
 
-        self.set_open_button_label("Importing...")
+        #self.set_open_button_label("Importing...")
         self.set_open_button_icon_visible(False)  # Hide the open-folder icon
         print("Open button disconnected and spinner shown.")
 

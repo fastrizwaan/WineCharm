@@ -4,3 +4,6 @@ flatpak/build-dir
 .flatpak-builder
 flatpak/repo
 flatpak/*.flatpak
+
+.codegpt
+
