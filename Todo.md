@@ -20,40 +20,47 @@ Refactoring winecharm
     - [ ] restore_from_backup
     - [ ] perform_restore
     
-- [ ] Add all info from .charm and buttons, row, label in self.all_scripts, use script_key (sha256sum)
-- [ ] play/stop button, row highlight should be manageed.
+- [x] Add all info from .charm and buttons, row, label in self.all_scripts, use script_key (sha256sum)
+- [x] play/stop button, row highlight should be manageed.
 
-
-
-# Current issue
-- 1. [ ] if the process has ended, the launch_button is not reverted to stop and highlight is not removed
-- 2. [ ]  Error terminating script f427f2d354acd78f2177aaeb78a677d34d7825751dc3abe70d40fd537b70c4d8: Command 'bash -c 'export PATH=.:$PATH; WINEPREFIX=/var/home/rizvan/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Prefixes/ReShade_Setup_6.1.1-f427f2d354 wineserver -k'' returned non-zero exit status 1. this is related to 1.
 
 is not resetting the play functionality.
  
  # Todo WineCharm 0.97
- - 1. [ ] Runner Support
-     - [ ] Check working runner before launch (this will help when freedesktop runtime has changed or on system)
-     - [ ] On startup, do a working runner check; 
+ - 1. [x] Runner Support
+     - [x] Check working runner before launch (this will help when freedesktop runtime has changed or on system)
+     - [x] On startup, do a working runner check; 
            (runner_ver=runner --version, if not runner_ver: report user that runner is not compatible, and let the user choose other runner.)
      - [ ] Script level
         - [ ] Create Bundle Bottle (Game_dir + Runner + Prefix) = bottle (Hello-Bundle.bottle)
+            - [x] Copy Game Dir while tarring
+            - [x] Avoid do not include dirs
+            - [x] Change /media/$USER to %USERNAME%
+            - [x] Before creating bottle, restore /media/$USER so that
+            - [ ] update script files with new path drivec/GAMEDIR/<dir>/exe_file.exe (much like import game dir)
+            - [ ] Check size of Gamedir, if > 3GB ask user
+            - [ ] Show GUI progress of tarring using % 
+            - [ ] Allow cancellation of bundle creation, while it is running using same open/bottling button
+            - [ ] Revert scripts with actual path, if interrupted or due to power failure or other reasons. (self repair)
+                - [ ] create a copy at winecharm's data directory...
+                - [ ] create a file/mechanism which will repair broken wineprefix
+                
         - [ ] Import Runner
-        - [ ] Import Game Directory
+        - [x] Import Game Directory
      - [ ] Settings level
-         - [ ] Download
+         - [x] Download
              - List
-             - [ ] Proton
-             - [ ] Wine Stable ones
-             - [ ] Wine Latest
-             - [ ] Wine multi lib supported
-         - [ ] Default
-         - [ ] Change
-         - [ ] List all Runners even from prefixes_dir/*/Runner/runner_dir/bin/wine
+             - [x] Proton
+             - [x] Wine Stable ones
+             - [x] Wine Latest
+             - [x] Wine multi lib supported
+         - [x] Default
+         - [x] Change
+         - [x] List all Runners even from prefixes_dir/*/Runner/runner_dir/bin/wine
 
- - 2. [ ] Settings support (like show_options_for_script)
+ - 2. [x] Settings support (like show_options_for_script)
      - [ ] Arch 
-     - [ ] Runner
+     - [x] Runner
          - [ ] same as Settings level above
      - [ ] Template
         - [ ] Configure
@@ -66,26 +73,20 @@ is not resetting the play functionality.
      - [ ] repair 
      
 - 4. Script (options)
-    - [ ] Run Other Exe in wineprefix  (open other exe)
-    - [ ] Import Game directory
-    - [ ] Winetricks CLI (install dxvk vkd3d)
+    - [x] Run Other Exe in wineprefix  (open other exe)
+    - [x] Import Game directory
+    - [x] Winetricks CLI (install dxvk vkd3d)
     - [ ] Import Runner inside prefix
-    - [ ] Set Environment Variable
-    - [ ] Save drive_c/user directory to file (with %USERNAME%)
-    - [ ] Load file for drive_c/user directory
+    - [x] Set Environment Variable
+    - [x] Save drive_c/user directory to file (with %USERNAME%)
+    - [x] Load file for drive_c/user directory
     - [ ] About
         - [ ] Name, Size, Gamedir size, Prefix size, if gamedir in prefix then combined.
-    - [ ] Change Runner
-    - [ ] Rename prefix directory
+    - [x] Change Runner
+    - [x] Rename prefix directory
     - [ ] Set Wine Arch
-    - [ ] Set Application Category
-    - [ ] winecfg
-    - [ ] regedit
-    - [ ] wine explorer
-    - [ ] wine control panel
-    - [ ] wine taskmgr
-    - [ ] wine add/remove programs
-    - [ ] wine notepad
-    - [ ] wine wordpad
+    - [x] Set Application Category
+    - [x] winecfg
+    - [x] regedit
 
 WineZGUI bug: Downloading and setting runner (say wine-9.0) and creating a script's bundle with a different runner (say wine-7.0) will create bundle with Global runner (9.0) instead of local runner (7.0); perhaps global runner variable needs fixing for local runner in create prefix and create bundle.
