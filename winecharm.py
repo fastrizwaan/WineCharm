@@ -3626,20 +3626,36 @@ class WineCharmApp(Gtk.Application):
 
         # Get the user's home directory to replace with `~`
         usershome = os.path.expanduser('~')
-        
+
         user = os.getenv('USER')
-        find_replace_pairs = {usershome: '~', f'/media/{user}/': '/media/%USERNAME%/'}
+        find_replace_pairs = {usershome: '~', f'\'{usershome}': '`\~'}
+        find_replace_media_username = {f'/media/{user}/': '/media/%USERNAME%/'}
         restore_media_username = {'/media/%USERNAME%/': f'/media/{user}/'}
+
+                # Extract exe_file from script_data
+        script_data = self.extract_yaml_info(script_key)
+        if not script_data:
+            raise Exception("Script data not found.")
+
+        exe_file = self.expand_and_resolve_path(script_data['exe_file'])
+        #exe_file = Path(str(exe_file).replace("%USERNAME%", user))
+        exe_path = exe_file.parent
+        exe_name = exe_file.name
+        game_dir = wineprefix / "drive_c" / "GAMEDIR"
+        game_dir_exe = game_dir / exe_path.name
         # Step 2: Define the steps for the backup process
+
         def perform_backup_steps():
             steps = [
                 (f"Replace \"{usershome}\" with '~' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
                 ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
+                (f"Replace \"/media/{user}\" with '/media/%USERNAME%' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_media_username)),
+                ("Updating Script Path", lambda: self.update_script_path(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
                 ("Creating Bottle archive", lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
                 ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
                 (f"Revert %USERNAME% with \"{user}\" in script files", lambda: self.replace_strings_in_specific_files(wineprefix, restore_media_username)),
+                ("Reverting Script Path", lambda: self.update_script_path(script, self.replace_home_with_tilde_in_path(str(exe_file)))),
             ]
-
             for step_text, step_func in steps:
                 GLib.idle_add(self.show_initializing_step, step_text)
                 try:

@@ -37,7 +37,7 @@ is not resetting the play functionality.
             - [x] Avoid do not include dirs
             - [x] Change /media/$USER to %USERNAME%
             - [x] Before creating bottle, restore /media/$USER so that
-            - [ ] update script files with new path drivec/GAMEDIR/<dir>/exe_file.exe (much like import game dir)
+            - [x] update script files with new path drivec/GAMEDIR/<dir>/exe_file.exe (much like import game dir)
             - [ ] Check size of Gamedir, if > 3GB ask user
             - [ ] Show GUI progress of tarring using % 
             - [ ] Allow cancellation of bundle creation, while it is running using same open/bottling button
