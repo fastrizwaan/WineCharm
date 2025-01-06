@@ -3642,7 +3642,7 @@ class WineCharmApp(Gtk.Application):
         exe_path = exe_file.parent
         exe_name = exe_file.name
         game_dir = wineprefix / "drive_c" / "GAMEDIR"
-        game_dir_exe = game_dir / exe_path.name
+        game_dir_exe = game_dir / exe_path.name / exe_name
         # Step 2: Define the steps for the backup process
 
         def perform_backup_steps():
