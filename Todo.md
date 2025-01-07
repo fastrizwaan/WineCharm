@@ -33,6 +33,7 @@ is not resetting the play functionality.
            (runner_ver=runner --version, if not runner_ver: report user that runner is not compatible, and let the user choose other runner.)
      - [ ] Script level
         - [ ] Create Bundle Bottle (Game_dir + Runner + Prefix) = bottle (Hello-Bundle.bottle)
+            - [x] check if exe_file exists before bundling the game_dir
             - [x] Copy Game Dir while tarring
             - [x] Avoid do not include dirs
             - [x] Change /media/$USER to %USERNAME%
