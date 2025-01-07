@@ -34,11 +34,15 @@ is not resetting the play functionality.
      - [ ] Script level
         - [ ] Create Bundle Bottle (Game_dir + Runner + Prefix) = bottle (Hello-Bundle.bottle)
             - [x] check if exe_file exists before bundling  the game_dir
-            - [ ] Check size of Gamedir and print on terminal
+            - [x] Check size of Gamedir and print on terminal
             - [ ] if > 3GB ask user with a dialog before proceeding
+            - [x] check if gamedir is inside prefixdir, suggest -bottle name for backup prefix
             - [ ] check if gamedir is inside prefixdir, then use a different command to create bottle
+            - [ ] Bundle runner when exe_file inside prefixdir with backup prefix/create bottle
             - [ ] bundle runner/runners if any charm file has it.
             - [ ] update runner path in the charm script file
+            - [ ] copy runner dir while tarring (if bottle)
+            - [ ] update the script file
             - [x] Copy Game Dir while tarring
             - [x] Avoid do not include dirs
             - [x] Change /media/$USER to %USERNAME%

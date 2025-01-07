@@ -2709,8 +2709,29 @@ class WineCharmApp(Gtk.Application):
         self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
 
     def show_backup_prefix_dialog(self, script, script_key, button):
+        wineprefix = Path(script).parent
+        # Extract exe_file from script_data
+        script_data = self.extract_yaml_info(script_key)
+        if not script_data:
+            raise Exception("Script data not found.")
+
+        exe_file = self.expand_and_resolve_path(script_data['exe_file'])
+        #exe_file = Path(str(exe_file).replace("%USERNAME%", user))
+        exe_path = exe_file.parent
+        exe_name = exe_file.name
+        game_dir = wineprefix / "drive_c" / "GAMEDIR"
+        game_dir_exe = game_dir / exe_path.name / exe_name
+
+
+        # Check if game directory is inside the prefix
+        is_inside_prefix = exe_path.is_relative_to(wineprefix)
+
         # Step 1: Suggest the backup file name
-        default_backup_name = f"{script.stem} prefix backup.tar.zst"
+        if is_inside_prefix:
+            default_backup_name = f"{script.stem}-bottle.tar.zst"
+        else:
+            default_backup_name = f"{script.stem}-prefix.tar.zst"
+        
 
         # Create a Gtk.FileDialog instance for saving the file
         file_dialog = Gtk.FileDialog.new()
