@@ -3612,6 +3612,19 @@ class WineCharmApp(Gtk.Application):
         self.selected_row = None
 
 ######################### CREATE BOTTLE
+    # Get directory size method
+    def get_directory_size(self, path):
+        if not path.exists():
+            print(f"The provided path '{path}' does not exist.")
+            return 0
+
+        try:
+            total_size = sum(f.stat().st_size for f in path.glob('**/*') if f.is_file())
+            return total_size
+        except Exception as e:
+            print(f"Error calculating directory size: {e}")
+            return 0
+
     def create_bottle(self, script, script_key, backup_path):
         """
         Backs up the Wine prefix in a stepwise manner, indicating progress via spinner and label updates.
