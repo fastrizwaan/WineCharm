@@ -3715,6 +3715,7 @@ class WineCharmApp(Gtk.Application):
         if not script_data:
             raise Exception("Script data not found.")
 
+        wineprefix = Path(script).parent
         exe_file = self.expand_and_resolve_path(script_data['exe_file'])
         #exe_file = Path(str(exe_file).replace("%USERNAME%", user))
         exe_path = exe_file.parent
