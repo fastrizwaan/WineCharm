@@ -33,13 +33,16 @@ is not resetting the play functionality.
            (runner_ver=runner --version, if not runner_ver: report user that runner is not compatible, and let the user choose other runner.)
      - [ ] Script level
         - [ ] Create Bundle Bottle (Game_dir + Runner + Prefix) = bottle (Hello-Bundle.bottle)
-            - [x] check if exe_file exists before bundling the game_dir
+            - [x] check if exe_file exists before bundling  the game_dir
+            - [ ] Check size of Gamedir
+            - [ ] if > 3GB ask user with a dialog before proceeding
+            - [ ] check if gamedir is inside prefixdir, then use a different command to create bottle
+            - [ ] bundle runner/runners if any charm file has it.
             - [x] Copy Game Dir while tarring
             - [x] Avoid do not include dirs
             - [x] Change /media/$USER to %USERNAME%
             - [x] Before creating bottle, restore /media/$USER so that
             - [x] update script files with new path drivec/GAMEDIR/<dir>/exe_file.exe (much like import game dir)
-            - [ ] Check size of Gamedir, if > 3GB ask user
             - [ ] Show GUI progress of tarring using % 
             - [ ] Allow cancellation of bundle creation, while it is running using same open/bottling button
             - [ ] Revert scripts with actual path, if interrupted or due to power failure or other reasons. (self repair)
