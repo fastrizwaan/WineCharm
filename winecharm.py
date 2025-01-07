@@ -3658,6 +3658,19 @@ class WineCharmApp(Gtk.Application):
         game_dir_exe = game_dir / exe_path.name / exe_name
         # Step 2: Define the steps for the backup process
 
+        # Calculate the directory size in bytes
+        directory_size = self.get_directory_size(exe_path)
+
+        # Convert directory size to GB for comparison
+        directory_size_gb = directory_size / (1024 ** 3)  # 1 GB is 1024^3 bytes
+        print("----------------------------------------------------------")
+        print(directory_size)
+        print(directory_size_gb)
+
+        if directory_size_gb > 3:
+            print("Size Greater than 3GB")
+        print("----------------------------------------------------------")
+
         def perform_backup_steps():
             steps = [
                 (f"Replace \"{usershome}\" with '~' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
