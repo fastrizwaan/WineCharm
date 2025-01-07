@@ -3695,6 +3695,22 @@ class WineCharmApp(Gtk.Application):
         self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
 
     def show_create_bottle_dialog(self, script, script_key, button):
+
+        # Step 0: Check if the executable file exists
+        # Extract exe_file from script_data
+        script_data = self.extract_yaml_info(script_key)
+        if not script_data:
+            raise Exception("Script data not found.")
+
+        exe_file = self.expand_and_resolve_path(script_data['exe_file'])
+        #exe_file = Path(str(exe_file).replace("%USERNAME%", user))
+        exe_path = exe_file.parent
+
+        # If exe_not found i.e., game_dir is not accessble due to unmounted directory
+        if not exe_file.exists():
+            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Exe Not Found", f"Not Mounted or Deleted?\n{exe_file}")
+            return
+
         # Step 1: Suggest the backup file name
         default_backup_name = f"{script.stem} prefix backup.tar.zst"
 
