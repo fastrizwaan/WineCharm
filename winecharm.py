@@ -3547,7 +3547,7 @@ class WineCharmApp(Gtk.Application):
             ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
             ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog),
             ("Backup Prefix", "document-save-symbolic", self.show_backup_prefix_dialog),
-            ("Create Bottle", "package-x-generic-symbolic", self.show_create_bottle_dialog),
+            ("Create Bottle", "package-x-generic-symbolic", self.create_bottle_selected),
             ("Save Wine User Dirs", "document-save-symbolic", self.show_save_user_dirs_dialog),
             ("Load Wine User Dirs", "document-revert-symbolic", self.show_load_user_dirs_dialog),
             ("Reset Shortcut", "view-refresh-symbolic", self.reset_shortcut_confirmation),
@@ -3697,8 +3697,8 @@ class WineCharmApp(Gtk.Application):
         self.hide_processing_spinner()
 
         # Notify the user that the backup is complete
-        self.show_info_dialog("Backup Complete", f"Backup saved to {backup_path}")
-        print("Backup process completed successfully.")
+        self.show_info_dialog("Bottle Created", f"{backup_path}")
+        print("Bottle creating process completed successfully.")
 
         # Iterate over all script buttons and update the UI based on `is_clicked_row`
         for key, data in self.script_ui_data.items():
@@ -3707,7 +3707,14 @@ class WineCharmApp(Gtk.Application):
             row_options_button = data['options_button']
         self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
 
-    def show_create_bottle_dialog(self, script, script_key, button):
+    def on_backup_confirmation_response(self, dialog, response_id, script, script_key):
+        if response_id == "continue":
+            dialog.close()
+            self.show_create_bottle_dialog(script, script_key)
+        else:
+            return
+
+    def create_bottle_selected(self, script, script_key, button):
 
         # Step 1: Check if the executable file exists
         # Extract exe_file from script_data
@@ -3734,27 +3741,44 @@ class WineCharmApp(Gtk.Application):
 
         # Convert directory size to GB for comparison
         directory_size_gb = directory_size / (1024 ** 3)  # 1 GB is 1024^3 bytes
+        directory_size_gb = round(directory_size_gb, 2)  # round to two decimal places
+
         print("----------------------------------------------------------")
         print(directory_size)
         print(directory_size_gb)
 
         if directory_size_gb > 3:
             print("Size Greater than 3GB")
-        print("----------------------------------------------------------")
+            # Show confirmation dialog
+            dialog = Adw.MessageDialog.new(
+            self.window,
+            "Large Game Directory",
+            f"The game directory size is {directory_size_gb}GB. Do you want to continue?"
+            )
+            dialog.add_response("cancel", "Cancel")
+            dialog.add_response("continue", "Continue")
+            dialog.set_response_appearance("continue", Adw.ResponseAppearance.SUGGESTED)
+        #dialog.connect("response", perform_backup_steps, script, script_key, backup_path)
+            dialog.connect("response", self.on_backup_confirmation_response, script, script_key)
+            dialog.present()
+            print("----------------------------------------------------------")
+        else:
+            self.show_create_bottle_dialog(script, script_key)
 
-        # Step 3: Suggest the backup file name
-        default_backup_name = f"{script.stem} prefix backup.tar.zst"
+    def show_create_bottle_dialog(self, script, script_key):
+            # Step 3: Suggest the backup file name
+            default_backup_name = f"{script.stem}-bottle.tar.zst"
 
-        # Create a Gtk.FileDialog instance for saving the file
-        file_dialog = Gtk.FileDialog.new()
+            # Create a Gtk.FileDialog instance for saving the file
+            file_dialog = Gtk.FileDialog.new()
 
-        # Set the initial file name using set_initial_name() method
-        file_dialog.set_initial_name(default_backup_name)
+            # Set the initial file name using set_initial_name() method
+            file_dialog.set_initial_name(default_backup_name)
 
-        # Open the dialog asynchronously to select the save location
-        file_dialog.save(self.window, None, self.on_create_bottle_dialog_response, script, script_key)
+            # Open the dialog asynchronously to select the save location
+            file_dialog.save(self.window, None, self.on_create_bottle_dialog_response, script, script_key)
 
-        print("FileDialog presented for saving the backup.")
+            print("FileDialog presented for saving the backup.")
 
     def on_create_bottle_dialog_response(self, dialog, result, script, script_key):
         try:
