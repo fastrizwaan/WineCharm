@@ -3656,7 +3656,7 @@ class WineCharmApp(Gtk.Application):
         
         self.show_processing_spinner("Bottling...")
         #self.set_open_button_icon_visible(False)
-        #self.disconnect_open_button()
+        self.disconnect_open_button()
 
         # Get the user's home directory to replace with `~`
         usershome = os.path.expanduser('~')
