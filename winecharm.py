@@ -2724,10 +2724,10 @@ class WineCharmApp(Gtk.Application):
 
 
         # Check if game directory is inside the prefix
-        is_inside_prefix = exe_path.is_relative_to(wineprefix)
+        is_exe_inside_prefix = exe_path.is_relative_to(wineprefix)
 
         # Step 1: Suggest the backup file name
-        if is_inside_prefix:
+        if is_exe_inside_prefix:
             default_backup_name = f"{script.stem}-bottle.tar.zst"
         else:
             default_backup_name = f"{script.stem}-prefix.tar.zst"
@@ -3681,13 +3681,32 @@ class WineCharmApp(Gtk.Application):
         exe_path = exe_file.parent
         exe_name = exe_file.name
 
+        runner = self.expand_and_resolve_path(script_data['runner'])
+
+        # If runner is inside the script
+        if runner:
+            print(f"RUNNER FOUND = {runner}")
+            # Check if the runner is inside runners_dir
+            is_runner_inside_prefix = runner.is_relative_to(self.runners_dir)
+            print("===========================================================")
+            if is_runner_inside_prefix:
+                print("RUNNER INSIDE PREFIX")
+                runner_dir = runner.parent.parent
+                runner_dir_exe = runner_dir / "bin/wine"
+
+                target_runner_dir = wineprefix / "Runner" 
+                target_runner_exe = target_runner_dir / runner_dir.name / "bin/wine"
+            else:
+                target_runner_exe = runner
+                runner_dir_exe = runner
+                print("RUNNER IS NOT INSIDE PREFIX")
 
         # Check if game directory is inside the prefix
-        is_inside_prefix = exe_path.is_relative_to(wineprefix)
+        is_exe_inside_prefix = exe_path.is_relative_to(wineprefix)
 
         print("==========================================================")
         # exe_file path replacement should use existing exe_file if it's already inside prefix
-        if is_inside_prefix:
+        if is_exe_inside_prefix:
             game_dir = exe_path
             game_dir_exe = exe_file
             print(f"""
@@ -3706,16 +3725,34 @@ class WineCharmApp(Gtk.Application):
         # Step 2: Define the steps for the backup process
 
         def perform_backup_steps():
-            steps = [
+            # Basic steps that are always needed
+            basic_steps = [
                 (f"Replace \"{usershome}\" with '~' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
                 ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
                 (f"Replace \"/media/{user}\" with '/media/%USERNAME%' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_media_username)),
-                ("Updating Script Path", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
+                ("Updating exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
                 ("Creating Bottle archive", lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
                 ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
                 (f"Revert %USERNAME% with \"{user}\" in script files", lambda: self.replace_strings_in_specific_files(wineprefix, restore_media_username)),
-                ("Reverting Script Path", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(exe_file)))),
+                ("Reverting exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(exe_file))))
             ]
+            
+            # Add runner-related steps only if runner exists and is not empty
+            steps = basic_steps.copy()
+            if runner and str(runner).strip():  # Check if runner exists and is not empty
+                # Check if the runner is inside runners_dir
+                is_runner_inside_prefix = runner.is_relative_to(self.runners_dir)
+                if is_runner_inside_prefix:
+                    # Insert runner update steps after exe_file update and before archive creation
+                    runner_update_index = next(i for i, (text, _) in enumerate(steps) if text == "Creating Bottle archive")
+                    steps.insert(runner_update_index, 
+                        ("Updating runner Path in Script", lambda: self.update_runner_path_in_script(script, self.replace_home_with_tilde_in_path(str(target_runner_exe))))
+                    )
+                    # Add runner revert step at the end
+                    steps.append(
+                        ("Reverting runner Path in Script", lambda: self.update_runner_path_in_script(script, self.replace_home_with_tilde_in_path(str(runner))))
+                    )
+
             for step_text, step_func in steps:
                 GLib.idle_add(self.show_initializing_step, step_text)
                 try:
@@ -3727,9 +3764,8 @@ class WineCharmApp(Gtk.Application):
                     GLib.idle_add(self.show_info_dialog, "Backup Failed", f"Error during '{step_text}': {str(e)}")
                     break
 
-            # Step 3: Once all steps are completed, reset the UI
+            # Once all steps are completed, reset the UI
             GLib.idle_add(self.on_create_bottle_completed, script_key, backup_path)
-
         # Step 4: Run the backup steps in a separate thread to keep the UI responsive
         threading.Thread(target=perform_backup_steps).start()
 
@@ -3852,14 +3888,10 @@ class WineCharmApp(Gtk.Application):
             print(f"An error occurred: {e}")
 
     def create_bottle_archive(self, script_key, wineprefix, backup_path):
-
         # Get the current username from the environment
         current_username = os.getenv("USER") or os.getenv("USERNAME")
         if not current_username:
             raise Exception("Unable to determine the current username from the environment.")
-
-        # Escape the wineprefix name for the transform pattern to handle special characters
-        #escaped_prefix_name = re.escape(wineprefix.name)
 
         # Extract exe_file from script_data
         script_data = self.extract_yaml_info(script_key)
@@ -3871,43 +3903,55 @@ class WineCharmApp(Gtk.Application):
         exe_path = exe_file.parent
 
         # Check if game directory is inside the prefix
-        is_inside_prefix = exe_path.is_relative_to(wineprefix)
+        is_exe_inside_prefix = exe_path.is_relative_to(wineprefix)
 
         tar_game_dir_name = exe_path.name
         tar_game_dir_path = exe_path.parent
-        # Prepare the transform pattern to rename the user's directory to '%USERNAME%'
-        # The pattern must be expanded to include anything under the user's folder
-        #transform_pattern = rf"s|{escaped_prefix_name}/drive_c/users/{current_username}|{escaped_prefix_name}/drive_c/users/%USERNAME%|g"
-        #transform_pattern2 = rf"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g"
 
-        print('tar_game_dir_name = {exe_path.name}, tar_game_dir_path = {exe_path.parent}, tar_game_dir_name = {tar_game_dir_name} tar_game_dir_path = {tar_game_dir_path}')
-        
-        
-        # Prepare the tar command with the --transform option based on whether the executable file is located inside the wine prefix or not
-        if is_inside_prefix:
-            tar_command = [
+        runner = self.expand_and_resolve_path(script_data['runner'])
+
+        # Start building the tar command with common options
+        tar_command = [
             'tar',
             '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
-            '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%USERNAME%|g",  # Rename the directory and its contents
-            '--transform', f"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g",
-            '-cf', backup_path,
-            '-C', str(wineprefix.parent),
-            wineprefix.name,
-            ]
-        else:
-            tar_command = [
-                'tar',
-                '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
-                '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%USERNAME%|g",  # Rename the directory and its contents
-                '--transform', f"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g",
-                '-cf', backup_path,
-                '-C', str(wineprefix.parent),
-                wineprefix.name,
-                '-C', str(tar_game_dir_path),
-                rf"./{tar_game_dir_name}",
-            ]
+            '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%USERNAME%|g",
+        ]
 
-        print(f"Running backup command: {' '.join(tar_command)}")
+        # If game is not in prefix, add game directory transform
+        if not is_exe_inside_prefix:
+            tar_command.extend([
+                '--transform', f"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g"
+            ])
+
+        # Initialize the list of source directories and their base paths
+        sources = []
+        
+        # Always add the wineprefix
+        sources.append(('-C', str(wineprefix.parent), wineprefix.name))
+
+        # If runner exists and is inside runners_dir
+        if runner and runner.is_relative_to(self.runners_dir):
+            runner_dir = runner.parent.parent
+            runner_dir_name = runner_dir.name
+            runner_dir_path = runner_dir.parent
+            tar_command.extend([
+                '--transform', f"s|^\./{runner_dir_name}|{wineprefix.name}/Runner/{runner_dir_name}|g"
+            ])
+            sources.append(('-C', str(runner_dir_path), rf"./{runner_dir_name}"))
+
+
+        # If game is not in prefix, add it as a source
+        if not is_exe_inside_prefix:
+            sources.append(('-C', str(tar_game_dir_path), rf"./{tar_game_dir_name}"))
+
+        # Add the output file path
+        tar_command.extend(['-cf', backup_path])
+
+        # Add all sources to the command
+        for source in sources:
+            tar_command.extend(source)
+
+        print(f"Running create bottle command: {' '.join(tar_command)}")
 
         # Execute the tar command
         result = subprocess.run(tar_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -3917,6 +3961,7 @@ class WineCharmApp(Gtk.Application):
 
         print(f"Backup archive created at {backup_path}")
 #########################/CREATE BOTTLE
+
 
     def show_log_file(self, script, script_key, *args):
         log_file_path = Path(script.parent) / f"{script.stem}.log"
@@ -6219,6 +6264,31 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error updating script path: {e}")
 
+    def update_runner_path_in_script(self, script_path, new_runner):
+        """
+        Update the .charm file to point to the new location of runner.
+        """
+        try:
+            # Read the script file
+            with open(script_path, "r") as file:
+                script_content = file.readlines()
+
+            # Update the runner path with the new location
+            updated_content = []
+            for line in script_content:
+                if line.startswith("runner:"):
+                    updated_content.append(f"runner: '{new_runner}'\n")
+                else:
+                    updated_content.append(line)
+
+            # Write the updated content back to the file
+            with open(script_path, "w") as file:
+                file.writelines(updated_content)
+
+            print(f"Updated runner in {script_path} to {new_runner}")
+
+        except Exception as e:
+            print(f"Error updating script path: {e}")
 
 
     def get_do_not_bundle_directories(self):

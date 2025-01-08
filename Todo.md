@@ -38,11 +38,11 @@ is not resetting the play functionality.
             - [x] if > 3GB ask user with a dialog before proceeding
             - [x] check if gamedir is inside prefixdir, suggest -bottle name for backup prefix
             - [x] check if gamedir is inside prefixdir, then use a different command to create bottle
-            - [ ] Bundle runner when exe_file inside prefixdir with backup prefix/create bottle
-            - [ ] bundle runner/runners if any charm file has it.
-            - [ ] update runner path in the charm script file
-            - [ ] copy runner dir while tarring (if bottle)
-            - [ ] update runner path in the script file
+            - [x] Bundle runner when exe_file inside prefixdir with create bottle
+            - [x] bundle runner/runners if current charm file has it.
+            - [x] update runner path in the charm script file
+            - [x] copy runner dir while tarring (if bottle)
+            - [x] update runner path in the script file
             - [x] Copy Game Dir while tarring
             - [x] Avoid do not include dirs
             - [x] Change /media/$USER to %USERNAME%
