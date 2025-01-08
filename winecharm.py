@@ -3710,11 +3710,11 @@ class WineCharmApp(Gtk.Application):
                 (f"Replace \"{usershome}\" with '~' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
                 ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
                 (f"Replace \"/media/{user}\" with '/media/%USERNAME%' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_media_username)),
-                ("Updating Script Path", lambda: self.update_script_exe_file_path(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
+                ("Updating Script Path", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
                 ("Creating Bottle archive", lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
                 ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
                 (f"Revert %USERNAME% with \"{user}\" in script files", lambda: self.replace_strings_in_specific_files(wineprefix, restore_media_username)),
-                ("Reverting Script Path", lambda: self.update_script_exe_file_path(script, self.replace_home_with_tilde_in_path(str(exe_file)))),
+                ("Reverting Script Path", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(exe_file)))),
             ]
             for step_text, step_func in steps:
                 GLib.idle_add(self.show_initializing_step, step_text)
@@ -6157,7 +6157,7 @@ class WineCharmApp(Gtk.Application):
         
         steps = [
             ("Copying Game Directory", lambda: shutil.copytree(src, dst_path, dirs_exist_ok=True)),
-            ("Updating Script Path", lambda: self.update_script_exe_file_path(script_path, dst_path / exe_name))
+            ("Updating Script Path", lambda: self.update_exe_file_path_in_script(script_path, dst_path / exe_name))
         ]
 
         def perform_import_steps():
@@ -6193,7 +6193,7 @@ class WineCharmApp(Gtk.Application):
 
         print("Game directory import completed.")
 
-    def update_script_exe_file_path(self, script_path, new_exe_file):
+    def update_exe_file_path_in_script(self, script_path, new_exe_file):
         """
         Update the .charm file to point to the new location of exe_file.
         """
