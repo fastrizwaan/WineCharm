@@ -49,8 +49,8 @@ is not resetting the play functionality.
             - [x] Before creating bottle, restore /media/$USER so that
             - [x] update script files with new path drivec/GAMEDIR/<dir>/exe_file.exe (much like import game dir)
             - [ ] Show GUI progress of tarring using % 
-            - [ ] Allow cancellation of bundle creation, while it is running using same open/bottling button
-            - [ ] Revert scripts with actual path, if interrupted or due to power failure or other reasons. (self repair)
+            - [x] Allow cancellation of bundle creation, while it is running using same open/bottling button
+            - [x] Revert scripts with actual path, if interrupted or due to power failure or other reasons. (self repair)
                 - [ ] create a copy at winecharm's data directory...
                 - [ ] create a file/mechanism which will repair broken wineprefix
                 
@@ -93,7 +93,6 @@ is not resetting the play functionality.
         - [ ] Name, Size, Gamedir size, Prefix size, if gamedir in prefix then combined.
     - [x] Change Runner
     - [x] Rename prefix directory
-    - [ ] Set Wine Arch
     - [x] Set Application Category
     - [x] winecfg
     - [x] regedit

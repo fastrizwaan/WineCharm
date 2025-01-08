@@ -88,6 +88,11 @@ class WineCharmApp(Gtk.Application):
         self.icon_view = False
         self.script_list = {}
         self.import_steps_ui = {}
+        self.current_script = None
+        self.current_script_key = None
+        self.stop_processing = False
+        self.processing_thread = None
+        self.current_backup_path = None
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
         self.script_buttons = {}
@@ -3050,40 +3055,43 @@ class WineCharmApp(Gtk.Application):
         self.replace_strings_in_files(directory, find_replace_pairs)
         
         
-    def replace_strings_in_specific_files(self, directory, find_replace_pairs):
-        # Define the patterns of the files you want to modify
-        file_patterns = ["*.charm", "*.yaml", "*.yml", "*.txt", "*.desktop", "*.sh"]
+    def replace_strings_in_specific_files(self, wineprefix, find_replace_pairs):
+        """
+        Replace strings in files with interruption support
+        """
+        if self.stop_processing:
+            raise Exception("Operation cancelled by user")
 
-        # Collect all the files matching the patterns
-        files_to_modify = []
-        for pattern in file_patterns:
-            files_to_modify.extend(glob.glob(os.path.join(directory, pattern)))
+        for root, dirs, files in os.walk(wineprefix):
+            if self.stop_processing:
+                raise Exception("Operation cancelled by user")
+                
+            for file in files:
+                if self.stop_processing:
+                    raise Exception("Operation cancelled by user")
+                    
+                file_path = Path(root) / file
+                
+                # Only process text files
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                except (UnicodeDecodeError, IOError):
+                    continue
 
-        for file_path in files_to_modify:
-            # Skip binary files
-            if self.is_binary_file(file_path):
-                print(f"Skipping binary file: {file_path}")
-                continue
+                modified = False
+                new_content = content
+                
+                for find_str, replace_str in find_replace_pairs.items():
+                    if find_str in new_content:
+                        new_content = new_content.replace(find_str, replace_str)
+                        modified = True
 
-            # Skip files where permission is denied
-            if not os.access(file_path, os.R_OK | os.W_OK):
-                print(f"Skipping file: {file_path} (Permission denied)")
-                continue
-
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-
-                # Replace strings based on the provided dictionary
-                for find, replace in find_replace_pairs.items():
-                    content = content.replace(find, replace)
-
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(content)
-
-                print(f"Replacements applied to file: {file_path}")
-            except (UnicodeDecodeError, FileNotFoundError, PermissionError) as e:
-                print(f"Skipping file: {file_path} ({e})")
+                if modified:
+                    if self.stop_processing:
+                        raise Exception("Operation cancelled by user")
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(new_content)
 
     def replace_strings_in_files(self, directory, find_replace_pairs):
         for root, dirs, files in os.walk(directory):
@@ -3579,7 +3587,6 @@ class WineCharmApp(Gtk.Application):
             ("Environment Variables", "preferences-system-symbolic", self.set_environment_variables),
             ("Change Runner", "preferences-desktop-apps-symbolic", self.change_runner),
             ("Rename Prefix Directory", "folder-visiting-symbolic", self.rename_prefix_directory),
-            ("Set Wine Arch", "preferences-system-symbolic", self.set_wine_arch),
             ("Wine Config (winecfg)", "preferences-system-symbolic", self.wine_config),
             ("Registry Editor (regedit)", "dialog-password-symbolic", self.wine_registry_editor)
 
@@ -3650,13 +3657,16 @@ class WineCharmApp(Gtk.Application):
         """
         Backs up the Wine prefix in a stepwise manner, indicating progress via spinner and label updates.
         """
+        # Store current script info for cancellation handling
+        self.current_script = script
+        self.current_script_key = script_key
+        self.stop_processing = False
+        self.current_backup_path = backup_path
         wineprefix = Path(script).parent
 
         # Step 1: Disconnect the UI elements and initialize the spinner
-        
         self.show_processing_spinner("Bottling...")
-        #self.set_open_button_icon_visible(False)
-        self.disconnect_open_button()
+        self.connect_open_button_with_bottling_cancel(script_key)
 
         # Get the user's home directory to replace with `~`
         usershome = os.path.expanduser('~')
@@ -3676,7 +3686,6 @@ class WineCharmApp(Gtk.Application):
             raise Exception("Script data not found.")
 
         exe_file = self.expand_and_resolve_path(script_data['exe_file'])
-        #exe_file = Path(str(exe_file).replace("%USERNAME%", user))
         exe_file = Path(str(exe_file).replace("%USERNAME%", user))
         exe_path = exe_file.parent
         exe_name = exe_file.name
@@ -3722,52 +3731,63 @@ class WineCharmApp(Gtk.Application):
             game_dir = {game_dir}
             game_dir_exe = {game_dir_exe}
             """)
-        # Step 2: Define the steps for the backup process
 
         def perform_backup_steps():
-            # Basic steps that are always needed
-            basic_steps = [
-                (f"Replace \"{usershome}\" with '~' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
-                ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
-                (f"Replace \"/media/{user}\" with '/media/%USERNAME%' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_media_username)),
-                ("Updating exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
-                ("Creating Bottle archive", lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
-                ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
-                (f"Revert %USERNAME% with \"{user}\" in script files", lambda: self.replace_strings_in_specific_files(wineprefix, restore_media_username)),
-                ("Reverting exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(exe_file))))
-            ]
-            
-            # Add runner-related steps only if runner exists and is not empty
-            steps = basic_steps.copy()
-            if runner and str(runner).strip():  # Check if runner exists and is not empty
-                # Check if the runner is inside runners_dir
-                is_runner_inside_prefix = runner.is_relative_to(self.runners_dir)
-                if is_runner_inside_prefix:
-                    # Insert runner update steps after exe_file update and before archive creation
-                    runner_update_index = next(i for i, (text, _) in enumerate(steps) if text == "Creating Bottle archive")
-                    steps.insert(runner_update_index, 
-                        ("Updating runner Path in Script", lambda: self.update_runner_path_in_script(script, self.replace_home_with_tilde_in_path(str(target_runner_exe))))
-                    )
-                    # Add runner revert step at the end
-                    steps.append(
-                        ("Reverting runner Path in Script", lambda: self.update_runner_path_in_script(script, self.replace_home_with_tilde_in_path(str(runner))))
-                    )
+            try:
+                # Basic steps that are always needed
+                basic_steps = [
+                    (f"Replace \"{usershome}\" with '~' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
+                    ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
+                    (f"Replace \"/media/{user}\" with '/media/%USERNAME%' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_media_username)),
+                    ("Updating exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
+                    ("Creating Bottle archive", lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
+                    ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
+                    (f"Revert %USERNAME% with \"{user}\" in script files", lambda: self.replace_strings_in_specific_files(wineprefix, restore_media_username)),
+                    ("Reverting exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(exe_file))))
+                ]
+                
+                # Add runner-related steps only if runner exists and is not empty
+                steps = basic_steps.copy()
+                if runner and str(runner).strip():
+                    is_runner_inside_prefix = runner.is_relative_to(self.runners_dir)
+                    if is_runner_inside_prefix:
+                        runner_update_index = next(i for i, (text, _) in enumerate(steps) if text == "Creating Bottle archive")
+                        steps.insert(runner_update_index, 
+                            ("Updating runner Path in Script", lambda: self.update_runner_path_in_script(script, self.replace_home_with_tilde_in_path(str(target_runner_exe))))
+                        )
+                        steps.append(
+                            ("Reverting runner Path in Script", lambda: self.update_runner_path_in_script(script, self.replace_home_with_tilde_in_path(str(runner))))
+                        )
 
-            for step_text, step_func in steps:
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    # Execute the step
-                    step_func()
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                except Exception as e:
-                    print(f"Error during step '{step_text}': {e}")
-                    GLib.idle_add(self.show_info_dialog, "Backup Failed", f"Error during '{step_text}': {str(e)}")
-                    break
+                for step_text, step_func in steps:
+                    if self.stop_processing:
+                        GLib.idle_add(self.cleanup_cancelled_bottle, script, script_key)
+                        return
 
-            # Once all steps are completed, reset the UI
-            GLib.idle_add(self.on_create_bottle_completed, script_key, backup_path)
-        # Step 4: Run the backup steps in a separate thread to keep the UI responsive
-        threading.Thread(target=perform_backup_steps).start()
+                    GLib.idle_add(self.show_initializing_step, step_text)
+                    try:
+                        step_func()
+                        if self.stop_processing:
+                            GLib.idle_add(self.cleanup_cancelled_bottle, script, script_key)
+                            return
+                        GLib.idle_add(self.mark_step_as_done, step_text)
+                    except Exception as e:
+                        print(f"Error during step '{step_text}': {e}")
+                        if not self.stop_processing:
+                            GLib.idle_add(self.show_info_dialog, "Backup Failed", f"Error during '{step_text}': {str(e)}")
+                        GLib.idle_add(self.cleanup_cancelled_bottle, script, script_key)
+                        return
+
+                if not self.stop_processing:
+                    GLib.idle_add(self.on_create_bottle_completed, script_key, backup_path)
+                
+            except Exception as e:
+                print(f"Backup process failed: {e}")
+                GLib.idle_add(self.cleanup_cancelled_bottle, script, script_key)
+
+        # Run the backup steps in a separate thread to keep the UI responsive
+        self.processing_thread = threading.Thread(target=perform_backup_steps)
+        self.processing_thread.start()
 
     def on_create_bottle_completed(self, script_key, backup_path):
         """
@@ -3888,6 +3908,82 @@ class WineCharmApp(Gtk.Application):
             print(f"An error occurred: {e}")
 
     def create_bottle_archive(self, script_key, wineprefix, backup_path):
+        """
+        Create a bottle archive with interruption support
+        """
+
+        if self.stop_processing:
+            raise Exception("Operation cancelled by user")
+
+        current_username = os.getenv("USER") or os.getenv("USERNAME")
+        if not current_username:
+            raise Exception("Unable to determine the current username from the environment.")
+
+        script_data = self.extract_yaml_info(script_key)
+        if not script_data:
+            raise Exception("Script data not found.")
+
+        exe_file = Path(script_data['exe_file']).expanduser().resolve()
+        exe_file = Path(str(exe_file).replace("%USERNAME%", current_username))
+        exe_path = exe_file.parent
+        tar_game_dir_name = exe_path.name
+        tar_game_dir_path = exe_path.parent
+
+        runner = self.expand_and_resolve_path(script_data['runner'])
+
+        # Build tar command with transforms
+        tar_command = [
+            'tar',
+            '-I', 'zstd -T0',
+            '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%USERNAME%|g",
+        ]
+
+        is_exe_inside_prefix = exe_path.is_relative_to(wineprefix)
+        if not is_exe_inside_prefix:
+            tar_command.extend([
+                '--transform', f"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g"
+            ])
+
+        sources = []
+        sources.append(('-C', str(wineprefix.parent), wineprefix.name))
+
+        if runner and runner.is_relative_to(self.runners_dir):
+            runner_dir = runner.parent.parent
+            runner_dir_name = runner_dir.name
+            runner_dir_path = runner_dir.parent
+            tar_command.extend([
+                '--transform', f"s|^\./{runner_dir_name}|{wineprefix.name}/Runner/{runner_dir_name}|g"
+            ])
+            sources.append(('-C', str(runner_dir_path), rf"./{runner_dir_name}"))
+
+        if not is_exe_inside_prefix:
+            sources.append(('-C', str(tar_game_dir_path), rf"./{tar_game_dir_name}"))
+
+        tar_command.extend(['-cf', backup_path])
+
+        for source in sources:
+            tar_command.extend(source)
+
+        print(f"Running create bottle command: {' '.join(tar_command)}")
+
+        process = subprocess.Popen(tar_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        while process.poll() is None:
+            if self.stop_processing:
+                process.terminate()
+                try:
+                    process.wait(timeout=2)
+                    if Path(backup_path).exists():
+                        Path(backup_path).unlink()
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                raise Exception("Operation cancelled by user")
+            time.sleep(0.1)
+
+        if process.returncode != 0 and not self.stop_processing:
+            stderr = process.stderr.read().decode()
+            raise Exception(f"Backup failed: {stderr}")
+
         # Get the current username from the environment
         current_username = os.getenv("USER") or os.getenv("USERNAME")
         if not current_username:
@@ -3960,7 +4056,87 @@ class WineCharmApp(Gtk.Application):
             raise Exception(f"Backup failed: {result.stderr}")
 
         print(f"Backup archive created at {backup_path}")
-#########################/CREATE BOTTLE
+
+    def connect_open_button_with_bottling_cancel(self, script_key):
+        """
+        Connect cancel handler to the open button
+        """
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_bottle_clicked, script_key)
+        
+        if not hasattr(self, 'spinner') or not self.spinner:
+            self.spinner = Gtk.Spinner()
+            self.spinner.start()
+            self.open_button_box.append(self.spinner)
+
+        #self.set_open_button_label("Cancel")
+        self.set_open_button_icon_visible(False)
+
+    def cleanup_cancelled_bottle(self, script, script_key):
+        """
+        Clean up after bottle creation is cancelled
+        """
+        try:
+            if Path(script).exists():
+                script_data = self.extract_yaml_info(script_key)
+                if script_data:
+                    # Revert exe_file path
+                    if 'exe_file' in script_data:
+                        original_exe = script_data['exe_file']
+                        self.update_exe_file_path_in_script(script, original_exe)
+                    
+                    # Revert runner path if it exists
+                    if 'runner' in script_data and script_data['runner']:
+                        original_runner = script_data['runner']
+                        self.update_runner_path_in_script(script, original_runner)
+
+        except Exception as e:
+            print(f"Error during cleanup: {e}")
+        finally:
+            #self.reconnect_open_button()
+            self.hide_processing_spinner()
+            if self.stop_processing:
+                self.show_info_dialog("Cancelled", "Bottle creation was cancelled")
+                # Delete partial backup file if it exists
+                if hasattr(self, 'current_backup_path') and Path(self.current_backup_path).exists():
+                    try:
+                        Path(self.current_backup_path).unlink()
+                        self.current_backup_path = None
+                    except Exception as e:
+                        print(f"Error deleting partial backup file: {e}")
+
+    def on_cancel_bottle_clicked(self, button, script_key):
+        """
+        Handle cancel button click
+        """
+        dialog = Adw.MessageDialog.new(
+            self.window,
+            "Cancel Bottle Creation",
+            "Do you want to cancel the bottle creation process?"
+        )
+        dialog.add_response("continue", "Continue")
+        dialog.add_response("cancel", "Cancel Creation")
+        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.connect("response", self.on_cancel_bottle_dialog_response, script_key)
+        dialog.present()
+
+    def on_cancel_bottle_dialog_response(self, dialog, response, script_key):
+        """
+        Handle cancel dialog response
+        """
+        if response == "cancel":
+            self.stop_processing = True
+        dialog.close()
+
+        # Iterate over all script buttons and update the UI based on `is_clicked_row`
+        for key, data in self.script_ui_data.items():
+            row_button = data['row']
+            row_play_button = data['play_button']
+            row_options_button = data['options_button']
+        self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
+###################################### / CREATE BOTTLE  end
+
 
 
     def show_log_file(self, script, script_key, *args):
