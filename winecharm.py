@@ -3661,7 +3661,11 @@ class WineCharmApp(Gtk.Application):
         # Get the user's home directory to replace with `~`
         usershome = os.path.expanduser('~')
 
-        user = os.getenv('USER')
+        # Get the current username from the environment
+        user = os.getenv("USER") or os.getenv("USERNAME")
+        if not user:
+            raise Exception("Unable to determine the current username from the environment.")
+        
         find_replace_pairs = {usershome: '~', f'\'{usershome}': '`\~'}
         find_replace_media_username = {f'/media/{user}/': '/media/%USERNAME%/'}
         restore_media_username = {'/media/%USERNAME%/': f'/media/{user}/'}
@@ -3673,10 +3677,32 @@ class WineCharmApp(Gtk.Application):
 
         exe_file = self.expand_and_resolve_path(script_data['exe_file'])
         #exe_file = Path(str(exe_file).replace("%USERNAME%", user))
+        exe_file = Path(str(exe_file).replace("%USERNAME%", user))
         exe_path = exe_file.parent
         exe_name = exe_file.name
-        game_dir = wineprefix / "drive_c" / "GAMEDIR"
-        game_dir_exe = game_dir / exe_path.name / exe_name
+
+
+        # Check if game directory is inside the prefix
+        is_inside_prefix = exe_path.is_relative_to(wineprefix)
+
+        print("==========================================================")
+        # exe_file path replacement should use existing exe_file if it's already inside prefix
+        if is_inside_prefix:
+            game_dir = exe_path
+            game_dir_exe = exe_file
+            print(f"""
+            exe_file is inside wineprefix:
+            game_dir = {game_dir}
+            game_dir_exe = {game_dir_exe}
+            """)
+        else:
+            game_dir = wineprefix / "drive_c" / "GAMEDIR"
+            game_dir_exe = game_dir / exe_path.name / exe_name
+            print(f"""
+            exe_file is OUTSIDE wineprefix:
+            game_dir = {game_dir}
+            game_dir_exe = {game_dir_exe}
+            """)
         # Step 2: Define the steps for the backup process
 
         def perform_backup_steps():
@@ -3751,6 +3777,13 @@ class WineCharmApp(Gtk.Application):
         game_dir = wineprefix / "drive_c" / "GAMEDIR"
         game_dir_exe = game_dir / exe_path.name / exe_name
 
+        # Check if the game directory is in DO_NOT_BUNDLE_FROM directories
+        if str(exe_path) in self.get_do_not_bundle_directories():
+            msg1 = "Cannot copy the selected game directory"
+            msg2 = "Please move the files to a different directory to create a bundle."
+            self.show_info_dialog(msg1, msg2)
+            return
+
         # If exe_not found i.e., game_dir is not accessble due to unmounted directory
         if not exe_file.exists():
             GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Exe Not Found", f"Not Mounted or Deleted?\n{exe_file}")
@@ -3819,6 +3852,7 @@ class WineCharmApp(Gtk.Application):
             print(f"An error occurred: {e}")
 
     def create_bottle_archive(self, script_key, wineprefix, backup_path):
+
         # Get the current username from the environment
         current_username = os.getenv("USER") or os.getenv("USERNAME")
         if not current_username:
@@ -3836,23 +3870,22 @@ class WineCharmApp(Gtk.Application):
         exe_file = Path(str(exe_file).replace("%USERNAME%", current_username))
         exe_path = exe_file.parent
 
-        # Check if the game directory is in DO_NOT_BUNDLE_FROM directories
-        if str(exe_path) in self.get_do_not_bundle_directories():
-            msg1 = "Cannot copy the selected game directory"
-            msg2 = "Please move the files to a different directory to create a bundle."
-            self.show_info_dialog(msg1, msg2)
-            return
+        # Check if game directory is inside the prefix
+        is_inside_prefix = exe_path.is_relative_to(wineprefix)
 
         tar_game_dir_name = exe_path.name
         tar_game_dir_path = exe_path.parent
         # Prepare the transform pattern to rename the user's directory to '%USERNAME%'
         # The pattern must be expanded to include anything under the user's folder
         #transform_pattern = rf"s|{escaped_prefix_name}/drive_c/users/{current_username}|{escaped_prefix_name}/drive_c/users/%USERNAME%|g"
-        transform_pattern2 = rf"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g"
+        #transform_pattern2 = rf"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g"
 
         print('tar_game_dir_name = {exe_path.name}, tar_game_dir_path = {exe_path.parent}, tar_game_dir_name = {tar_game_dir_name} tar_game_dir_path = {tar_game_dir_path}')
-        # Prepare the tar command with --transform option
-        tar_command = [
+        
+        
+        # Prepare the tar command with the --transform option based on whether the executable file is located inside the wine prefix or not
+        if is_inside_prefix:
+            tar_command = [
             'tar',
             '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
             '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%USERNAME%|g",  # Rename the directory and its contents
@@ -3860,9 +3893,19 @@ class WineCharmApp(Gtk.Application):
             '-cf', backup_path,
             '-C', str(wineprefix.parent),
             wineprefix.name,
-            '-C', str(tar_game_dir_path),
-            rf"./{tar_game_dir_name}",
-        ]
+            ]
+        else:
+            tar_command = [
+                'tar',
+                '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
+                '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%USERNAME%|g",  # Rename the directory and its contents
+                '--transform', f"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g",
+                '-cf', backup_path,
+                '-C', str(wineprefix.parent),
+                wineprefix.name,
+                '-C', str(tar_game_dir_path),
+                rf"./{tar_game_dir_name}",
+            ]
 
         print(f"Running backup command: {' '.join(tar_command)}")
 

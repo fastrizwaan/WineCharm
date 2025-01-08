@@ -37,7 +37,7 @@ is not resetting the play functionality.
             - [x] Check size of Gamedir and print on terminal
             - [x] if > 3GB ask user with a dialog before proceeding
             - [x] check if gamedir is inside prefixdir, suggest -bottle name for backup prefix
-            - [ ] check if gamedir is inside prefixdir, then use a different command to create bottle
+            - [x] check if gamedir is inside prefixdir, then use a different command to create bottle
             - [ ] Bundle runner when exe_file inside prefixdir with backup prefix/create bottle
             - [ ] bundle runner/runners if any charm file has it.
             - [ ] update runner path in the charm script file
