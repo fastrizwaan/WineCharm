@@ -3676,7 +3676,7 @@ class WineCharmApp(Gtk.Application):
         if not user:
             raise Exception("Unable to determine the current username from the environment.")
         
-        find_replace_pairs = {usershome: '~', f'\'{usershome}': '`\~'}
+        find_replace_pairs = {usershome: '~', f'\'{usershome}': '\'~\''}
         find_replace_media_username = {f'/media/{user}/': '/media/%USERNAME%/'}
         restore_media_username = {'/media/%USERNAME%/': f'/media/{user}/'}
 
@@ -3941,7 +3941,7 @@ class WineCharmApp(Gtk.Application):
         is_exe_inside_prefix = exe_path.is_relative_to(wineprefix)
         if not is_exe_inside_prefix:
             tar_command.extend([
-                '--transform', f"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g"
+                '--transform', rf"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g"
             ])
 
         sources = []
@@ -3952,7 +3952,7 @@ class WineCharmApp(Gtk.Application):
             runner_dir_name = runner_dir.name
             runner_dir_path = runner_dir.parent
             tar_command.extend([
-                '--transform', f"s|^\./{runner_dir_name}|{wineprefix.name}/Runner/{runner_dir_name}|g"
+                '--transform', rf"s|^\./{runner_dir_name}|{wineprefix.name}/Runner/{runner_dir_name}|g"
             ])
             sources.append(('-C', str(runner_dir_path), rf"./{runner_dir_name}"))
 
@@ -4010,13 +4010,13 @@ class WineCharmApp(Gtk.Application):
         tar_command = [
             'tar',
             '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
-            '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%USERNAME%|g",
+            '--transform', rf"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%USERNAME%|g",
         ]
 
         # If game is not in prefix, add game directory transform
         if not is_exe_inside_prefix:
             tar_command.extend([
-                '--transform', f"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g"
+                '--transform', rf"s|^\./{tar_game_dir_name}|{wineprefix.name}/drive_c/GAMEDIR/{tar_game_dir_name}|g"
             ])
 
         # Initialize the list of source directories and their base paths
@@ -4031,7 +4031,7 @@ class WineCharmApp(Gtk.Application):
             runner_dir_name = runner_dir.name
             runner_dir_path = runner_dir.parent
             tar_command.extend([
-                '--transform', f"s|^\./{runner_dir_name}|{wineprefix.name}/Runner/{runner_dir_name}|g"
+                '--transform', rf"s|^\./{runner_dir_name}|{wineprefix.name}/Runner/{runner_dir_name}|g"
             ])
             sources.append(('-C', str(runner_dir_path), rf"./{runner_dir_name}"))
 
