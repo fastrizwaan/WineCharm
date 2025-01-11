@@ -341,45 +341,47 @@ class WineCharmApp(Gtk.Application):
                     print(f"Error processing {item}: {e}")
 
     def initialize_template(self, template_dir, callback):
-        """
-        Modified template initialization to use the new progress system with progress bar
-        """
         self.create_required_directories()
         self.initializing_template = True
-        
-        # Disconnect open button handler
         if self.open_button_handler_id is not None:
             self.open_button.disconnect(self.open_button_handler_id)
-        
+
+        self.spinner = Gtk.Spinner()
+        self.spinner.start()
+        self.open_button_box.append(self.spinner)
+
+        self.set_open_button_label("Initializing...")
+        self.set_open_button_icon_visible(False)  # Hide the open-folder icon
+        self.search_button.set_sensitive(False)  # Disable the search button
+        self.view_toggle_button.set_sensitive(False)
+        self.ensure_directory_exists(template_dir)
+
         steps = [
             ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
             ("Replace symbolic links with directories", lambda: self.remove_symlinks_and_create_directories(template_dir)),
-            ("Installing corefonts", f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
-            ("Installing openal", f"WINEPREFIX='{template_dir}' winetricks -q openal"),
-            ("Installing vkd3d", f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-            ("Installing dxvk", f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+            ("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+            ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+            ("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+            ("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+            #("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
+            #("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
         ]
-        
-        # Set total steps and initialize progress UI
-        self.total_steps = len(steps)
-        self.show_processing_spinner("Initializing Template...")
 
         def initialize():
-            for index, (step_text, command) in enumerate(steps, 1):
+            for step_text, command in steps:
                 GLib.idle_add(self.show_initializing_step, step_text)
                 try:
                     if callable(command):
+                        # If the command is a callable, invoke it directly
                         command()
                     else:
+                        # Run the command in the shell
                         subprocess.run(command, shell=True, check=True)
                     GLib.idle_add(self.mark_step_as_done, step_text)
-                    # Update progress bar
-                    GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
                 except subprocess.CalledProcessError as e:
                     print(f"Error initializing template: {e}")
                     break
             GLib.idle_add(callback)
-            GLib.idle_add(self.hide_processing_spinner)
 
         threading.Thread(target=initialize).start()
 
@@ -445,64 +447,24 @@ class WineCharmApp(Gtk.Application):
         button.set_visible(True)
         self.flowbox.queue_draw()  # Ensure the flowbox redraws itself to show the new button
 
-    def show_initializing_step(self, step_text):
-        """
-        Show a new processing step in the flowbox
-        """
-        
-
-        if hasattr(self, 'progress_bar'):
-            # Calculate total steps dynamically
-            if hasattr(self, 'total_steps'):
-                total_steps = self.total_steps
-            else:
-                # Default for bottle creation
-                total_steps = 8
-            
-            current_step = len(self.step_boxes) + 1
-            progress = current_step / total_steps
-            
-            # Update progress bar
-            self.progress_bar.set_fraction(progress)
-            self.progress_bar.set_text(f"Step {current_step}/{total_steps}")
-            
-            # Create step box
-            step_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            step_box.set_margin_start(12)
-            step_box.set_margin_end(12)
-            step_box.set_margin_top(6)
-            step_box.set_margin_bottom(6)
-            
-            # Add status icon and label
-            step_icon = self.spinner = Gtk.Spinner()
-            step_label = Gtk.Label(label=step_text)
-            step_label.set_halign(Gtk.Align.START)
-            step_label.set_hexpand(True)
-            
-            step_box.append(step_icon)
-            step_box.append(step_label)
-            self.spinner.start()
-
-            
-            # Add to flowbox
-            flowbox_child = Gtk.FlowBoxChild()
-            flowbox_child.set_child(step_box)
-            self.flowbox.append(flowbox_child)
-            
-            # Store reference
-            self.step_boxes.append((step_box, step_icon, step_label))
-
     def mark_step_as_done(self, step_text):
         """
-        Mark a step as completed in the flowbox
+        Mark the step as done by updating the UI with a checkmark.
         """
-        if hasattr(self, 'step_boxes'):
-            for step_box, step_icon, step_label in self.step_boxes:
-                if step_label.get_text() == step_text:
-                    step_box.remove(step_icon)
-                    done_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
-                    step_box.prepend(done_icon)
+        child = self.flowbox.get_first_child()
+        while child:
+            button = child.get_child()
+            if isinstance(button, Gtk.Button):  # Ensure you're working with a Gtk.Button
+                label = button.get_child().get_last_child()  # Access the label inside the button
+                if isinstance(label, Gtk.Label) and label.get_text() == step_text:
+                    checkbox = button.get_first_child().get_first_child()  # Access the checkbox inside the button
+                    if isinstance(checkbox, Gtk.CheckButton):
+                        checkbox.set_active(True)  # Mark the checkbox as checked
+                    button.add_css_class("normal-font")  # Optionally update the style
                     break
+            child = child.get_next_sibling()
+
+        self.flowbox.queue_draw()  # Ensure the flowbox redraws itself to update the checkbox status
 
     def check_required_programs(self):
         if shutil.which("flatpak-spawn"):
@@ -3510,7 +3472,6 @@ class WineCharmApp(Gtk.Application):
             ("Checking Uncompressed Size", lambda: self.check_disk_space_and_show_step(file_path)),
             ("Extracting Backup File", lambda: self.extract_backup(file_path)),
             ("Processing Registry Files", lambda: self.process_reg_files(self.extract_prefix_dir(file_path))),
-            ("Performing Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(file_path))),
             ("Replacing Symbolic Links with Directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
             ("Renaming and merging user directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
             ("Add Shortcuts to Script List", lambda: self.add_charm_files_to_script_list(self.extract_prefix_dir(file_path))),
@@ -3703,14 +3664,12 @@ class WineCharmApp(Gtk.Application):
         self.current_backup_path = backup_path
         wineprefix = Path(script).parent
 
-        self.hide_processing_spinner()
-
         # Step 1: Disconnect the UI elements and initialize the spinner
         self.show_processing_spinner("Bottling...")
         self.connect_open_button_with_bottling_cancel(script_key)
 
         # Get the user's home directory to replace with `~`
-        usershome = os.path.expanduser('~create_bottle(')
+        usershome = os.path.expanduser('~')
 
         # Get the current username from the environment
         user = os.getenv("USER") or os.getenv("USERNAME")
@@ -3777,9 +3736,9 @@ class WineCharmApp(Gtk.Application):
             try:
                 # Basic steps that are always needed
                 basic_steps = [
-                    (f"Replace \"{usershome}\" with '~' in files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
+                    (f"Replace \"{usershome}\" with '~' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
                     ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
-                    (f"Replace \"/media/{user}\" with '/media/%USERNAME%' in files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_media_username)),
+                    (f"Replace \"/media/{user}\" with '/media/%USERNAME%' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_media_username)),
                     ("Updating exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
                     ("Creating Bottle archive", lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
                     ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
@@ -4106,10 +4065,10 @@ class WineCharmApp(Gtk.Application):
             self.open_button.disconnect(self.open_button_handler_id)
             self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_bottle_clicked, script_key)
         
-        #if not hasattr(self, 'spinner') or not self.spinner:
-        #    self.spinner = Gtk.Spinner()
-        #    self.spinner.start()
-        #    self.open_button_box.append(self.spinner)
+        if not hasattr(self, 'spinner') or not self.spinner:
+            self.spinner = Gtk.Spinner()
+            self.spinner.start()
+            self.open_button_box.append(self.spinner)
 
         #self.set_open_button_label("Cancel")
         self.set_open_button_icon_visible(False)
@@ -4139,12 +4098,6 @@ class WineCharmApp(Gtk.Application):
             self.hide_processing_spinner()
             if self.stop_processing:
                 self.show_info_dialog("Cancelled", "Bottle creation was cancelled")
-            # Iterate over all script buttons and update the UI based on `is_clicked_row`
-                for key, data in self.script_ui_data.items():
-                    row_button = data['row']
-                    row_play_button = data['play_button']
-                    row_options_button = data['options_button']
-                self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
                 # Delete partial backup file if it exists
                 if hasattr(self, 'current_backup_path') and Path(self.current_backup_path).exists():
                     try:
@@ -4174,24 +4127,17 @@ class WineCharmApp(Gtk.Application):
         """
         if response == "cancel":
             self.stop_processing = True
-            dialog.close()
-#            self.set_open_button_label("Open")
-#            self.set_open_button_icon_visible(True)
-#            self.reconnect_open_button()
-#            self.hide_processing_spinner()
+        dialog.close()
 
+        # Iterate over all script buttons and update the UI based on `is_clicked_row`
+        for key, data in self.script_ui_data.items():
+            row_button = data['row']
+            row_play_button = data['play_button']
+            row_options_button = data['options_button']
+        self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
+###################################### / CREATE BOTTLE end NEW BOTTLE 2 with PROGRESS
 
-#            # Iterate over all script buttons and update the UI based on `is_clicked_row`
-#            for key, data in self.script_ui_data.items():
-#                row_button = data['row']
-#                row_play_button = data['play_button']
-#                row_options_button = data['options_button']
-#            self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
-        else:
-            dialog.close()
-
-###################################### / CREATE BOTTLE  end
-
+######################### NEW BOTTLE 2 with progress end
 
 
     def show_log_file(self, script, script_key, *args):
@@ -5324,54 +5270,38 @@ class WineCharmApp(Gtk.Application):
             GLib.timeout_add_seconds(0.5, self.create_script_list)
 
 
-    def show_processing_spinner(self, label_text):
-        """
-        Initialize progress tracking UI for any step-based process
-        """
-        # Clear the open button box
-        while self.open_button_box.get_first_child():
-            self.open_button_box.remove(self.open_button_box.get_first_child())
-        
-        # Create and add progress bar to the open button
-        self.progress_bar = Gtk.ProgressBar()
-        self.progress_bar.set_show_text(True)
-        self.progress_bar.set_text(label_text)
-        self.progress_bar.set_fraction(0.0)
-        self.progress_bar.set_size_request(460, -1)
-        self.open_button_box.append(self.progress_bar)
-        
-        # Clear the flowbox for showing steps
-        self.flowbox.remove_all()
-        
-        # Create a list to store steps
-        self.step_boxes = []
-        
-        # Disable UI elements during processing
-        self.search_button.set_sensitive(False)
-        self.view_toggle_button.set_sensitive(False)
+    def show_processing_spinner(self, message="Processing..."):
+        if not self.spinner:
+            self.spinner = Gtk.Spinner()
+            self.spinner.start()
+            self.open_button_box.append(self.spinner)
+
+            box = self.open_button.get_child()
+            child = box.get_first_child()
+            while child:
+                if isinstance(child, Gtk.Image):
+                    child.set_visible(False)
+                elif isinstance(child, Gtk.Label):
+                    child.set_label(message)
+                child = child.get_next_sibling()
 
     def hide_processing_spinner(self):
-        """
-        Restore UI state after process completion
-        """
-        # Clear progress bar
-        while self.open_button_box.get_first_child():
-            self.open_button_box.remove(self.open_button_box.get_first_child())
-        
-        # Restore original button content
-        open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
-        open_label = Gtk.Label(label="Open")
-        self.open_button_box.append(open_icon)
-        self.open_button_box.append(open_label)
-        
-        # Re-enable UI elements
-        self.search_button.set_sensitive(True)
-        self.view_toggle_button.set_sensitive(True)
-        
-        # Clear step tracking
-        if hasattr(self, 'step_boxes'):
-            self.step_boxes = []
+        print("hide_processing_spinner")
+        if self.spinner and self.spinner.get_parent() == self.open_button_box:
+            self.spinner.stop()
+            self.open_button_box.remove(self.spinner)
+            self.spinner = None  # Ensure the spinner is set to None
+            
+        box = self.open_button.get_child()
+        child = box.get_first_child()
+        while child:
+            if isinstance(child, Gtk.Image):
+                child.set_visible(True)
+            elif isinstance(child, Gtk.Label):
+                child.set_label("Open")
+            child = child.get_next_sibling()
 
+        print("Spinner hidden.")
 
     def on_open(self, app, files, *args):
         # Ensure the application is fully initialized
@@ -5683,30 +5613,23 @@ class WineCharmApp(Gtk.Application):
 
     def import_wine_directory(self, src, dst):
         """
-        Import the Wine directory with progress tracking in flowbox
+        Import the Wine directory in steps: copy the directory, process registry files, and create scripts for executables.
         """
-        # Clear the flowbox and initialize the progress UI
+        # Clear the flowbox and initialize the steps UI
         GLib.idle_add(self.flowbox.remove_all)
-        
+
         steps = [
             ("Copying Wine directory", lambda: self.custom_copytree(src, dst)),
             ("Processing registry files", lambda: self.process_reg_files(dst)),
-            ("Performing Replacements", lambda: self.perform_replacements(dst)),
             ("Creating scripts for .exe files", lambda: self.create_scripts_for_exe_files(dst)),
         ]
-        
-        # Set total steps and initialize progress UI
-        self.total_steps = len(steps)
-        self.show_processing_spinner("Importing Wine Directory...")
 
         def perform_import_steps():
-            for index, (step_text, step_func) in enumerate(steps, 1):
+            for step_text, step_func in steps:
                 GLib.idle_add(self.show_initializing_step, step_text)
                 try:
                     step_func()
                     GLib.idle_add(self.mark_step_as_done, step_text)
-                    # Update progress bar
-                    GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
                 except Exception as e:
                     print(f"Error during step '{step_text}': {e}")
                     GLib.idle_add(self.show_info_dialog, "Error", f"An error occurred during '{step_text}': {e}")
@@ -5714,7 +5637,6 @@ class WineCharmApp(Gtk.Application):
 
             # Re-enable UI elements and restore the script list after the import process
             GLib.idle_add(self.on_import_wine_directory_completed)
-            GLib.idle_add(self.hide_processing_spinner)
 
         threading.Thread(target=perform_import_steps).start()
 
@@ -8175,11 +8097,321 @@ class WineCharmApp(Gtk.Application):
             return False
 
 
+###########################
+    def show_processing_spinner(self, label_text):
+        """
+        Show progress bar for the bottling process
+        """
+        # Remove the open button temporarily
+        self.vbox.remove(self.open_button)
+        
+        # Create progress bar box
+        self.progress_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.progress_box.set_margin_top(6)
+        self.progress_box.set_margin_bottom(6)
+        
+        # Add progress bar
+        self.progress_bar = Gtk.ProgressBar()
+        self.progress_bar.set_show_text(True)
+        self.progress_bar.set_text("Initializing...")
+        self.progress_bar.set_fraction(0.0)
+        
+        # Set up the progress box
+        self.progress_box.append(self.progress_bar)
+        self.vbox.prepend(self.progress_box)
+
+    def hide_processing_spinner(self):
+        """
+        Hide progress bar and restore open button
+        """
+        if hasattr(self, 'progress_box'):
+            self.vbox.remove(self.progress_box)
+            self.progress_box = None
+            self.progress_bar = None
+        
+        # Restore the open button
+        self.vbox.prepend(self.open_button)
+
+    def show_initializing_step(self, step_text):
+        """
+        Update progress bar for current step
+        """
+        if hasattr(self, 'progress_bar'):
+            # Calculate progress based on step number (assuming 8 total steps)
+            total_steps = 8
+            current_step = len([child for child in self.progress_box])
+            progress = current_step / total_steps
+            
+            self.progress_bar.set_fraction(progress)
+            self.progress_bar.set_text(step_text)
+            
+            # Add step label
+            step_label = Gtk.Label()
+            step_label.set_markup(f"⏳ {step_text}")
+            step_label.set_halign(Gtk.Align.START)
+            self.progress_box.append(step_label)
+
+    def mark_step_as_done(self, step_text):
+        """
+        Mark a step as completed in the progress
+        """
+        if hasattr(self, 'progress_box'):
+            # Find the label for this step and update it
+            for child in self.progress_box:
+                if isinstance(child, Gtk.Label) and step_text in child.get_text():
+                    child.set_markup(f"✓ {step_text}")
+                    break
+
+# NEW PROGRESSS
+    def show_processing_spinner(self, label_text):
+        """
+        Replace open button content with progress bar
+        """
+        # Clear the open button box
+        while self.open_button_box.get_first_child():
+            self.open_button_box.remove(self.open_button_box.get_first_child())
+        
+        # Create and add progress bar to the open button
+        self.progress_bar = Gtk.ProgressBar()
+        self.progress_bar.set_show_text(True)
+        self.progress_bar.set_text("Initializing...")
+        self.progress_bar.set_fraction(0.0)
+        self.progress_bar.set_size_request(300, 20)  # Set a fixed width for the progress bar
+        self.open_button_box.append(self.progress_bar)
+        
+        # Clear the flowbox for showing steps
+        self.flowbox.remove_all()
+        
+        # Create a list to store steps
+        self.step_boxes = []
+
+    def hide_processing_spinner(self):
+        """
+        Restore original open button content
+        """
+        # Clear progress bar
+        while self.open_button_box.get_first_child():
+            self.open_button_box.remove(self.open_button_box.get_first_child())
+        
+        # Restore original button content
+        open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
+        open_label = Gtk.Label(label="Open")
+        self.open_button_box.append(open_icon)
+        self.open_button_box.append(open_label)
+        
+        # Clear the steps from flowbox
+        self.flowbox.remove_all()
+
+    def show_initializing_step(self, step_text):
+        """
+        Add step to flowbox and update progress
+        """
+        if hasattr(self, 'progress_bar'):
+            # Calculate progress based on step number
+            total_steps = 8
+            current_step = len(self.step_boxes) + 1
+            progress = current_step / total_steps
+            
+            # Update progress bar
+            self.progress_bar.set_fraction(progress)
+            self.progress_bar.set_text(f"Step {current_step}/{total_steps}")
+            
+            # Create step box for flowbox
+            step_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            step_box.set_margin_start(12)
+            step_box.set_margin_end(12)
+            step_box.set_margin_top(6)
+            step_box.set_margin_bottom(6)
+            
+            # Add step icon and label
+            step_icon = Gtk.Image.new_from_icon_name("process-working-symbolic")
+            step_label = Gtk.Label(label=step_text)
+            step_label.set_halign(Gtk.Align.START)
+            step_label.set_hexpand(True)
+            
+            step_box.append(step_icon)
+            step_box.append(step_label)
+            
+            # Add to flowbox
+            flowbox_child = Gtk.FlowBoxChild()
+            flowbox_child.set_child(step_box)
+            self.flowbox.append(flowbox_child)
+            
+            # Store reference to box for updating later
+            self.step_boxes.append((step_box, step_icon, step_label))
+
+    def mark_step_as_done(self, step_text):
+        """
+        Mark step as completed in flowbox
+        """
+        if hasattr(self, 'step_boxes'):
+            for step_box, step_icon, step_label in self.step_boxes:
+                if step_label.get_text() == step_text:
+                    # Replace working icon with checkmark
+                    step_box.remove(step_icon)
+                    done_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+                    step_box.prepend(done_icon)
+                    break
+
+    def connect_open_button_with_bottling_cancel(self, script_key):
+        """
+        Connect cancel handler to the open button and show progress
+        """
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_bottle_clicked, script_key)
 
 
+############### PROGRESS 2 for initializing template:
+    def show_processing_spinner(self, label_text):
+        """
+        Initialize progress tracking UI for any step-based process
+        """
+        # Clear the open button box
+        while self.open_button_box.get_first_child():
+            self.open_button_box.remove(self.open_button_box.get_first_child())
+        
+        # Create and add progress bar to the open button
+        self.progress_bar = Gtk.ProgressBar()
+        self.progress_bar.set_show_text(True)
+        self.progress_bar.set_text(label_text)
+        self.progress_bar.set_fraction(0.0)
+        self.progress_bar.set_size_request(300, 20)
+        self.open_button_box.append(self.progress_bar)
+        
+        # Clear the flowbox for showing steps
+        self.flowbox.remove_all()
+        
+        # Create a list to store steps
+        self.step_boxes = []
+        
+        # Disable UI elements during processing
+        self.search_button.set_sensitive(False)
+        self.view_toggle_button.set_sensitive(False)
 
+    def hide_processing_spinner(self):
+        """
+        Restore UI state after process completion
+        """
+        # Clear progress bar
+        while self.open_button_box.get_first_child():
+            self.open_button_box.remove(self.open_button_box.get_first_child())
+        
+        # Restore original button content
+        open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
+        open_label = Gtk.Label(label="Open")
+        self.open_button_box.append(open_icon)
+        self.open_button_box.append(open_label)
+        
+        # Re-enable UI elements
+        self.search_button.set_sensitive(True)
+        self.view_toggle_button.set_sensitive(True)
+        
+        # Clear step tracking
+        if hasattr(self, 'step_boxes'):
+            self.step_boxes = []
 
+    def show_initializing_step(self, step_text):
+        """
+        Show a new processing step in the flowbox
+        """
+        
 
+        if hasattr(self, 'progress_bar'):
+            # Calculate total steps dynamically
+            if hasattr(self, 'total_steps'):
+                total_steps = self.total_steps
+            else:
+                # Default for bottle creation
+                total_steps = 8
+            
+            current_step = len(self.step_boxes) + 1
+            progress = current_step / total_steps
+            
+            # Update progress bar
+            self.progress_bar.set_fraction(progress)
+            self.progress_bar.set_text(f"Step {current_step}/{total_steps}")
+            
+            # Create step box
+            step_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            step_box.set_margin_start(12)
+            step_box.set_margin_end(12)
+            step_box.set_margin_top(6)
+            step_box.set_margin_bottom(6)
+            
+            # Add status icon and label
+            step_icon = self.spinner = Gtk.Spinner()
+            step_label = Gtk.Label(label=step_text)
+            step_label.set_halign(Gtk.Align.START)
+            step_label.set_hexpand(True)
+            
+            step_box.append(step_icon)
+            step_box.append(step_label)
+            self.spinner.start()
+
+            
+            # Add to flowbox
+            flowbox_child = Gtk.FlowBoxChild()
+            flowbox_child.set_child(step_box)
+            self.flowbox.append(flowbox_child)
+            
+            # Store reference
+            self.step_boxes.append((step_box, step_icon, step_label))
+
+    def mark_step_as_done(self, step_text):
+        """
+        Mark a step as completed in the flowbox
+        """
+        if hasattr(self, 'step_boxes'):
+            for step_box, step_icon, step_label in self.step_boxes:
+                if step_label.get_text() == step_text:
+                    step_box.remove(step_icon)
+                    done_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
+                    step_box.prepend(done_icon)
+                    break
+
+    def initialize_template(self, template_dir, callback):
+        """
+        Modified template initialization to use the new progress system
+        """
+        self.create_required_directories()
+        self.initializing_template = True
+        
+        # Disconnect open button handler
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+        
+        # Initialize the progress UI
+        self.ensure_directory_exists(template_dir)
+        
+        steps = [
+            ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
+            ("Replace symbolic links with directories", lambda: self.remove_symlinks_and_create_directories(template_dir)),
+            ("Installing corefonts", f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+            ("Installing openal", f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+            ("Installing vkd3d", f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+            ("Installing dxvk", f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+        ]
+        
+        # Set total steps for progress calculation
+        self.total_steps = len(steps)
+        self.show_processing_spinner("Initializing Template...")
+
+        def initialize():
+            for step_text, command in steps:
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    if callable(command):
+                        command()
+                    else:
+                        subprocess.run(command, shell=True, check=True)
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except subprocess.CalledProcessError as e:
+                    print(f"Error initializing template: {e}")
+                    break
+            GLib.idle_add(callback)
+
+        threading.Thread(target=initialize).start()
 
 
 
