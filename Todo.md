@@ -27,6 +27,17 @@ Refactoring winecharm
 is not resetting the play functionality.
  
  # Todo WineCharm 0.97
+ - BUGS and Features
+    - [ ] Cancellable
+        - [ ] Initialize Template
+        - [ ] Import Wine Directory
+        - [ ] Restore Backup
+        - [ ] Restore WZT
+        - [ ] Create Bottle
+        - [ ] Restore Bottle
+    - [ ] Show Error dialog as button for launch
+        - [ ] Show an (i) button beside play button to show log instead of Launch error dialog
+        
  - 1. [x] Runner Support
      - [x] Check working runner before launch (this will help when freedesktop runtime has changed or on system)
      - [x] On startup, do a working runner check; 
