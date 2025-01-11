@@ -2752,6 +2752,7 @@ class WineCharmApp(Gtk.Application):
         self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
 
     def show_backup_prefix_dialog(self, script, script_key, button):
+        self.stop_processing = False
         wineprefix = Path(script).parent
         # Extract exe_file from script_data
         script_data = self.extract_yaml_info(script_key)
@@ -3710,7 +3711,7 @@ class WineCharmApp(Gtk.Application):
         self.connect_open_button_with_bottling_cancel(script_key)
 
         # Get the user's home directory to replace with `~`
-        usershome = os.path.expanduser('~create_bottle(')
+        usershome = os.path.expanduser('~')
 
         # Get the current username from the environment
         user = os.getenv("USER") or os.getenv("USERNAME")
@@ -3859,7 +3860,7 @@ class WineCharmApp(Gtk.Application):
             return
 
     def create_bottle_selected(self, script, script_key, button):
-
+        self.stop_processing = False
         # Step 1: Check if the executable file exists
         # Extract exe_file from script_data
         script_data = self.extract_yaml_info(script_key)
@@ -4175,6 +4176,7 @@ class WineCharmApp(Gtk.Application):
         if response == "cancel":
             self.stop_processing = True
             dialog.close()
+            #GLib.timeout_add_seconds(0.5, dialog.close)
 #            self.set_open_button_label("Open")
 #            self.set_open_button_icon_visible(True)
 #            self.reconnect_open_button()
@@ -4188,7 +4190,9 @@ class WineCharmApp(Gtk.Application):
 #                row_options_button = data['options_button']
 #            self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
         else:
+            self.stop_processing = False
             dialog.close()
+            #GLib.timeout_add_seconds(0.5, dialog.close)
 
 ###################################### / CREATE BOTTLE  end
 
