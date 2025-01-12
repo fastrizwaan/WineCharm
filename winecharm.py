@@ -2713,6 +2713,9 @@ class WineCharmApp(Gtk.Application):
                 ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
             ]
             
+            # Set total steps and initialize progress UI
+            self.total_steps = len(steps)
+            
             for step_text, step_func in steps:
                 GLib.idle_add(self.show_initializing_step, step_text)
                 try:
@@ -2770,11 +2773,9 @@ class WineCharmApp(Gtk.Application):
         # Check if game directory is inside the prefix
         is_exe_inside_prefix = exe_path.is_relative_to(wineprefix)
 
+        creation_date_and_time = datetime.now().strftime("%Y%m%d%H%M")
         # Step 1: Suggest the backup file name
-        if is_exe_inside_prefix:
-            default_backup_name = f"{script.stem}-bottle.tar.zst"
-        else:
-            default_backup_name = f"{script.stem}-prefix.tar.zst"
+        default_backup_name = f"{script.stem}-{creation_date_and_time}.prefix"
         
 
         # Create a Gtk.FileDialog instance for saving the file
@@ -2815,13 +2816,18 @@ class WineCharmApp(Gtk.Application):
 
         # Step 3: Create file filters for .tar.zst and .wzt files
         file_filter_combined = Gtk.FileFilter()
-        file_filter_combined.set_name("Backup Files (*.tar.zst, *.wzt)")
-        file_filter_combined.add_pattern("*.tar.zst")
+        file_filter_combined.set_name("Backup Files (*.prefix, *.bottle, *.wzt)")
+        file_filter_combined.add_pattern("*.prefix")
+        file_filter_combined.add_pattern("*.bottle")
         file_filter_combined.add_pattern("*.wzt")
 
+        file_filter_botle_tar = Gtk.FileFilter()
+        file_filter_botle_tar.set_name("WineCharm Bottle Files (*.bottle)")
+        file_filter_botle_tar.add_pattern("*.bottle")
+
         file_filter_tar = Gtk.FileFilter()
-        file_filter_tar.set_name("Compressed Backup Files (*.tar.zst)")
-        file_filter_tar.add_pattern("*.tar.zst")
+        file_filter_tar.set_name("WineCharm Prefix Backup (*.prefix)")
+        file_filter_tar.add_pattern("*.prefix")
 
         file_filter_wzt = Gtk.FileFilter()
         file_filter_wzt.set_name("Winezgui Backup Files (*.wzt)")
@@ -2835,6 +2841,7 @@ class WineCharmApp(Gtk.Application):
 
         # Add individual filters for .tar.zst and .wzt files
         filter_model.append(file_filter_tar)
+        filter_model.append(file_filter_botle_tar)
         filter_model.append(file_filter_wzt)
         
         # Apply the filters to the file dialog
@@ -2922,7 +2929,7 @@ class WineCharmApp(Gtk.Application):
                 print(f"Selected file: {file_path}")
 
                 # Check the file extension to determine whether it's a .tar.zst or .wzt file
-                if file_path.endswith(".tar.zst"):
+                if file_path.endswith(".prefix") or file_path.endswith(".bottle"):
                     self.restore_tar_zst_backup(file_path)
                 elif file_path.endswith(".wzt"):
                     self.restore_wzt_backup(file_path)
@@ -3788,6 +3795,9 @@ class WineCharmApp(Gtk.Application):
                     ("Reverting exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(exe_file))))
                 ]
                 
+                # Set total steps and initialize progress UI
+                self.total_steps = len(basic_steps)
+
                 # Add runner-related steps only if runner exists and is not empty
                 steps = basic_steps.copy()
                 if runner and str(runner).strip():
@@ -3918,8 +3928,10 @@ class WineCharmApp(Gtk.Application):
             self.show_create_bottle_dialog(script, script_key)
 
     def show_create_bottle_dialog(self, script, script_key):
-            # Step 3: Suggest the backup file name
-            default_backup_name = f"{script.stem}-bottle.tar.zst"
+
+            creation_date_and_time = datetime.now().strftime("%Y%m%d%H%M")
+            # Suggest the backup file name
+            default_backup_name = f"{script.stem}-{creation_date_and_time}.bottle"
 
             # Create a Gtk.FileDialog instance for saving the file
             file_dialog = Gtk.FileDialog.new()
