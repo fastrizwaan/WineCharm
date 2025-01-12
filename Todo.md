@@ -31,10 +31,13 @@ is not resetting the play functionality.
     - [ ] Cancellable
         - [ ] Initialize Template
         - [ ] Import Wine Directory
-        - [ ] Restore Backup
+        - [ ] Restore Prefix
         - [ ] Restore WZT
-        - [ ] Create Bottle
+        - [x] Backup Prefix
+        - [x] Create Bottle
         - [ ] Restore Bottle
+        - [ ] Going to Settings -> Create Bottle/Create Prefix open button is not working either it won't work or 
+        - [ ] Fix settings related self.open_button_handler_id
     - [ ] Show Error dialog as button for launch
         - [ ] Show an (i) button beside play button to show log instead of Launch error dialog
         
@@ -59,7 +62,7 @@ is not resetting the play functionality.
             - [x] Change /media/$USER to %USERNAME%
             - [x] Before creating bottle, restore /media/$USER so that
             - [x] update script files with new path drivec/GAMEDIR/<dir>/exe_file.exe (much like import game dir)
-            - [ ] Show GUI progress of tarring using % 
+            - [x] Show GUI progress of tarring using progressbar 
             - [x] Allow cancellation of bundle creation, while it is running using same open/bottling button
             - [x] Revert scripts with actual path, if interrupted or due to power failure or other reasons. (self repair)
                 - [ ] create a copy at winecharm's data directory...

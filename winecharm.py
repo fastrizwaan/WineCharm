@@ -2591,40 +2591,6 @@ class WineCharmApp(Gtk.Application):
         dialog.present()
 
         
-    def create_backup_archive(self, wineprefix, backup_path):
-        # Get the current username from the environment
-        current_username = os.getenv("USER") or os.getenv("USERNAME")
-        if not current_username:
-            raise Exception("Unable to determine the current username from the environment.")
-
-        # Escape the wineprefix name for the transform pattern to handle special characters
-        #escaped_prefix_name = re.escape(wineprefix.name)
-
-        # Prepare the transform pattern to rename the user's directory to '%USERNAME%'
-        # The pattern must be expanded to include anything under the user's folder
-        #transform_pattern = f"s|{escaped_prefix_name}/drive_c/users/{current_username}|{escaped_prefix_name}/drive_c/users/%USERNAME%|g"
-
-        # Prepare the tar command with --transform option
-        tar_command = [
-            'tar',
-            '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
-            '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%USERNAME%|g",  # Rename the directory and its contents
-            '-cf', backup_path,
-            '-C', str(wineprefix.parent),
-            wineprefix.name
-        ]
-
-        print(f"Running backup command: {' '.join(tar_command)}")
-
-        # Execute the tar command
-        result = subprocess.run(tar_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-        if result.returncode != 0:
-            raise Exception(f"Backup failed: {result.stderr}")
-
-        print(f"Backup archive created at {backup_path}")
-
-
     def reverse_process_reg_files(self, wineprefix):
         print(f"Starting to process .reg files in {wineprefix}")
         
@@ -2687,73 +2653,7 @@ class WineCharmApp(Gtk.Application):
         print(f"Completed processing .reg files in {wineprefix}")
 
 
-    def backup_prefix(self, script, script_key, backup_path):
-        """
-        Backs up the Wine prefix in a stepwise manner, indicating progress via spinner and label updates.
-        """
-        wineprefix = Path(script).parent
-
-        # Step 1: Disconnect the UI elements and initialize the spinner
-        self.disconnect_open_button()
-        self.set_open_button_label("Exporting...")
-        self.show_processing_spinner("Preparing backup...")
-
-        # Get the user's home directory to replace with `~`
-        usershome = os.path.expanduser('~')
-        find_replace_pairs = {usershome: '~'}
-        user = os.getenv('USER')
-        #home_to_userhome = {user: "%USERNAME%"}
-        #userhome_to_home = {"%USERNAME%": user}
-        # Step 2: Define the steps for the backup process
-        def perform_backup_steps():
-            steps = [
-                (f"Replace \"{usershome}\" with '~' in script files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
-                ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
-                ("Creating backup archive", lambda: self.create_backup_archive(wineprefix, backup_path)),
-                ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
-            ]
-            
-            # Set total steps and initialize progress UI
-            self.total_steps = len(steps)
-            
-            for step_text, step_func in steps:
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    # Execute the step
-                    step_func()
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                except Exception as e:
-                    print(f"Error during step '{step_text}': {e}")
-                    GLib.idle_add(self.show_info_dialog, "Backup Failed", f"Error during '{step_text}': {str(e)}")
-                    break
-
-            # Step 3: Once all steps are completed, reset the UI
-            GLib.idle_add(self.on_backup_prefix_completed, script_key, backup_path)
-
-        # Step 4: Run the backup steps in a separate thread to keep the UI responsive
-        threading.Thread(target=perform_backup_steps).start()
-
-    def on_backup_prefix_completed(self, script_key,backup_path):
-        """
-        Called when the backup process is complete. Updates the UI accordingly.
-        """
-        # Reset the button label and remove the spinner
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)
-        self.reconnect_open_button()
-        self.hide_processing_spinner()
-        
-        # Notify the user that the backup is complete
-        self.show_info_dialog("Backup Complete", f"Backup saved to {backup_path}")
-        print("Backup process completed successfully.")
-       # GLib.idle_add(self.show_options_for_script, self.script_data, self.selected_row, self.current_script_key)
-        # Iterate over all script buttons and update the UI based on `is_clicked_row`
-        for key, data in self.script_ui_data.items():
-            row_button = data['row']
-            row_play_button = data['play_button']
-            row_options_button = data['options_button']
-        self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
-
+##### BACKUP PREFIX
     def show_backup_prefix_dialog(self, script, script_key, button):
         self.stop_processing = False
         wineprefix = Path(script).parent
@@ -2805,6 +2705,244 @@ class WineCharmApp(Gtk.Application):
         except GLib.Error as e:
             # Handle any errors, such as cancellation
             print(f"An error occurred: {e}")
+
+    def on_backup_prefix_completed(self, script_key, backup_path):
+        """
+        Called when the backup process is complete. Updates the UI safely.
+        """
+        try:
+            GLib.idle_add(self._complete_backup_ui_update, script_key, backup_path)
+        except Exception as e:
+            print(f"Error scheduling backup completion UI update: {e}")
+            self.show_info_dialog("Warning", "Backup completed but there was an error updating the UI")
+
+    def _complete_backup_ui_update(self, script_key, backup_path):
+        """
+        Performs the actual UI updates on the main thread after backup completion
+        """
+        try:
+            # First disconnect any existing handlers
+            if hasattr(self, 'open_button_handler_id') and self.open_button_handler_id is not None:
+                if hasattr(self, 'open_button'):
+                    try:
+                        self.open_button.disconnect(self.open_button_handler_id)
+                    except:
+                        pass
+                    self.open_button_handler_id = None
+            
+            # Then reset the UI elements
+            self.hide_processing_spinner()
+            
+            # Now reconnect the open button
+            if hasattr(self, 'open_button'):
+                self.open_button_handler_id = self.open_button.connect(
+                    "clicked", 
+                    self.on_open_button_clicked
+                )
+            
+            # Update labels and icons
+            self.set_open_button_label("Open")
+            self.set_open_button_icon_visible(True)
+            
+            # Show completion dialog
+            self.show_info_dialog("Backup Complete", f"Backup saved to {backup_path}")
+            print("Backup process completed successfully.")
+
+            # Update script options if available
+            if hasattr(self, 'script_ui_data') and script_key in self.script_ui_data:
+                self.show_options_for_script(
+                    self.script_ui_data[script_key],
+                    self.script_ui_data[script_key]['row'],
+                    script_key
+                )
+            
+            return False  # Required for GLib.idle_add
+            
+        except Exception as e:
+            print(f"Error during backup completion UI update: {e}")
+            self.show_info_dialog("Warning", "Backup completed but there was an error updating the UI")
+            return False
+
+
+
+    def backup_prefix(self, script, script_key, backup_path):
+        """
+        Backs up the Wine prefix in a stepwise manner, indicating progress via spinner and label updates.
+        """
+        # Store current script info for cancellation handling
+        self.current_script = script
+        self.current_script_key = script_key
+        self.stop_processing = False
+        self.current_backup_path = backup_path
+        wineprefix = Path(script).parent
+
+        try:
+            # Step 1: Initialize the UI for backup process
+            self.show_processing_spinner("Exporting...")
+            self.connect_open_button_with_backup_cancel(script_key)
+
+            # Get the user's home directory to replace with `~`
+            usershome = os.path.expanduser('~')
+            find_replace_pairs = {usershome: '~'}
+            
+            def perform_backup_steps():
+                try:
+                    steps = [
+                        (f"Replace \"{usershome}\" with '~' in script files", 
+                        lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
+                        ("Reverting user-specific .reg changes", 
+                        lambda: self.reverse_process_reg_files(wineprefix)),
+                        ("Creating backup archive", 
+                        lambda: self.create_backup_archive(wineprefix, backup_path)),
+                        ("Re-applying user-specific .reg changes", 
+                        lambda: self.process_reg_files(wineprefix))
+                    ]
+                    
+                    self.total_steps = len(steps)
+                    
+                    for step_text, step_func in steps:
+                        if self.stop_processing:
+                            GLib.idle_add(self.cleanup_cancelled_backup, script, script_key)
+                            return
+
+                        GLib.idle_add(self.show_initializing_step, step_text)
+                        try:
+                            step_func()
+                            if self.stop_processing:
+                                GLib.idle_add(self.cleanup_cancelled_backup, script, script_key)
+                                return
+                            GLib.idle_add(self.mark_step_as_done, step_text)
+                        except Exception as e:
+                            print(f"Error during step '{step_text}': {e}")
+                            if not self.stop_processing:
+                                GLib.idle_add(self.show_info_dialog, "Backup Failed", 
+                                            f"Error during '{step_text}': {str(e)}")
+                            GLib.idle_add(self.cleanup_cancelled_backup, script, script_key)
+                            return
+
+                    if not self.stop_processing:
+                        GLib.idle_add(self.on_backup_prefix_completed, script_key, backup_path)
+                        
+                except Exception as e:
+                    print(f"Backup process failed: {e}")
+                    GLib.idle_add(self.cleanup_cancelled_backup, script, script_key)
+
+            # Run the backup steps in a separate thread
+            self.processing_thread = threading.Thread(target=perform_backup_steps)
+            self.processing_thread.start()
+
+        except Exception as e:
+            print(f"Error initializing backup process: {e}")
+            self.cleanup_cancelled_backup(script, script_key)
+    def create_backup_archive(self, wineprefix, backup_path):
+        """
+        Create a backup archive with interruption support
+        """
+        if self.stop_processing:
+            raise Exception("Operation cancelled by user")
+
+        current_username = os.getenv("USER") or os.getenv("USERNAME")
+        if not current_username:
+            raise Exception("Unable to determine the current username from the environment.")
+
+        tar_command = [
+            'tar',
+            '-I', 'zstd -T0',
+            '--transform', f"s|{wineprefix.name}/drive_c/users/{current_username}|{wineprefix.name}/drive_c/users/%USERNAME%|g",
+            '-cf', backup_path,
+            '-C', str(wineprefix.parent),
+            wineprefix.name
+        ]
+
+        print(f"Running backup command: {' '.join(tar_command)}")
+
+        process = subprocess.Popen(tar_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        while process.poll() is None:
+            if self.stop_processing:
+                process.terminate()
+                try:
+                    process.wait(timeout=2)
+                    if Path(backup_path).exists():
+                        Path(backup_path).unlink()
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                raise Exception("Operation cancelled by user")
+            time.sleep(0.1)
+
+        if process.returncode != 0 and not self.stop_processing:
+            stderr = process.stderr.read().decode()
+            raise Exception(f"Backup failed: {stderr}")
+
+    def connect_open_button_with_backup_cancel(self, script_key):
+        """
+        Connect cancel handler to the open button for backup process
+        """
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_backup_clicked, script_key)
+        
+        self.set_open_button_icon_visible(False)
+
+    def cleanup_cancelled_backup(self, script, script_key):
+        """
+        Clean up after backup is cancelled
+        """
+        try:
+            # Clean up partial backup file if it exists
+            if hasattr(self, 'current_backup_path') and Path(self.current_backup_path).exists():
+                try:
+                    Path(self.current_backup_path).unlink()
+                    self.current_backup_path = None
+                except Exception as e:
+                    print(f"Error deleting partial backup file: {e}")
+        except Exception as e:
+            print(f"Error during backup cleanup: {e}")
+        finally:
+            try:
+                # Reset UI state
+                self.set_open_button_label("Open")
+                self.set_open_button_icon_visible(True)
+                self.hide_processing_spinner()
+                
+                if self.stop_processing:
+                    self.show_info_dialog("Cancelled", "Backup was cancelled")
+                
+                # Safely update UI elements
+                if hasattr(self, 'script_ui_data') and script_key in self.script_ui_data:
+                    self.show_options_for_script(self.script_ui_data[script_key], 
+                                            self.script_ui_data[script_key]['row'], 
+                                            script_key)
+            except Exception as e:
+                print(f"Error during UI cleanup: {e}")
+                self.show_info_dialog("Warning", "There was an error updating the UI")
+
+    def on_cancel_backup_clicked(self, button, script_key):
+        """
+        Handle cancel button click during backup
+        """
+        dialog = Adw.MessageDialog.new(
+            self.window,
+            "Cancel Backup",
+            "Do you want to cancel the backup process?"
+        )
+        dialog.add_response("continue", "Continue")
+        dialog.add_response("cancel", "Cancel Backup")
+        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.connect("response", self.on_cancel_backup_dialog_response, script_key)
+        dialog.present()
+
+    def on_cancel_backup_dialog_response(self, dialog, response, script_key):
+        """
+        Handle cancel dialog response for backup
+        """
+        if response == "cancel":
+            self.stop_processing = True
+        dialog.close()
+
+##### /BACKUP PREFIX xx
+
+
 
 
     def restore_from_backup(self, action=None, param=None):
@@ -3843,24 +3981,59 @@ class WineCharmApp(Gtk.Application):
 
     def on_create_bottle_completed(self, script_key, backup_path):
         """
-        Called when the backup process is complete. Updates the UI accordingly.
+        Called when the bottle creation process is complete. Schedules UI updates safely.
         """
-        # Reset the button label and remove the spinner
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)
-        self.reconnect_open_button()
-        self.hide_processing_spinner()
+        try:
+            GLib.idle_add(self._complete_bottle_creation_ui_update, script_key, backup_path)
+        except Exception as e:
+            print(f"Error scheduling bottle creation UI update: {e}")
+            self.show_info_dialog("Warning", "Bottle created but there was an error updating the UI")
 
-        # Notify the user that the backup is complete
-        self.show_info_dialog("Bottle Created", f"{backup_path}")
-        print("Bottle creating process completed successfully.")
+    def _complete_bottle_creation_ui_update(self, script_key, backup_path):
+        """
+        Performs the actual UI updates on the main thread after bottle creation completion
+        """
+        try:
+            # First disconnect any existing handlers
+            if hasattr(self, 'open_button_handler_id') and self.open_button_handler_id is not None:
+                if hasattr(self, 'open_button'):
+                    try:
+                        self.open_button.disconnect(self.open_button_handler_id)
+                    except:
+                        pass
+                    self.open_button_handler_id = None
+            
+            # Reset the UI elements
+            self.hide_processing_spinner()
+            
+            # Reconnect the open button
+            if hasattr(self, 'open_button'):
+                self.open_button_handler_id = self.open_button.connect(
+                    "clicked", 
+                    self.on_open_button_clicked
+                )
+            
+            # Update labels and icons
+            self.set_open_button_label("Open")
+            self.set_open_button_icon_visible(True)
+            
+            # Show completion dialog
+            self.show_info_dialog("Bottle Created", f"{backup_path}")
+            print("Bottle creating process completed successfully.")
 
-        # Iterate over all script buttons and update the UI based on `is_clicked_row`
-        for key, data in self.script_ui_data.items():
-            row_button = data['row']
-            row_play_button = data['play_button']
-            row_options_button = data['options_button']
-        self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
+            # Safely update UI elements
+            if hasattr(self, 'script_ui_data') and script_key in self.script_ui_data:
+                self.show_options_for_script(self.script_ui_data[script_key], 
+                                        self.script_ui_data[script_key]['row'], 
+                                        script_key)
+
+            return False  # Required for GLib.idle_add
+            
+        except Exception as e:
+            print(f"Error during bottle creation UI update: {e}")
+            self.show_info_dialog("Warning", "Bottle created but there was an error updating the UI")
+            return False
+
 
     def on_backup_confirmation_response(self, dialog, response_id, script, script_key):
         if response_id == "continue":
@@ -5368,26 +5541,36 @@ class WineCharmApp(Gtk.Application):
 
     def hide_processing_spinner(self):
         """
-        Restore UI state after process completion
+        Restore UI state after process completion with safe widget removal
         """
-        # Clear progress bar
-        while self.open_button_box.get_first_child():
-            self.open_button_box.remove(self.open_button_box.get_first_child())
-        
-        # Restore original button content
-        open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
-        open_label = Gtk.Label(label="Open")
-        self.open_button_box.append(open_icon)
-        self.open_button_box.append(open_label)
-        
-        # Re-enable UI elements
-        self.search_button.set_sensitive(True)
-        self.view_toggle_button.set_sensitive(True)
-        
-        # Clear step tracking
-        if hasattr(self, 'step_boxes'):
-            self.step_boxes = []
-
+        try:
+            # Safely remove children from open_button_box
+            if hasattr(self, 'open_button_box'):
+                child = self.open_button_box.get_first_child()
+                while child:
+                    next_child = child.get_next_sibling()
+                    self.open_button_box.remove(child)
+                    child = next_child
+            
+            # Safely restore original button content
+            if hasattr(self, 'open_button_box'):
+                open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
+                open_label = Gtk.Label(label="Open")
+                self.open_button_box.append(open_icon)
+                self.open_button_box.append(open_label)
+            
+            # Safely re-enable UI elements
+            if hasattr(self, 'search_button'):
+                self.search_button.set_sensitive(True)
+            if hasattr(self, 'view_toggle_button'):
+                self.view_toggle_button.set_sensitive(True)
+            
+            # Clear step tracking safely
+            if hasattr(self, 'step_boxes'):
+                self.step_boxes = []
+                
+        except Exception as e:
+            print(f"Error in hide_processing_spinner: {e}")
 
     def on_open(self, app, files, *args):
         # Ensure the application is fully initialized
@@ -7259,29 +7442,39 @@ class WineCharmApp(Gtk.Application):
 
 #########   ######
     def replace_open_button_with_settings(self):
-#        script_data = self.extract_yaml_info(script_key)
-#        if not script_data:
-#            return None
+        """
+        Replace the open button with a settings button, with proper parent checking.
+        """
+        try:
+            # First check if the open_button exists and has a parent
+            if hasattr(self, 'open_button') and self.open_button is not None:
+                parent = self.open_button.get_parent()
+                if parent is not None:
+                    if parent == self.vbox:  # Verify the parent is actually self.vbox
+                        self.vbox.remove(self.open_button)
+                    else:
+                        print("Warning: open_button's parent is not self.vbox")
+                        return
+            else:
+                print("Warning: open_button not found or is None")
+                return
+
+            # Create and configure the settings button
+            self.launch_button = Gtk.Button(label="Settings")
+            self.launch_button.set_size_request(450, 36)
             
-        if self.open_button.get_parent():
-            self.vbox.remove(self.open_button)
+            # Add the new button to the vbox
+            self.vbox.prepend(self.launch_button)
+            self.launch_button.set_visible(True)
+            
+            # Clear the handler ID since we're replacing the button
+            self.open_button_handler_id = None
 
-        self.launch_button = Gtk.Button(label="Setttings")
-        self.launch_button.set_size_request(450, 36)
-        launch_label = "Settings"
-        #yaml_info = self.extract_yaml_info(script)
- #       script_key = script_data['sha256sum']  # Use sha256sum as the key
+        except Exception as e:
+            print(f"Error in replace_open_button_with_settings: {e}")
+            # You might want to show a dialog to the user here
+            return None
 
-        #self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, self.launch_button, row))
-
-        # Store the script_key associated with this launch button
-        #self.launch_button_exe_name = script_key
-
-        self.vbox.prepend(self.launch_button)
-        self.launch_button.set_visible(True)
-        self.open_button_handler_id = None
-        
-        
     def show_options_for_settings(self, action=None, param=None):
         """
         Display the settings options without hiding the open button.
@@ -8189,13 +8382,6 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error checking archive contents: {e}")
             return False
-
-
-
-
-
-
-
 
 
 
