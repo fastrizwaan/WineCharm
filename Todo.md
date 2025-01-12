@@ -33,14 +33,14 @@ is not resetting the play functionality.
         - [ ] Import Wine Directory
         - [ ] Restore Prefix
         - [ ] Restore WZT
-        - [x] Backup Prefix
+        - [x] Create Prefix
         - [x] Create Bottle
         - [ ] Restore Bottle
-        - [ ] Going to Settings -> Create Bottle/Create Prefix open button is not working either it won't work or 
-        - [ ] Fix settings related self.open_button_handler_id
     - [ ] Show Error dialog as button for launch
         - [ ] Show an (i) button beside play button to show log instead of Launch error dialog
-        
+    - [x] Search in Settings
+    - [ ] Search in Script options
+    
  - 1. [x] Runner Support
      - [x] Check working runner before launch (this will help when freedesktop runtime has changed or on system)
      - [x] On startup, do a working runner check; 
