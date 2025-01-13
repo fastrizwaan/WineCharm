@@ -30,12 +30,13 @@ is not resetting the play functionality.
  - BUGS and Features
     - [ ] Cancellable
         - [ ] Initialize Template
+        - [x] Create Prefix
+        - [x] Create Bottle
+    - [ ] These need to extract in a temporary directoy then moved when overwriting. if overwriting is canceled, delete the extracted directory
+        - [ ] Restore Bottle
         - [ ] Import Wine Directory
         - [ ] Restore Prefix
         - [ ] Restore WZT
-        - [x] Create Prefix
-        - [x] Create Bottle
-        - [ ] Restore Bottle
     - [ ] Show Error dialog as button for launch
         - [ ] Show an (i) button beside play button to show log instead of Launch error dialog
     - [x] Search in Settings
