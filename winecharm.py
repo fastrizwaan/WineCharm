@@ -824,19 +824,58 @@ class WineCharmApp(Gtk.Application):
     def on_key_pressed(self, controller, keyval, keycode, state):
         if keyval == Gdk.KEY_Escape:
             self.search_button.set_active(False)
-            self.filter_script_list("")  # Reset the list to show all scripts
+            
+            # Reset the appropriate view based on context
+            if hasattr(self, 'settings_flowbox') and self.settings_flowbox.get_parent() is not None:
+                self.search_entry.set_text("")
+                self.populate_settings_options()
+            elif hasattr(self, 'script_options_flowbox') and self.script_options_flowbox.get_parent() is not None:
+                self.search_entry.set_text("")
+                self.populate_script_options()  # Removed extra arguments
+            else:
+                self.filter_script_list("")
 
     def on_search_button_clicked(self, button):
-        if self.search_active:
-            self.vbox.remove(self.search_entry_box)
-            self.vbox.prepend(self.open_button)
-            self.search_active = False
-            self.filter_script_list("")  # Reset the list to show all scripts
-        else:
-            self.vbox.remove(self.open_button)
-            self.vbox.prepend(self.search_entry_box)
-            self.search_entry.grab_focus()
-            self.search_active = True
+        try:
+            if self.search_active:
+                # Before removing search entry, make sure it's in the vbox
+                if self.search_entry_box.get_parent() == self.vbox:
+                    self.vbox.remove(self.search_entry_box)
+                
+                # Before adding open/launch button, make sure it's not already in the vbox
+                if hasattr(self, 'launch_button') and self.launch_button is not None:
+                    if self.launch_button.get_parent() != self.vbox:
+                        self.vbox.prepend(self.launch_button)
+                else:
+                    if self.open_button.get_parent() != self.vbox:
+                        self.vbox.prepend(self.open_button)
+                
+                self.search_active = False
+                
+                # Reset the appropriate view based on context
+                if hasattr(self, 'settings_flowbox') and self.settings_flowbox.get_parent() is not None:
+                    self.search_entry.set_text("")
+                    self.populate_settings_options()
+                elif hasattr(self, 'script_options_flowbox') and self.script_options_flowbox.get_parent() is not None:
+                    self.search_entry.set_text("")
+                    self.populate_script_options()
+                else:
+                    self.filter_script_list("")
+            else:
+                # Only try to remove if button is in the vbox
+                current_button = self.launch_button if hasattr(self, 'launch_button') and self.launch_button is not None else self.open_button
+                if current_button.get_parent() == self.vbox:
+                    self.vbox.remove(current_button)
+                
+                # Only add search entry if it's not already in the vbox
+                if self.search_entry_box.get_parent() != self.vbox:
+                    self.vbox.prepend(self.search_entry_box)
+                
+                self.search_entry.grab_focus()
+                self.search_active = True
+        except Exception as e:
+            print(f"Error in search button handling: {e}")
+
 
     def on_search_entry_activated(self, entry):
         search_term = entry.get_text().lower()
@@ -844,7 +883,13 @@ class WineCharmApp(Gtk.Application):
 
     def on_search_entry_changed(self, entry):
         search_term = entry.get_text().lower()
-        self.filter_script_list(search_term)
+        # Check if we're in settings view
+        if hasattr(self, 'settings_flowbox') and self.settings_flowbox.get_parent() is not None:
+            self.populate_settings_options(search_term)
+        elif hasattr(self, 'script_options_flowbox') and self.script_options_flowbox.get_parent() is not None:
+            self.populate_script_options(search_term)  # Only pass search term
+        else:
+            self.filter_script_list(search_term)
 
     def filter_script_list(self, search_term):
         """
@@ -966,8 +1011,9 @@ class WineCharmApp(Gtk.Application):
             GLib.timeout_add_seconds(0.5, self.create_script_list)
 
     def on_back_button_clicked(self, button):
-        #print("Back button clicked")
-
+        # If search is active, toggle it off first
+        if self.search_active:
+            self.search_button.set_active(False)
 
         # Reset the header bar title and visibility of buttons
         self.headerbar.set_title_widget(self.title_box)
@@ -977,14 +1023,18 @@ class WineCharmApp(Gtk.Application):
         self.back_button.set_visible(False)
 
         # Remove the "Launch" button if it exists
-        if hasattr(self, 'launch_button') and self.launch_button.get_parent():
-            self.vbox.remove(self.launch_button)
+        if hasattr(self, 'launch_button') and self.launch_button is not None:
+            if self.launch_button.get_parent() == self.vbox:
+                self.vbox.remove(self.launch_button)
             self.launch_button = None
 
         # Restore the "Open" button
-        if not self.open_button.get_parent():
+        if self.open_button.get_parent() != self.vbox:
             self.vbox.prepend(self.open_button)
         self.open_button.set_visible(True)
+        
+        # Restore original open button functionality
+        self.restore_open_button()
 
         # Ensure the correct child is set in the main_frame
         if self.main_frame.get_child() != self.scrolled:
@@ -992,7 +1042,7 @@ class WineCharmApp(Gtk.Application):
 
         # Restore the script list
         self.create_script_list()
-        #self.check_running_processes_and_update_buttons()
+
         
     def wrap_text_at_20_chars(self):
         text="Speedpro Installer Setup"
@@ -1121,6 +1171,47 @@ class WineCharmApp(Gtk.Application):
 
         self.vbox.prepend(self.launch_button)
         self.launch_button.set_visible(True)
+
+    def replace_launch_button(self, ui_state, row, script_key):
+        """
+        Replace the open button with a launch button.
+        """
+        try:
+            # Remove existing launch button if it exists
+            if hasattr(self, 'launch_button') and self.launch_button is not None:
+                parent = self.launch_button.get_parent()
+                if parent is not None:
+                    parent.remove(self.launch_button)
+
+            # Create new launch button
+            self.launch_button = Gtk.Button()
+            self.launch_button.set_size_request(450, 36)
+            
+            # Set initial icon state
+            is_running = script_key in self.running_processes
+            launch_icon = Gtk.Image.new_from_icon_name(
+                "media-playback-stop-symbolic" if is_running
+                else "media-playback-start-symbolic"
+            )
+            self.launch_button.set_tooltip_text("Stop" if is_running else "Play")
+            self.launch_button.set_child(launch_icon)
+            
+            # Connect click handler
+            self.launch_button.connect(
+                "clicked",
+                lambda btn: self.toggle_play_stop(script_key, self.launch_button, row)
+            )
+            
+            # Add to vbox
+            if hasattr(self, 'vbox') and self.vbox is not None:
+                if self.open_button.get_parent() == self.vbox:
+                    self.vbox.remove(self.open_button)
+                self.vbox.prepend(self.launch_button)
+                self.launch_button.set_visible(True)
+            
+        except Exception as e:
+            print(f"Error in replace_launch_button: {e}")
+            self.launch_button = None
 
 ############################### 1050 - 1682 ########################################
     def create_script_list(self):
@@ -3717,40 +3808,35 @@ class WineCharmApp(Gtk.Application):
 
     def show_options_for_script(self, ui_state, row, script_key):
         """
-        Display the options for a specific script.
-        
-        Args:
-            ui_state (dict): Information about the script stored in script_data_two.
-            row (Gtk.Widget): The row UI element where the options will be displayed.
-            script_key (str): The unique key for the script (should be sha256sum or a unique identifier).
+        Display the options for a specific script with search functionality.
         """
-        # Get the script path from ui_state
-        script = Path(ui_state['script_path'])  # Get the script path from ui_state
-
-        # Ensure the search button is toggled off and the search entry is cleared
         self.search_button.set_active(False)
+        # Store current script info for search functionality
+        self.current_script = Path(ui_state['script_path'])
+        self.current_script_key = script_key
+        self.current_row = row
+        self.current_ui_state = ui_state
+
+        # Clear main frame
         self.main_frame.set_child(None)
 
         scrolled_window = Gtk.ScrolledWindow()
         scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled_window.set_vexpand(True)
 
-        options_flowbox = Gtk.FlowBox()
-        options_flowbox.set_valign(Gtk.Align.START)
-        options_flowbox.set_halign(Gtk.Align.FILL)
-        options_flowbox.set_max_children_per_line(4)
-        options_flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        options_flowbox.set_vexpand(True)
-        options_flowbox.set_hexpand(True)
-        scrolled_window.set_child(options_flowbox)
+        self.script_options_flowbox = Gtk.FlowBox()
+        self.script_options_flowbox.set_valign(Gtk.Align.START)
+        self.script_options_flowbox.set_halign(Gtk.Align.FILL)
+        self.script_options_flowbox.set_max_children_per_line(4)
+        self.script_options_flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.script_options_flowbox.set_vexpand(True)
+        self.script_options_flowbox.set_hexpand(True)
+        scrolled_window.set_child(self.script_options_flowbox)
 
         self.main_frame.set_child(scrolled_window)
 
-        # Initialize or replace self.options_listbox with the current options_flowbox
-        self.options_listbox = options_flowbox
-
-        # Options list
-        options = [
+        # Store options as instance variable for filtering
+        self.script_options = [
             ("Show log", "document-open-symbolic", self.show_log_file),
             ("Open Terminal", "utilities-terminal-symbolic", self.open_terminal),
             ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
@@ -3778,52 +3864,69 @@ class WineCharmApp(Gtk.Application):
 
         ]
 
-        for label, icon_name, callback in options:
-            option_button = Gtk.Button()
-            option_button.set_size_request(150, 36)
-            option_button.add_css_class("flat")
-            option_button.add_css_class("normal-font")
+        # Initial population of options
+        self.populate_script_options()
 
-            option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-            option_button.set_child(option_hbox)
-
-            option_icon = Gtk.Image.new_from_icon_name(icon_name)
-            option_label = Gtk.Label(label=label)
-            option_label.set_xalign(0)
-            option_label.set_hexpand(True)
-            option_label.set_ellipsize(Pango.EllipsizeMode.END)
-            option_hbox.append(option_icon)
-            option_hbox.append(option_label)
-
-            options_flowbox.append(option_button)
-
-            # Enable or disable the "Show log" button based on log file existence and size
-            if label == "Show log":
-                log_file_path = script.parent / f"{script.stem}.log"
-                if not log_file_path.exists() or log_file_path.stat().st_size == 0:
-                    option_button.set_sensitive(False)
-
-            # Ensure the correct button (`btn`) is passed to the callback
-            option_button.connect(
-                "clicked",
-                lambda btn, cb=callback, sc=script, sk=script_key: self.callback_wrapper(cb, sc, sk, btn)
-            )
-
-        # Use `script` as a Path object for `create_icon_title_widget`
-        self.headerbar.set_title_widget(self.create_icon_title_widget(script))
-
+        # Update UI elements
+        self.headerbar.set_title_widget(self.create_icon_title_widget(self.current_script))
         self.menu_button.set_visible(False)
-        self.search_button.set_visible(False)
+        self.search_button.set_visible(True)
         self.view_toggle_button.set_visible(False)
 
         if self.back_button.get_parent() is None:
             self.headerbar.pack_start(self.back_button)
         self.back_button.set_visible(True)
 
+        # Handle button replacement
+        if self.search_active:
+            if self.search_entry_box.get_parent():
+                self.vbox.remove(self.search_entry_box)
+            self.search_active = False
+
         self.open_button.set_visible(False)
-        self.replace_open_button_with_launch(ui_state, row, script_key)
-        self.update_execute_button_icon(ui_state)
-        self.selected_row = None
+        self.replace_launch_button(ui_state, row, script_key)
+
+    def populate_script_options(self, filter_text=""):
+        """
+        Populate the script options flowbox with filtered options.
+        """
+        # Clear existing options
+        while child := self.script_options_flowbox.get_first_child():
+            self.script_options_flowbox.remove(child)
+
+        # Add filtered options
+        filter_text = filter_text.lower()
+        for label, icon_name, callback in self.script_options:
+            if filter_text in label.lower():
+                option_button = Gtk.Button()
+                option_button.set_size_request(150, 36)
+                option_button.add_css_class("flat")
+                option_button.add_css_class("normal-font")
+
+                option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+                option_button.set_child(option_hbox)
+
+                option_icon = Gtk.Image.new_from_icon_name(icon_name)
+                option_label = Gtk.Label(label=label)
+                option_label.set_xalign(0)
+                option_label.set_hexpand(True)
+                option_label.set_ellipsize(Pango.EllipsizeMode.END)
+                option_hbox.append(option_icon)
+                option_hbox.append(option_label)
+
+                self.script_options_flowbox.append(option_button)
+
+                # Handle the log button sensitivity
+                if label == "Show log":
+                    log_file_path = self.current_script.parent / f"{self.current_script.stem}.log"
+                    if not log_file_path.exists() or log_file_path.stat().st_size == 0:
+                        option_button.set_sensitive(False)
+
+                # Connect the button callback
+                option_button.connect(
+                    "clicked",
+                    lambda btn, cb=callback: self.callback_wrapper(cb, self.current_script, self.current_script_key, btn)
+                )
 
 ######################### CREATE BOTTLE
     # Get directory size method
@@ -5268,24 +5371,19 @@ class WineCharmApp(Gtk.Application):
             # Default case, pass all arguments (script, script_key, button, and *args)
             return callback(script, script_key, button, *args)
 
-
-
-
-
-    def update_execute_button_icon(self, script):
-        for child in self.options_listbox:
-            box = child.get_child()
-            widget = box.get_first_child()
-            while widget:
-                if isinstance(widget, Gtk.Button) and widget.get_tooltip_text() == "Run or stop the script":
-                    play_stop_button = widget
-                    if script.stem in self.running_processes:
-                        play_stop_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
-                        play_stop_button.set_tooltip_text("Stop")
-                    else:
-                        play_stop_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-                        play_stop_button.set_tooltip_text("Run or stop the script")
-                widget = widget.get_next_sibling()
+    def update_execute_button_icon(self, ui_state):
+        """
+        Update the launch button icon based on process state.
+        """
+        if hasattr(self, 'launch_button') and self.launch_button is not None:
+            script_key = self.current_script_key
+            if script_key in self.running_processes:
+                launch_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
+                self.launch_button.set_tooltip_text("Stop")
+            else:
+                launch_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+                self.launch_button.set_tooltip_text("Play")
+            self.launch_button.set_child(launch_icon)
 
     def run_winetricks_script(self, script_name, wineprefix):
         command = f"WINEPREFIX={shlex.quote(str(wineprefix))} winetricks {script_name}"
@@ -7443,48 +7541,57 @@ class WineCharmApp(Gtk.Application):
 
 #########   ######
     def replace_open_button_with_settings(self):
-        """
-        Replace the open button with a settings button, with proper parent checking.
-        """
-        try:
-            # First check if the open_button exists and has a parent
-            if hasattr(self, 'open_button') and self.open_button is not None:
-                parent = self.open_button.get_parent()
-                if parent is not None:
-                    if parent == self.vbox:  # Verify the parent is actually self.vbox
-                        self.vbox.remove(self.open_button)
-                    else:
-                        print("Warning: open_button's parent is not self.vbox")
-                        return
-            else:
-                print("Warning: open_button not found or is None")
-                return
+        # Remove existing click handler from open button
+        if hasattr(self, 'open_button_handler_id'):
+            self.open_button.disconnect(self.open_button_handler_id)
+        
+        # Update button appearance
+        #for child in self.open_button_box:
+        #    self.open_button_box.remove(child)
+        
+        # Create new settings button content
+        #settings_icon = Gtk.Image.new_from_icon_name("preferences-system-symbolic")
+        #settings_label = Gtk.Label(label="Settings")
+        #self.open_button_box.append(settings_icon)
+        #self.open_button_box.append(settings_label)
+        self.set_open_button_label("Settings")
+        self.set_open_button_icon_visible(False)
+        # Connect new click handler
+        self.open_button_handler_id = self.open_button.connect(
+            "clicked",
+            lambda btn: print("Settings clicked")
+        )
 
-            # Create and configure the settings button
-            self.launch_button = Gtk.Button(label="Settings")
-            self.launch_button.set_size_request(450, 36)
-            
-            # Add the new button to the vbox
-            self.vbox.prepend(self.launch_button)
-            self.launch_button.set_visible(True)
-            
-            # Clear the handler ID since we're replacing the button
-            self.open_button_handler_id = None
-
-        except Exception as e:
-            print(f"Error in replace_open_button_with_settings: {e}")
-            # You might want to show a dialog to the user here
-            return None
+    def restore_open_button(self):
+        # Remove settings click handler
+        if hasattr(self, 'open_button_handler_id'):
+            self.open_button.disconnect(self.open_button_handler_id)
+        
+        # Update button appearance
+        #for child in self.open_button_box:
+        #    self.open_button_box.remove(child)
+        
+        # Restore original open button content
+        #open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
+        #open_label = Gtk.Label(label="Open")
+        #self.open_button_box.append(open_icon)
+        #self.open_button_box.append(open_label)
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)
+        # Reconnect original click handler
+        self.open_button_handler_id = self.open_button.connect(
+            "clicked",
+            self.on_open_button_clicked
+        )
 
     def show_options_for_settings(self, action=None, param=None):
         """
-        Display the settings options without hiding the open button.
+        Display the settings options with search functionality using existing search mechanism.
         """
-        # Set the title to "WineCharm"
-        #self.headerbar.set_title("WineCharm")
-
-        # Ensure the search button is toggled off and the search entry is cleared
         self.search_button.set_active(False)
+        # Ensure the search button is visible and the search entry is cleared
+        self.search_button.set_visible(True)
+        self.search_entry.set_text("")
         self.main_frame.set_child(None)
 
         # Create a scrolled window for settings options
@@ -7492,19 +7599,19 @@ class WineCharmApp(Gtk.Application):
         scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         scrolled_window.set_vexpand(True)
 
-        options_flowbox = Gtk.FlowBox()
-        options_flowbox.set_valign(Gtk.Align.START)
-        options_flowbox.set_halign(Gtk.Align.FILL)
-        options_flowbox.set_max_children_per_line(4)
-        options_flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        options_flowbox.set_vexpand(True)
-        options_flowbox.set_hexpand(True)
-        scrolled_window.set_child(options_flowbox)
+        self.settings_flowbox = Gtk.FlowBox()
+        self.settings_flowbox.set_valign(Gtk.Align.START)
+        self.settings_flowbox.set_halign(Gtk.Align.FILL)
+        self.settings_flowbox.set_max_children_per_line(4)
+        self.settings_flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.settings_flowbox.set_vexpand(True)
+        self.settings_flowbox.set_hexpand(True)
+        scrolled_window.set_child(self.settings_flowbox)
 
         self.main_frame.set_child(scrolled_window)
 
-        # Options list for settings
-        options = [
+        # Store settings options as instance variable for filtering
+        self.settings_options = [
             ("Runner Set Default", "preferences-desktop-apps-symbolic", self.set_default_runner),
             ("Runner Download", "emblem-downloads-symbolic", self.on_settings_download_runner_clicked),
             ("Runner Import", "folder-download-symbolic", self.import_runner),
@@ -7521,44 +7628,51 @@ class WineCharmApp(Gtk.Application):
             ("Set Wine Arch", "preferences-system-symbolic", self.set_wine_arch)
         ]
 
-        for label, icon_name, callback in options:
-            option_button = Gtk.Button()
-            option_button.set_size_request(190, 36)
-            option_button.add_css_class("flat")
-            option_button.add_css_class("normal-font")
-
-            option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-            option_button.set_child(option_hbox)
-
-            option_icon = Gtk.Image.new_from_icon_name(icon_name)
-            option_label = Gtk.Label(label=label)
-            option_label.set_xalign(0)
-            option_label.set_hexpand(True)
-            option_label.set_ellipsize(Pango.EllipsizeMode.END)
-            option_hbox.append(option_icon)
-            option_hbox.append(option_label)
-
-            options_flowbox.append(option_button)
-
-            # Ensure the correct button (`btn`) is passed to the callback
-            option_button.connect(
-                "clicked",
-                lambda btn, cb=callback: cb()
-            )
+        # Initial population of options
+        self.populate_settings_options()
 
         # Hide unnecessary UI components
         self.menu_button.set_visible(False)
-        self.search_button.set_visible(False)
         self.view_toggle_button.set_visible(False)
 
         if self.back_button.get_parent() is None:
             self.headerbar.pack_start(self.back_button)
         self.back_button.set_visible(True)
 
-        # Remove this line to keep the open button visible:
-        # self.open_button.set_visible(False)
         self.replace_open_button_with_settings()
         self.selected_row = None
+
+    def populate_settings_options(self, filter_text=""):
+        """
+        Populate the settings flowbox with filtered options.
+        """
+        # Clear existing options using GTK4's method
+        while child := self.settings_flowbox.get_first_child():
+            self.settings_flowbox.remove(child)
+
+        # Add filtered options
+        filter_text = filter_text.lower()
+        for label, icon_name, callback in self.settings_options:
+            if filter_text in label.lower():
+                option_button = Gtk.Button()
+                option_button.set_size_request(190, 36)
+                option_button.add_css_class("flat")
+                option_button.add_css_class("normal-font")
+
+                option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+                option_button.set_child(option_hbox)
+
+                option_icon = Gtk.Image.new_from_icon_name(icon_name)
+                option_label = Gtk.Label(label=label)
+                option_label.set_xalign(0)
+                option_label.set_hexpand(True)
+                option_label.set_ellipsize(Pango.EllipsizeMode.END)
+                option_hbox.append(option_icon)
+                option_hbox.append(option_label)
+
+                self.settings_flowbox.append(option_button)
+                option_button.connect("clicked", lambda btn, cb=callback: cb())
+
 
 
 
@@ -8384,667 +8498,6 @@ class WineCharmApp(Gtk.Application):
             print(f"Error checking archive contents: {e}")
             return False
 #########################################################
-    def replace_open_button_with_settings(self):
-        # Remove existing click handler from open button
-        if hasattr(self, 'open_button_handler_id'):
-            self.open_button.disconnect(self.open_button_handler_id)
-        
-        # Update button appearance
-        #for child in self.open_button_box:
-        #    self.open_button_box.remove(child)
-        
-        # Create new settings button content
-        #settings_icon = Gtk.Image.new_from_icon_name("preferences-system-symbolic")
-        #settings_label = Gtk.Label(label="Settings")
-        #self.open_button_box.append(settings_icon)
-        #self.open_button_box.append(settings_label)
-        self.set_open_button_label("Settings")
-        self.set_open_button_icon_visible(False)
-        # Connect new click handler
-        self.open_button_handler_id = self.open_button.connect(
-            "clicked",
-            lambda btn: print("Settings clicked")
-        )
-
-    def restore_open_button(self):
-        # Remove settings click handler
-        if hasattr(self, 'open_button_handler_id'):
-            self.open_button.disconnect(self.open_button_handler_id)
-        
-        # Update button appearance
-        #for child in self.open_button_box:
-        #    self.open_button_box.remove(child)
-        
-        # Restore original open button content
-        #open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
-        #open_label = Gtk.Label(label="Open")
-        #self.open_button_box.append(open_icon)
-        #self.open_button_box.append(open_label)
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)
-        # Reconnect original click handler
-        self.open_button_handler_id = self.open_button.connect(
-            "clicked",
-            self.on_open_button_clicked
-        )
-
-    # Modified on_back_button_clicked method
-    def on_back_button_clicked(self, button):
-        # Reset the header bar title and visibility of buttons
-        self.headerbar.set_title_widget(self.title_box)
-        self.menu_button.set_visible(True)
-        self.search_button.set_visible(True)
-        self.view_toggle_button.set_visible(True)
-        self.back_button.set_visible(False)
-
-        # Remove the "Launch" button if it exists
-        if hasattr(self, 'launch_button') and self.launch_button is not None and self.launch_button.get_parent():
-            self.vbox.remove(self.launch_button)
-            self.launch_button = None
-
-        # Restore the "Open" button
-        if not self.open_button.get_parent():
-            self.vbox.prepend(self.open_button)
-        self.open_button.set_visible(True)
-        
-        # Restore original open button functionality
-        self.restore_open_button()
-
-        # Ensure the correct child is set in the main_frame
-        if self.main_frame.get_child() != self.scrolled:
-            self.main_frame.set_child(self.scrolled)
-
-        # Restore the script list
-        self.create_script_list()
-
-
-################### search in settings
-    def show_options_for_settings(self, action=None, param=None):
-        """
-        Display the settings options with search functionality using existing search mechanism.
-        """
-        # Ensure the search button is visible and the search entry is cleared
-        self.search_button.set_visible(True)
-        self.search_entry.set_text("")
-        self.main_frame.set_child(None)
-
-        # Create a scrolled window for settings options
-        scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scrolled_window.set_vexpand(True)
-
-        self.settings_flowbox = Gtk.FlowBox()
-        self.settings_flowbox.set_valign(Gtk.Align.START)
-        self.settings_flowbox.set_halign(Gtk.Align.FILL)
-        self.settings_flowbox.set_max_children_per_line(4)
-        self.settings_flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        self.settings_flowbox.set_vexpand(True)
-        self.settings_flowbox.set_hexpand(True)
-        scrolled_window.set_child(self.settings_flowbox)
-
-        self.main_frame.set_child(scrolled_window)
-
-        # Store settings options as instance variable for filtering
-        self.settings_options = [
-            ("Runner Set Default", "preferences-desktop-apps-symbolic", self.set_default_runner),
-            ("Runner Download", "emblem-downloads-symbolic", self.on_settings_download_runner_clicked),
-            ("Runner Import", "folder-download-symbolic", self.import_runner),
-            ("Runner Backup", "document-save-symbolic", self.backup_runner),
-            ("Runner Restore", "document-revert-symbolic", self.restore_runner),
-            ("Runner Delete", "user-trash-symbolic", self.delete_runner),
-            ("Template Set Default", "document-new-symbolic", self.set_default_template),
-            ("Template Configure", "preferences-other-symbolic", self.configure_template),
-            ("Template Import", "folder-download-symbolic", self.import_template),
-            ("Template Clone", "folder-copy-symbolic", self.clone_template),
-            ("Template Backup", "document-save-symbolic", self.backup_template),
-            ("Template Restore", "document-revert-symbolic", self.restore_template),
-            ("Template Delete", "user-trash-symbolic", self.delete_template),
-            ("Set Wine Arch", "preferences-system-symbolic", self.set_wine_arch)
-        ]
-
-        # Initial population of options
-        self.populate_settings_options()
-
-        # Hide unnecessary UI components
-        self.menu_button.set_visible(False)
-        self.view_toggle_button.set_visible(False)
-
-        if self.back_button.get_parent() is None:
-            self.headerbar.pack_start(self.back_button)
-        self.back_button.set_visible(True)
-
-        self.replace_open_button_with_settings()
-        self.selected_row = None
-
-    def populate_settings_options(self, filter_text=""):
-        """
-        Populate the settings flowbox with filtered options.
-        """
-        # Clear existing options using GTK4's method
-        while child := self.settings_flowbox.get_first_child():
-            self.settings_flowbox.remove(child)
-
-        # Add filtered options
-        filter_text = filter_text.lower()
-        for label, icon_name, callback in self.settings_options:
-            if filter_text in label.lower():
-                option_button = Gtk.Button()
-                option_button.set_size_request(190, 36)
-                option_button.add_css_class("flat")
-                option_button.add_css_class("normal-font")
-
-                option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-                option_button.set_child(option_hbox)
-
-                option_icon = Gtk.Image.new_from_icon_name(icon_name)
-                option_label = Gtk.Label(label=label)
-                option_label.set_xalign(0)
-                option_label.set_hexpand(True)
-                option_label.set_ellipsize(Pango.EllipsizeMode.END)
-                option_hbox.append(option_icon)
-                option_hbox.append(option_label)
-
-                self.settings_flowbox.append(option_button)
-                option_button.connect("clicked", lambda btn, cb=callback: cb())
-
-    # Modify the existing search handlers to work with settings
-    def on_search_entry_changed(self, entry):
-        search_term = entry.get_text().lower()
-        # Check if we're in settings view
-        if hasattr(self, 'settings_flowbox') and self.settings_flowbox.get_parent() is not None:
-            self.populate_settings_options(search_term)
-        else:
-            self.filter_script_list(search_term)
-
-##################### clear up the settings search
-    def on_key_pressed(self, controller, keyval, keycode, state):
-        if keyval == Gdk.KEY_Escape:
-            self.search_button.set_active(False)
-            # Check if we're in settings view
-            if hasattr(self, 'settings_flowbox') and self.settings_flowbox.get_parent() is not None:
-                self.search_entry.set_text("")  # Clear the search entry
-                self.populate_settings_options()  # Reset settings options
-            else:
-                self.filter_script_list("")  # Reset the script list
-
-    def on_search_button_clicked(self, button):
-        if self.search_active:
-            self.vbox.remove(self.search_entry_box)
-            self.vbox.prepend(self.open_button)
-            self.search_active = False
-            # Check if we're in settings view
-            if hasattr(self, 'settings_flowbox') and self.settings_flowbox.get_parent() is not None:
-                self.search_entry.set_text("")  # Clear the search entry
-                self.populate_settings_options()  # Reset settings options
-            else:
-                self.filter_script_list("")  # Reset the script list
-        else:
-            self.vbox.remove(self.open_button)
-            self.vbox.prepend(self.search_entry_box)
-            self.search_entry.grab_focus()
-            self.search_active = True
-
-##################### Script OPTIONS RIZVAN
-    def show_options_for_script(self, ui_state, row, script_key):
-        """
-        Display the options for a specific script.
-        
-        Args:
-            ui_state (dict): Information about the script stored in script_data_two.
-            row (Gtk.Widget): The row UI element where the options will be displayed.
-            script_key (str): The unique key for the script (should be sha256sum or a unique identifier).
-        """
-        # Get the script path from ui_state
-        script = Path(ui_state['script_path'])  # Get the script path from ui_state
-
-        # Ensure the search button is toggled off and the search entry is cleared
-        self.search_button.set_active(False)
-        self.search_button.set_visible(True)
-        self.search_entry.set_text("")
-        self.main_frame.set_child(None)
-
-        # Create a scrolled window for script options
-        scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scrolled_window.set_vexpand(True)
-
-        self.options_flowbox = Gtk.FlowBox()
-        self.options_flowbox.set_valign(Gtk.Align.START)
-        self.options_flowbox.set_halign(Gtk.Align.FILL)
-        self.options_flowbox.set_max_children_per_line(4)
-        self.options_flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        self.options_flowbox.set_vexpand(True)
-        self.options_flowbox.set_hexpand(True)
-        scrolled_window.set_child(self.options_flowbox)
-
-        self.main_frame.set_child(scrolled_window)
-
-        # Initialize or replace self.options_listbox with the current self.options_flowbox
-        self.options_listbox = self.options_flowbox
-
-        # Store script options as instance variable for filtering
-        self.script_options = [
-            ("Show log", "document-open-symbolic", self.show_log_file),
-            ("Open Terminal", "utilities-terminal-symbolic", self.open_terminal),
-            ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
-            ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager),
-            ("Edit Script File", "text-editor-symbolic", self.open_script_file),
-            ("Delete Wineprefix", "user-trash-symbolic", self.show_delete_wineprefix_confirmation),
-            ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation),
-            ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
-            ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
-            ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog),
-            ("Backup Prefix", "document-save-symbolic", self.show_backup_prefix_dialog),
-            ("Create Bottle", "package-x-generic-symbolic", self.create_bottle_selected),
-            ("Save Wine User Dirs", "document-save-symbolic", self.show_save_user_dirs_dialog),
-            ("Load Wine User Dirs", "document-revert-symbolic", self.show_load_user_dirs_dialog),
-            ("Reset Shortcut", "view-refresh-symbolic", self.reset_shortcut_confirmation),
-            ("Add Desktop Shortcut", "user-bookmarks-symbolic", self.add_desktop_shortcut),
-            ("Remove Desktop Shortcut", "action-unavailable-symbolic", self.remove_desktop_shortcut),
-            ("Import Game Directory", "folder-download-symbolic", self.import_game_directory),
-            ("Run Other Exe", "system-run-symbolic", self.run_other_exe),
-            ("Environment Variables", "preferences-system-symbolic", self.set_environment_variables),
-            ("Change Runner", "preferences-desktop-apps-symbolic", self.change_runner),
-            ("Rename Prefix Directory", "folder-visiting-symbolic", self.rename_prefix_directory),
-            ("Wine Config (winecfg)", "preferences-system-symbolic", self.wine_config),
-            ("Registry Editor (regedit)", "dialog-password-symbolic", self.wine_registry_editor)
-
-        ]
-
-        # Initial population of options
-        self.populate_script_options(script, script_key)
-
-        # Use `script` as a Path object for `create_icon_title_widget`
-        self.headerbar.set_title_widget(self.create_icon_title_widget(script))
-     
-        # Hide unnecessary UI components
-        self.menu_button.set_visible(False)
-        self.view_toggle_button.set_visible(False)
-
-        if self.back_button.get_parent() is None:
-            self.headerbar.pack_start(self.back_button)
-        self.back_button.set_visible(True)
-
-        self.open_button.set_visible(False)
-        self.replace_open_button_with_launch(ui_state, row, script_key)
-        self.update_execute_button_icon(ui_state)
-        self.selected_row = None
-
-
-    def populate_script_options(self, script, script_key, filter_text=""):
-        # Clear existing options using GTK4's method
-        while child := self.options_flowbox.get_first_child():
-            self.options_flowbox.remove(child)
-
-        # Add filtered options    
-        for label, icon_name, callback in self.script_options:
-            option_button = Gtk.Button()
-            option_button.set_size_request(150, 36)
-            option_button.add_css_class("flat")
-            option_button.add_css_class("normal-font")
-
-            option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-            option_button.set_child(option_hbox)
-
-            option_icon = Gtk.Image.new_from_icon_name(icon_name)
-            option_label = Gtk.Label(label=label)
-            option_label.set_xalign(0)
-            option_label.set_hexpand(True)
-            option_label.set_ellipsize(Pango.EllipsizeMode.END)
-            option_hbox.append(option_icon)
-            option_hbox.append(option_label)
-
-            self.options_flowbox.append(option_button)
-
-            # Enable or disable the "Show log" button based on log file existence and size
-            if label == "Show log":
-                log_file_path = script.parent / f"{script.stem}.log"
-                if not log_file_path.exists() or log_file_path.stat().st_size == 0:
-                    option_button.set_sensitive(False)
-
-            # Ensure the correct button (`btn`) is passed to the callback
-            option_button.connect(
-                "clicked",
-                lambda btn, cb=callback, sc=script, sk=script_key: self.callback_wrapper(cb, sc, sk, btn)
-            )
-
-    # Modify the existing search handlers to work with script options
-    def on_search_entry_changed(self, entry):
-        search_term = entry.get_text().lower()
-        # Check if we're in settings view
-        if hasattr(self, 'settings_flowbox') and self.settings_flowbox.get_parent() is not None:
-            self.populate_settings_options(search_term)
-        elif hasattr(self, 'options_flowbox') and self.options_flowbox.get_parent() is not None:
-            self.populate_script_options(script, script_key, search_term)            
-        else:
-            self.filter_script_list(search_term)
-
-
-##################### clear up the settings search
-    def on_key_pressed(self, controller, keyval, keycode, state):
-        if keyval == Gdk.KEY_Escape:
-            self.search_button.set_active(False)
-            # Check if we're in settings view
-            if hasattr(self, 'settings_flowbox') and self.settings_flowbox.get_parent() is not None:
-                self.search_entry.set_text("")  # Clear the search entry
-                self.populate_settings_options()  # Reset settings options
-            elif hasattr(self, 'options_flowbox') and self.options_flowbox.get_parent() is not None:
-                self.search_entry.set_text("")  # Clear the search entry
-                self.populate_script_options(script, script_key)  # Reset settings options
-            else:
-                self.filter_script_list("")  # Reset the script list
-
-    def on_search_button_clicked(self, button):
-        if self.search_active:
-            self.vbox.remove(self.search_entry_box)
-            self.vbox.prepend(self.open_button)
-            self.search_active = False
-            # Check if we're in settings view
-            if hasattr(self, 'settings_flowbox') and self.settings_flowbox.get_parent() is not None:
-                self.search_entry.set_text("")  # Clear the search entry
-                self.populate_settings_options()  # Reset settings options
-            elif hasattr(self, 'options_flowbox') and self.options_flowbox.get_parent() is not None:
-                self.search_entry.set_text("")  # Clear the search entry
-                self.populate_script_options()  # Reset settings options
-            else:
-                self.filter_script_list("")  # Reset the script list
-        else:
-            self.vbox.remove(self.open_button)
-            self.vbox.prepend(self.search_entry_box)
-            self.search_entry.grab_focus()
-            self.search_active = True
-
-
-#################################### 2nd testing with mistral
-    def replace_open_button_with_settings(self):
-        """
-        Replace the open button with a settings button, with proper parent checking.
-        """
-        try:
-            # First check if the open_button exists and has a parent
-            if hasattr(self, 'open_button') and self.open_button is not None:
-                parent = self.open_button.get_parent()
-                if parent is not None:
-                    if parent == self.vbox:  # Verify the parent is actually self.vbox
-                        self.vbox.remove(self.open_button)
-                    else:
-                        print("Warning: open_button's parent is not self.vbox")
-                        return
-            else:
-                print("Warning: open_button not found or is None")
-                return
-
-            # Create and configure the settings button
-            self.launch_button = Gtk.Button(label="Settings")
-            self.launch_button.set_size_request(450, 36)
-
-            # Add the new button to the vbox
-            self.vbox.prepend(self.launch_button)
-            self.launch_button.set_visible(True)
-
-            # Clear the handler ID since we're replacing the button
-            self.open_button_handler_id = None
-
-        except Exception as e:
-            print(f"Error in replace_open_button_with_settings: {e}")
-            return None
-
-    def create_bottle(self, script, script_key, backup_path):
-        """
-        Backs up the Wine prefix in a stepwise manner, indicating progress via spinner and label updates.
-        """
-        # Store current script info for cancellation handling
-        self.current_script = script
-        self.current_script_key = script_key
-        self.stop_processing = False
-        self.current_backup_path = backup_path
-        wineprefix = Path(script).parent
-
-        self.hide_processing_spinner()
-
-        # Step 1: Disconnect the UI elements and initialize the spinner
-        self.show_processing_spinner("Bottling...")
-        self.connect_open_button_with_bottling_cancel(script_key)
-
-        # Get the user's home directory to replace with `~`
-        usershome = os.path.expanduser('~')
-
-        # Get the current username from the environment
-        user = os.getenv("USER") or os.getenv("USERNAME")
-        if not user:
-            raise Exception("Unable to determine the current username from the environment.")
-
-        find_replace_pairs = {usershome: '~', f'\'{usershome}': '\'~\''}
-        find_replace_media_username = {f'/media/{user}/': '/media/%USERNAME%/'}
-        restore_media_username = {'/media/%USERNAME%/': f'/media/{user}/'}
-
-        # Extract exe_file from script_data
-        script_data = self.extract_yaml_info(script_key)
-        if not script_data:
-            raise Exception("Script data not found.")
-
-        exe_file = self.expand_and_resolve_path(script_data['exe_file'])
-        exe_file = Path(str(exe_file).replace("%USERNAME%", user))
-        exe_path = exe_file.parent
-        exe_name = exe_file.name
-
-        runner = self.expand_and_resolve_path(script_data['runner'])
-
-        # If runner is inside the script
-        if runner:
-            print(f"RUNNER FOUND = {runner}")
-            # Check if the runner is inside runners_dir
-            is_runner_inside_prefix = runner.is_relative_to(self.runners_dir)
-            print("===========================================================")
-            if is_runner_inside_prefix:
-                print("RUNNER INSIDE PREFIX")
-                runner_dir = runner.parent.parent
-                runner_dir_exe = runner_dir / "bin/wine"
-
-                target_runner_dir = wineprefix / "Runner"
-                target_runner_exe = target_runner_dir / runner_dir.name / "bin/wine"
-            else:
-                target_runner_exe = runner
-                runner_dir_exe = runner
-                print("RUNNER IS NOT INSIDE PREFIX")
-
-        # Check if game directory is inside the prefix
-        is_exe_inside_prefix = exe_path.is_relative_to(wineprefix)
-
-        print("==========================================================")
-        # exe_file path replacement should use existing exe_file if it's already inside prefix
-        if is_exe_inside_prefix:
-            game_dir = exe_path
-            game_dir_exe = exe_file
-            print(f"""
-            exe_file is inside wineprefix:
-            game_dir = {game_dir}
-            game_dir_exe = {game_dir_exe}
-            """)
-        else:
-            game_dir = wineprefix / "drive_c" / "GAMEDIR"
-            game_dir_exe = game_dir / exe_path.name / exe_name
-            print(f"""
-            exe_file is OUTSIDE wineprefix:
-            game_dir = {game_dir}
-            game_dir_exe = {game_dir_exe}
-            """)
-
-        def perform_backup_steps():
-            try:
-                # Basic steps that are always needed
-                basic_steps = [
-                    (f"Replace \"{usershome}\" with '~' in files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
-                    ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
-                    (f"Replace \"/media/{user}\" with '/media/%USERNAME%' in files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_media_username)),
-                    ("Updating exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
-                    ("Creating Bottle archive", lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
-                    ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
-                    (f"Revert %USERNAME% with \"{user}\" in script files", lambda: self.replace_strings_in_specific_files(wineprefix, restore_media_username)),
-                    ("Reverting exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(exe_file))))
-                ]
-
-                # Set total steps and initialize progress UI
-                self.total_steps = len(basic_steps)
-
-                # Add runner-related steps only if runner exists and is not empty
-                steps = basic_steps.copy()
-                if runner and str(runner).strip():
-                    is_runner_inside_prefix = runner.is_relative_to(self.runners_dir)
-                    if is_runner_inside_prefix:
-                        runner_update_index = next(i for i, (text, _) in enumerate(steps) if text == "Creating Bottle archive")
-                        steps.insert(runner_update_index,
-                            ("Updating runner Path in Script", lambda: self.update_runner_path_in_script(script, self.replace_home_with_tilde_in_path(str(target_runner_exe))))
-                        )
-                        steps.append(
-                            ("Reverting runner Path in Script", lambda: self.update_runner_path_in_script(script, self.replace_home_with_tilde_in_path(str(runner))))
-                        )
-
-                for step_text, step_func in steps:
-                    if self.stop_processing:
-                        GLib.idle_add(self.cleanup_cancelled_bottle, script, script_key)
-                        return
-
-                    GLib.idle_add(self.show_initializing_step, step_text)
-                    try:
-                        step_func()
-                        if self.stop_processing:
-                            GLib.idle_add(self.cleanup_cancelled_bottle, script, script_key)
-                            return
-                        GLib.idle_add(self.mark_step_as_done, step_text)
-                    except Exception as e:
-                        print(f"Error during step '{step_text}': {e}")
-                        if not self.stop_processing:
-                            GLib.idle_add(self.show_info_dialog, "Backup Failed", f"Error during '{step_text}': {str(e)}")
-                        GLib.idle_add(self.cleanup_cancelled_bottle, script, script_key)
-                        return
-
-                if not self.stop_processing:
-                    GLib.idle_add(self.on_create_bottle_completed, script_key, backup_path)
-
-            except Exception as e:
-                print(f"Backup process failed: {e}")
-                GLib.idle_add(self.cleanup_cancelled_bottle, script, script_key)
-
-        # Run the backup steps in a separate thread to keep the UI responsive
-        self.processing_thread = threading.Thread(target=perform_backup_steps)
-        self.processing_thread.start()
-
-    def show_backup_prefix_dialog(self, script, script_key, button):
-        self.stop_processing = False
-        wineprefix = Path(script).parent
-        # Extract exe_file from script_data
-        script_data = self.extract_yaml_info(script_key)
-        if not script_data:
-            raise Exception("Script data not found.")
-
-        exe_file = self.expand_and_resolve_path(script_data['exe_file'])
-        exe_path = exe_file.parent
-        exe_name = exe_file.name
-        game_dir = wineprefix / "drive_c" / "GAMEDIR"
-        game_dir_exe = game_dir / exe_path.name / exe_name
-
-        # Check if game directory is inside the prefix
-        is_exe_inside_prefix = exe_path.is_relative_to(wineprefix)
-
-        creation_date_and_time = datetime.now().strftime("%Y%m%d%H%M")
-        # Step 1: Suggest the backup file name
-        default_backup_name = f"{script.stem}-{creation_date_and_time}.prefix"
-
-        # Create a Gtk.FileDialog instance for saving the file
-        file_dialog = Gtk.FileDialog.new()
-
-        # Set the initial file name using set_initial_name() method
-        file_dialog.set_initial_name(default_backup_name)
-
-        # Open the dialog asynchronously to select the save location
-        file_dialog.save(self.window, None, self.on_backup_prefix_dialog_response, script, script_key)
-
-        print("FileDialog presented for saving the backup.")
-
-    def on_backup_prefix_dialog_response(self, dialog, result, script, script_key):
-        try:
-            # Retrieve the selected file (save location) using save_finish()
-            backup_file = dialog.save_finish(result)
-            if backup_file:
-                self.on_back_button_clicked(None)
-                self.flowbox.remove_all()
-                backup_path = backup_file.get_path()  # Get the backup file path
-                print(f"Backup will be saved to: {backup_path}")
-
-                # Start the backup process in a separate thread
-                threading.Thread(target=self.backup_prefix, args=(script, script_key, backup_path)).start()
-
-        except GLib.Error as e:
-            # Handle any errors, such as cancellation
-            print(f"An error occurred: {e}")
-
-    def disconnect_open_button(self):
-        """
-        Disconnect the open button's handler and update its label to "Importing...".
-        """
-        if self.open_button_handler_id is not None:
-            self.open_button.disconnect(self.open_button_handler_id)
-            self.open_button_handler_id = None
-
-        if not hasattr(self, 'spinner') or not self.spinner:  # Ensure spinner is not created multiple times
-            self.spinner = Gtk.Spinner()
-            self.spinner.start()
-            self.open_button_box.append(self.spinner)
-
-        self.set_open_button_label("Importing...")
-        self.set_open_button_icon_visible(False)  # Hide the open-folder icon
-        print("Open button disconnected and spinner shown.")
-
-    def reconnect_open_button(self):
-        """
-        Reconnect the open button's handler and reset its label.
-        """
-        if self.open_button_handler_id is None:
-            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
-
-        if self.spinner:
-            self.spinner.stop()
-            self.open_button_box.remove(self.spinner)
-            self.spinner = None  # Ensure the spinner reference is cleared
-
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)
-        print("Open button reconnected and UI reset.")
-
-    def connect_open_button_with_bottling_cancel(self, script_key):
-        """
-        Connect cancel handler to the open button for bottling process
-        """
-        if self.open_button_handler_id is not None:
-            self.open_button.disconnect(self.open_button_handler_id)
-        self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_bottling_clicked, script_key)
-        self.set_open_button_icon_visible(False)
-
-    def on_cancel_bottling_clicked(self, button, script_key):
-        """
-        Handle cancel button click during bottling
-        """
-        dialog = Adw.MessageDialog.new(
-            self.window,
-            "Cancel Bottling",
-            "Do you want to cancel the bottling process?"
-        )
-        dialog.add_response("continue", "Continue")
-        dialog.add_response("cancel", "Cancel Bottling")
-        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
-        dialog.connect("response", self.on_cancel_bottling_dialog_response, script_key)
-        dialog.present()
-
-    def on_cancel_bottling_dialog_response(self, dialog, response, script_key):
-        """
-        Handle cancel dialog response for bottling
-        """
-        if response == "cancel":
-            self.stop_processing = True
-        dialog.close()
-
-
 
 
 

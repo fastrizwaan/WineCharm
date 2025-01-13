@@ -39,7 +39,7 @@ is not resetting the play functionality.
     - [ ] Show Error dialog as button for launch
         - [ ] Show an (i) button beside play button to show log instead of Launch error dialog
     - [x] Search in Settings
-    - [ ] Search in Script options
+    - [x] Search in Script options
     
  - 1. [x] Runner Support
      - [x] Check working runner before launch (this will help when freedesktop runtime has changed or on system)
@@ -65,8 +65,13 @@ is not resetting the play functionality.
             - [x] Show GUI progress of tarring using progressbar 
             - [x] Allow cancellation of bundle creation, while it is running using same open/bottling button
             - [x] Revert scripts with actual path, if interrupted or due to power failure or other reasons. (self repair)
-                - [ ] create a copy at winecharm's data directory...
                 - [ ] create a file/mechanism which will repair broken wineprefix
+                    - [ ] create a file WINEZGUIDIR/bottling_unfinished.yml and add file list with path and wineprefix info to the yml file; and copy the .charm .txt & .yml & *.reg files to WINEZGUIDIR/bottling/
+                    - [ ] if found WINEZGUIDIR/bottling_unfinished.yml on app launch repair the wineprefix, replace the files in the wineprefix
+
+        - [ ] Launch script, if sha256sum is missing, and exe is found update sha256sum in the .charm file
+        
+        - [ ] If setup is launched with a different runner, newly created script must use the runner as specified in the setup .charm file. If this script has runner, create new .charm files should use it.
                 
         - [ ] Import Runner
         - [x] Import Game Directory
