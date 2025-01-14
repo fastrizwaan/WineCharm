@@ -342,22 +342,26 @@ class WineCharmApp(Gtk.Application):
 
     def initialize_template(self, template_dir, callback):
         """
-        Modified template initialization to use the new progress system with progress bar
+        Modified template initialization with proper Path handling and interruption support
         """
+        template_dir = Path(template_dir) if not isinstance(template_dir, Path) else template_dir
+        
         self.create_required_directories()
         self.initializing_template = True
+        self.stop_processing = False
         
         # Disconnect open button handler
         if self.open_button_handler_id is not None:
             self.open_button.disconnect(self.open_button_handler_id)
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_template_init_clicked)
         
         steps = [
             ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
             ("Replace symbolic links with directories", lambda: self.remove_symlinks_and_create_directories(template_dir)),
-            ("Installing corefonts", f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
-            ("Installing openal", f"WINEPREFIX='{template_dir}' winetricks -q openal"),
-            ("Installing vkd3d", f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-            ("Installing dxvk", f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+           # ("Installing corefonts", f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+           # ("Installing openal", f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+           # ("Installing vkd3d", f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+           # ("Installing dxvk", f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
         ]
         
         # Set total steps and initialize progress UI
@@ -366,21 +370,45 @@ class WineCharmApp(Gtk.Application):
 
         def initialize():
             for index, (step_text, command) in enumerate(steps, 1):
+                if self.stop_processing:
+                    GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
+                    return
+                    
                 GLib.idle_add(self.show_initializing_step, step_text)
                 try:
                     if callable(command):
                         command()
                     else:
-                        subprocess.run(command, shell=True, check=True)
+                        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        while process.poll() is None:
+                            if self.stop_processing:
+                                process.terminate()
+                                try:
+                                    process.wait(timeout=2)
+                                except subprocess.TimeoutExpired:
+                                    process.kill()
+                                GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
+                                return
+                            time.sleep(0.1)
+                        
+                        if process.returncode != 0:
+                            raise subprocess.CalledProcessError(process.returncode, command)
+                    
                     GLib.idle_add(self.mark_step_as_done, step_text)
-                    # Update progress bar
-                    GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
+                    # Update progress bar only if it exists
+                    if hasattr(self, 'progress_bar'):
+                        GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
+                    
                 except subprocess.CalledProcessError as e:
                     print(f"Error initializing template: {e}")
-                    break
-            GLib.idle_add(callback)
-            GLib.idle_add(self.hide_processing_spinner)
-
+                    GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
+                    return
+                    
+            if not self.stop_processing:
+                GLib.idle_add(callback)
+                GLib.idle_add(self.hide_processing_spinner)
+                self.disconnect_open_button()
+                GLib.idle_add(self.reset_ui_after_template_init)
         threading.Thread(target=initialize).start()
 
     def on_template_initialized(self):
@@ -985,20 +1013,21 @@ class WineCharmApp(Gtk.Application):
             self.monitoring_active = True
 
     def process_cli_file_in_thread(self, file_path):
+        """
+        Process CLI file in a background thread with proper Path handling
+        """
         try:
             print(f"Processing CLI file in thread: {file_path}")
-            abs_file_path = str(Path(file_path).resolve())
+            file_path = Path(file_path) if not isinstance(file_path, Path) else file_path
+            abs_file_path = file_path.resolve()
             print(f"Resolved absolute CLI file path: {abs_file_path}")
 
-            if not Path(abs_file_path).exists():
+            if not abs_file_path.exists():
                 print(f"File does not exist: {abs_file_path}")
                 return
 
             # Perform the heavy processing here
-            self.create_yaml_file(abs_file_path, None)
-
-            # Schedule GUI updates in the main thread
-            #GLib.idle_add(self.update_gui_after_file_processing, abs_file_path)
+            self.create_yaml_file(str(abs_file_path), None)
 
         except Exception as e:
             print(f"Error processing file in background: {e}")
@@ -3160,7 +3189,7 @@ class WineCharmApp(Gtk.Application):
 
                 # Check the file extension to determine whether it's a .tar.zst or .wzt file
                 if file_path.endswith(".prefix") or file_path.endswith(".bottle"):
-                    self.restore_tar_zst_backup(file_path)
+                    self.restore_prefix_bottle_tar_zst(file_path)
                 elif file_path.endswith(".wzt"):
                     self.restore_wzt_backup(file_path)
 
@@ -3169,14 +3198,16 @@ class WineCharmApp(Gtk.Application):
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                 print(f"An error occurred: {e}")
 
-    def restore_tar_zst_backup(self, file_path):
+    def restore_prefix_bottle_tar_zst(self, file_path):
         """
-        Restore from a .tar.zst backup file.
+        Restore from a .prefix or .bottle which is a .tar.zst compressed  file.
         """
         # Clear the flowbox and show a progress spinner
         GLib.idle_add(self.flowbox.remove_all)
         self.show_processing_spinner(f"Restoring from {Path(file_path).name}")
         self.disconnect_open_button()
+
+        
 
         # Start a thread to restore from the backup (process the file in steps)
         self.perform_restore_steps(file_path)
@@ -3187,7 +3218,7 @@ class WineCharmApp(Gtk.Application):
         """
         # Clear the flowbox and show a progress spinner
         GLib.idle_add(self.flowbox.remove_all)
-        self.show_processing_spinner(f"Extracting WZT from {Path(file_path).name}")
+        self.show_processing_spinner(f"Restoring WZT")
         self.disconnect_open_button()
 
         # Start the WZT extraction process in steps
@@ -5625,7 +5656,7 @@ class WineCharmApp(Gtk.Application):
         self.progress_bar.set_show_text(True)
         self.progress_bar.set_text(label_text)
         self.progress_bar.set_fraction(0.0)
-        self.progress_bar.set_size_request(460, -1)
+        self.progress_bar.set_size_request(420, -1)
         self.open_button_box.append(self.progress_bar)
         
         # Clear the flowbox for showing steps
@@ -5900,9 +5931,15 @@ class WineCharmApp(Gtk.Application):
         # Reconnect open button and reset its label
         self.set_open_button_label("Open")
         self.set_open_button_icon_visible(True)
-        self.reconnect_open_button()
+        
         self.hide_processing_spinner()
 
+        # This will disconnect open_button handler, use this then reconnect.
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+
+        self.reconnect_open_button()
+        self.load_script_list()
         # Restore the script list in the flowbox
         GLib.idle_add(self.create_script_list)
 
@@ -5979,42 +6016,137 @@ class WineCharmApp(Gtk.Application):
             self.hide_processing_spinner()
             # No need to restore the script list as it wasn't cleared
 
+    def on_cancel_import_wine_direcotory_dialog_response(self, dialog, response):
+        """
+        Handle cancel dialog response
+        """
+        if response == "cancel":
+            self.stop_processing = True
+            dialog.close()
+            #GLib.timeout_add_seconds(0.5, dialog.close)
+#            self.set_open_button_label("Open")
+#            self.set_open_button_icon_visible(True)
+#            self.reconnect_open_button()
+#            self.hide_processing_spinner()
+
+
+#            # Iterate over all script buttons and update the UI based on `is_clicked_row`
+#            for key, data in self.script_ui_data.items():
+#                row_button = data['row']
+#                row_play_button = data['play_button']
+#                row_options_button = data['options_button']
+#            self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
+        else:
+            self.stop_processing = False
+            dialog.close()
+            #GLib.timeout_add_seconds(0.5, dialog.close)
+
+    def on_cancel_import_wine_directory_clicked(self, button):
+        """
+        Handle cancel button click
+        """
+        dialog = Adw.MessageDialog.new(
+            self.window,
+            "Cancel Bottle Creation",
+            "Do you want to cancel the bottle creation process?"
+        )
+        dialog.add_response("continue", "Continue")
+        dialog.add_response("cancel", "Cancel Creation")
+        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.connect("response", self.on_cancel_import_wine_direcotory_dialog_response)
+        dialog.present()
+
+
+    def connect_open_button_with_import_wine_directory_cancel(self):
+        """
+        Connect cancel handler to the open button
+        """
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_import_wine_directory_clicked)
+        
+        #if not hasattr(self, 'spinner') or not self.spinner:
+        #    self.spinner = Gtk.Spinner()
+        #    self.spinner.start()
+        #    self.open_button_box.append(self.spinner)
+
+        #self.set_open_button_label("Cancel")
+        self.set_open_button_icon_visible(False)
+
+
     def import_wine_directory(self, src, dst):
         """
-        Import the Wine directory with progress tracking in flowbox
+        Import the Wine directory with progress tracking and interruption support
         """
+        self.stop_processing = False
+        
+        
+        # Create temporary directory for import
+        temp_dst = dst.parent / f"{dst.name}_temp_{int(time.time())}"
+        
         # Clear the flowbox and initialize the progress UI
         GLib.idle_add(self.flowbox.remove_all)
         
         steps = [
-            ("Copying Wine directory", lambda: self.custom_copytree(src, dst)),
-            ("Processing registry files", lambda: self.process_reg_files(dst)),
-            ("Performing Replacements", lambda: self.perform_replacements(dst)),
+            ("Copying Wine directory", lambda: self.custom_copytree(src, temp_dst)),
+            ("Processing registry files", lambda: self.process_reg_files(temp_dst)),
+            ("Performing Replacements", lambda: self.perform_replacements(temp_dst)),
             ("Creating scripts for .exe files", lambda: self.create_scripts_for_exe_files(dst)),
         ]
         
         # Set total steps and initialize progress UI
         self.total_steps = len(steps)
         self.show_processing_spinner("Importing Wine Directory...")
+        self.connect_open_button_with_import_wine_directory_cancel()
 
         def perform_import_steps():
-            for index, (step_text, step_func) in enumerate(steps, 1):
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    step_func()
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                    # Update progress bar
-                    GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
-                except Exception as e:
-                    print(f"Error during step '{step_text}': {e}")
-                    GLib.idle_add(self.show_info_dialog, "Error", f"An error occurred during '{step_text}': {e}")
-                    break
+            try:
+                for index, (step_text, step_func) in enumerate(steps, 1):
+                    if self.stop_processing:
+                        GLib.idle_add(self.cleanup_cancelled_import, temp_dst)
+                        return
+                        
+                    GLib.idle_add(self.show_initializing_step, step_text)
+                    try:
+                        step_func()
+                        GLib.idle_add(self.mark_step_as_done, step_text)
+                        GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
+                    except Exception as e:
+                        print(f"Error during step '{step_text}': {e}")
+                        GLib.idle_add(self.cleanup_cancelled_import, temp_dst)
+                        GLib.idle_add(self.show_info_dialog, "Error", f"An error occurred during '{step_text}': {e}")
+                        return
 
-            # Re-enable UI elements and restore the script list after the import process
-            GLib.idle_add(self.on_import_wine_directory_completed)
-            GLib.idle_add(self.hide_processing_spinner)
+                if not self.stop_processing:
+                    # Success - replace old directory with new one
+                    if dst.exists():
+                        shutil.rmtree(dst)
+                    temp_dst.rename(dst)
+                    GLib.idle_add(self.on_import_wine_directory_completed)
+                    
+            except Exception as e:
+                print(f"Error during import process: {e}")
+                GLib.idle_add(self.cleanup_cancelled_import, temp_dst)
+                GLib.idle_add(self.show_info_dialog, "Error", f"Import failed: {e}")
+
 
         threading.Thread(target=perform_import_steps).start()
+
+    def cleanup_cancelled_import(self, temp_dir):
+        """
+        Clean up temporary directory and reset UI after cancelled import
+        """
+        try:
+            if temp_dir.exists():
+                shutil.rmtree(temp_dir)
+                print(f"Removed temporary directory: {temp_dir}")
+        except Exception as e:
+            print(f"Error cleaning up temporary directory: {e}")
+        finally:
+            self.stop_processing = False
+            GLib.idle_add(self.on_import_wine_directory_completed)
+            if not self.stop_processing:
+                GLib.idle_add(self.show_info_dialog, "Cancelled", "Wine directory import was cancelled")
 
 
 
@@ -6029,6 +6161,11 @@ class WineCharmApp(Gtk.Application):
             self.spinner = Gtk.Spinner()
             self.spinner.start()
             self.open_button_box.append(self.spinner)
+
+        if self.spinner:
+            self.spinner.stop()
+            self.open_button_box.remove(self.spinner)
+            self.spinner = None 
 
         #self.set_open_button_label("Importing...")
         self.set_open_button_icon_visible(False)  # Hide the open-folder icon
@@ -8497,17 +8634,130 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error checking archive contents: {e}")
             return False
-#########################################################
+######################################################### Initiazlie template and import directory imrpovement
+
+
+
+    def on_cancel_template_init_clicked(self, button):
+        """
+        Handle cancel button click during template initialization
+        """
+        dialog = Adw.MessageDialog.new(
+            self.window,
+            "Cancel Initialization",
+            "Do you want to cancel the template initialization process?"
+        )
+        dialog.add_response("continue", "Continue")
+        dialog.add_response("cancel", "Cancel Initialization")
+        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.connect("response", self.on_cancel_template_init_dialog_response)
+        dialog.present()
+
+    def on_cancel_template_init_dialog_response(self, dialog, response):
+        """
+        Handle cancel dialog response for template initialization
+        """
+        if response == "cancel":
+            self.stop_processing = True
+        dialog.close()
+
+    def cleanup_cancelled_template_init(self, template_dir):
+        """
+        Clean up after template initialization is cancelled, create a basic template,
+        and update settings.yml
+        """
+        template_dir = Path(template_dir) if not isinstance(template_dir, Path) else template_dir
+        
+        try:
+            if template_dir.exists():
+                shutil.rmtree(template_dir)
+                print(f"Removed incomplete template directory: {template_dir}")
+            
+            # Create the directory
+            template_dir.mkdir(parents=True, exist_ok=True)
+                
+            # Initialize basic wineprefix with minimal setup
+            basic_steps = [
+                ("Creating basic wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
+                ("Setting up directories", lambda: self.remove_symlinks_and_create_directories(template_dir))
+            ]
+            
+            for step_text, command in basic_steps:
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    if callable(command):
+                        command()
+                    else:
+                        subprocess.run(command, shell=True, check=True)
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except Exception as e:
+                    print(f"Error during basic template setup: {e}")
+                    raise
+                    
+            print("Initialized basic wineprefix")
+            
+            # Update template in settings
+            self.template = template_dir
+            self.save_settings()
+            print(f"Updated settings with new template path: {template_dir}")
+            
+        except Exception as e:
+            print(f"Error during template cleanup: {e}")
+        finally:
+            self.initializing_template = False
+            self.stop_processing = False
+            GLib.idle_add(self.reset_ui_after_template_init)
+            self.show_info_dialog("Basic Template Created", 
+                        "A basic template was created and settings were updated. Some features may be limited.")
+
+
+    def reset_ui_after_template_init(self):
+        """
+        Reset UI elements after template initialization and show confirmation
+        """
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)
+        self.hide_processing_spinner()
+        
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
+        
+        self.flowbox.remove_all()
+
+
+
+    def on_cancel_import_clicked(self, button):
+        """
+        Handle cancel button click during wine directory import
+        """
+        dialog = Adw.MessageDialog.new(
+            self.window,
+            "Cancel Import",
+            "Do you want to cancel the wine directory import process?"
+        )
+        dialog.add_response("continue", "Continue")
+        dialog.add_response("cancel", "Cancel Import")
+        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.connect("response", self.on_cancel_import_dialog_response)
+        dialog.present()
+
+    def on_cancel_import_dialog_response(self, dialog, response):
+        """
+        Handle cancel dialog response for wine directory import
+        """
+        if response == "cancel":
+            self.stop_processing = True
+        dialog.close()
+
+############################################### 4444444444444444444444444 New initialize template
 
 
 
 
 
 
-
-
-
-
+###################################3 55555555555555555555 initiliaze
 
 
 
