@@ -2955,6 +2955,7 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error initializing backup process: {e}")
             self.cleanup_cancelled_backup(script, script_key)
+
     def create_backup_archive(self, wineprefix, backup_path):
         """
         Create a backup archive with interruption support
@@ -3187,144 +3188,176 @@ class WineCharmApp(Gtk.Application):
                 file_path = file.get_path()
                 print(f"Selected file: {file_path}")
 
-                # Check the file extension to determine whether it's a .tar.zst or .wzt file
-                if file_path.endswith(".prefix") or file_path.endswith(".bottle"):
-                    self.restore_prefix_bottle_tar_zst(file_path)
-                elif file_path.endswith(".wzt"):
-                    self.restore_wzt_backup(file_path)
+                # the restore
+                self.restore_prefix_bottle_wzt_tar_zst(file_path)
 
         except GLib.Error as e:
             # Handle errors, such as dialog cancellation
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                 print(f"An error occurred: {e}")
 
-    def restore_prefix_bottle_tar_zst(self, file_path):
-        """
-        Restore from a .prefix or .bottle which is a .tar.zst compressed  file.
-        """
-        # Clear the flowbox and show a progress spinner
-        GLib.idle_add(self.flowbox.remove_all)
-        self.show_processing_spinner(f"Restoring from {Path(file_path).name}")
-        self.disconnect_open_button()
 
+    def restore_prefix_bottle_wzt_tar_zst(self, file_path):
+        """
+        Restore from a .prefix or .bottle which is a .tar.zst compressed file.
+        """
+        self.stop_processing = False
         
+        try:
+            # Extract prefix name before starting
+            extracted_prefix = self.extract_prefix_dir(file_path)
+            if not extracted_prefix:
+                raise Exception("Failed to determine prefix directory name")
+            
+            # Handle existing directory
+            backup_dir = None
+            if extracted_prefix.exists():
+                timestamp = int(time.time())
+                backup_dir = extracted_prefix.parent / f"{extracted_prefix.name}_backup_{timestamp}"
+                shutil.move(str(extracted_prefix), str(backup_dir))
+                print(f"Backed up existing directory to: {backup_dir}")
 
-        # Start a thread to restore from the backup (process the file in steps)
-        self.perform_restore_steps(file_path)
+            # Clear the flowbox and show progress spinner
+            GLib.idle_add(self.flowbox.remove_all)
+            self.show_processing_spinner(f"Restoring")
+            #self.disconnect_open_button()
+            #self.connect_open_button_with_import_wine_directory_cancel()
+            self.connect_open_button_with_restore_backup_cancel()
+            def restore_process():
+                try:
+                    # Determine the file extension and get the appropriate restore steps
+                    if file_path.endswith(".wzt"):
+                        restore_steps = self.get_wzt_restore_steps(file_path)
+                    else:
+                        restore_steps = self.get_restore_steps(file_path)
 
-    def restore_wzt_backup(self, file_path):
+                    # Perform restore steps
+                    for step_text, step_func in restore_steps:
+                        if self.stop_processing:
+                            # Handle cancellation
+                            if backup_dir and backup_dir.exists():
+                                if extracted_prefix.exists():
+                                    shutil.rmtree(extracted_prefix)
+                                shutil.move(str(backup_dir), str(extracted_prefix))
+                                print(f"Restored original directory from: {backup_dir}")
+                            GLib.idle_add(self.on_restore_completed)
+                            GLib.idle_add(self.show_info_dialog, "Cancelled", "Restore process was cancelled")
+                            return
+
+                        GLib.idle_add(self.show_initializing_step, step_text)
+                        try:
+                            step_func()
+                            GLib.idle_add(self.mark_step_as_done, step_text)
+                        except Exception as e:
+                            print(f"Error during step '{step_text}': {e}")
+                            # Handle failure
+                            if backup_dir and backup_dir.exists():
+                                if extracted_prefix.exists():
+                                    shutil.rmtree(extracted_prefix)
+                                shutil.move(str(backup_dir), str(extracted_prefix))
+                            GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
+                            return
+
+                    # If successful, remove backup directory
+                    if backup_dir and backup_dir.exists():
+                        shutil.rmtree(backup_dir)
+                        print(f"Removed backup directory: {backup_dir}")
+
+                    GLib.idle_add(self.on_restore_completed)
+
+                except Exception as e:
+                    print(f"Error during restore process: {e}")
+                    # Handle failure
+                    if backup_dir and backup_dir.exists():
+                        if extracted_prefix.exists():
+                            shutil.rmtree(extracted_prefix)
+                        shutil.move(str(backup_dir), str(extracted_prefix))
+                    GLib.idle_add(self.show_info_dialog, "Error", f"Restore failed: {str(e)}")
+
+            # Start the restore process in a new thread
+            threading.Thread(target=restore_process).start()
+
+        except Exception as e:
+            print(f"Error initiating restore process: {e}")
+            GLib.idle_add(self.show_info_dialog, "Error", f"Failed to start restore: {str(e)}")
+
+
+
+    def get_restore_steps(self, file_path):
         """
-        Restore from a .wzt backup file in steps, showing progress for each step.
+        Return the list of steps for restoring a prefix/bottle backup.
         """
-        # Clear the flowbox and show a progress spinner
-        GLib.idle_add(self.flowbox.remove_all)
-        self.show_processing_spinner(f"Restoring WZT")
-        self.disconnect_open_button()
-
-        # Start the WZT extraction process in steps
-        self.perform_wzt_restore_steps(file_path)
-
-
-    def perform_wzt_restore_steps(self, wzt_file):
-        """
-        Perform the WZT extraction process in steps, showing progress for each.
-        """
-        steps = [
-            ("Checking Disk Space", lambda: self.check_disk_space_and_show_step(wzt_file)),
-            ("Extracting WZT Backup File", lambda: self.extract_wzt_file(wzt_file)),
-            ("Performing Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(wzt_file))),
-            ("Processing Shell Files", lambda: self.process_sh_files(self.extract_prefix_dir(wzt_file))),
-            ("Replacing Symbolic Links with Directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(wzt_file))),
-            ("Renaming and merging user directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(wzt_file))),
-            ("Finding and Saving LNK Files", lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(wzt_file))),
+        return [
+            ("Checking Uncompressed Size", lambda: self.check_disk_space_and_show_step(file_path)),
+            ("Extracting Backup File", lambda: self.extract_backup(file_path)),
+            ("Processing Registry Files", lambda: self.process_reg_files(self.extract_prefix_dir(file_path))),
+            ("Performing Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(file_path))),
+            ("Replacing Symbolic Links with Directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
+            ("Renaming and merging user directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
+            ("Add Shortcuts to Script List", lambda: self.add_charm_files_to_script_list(self.extract_prefix_dir(file_path))),
         ]
 
-        def perform_steps():
-            for step_text, step_func in steps:
-                # Queue the UI update safely in the main thread
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    # Perform the restore step and check the result
-                    result = step_func()
-                    if result is False:
-                        # Stop further steps if a step fails
-                        print(f"Step '{step_text}' failed, aborting restore process.")
-                        break
-
-                    # Mark the step as done in the main thread
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                except Exception as e:
-                    print(f"Error during step '{step_text}': {e}")
-                    GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
-                    break
-
-            # Once complete, update the UI in the main thread
-            GLib.idle_add(self.on_restore_completed)
-
-        # Start the restore process in a new thread
-        threading.Thread(target=perform_steps).start()
-
+    def get_wzt_restore_steps(self, file_path):
+        """
+        Return the list of steps for restoring a WZT backup.
+        """
+        return [
+            ("Checking Disk Space", lambda: self.check_disk_space_and_show_step(file_path)),
+            ("Extracting WZT Backup File", lambda: self.extract_wzt_file(file_path)),
+            ("Performing User Related Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(file_path))),
+            ("Processing WineZGUI Script Files", lambda: self.process_sh_files(self.extract_prefix_dir(file_path))),
+            ("Search LNK Files and Append to Found List", lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(file_path))),
+            ("Replacing Symbolic Links with Directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
+            ("Renaming and Merging User Directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
+        ]
 
 
     def extract_wzt_file(self, wzt_file):
         """
         Extract the .wzt file to the Wine prefixes directory and process the files.
         """
-        extract_dir = Path(self.prefixes_dir)                           
+        extract_dir = Path(self.prefixes_dir)
         extract_dir.mkdir(parents=True, exist_ok=True)
         user = os.getenv('USER')
-        
+
         try:
             # Extract the first directory (prefix) inside the WZT archive
             wzt_prefix = subprocess.check_output(
                 ["bash", "-c", f"tar -tf '{wzt_file}' | grep '/$' | head -n1 | cut -f1 -d '/'"]
             ).decode('utf-8').strip()
-            
+
             if not wzt_prefix:
                 raise Exception("Unable to determine WZT prefix directory")
 
             extracted_wzt_prefix = extract_dir / wzt_prefix
-            
+
             # Extract the entire WZT archive into the correct prefix directory
             subprocess.run(
                 ["tar", "-xvf", wzt_file, "-C", extract_dir, "--transform", f"s|XOUSERXO|{user}|g"],
                 check=True
             )
-            
-            # Perform replacements, process .sh files, and find .lnk files
-            GLib.idle_add(self.show_initializing_step, f"Performing user related replacements...")
-            self.perform_replacements(extracted_wzt_prefix)
-            GLib.idle_add(self.mark_step_as_done, f"Performing user related replacements...")
 
-            GLib.idle_add(self.show_initializing_step, f"Processing WineZGUI script files...")
-            self.process_sh_files(extracted_wzt_prefix)
-            GLib.idle_add(self.mark_step_as_done, f"Processing WineZGUI script files...")
-            
-            GLib.idle_add(self.show_initializing_step, f"Search lnk files and append to found list...")
-            self.find_and_save_lnk_files(extracted_wzt_prefix)
-            GLib.idle_add(self.mark_step_as_done, f"Search lnk files and append to found list...")
-            
-            # Mark extraction as complete
-            self.on_extraction_complete(success=True, message=f"Extracted all files to {extracted_wzt_prefix}")
             self.extracted_dir = extracted_wzt_prefix  # Update the extracted directory reference
         except subprocess.CalledProcessError as e:
             print(f"Error extracting file: {e}")
-            self.on_extraction_complete(success=False, message=f"Error extracting file: {e}")
+            raise
         except Exception as e:
             print(f"Error: {e}")
-            self.on_extraction_complete(success=False, message=f"Error: {e}")
+            raise
+
 
     def on_extraction_complete(self, success, message):
         """
         Handle the completion of the extraction process.
         """
         GLib.idle_add(self.hide_processing_spinner)
+        self.disconnect_open_button()
         GLib.idle_add(self.reconnect_open_button)
 
         if success:
             print(message)
             # Perform any UI updates necessary after a successful extraction
-            GLib.idle_add(self.show_info_dialog, "Extraction Completed", message)
+            #GLib.idle_add(self.show_info_dialog, "Extraction Completed", message)
         else:
             print(f"Extraction failed: {message}")
             GLib.idle_add(self.show_info_dialog, "Extraction Error", message)
@@ -3492,10 +3525,11 @@ class WineCharmApp(Gtk.Application):
                             'env_vars': env_vars  # Include environment variables
                         }, yml_path)
 
-                        # Add the new script data directly to the script list
-                        self.new_scripts.add(Path(yml_path).stem)
-                        print(f"Created {yml_path}")
-                        created_charm_files = True  # Mark that at least one .charm file was created
+                        ### rizvan TEMPorary for restore wzt commentign next 4 lines
+                        ## Add the new script data directly to the script list
+                        #self.new_scripts.add(Path(yml_path).stem)
+                        #print(f"Created {yml_path}")
+                        #created_charm_files = True  # Mark that at least one .charm file was created
 
                     except Exception as e:
                         print(f"Error parsing INFOFILE {info_file_path}: {e}")
@@ -3708,10 +3742,14 @@ class WineCharmApp(Gtk.Application):
         Called when the restore process is complete. Updates UI, restores scripts, and resets the open button.
         """
         # Reconnect open button and reset its label
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+        self.disconnect_open_button()
         self.set_open_button_label("Open")
         self.set_open_button_icon_visible(True)
         self.reconnect_open_button()
         self.hide_processing_spinner()
+
 
         # Restore the script list in the flowbox
         GLib.idle_add(self.create_script_list)
@@ -3817,25 +3855,63 @@ class WineCharmApp(Gtk.Application):
     def check_disk_space_and_show_step(self, file_path):
         """
         Check available disk space and the uncompressed size of the backup file, showing this as a step.
+        First checks if compressed file size is < 1/4 of available space for quick approval.
         """
         # Update the UI to indicate that disk space is being checked
         #GLib.idle_add(self.show_initializing_step, "Checking Available Disk Space")
 
-        # Perform the disk space and uncompressed size check
-        enough_space, available_space, uncompressed_size = self.check_disk_space_and_uncompressed_size(self.prefixes_dir, file_path)
+        # Perform the quick disk space check first
+        enough_space, available_space, size_to_check = self.check_disk_space_quick(self.prefixes_dir, file_path)
 
         if not enough_space:
             # Show warning about disk space
             GLib.idle_add(self.show_info_dialog, "Insufficient Disk Space",
-                          f"The uncompressed size of the backup is {uncompressed_size / (1024 * 1024):.2f} MB, "
-                          f"but only {available_space / (1024 * 1024):.2f} MB is available. Please free up space.")
-            return False  # Return False to indicate failure and prevent further steps
+                        f"The estimated required space is {size_to_check / (1024 * 1024):.2f} MB, "
+                        f"but only {available_space / (1024 * 1024):.2f} MB is available. Please free up space.")
+            return False
 
         # If enough space, update the UI and log the success
-        GLib.idle_add(self.show_initializing_step, f"Uncompressed size check passed: {uncompressed_size / (1024 * 1024):.2f} MB")
-        print(f"Uncompressed size check passed: {uncompressed_size / (1024 * 1024)} MB")
-        GLib.idle_add(self.mark_step_as_done, f"Uncompressed size check passed: {uncompressed_size / (1024 * 1024):.2f} MB")
-        return True  # Return True to indicate success
+        message = f"Disk space check passed: {size_to_check / (1024 * 1024):.2f} MB required"
+        GLib.idle_add(self.show_initializing_step, message)
+        print(message)
+        GLib.idle_add(self.mark_step_as_done, message)
+        return True
+
+    def check_disk_space_quick(self, prefixes_dir, file_path):
+        """
+        Quick check of disk space by comparing compressed file size with available space.
+        Only if compressed size is > 1/4 of available space, we need the full uncompressed check.
+        
+        Args:
+            prefixes_dir (Path): The directory where the wine prefixes are stored.
+            file_path (str): Path to the backup .tar.zst file.
+
+        Returns:
+            (bool, int, int): Tuple containing:
+                - True if there's enough space, False otherwise
+                - Available disk space in bytes
+                - Size checked (either compressed or uncompressed) in bytes
+        """
+        try:
+            # Get available disk space
+            df_output = subprocess.check_output(['df', '--output=avail', str(prefixes_dir)]).decode().splitlines()[1]
+            available_space = int(df_output.strip()) * 1024  # Convert KB to bytes
+
+            # Get compressed file size
+            compressed_size = Path(file_path).stat().st_size
+
+            # If compressed file is less than 1/4 of available space, we're safe to proceed
+            if compressed_size * 4 <= available_space:
+                print(f"Quick check passed - Compressed size: {compressed_size / (1024 * 1024):.2f} MB")
+                return True, available_space, compressed_size
+
+            # Otherwise, we need to check the actual uncompressed size
+            uncompressed_size = self.get_total_uncompressed_size(file_path)
+            return available_space >= uncompressed_size, available_space, uncompressed_size
+
+        except (subprocess.CalledProcessError, OSError) as e:
+            print(f"Error checking disk space: {e}")
+            return False, 0, 0
 
     def show_options_for_script(self, ui_state, row, script_key):
         """
@@ -4862,6 +4938,7 @@ class WineCharmApp(Gtk.Application):
                                 print(f"Removed script {script_key} from ui_data")
 
                             # Optionally update the UI (e.g., refresh the script list or view)
+                            self.load_script_list()
                             self.create_script_list()  # Update the UI to reflect changes
                         else:
                             print(f"Shortcut file does not exist: {charm_file}")
@@ -5934,7 +6011,7 @@ class WineCharmApp(Gtk.Application):
         
         self.hide_processing_spinner()
 
-        # This will disconnect open_button handler, use this then reconnect.
+        # This will disconnect open_button handler, use this then reconnect the open
         if self.open_button_handler_id is not None:
             self.open_button.disconnect(self.open_button_handler_id)
 
@@ -6014,6 +6091,7 @@ class WineCharmApp(Gtk.Application):
             # If canceled, restore the UI to its original state
             self.reconnect_open_button()
             self.hide_processing_spinner()
+            GLib.idle_add(self.create_script_list)
             # No need to restore the script list as it wasn't cleared
 
     def on_cancel_import_wine_direcotory_dialog_response(self, dialog, response):
@@ -6023,19 +6101,6 @@ class WineCharmApp(Gtk.Application):
         if response == "cancel":
             self.stop_processing = True
             dialog.close()
-            #GLib.timeout_add_seconds(0.5, dialog.close)
-#            self.set_open_button_label("Open")
-#            self.set_open_button_icon_visible(True)
-#            self.reconnect_open_button()
-#            self.hide_processing_spinner()
-
-
-#            # Iterate over all script buttons and update the UI based on `is_clicked_row`
-#            for key, data in self.script_ui_data.items():
-#                row_button = data['row']
-#                row_play_button = data['play_button']
-#                row_options_button = data['options_button']
-#            self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
         else:
             self.stop_processing = False
             dialog.close()
@@ -6065,32 +6130,29 @@ class WineCharmApp(Gtk.Application):
             self.open_button.disconnect(self.open_button_handler_id)
             self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_import_wine_directory_clicked)
         
-        #if not hasattr(self, 'spinner') or not self.spinner:
-        #    self.spinner = Gtk.Spinner()
-        #    self.spinner.start()
-        #    self.open_button_box.append(self.spinner)
-
-        #self.set_open_button_label("Cancel")
         self.set_open_button_icon_visible(False)
 
 
     def import_wine_directory(self, src, dst):
         """
-        Import the Wine directory with progress tracking and interruption support
+        Import the Wine directory with improved safety and rollback capability.
+        Args:
+            src: Source directory path (Path object)
+            dst: Destination directory path (Path object)
         """
         self.stop_processing = False
         
+        # Generate backup directory name with timestamp
+        backup_dir = dst.parent / f"{dst.name}_backup_{int(time.time())}"
         
-        # Create temporary directory for import
-        temp_dst = dst.parent / f"{dst.name}_temp_{int(time.time())}"
-        
-        # Clear the flowbox and initialize the progress UI
+        # Clear the flowbox and initialize progress UI
         GLib.idle_add(self.flowbox.remove_all)
         
         steps = [
-            ("Copying Wine directory", lambda: self.custom_copytree(src, temp_dst)),
-            ("Processing registry files", lambda: self.process_reg_files(temp_dst)),
-            ("Performing Replacements", lambda: self.perform_replacements(temp_dst)),
+            ("Backing up existing directory", lambda: self.backup_existing_directory(dst, backup_dir)),
+            ("Copying Wine directory", lambda: self.custom_copytree(src, dst)),
+            ("Processing registry files", lambda: self.process_reg_files(dst)),
+            ("Performing Replacements", lambda: self.perform_replacements(dst)),
             ("Creating scripts for .exe files", lambda: self.create_scripts_for_exe_files(dst)),
         ]
         
@@ -6103,7 +6165,7 @@ class WineCharmApp(Gtk.Application):
             try:
                 for index, (step_text, step_func) in enumerate(steps, 1):
                     if self.stop_processing:
-                        GLib.idle_add(self.cleanup_cancelled_import, temp_dst)
+                        GLib.idle_add(lambda: self.handle_import_cancellation(dst, backup_dir))
                         return
                         
                     GLib.idle_add(self.show_initializing_step, step_text)
@@ -6113,24 +6175,91 @@ class WineCharmApp(Gtk.Application):
                         GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
                     except Exception as e:
                         print(f"Error during step '{step_text}': {e}")
-                        GLib.idle_add(self.cleanup_cancelled_import, temp_dst)
-                        GLib.idle_add(self.show_info_dialog, "Error", f"An error occurred during '{step_text}': {e}")
+                        GLib.idle_add(lambda: self.handle_import_error(dst, backup_dir, f"An error occurred during '{step_text}': {e}"))
                         return
 
                 if not self.stop_processing:
-                    # Success - replace old directory with new one
-                    if dst.exists():
-                        shutil.rmtree(dst)
-                    temp_dst.rename(dst)
+                    # Success - remove the backup
+                    self.cleanup_backup(backup_dir)
                     GLib.idle_add(self.on_import_wine_directory_completed)
                     
             except Exception as e:
                 print(f"Error during import process: {e}")
-                GLib.idle_add(self.cleanup_cancelled_import, temp_dst)
-                GLib.idle_add(self.show_info_dialog, "Error", f"Import failed: {e}")
-
+                GLib.idle_add(lambda: self.handle_import_error(dst, backup_dir, f"Import failed: {e}"))
 
         threading.Thread(target=perform_import_steps).start()
+
+    def backup_existing_directory(self, dst, backup_dir):
+        """
+        Safely backup the existing directory if it exists.
+        """
+        if dst.exists():
+            try:
+                dst.rename(backup_dir)
+                print(f"Created backup of existing directory: {backup_dir}")
+            except Exception as e:
+                raise Exception(f"Failed to create backup: {e}")
+
+    def handle_import_cancellation(self, dst, backup_dir):
+        """
+        Handle import cancellation by restoring from backup.
+        """
+        try:
+            if dst.exists():
+                shutil.rmtree(dst)
+                print(f"Removed incomplete import directory: {dst}")
+            
+            if backup_dir.exists():
+                backup_dir.rename(dst)
+                print(f"Restored original directory from backup")
+                
+        except Exception as e:
+            print(f"Error during cancellation cleanup: {e}")
+            # Still show cancelled message but also show error
+            GLib.idle_add(self.show_info_dialog, "Error", 
+                        f"Wine directory import was cancelled but encountered errors during cleanup: {e}\n"
+                        f"Backup directory may still exist at: {backup_dir}")
+            return
+        
+        self.stop_processing = False
+        GLib.idle_add(self.on_import_wine_directory_completed)
+        GLib.idle_add(self.show_info_dialog, "Cancelled", "Wine directory import was cancelled")
+
+    def handle_import_error(self, dst, backup_dir, error_message):
+        """
+        Handle errors during import by restoring from backup.
+        """
+        try:
+            if dst.exists():
+                shutil.rmtree(dst)
+                print(f"Removed failed import directory: {dst}")
+                
+            if backup_dir.exists():
+                backup_dir.rename(dst)
+                print(f"Restored original directory after error")
+                
+        except Exception as e:
+            print(f"Error during error cleanup: {e}")
+            error_message += f"\nAdditional error during cleanup: {e}"
+            if backup_dir.exists():
+                error_message += f"\nBackup directory may still exist at: {backup_dir}"
+        
+        self.stop_processing = False
+        GLib.idle_add(self.on_import_wine_directory_completed)
+        GLib.idle_add(self.show_info_dialog, "Error", error_message)
+
+    def cleanup_backup(self, backup_dir):
+        """
+        Clean up backup directory after successful import.
+        """
+        try:
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
+                print(f"Removed backup directory after successful import: {backup_dir}")
+        except Exception as e:
+            print(f"Warning: Failed to remove backup directory: {e}")
+            # Continue anyway since the import was successful
+
 
     def cleanup_cancelled_import(self, temp_dir):
         """
@@ -6148,7 +6277,12 @@ class WineCharmApp(Gtk.Application):
             if not self.stop_processing:
                 GLib.idle_add(self.show_info_dialog, "Cancelled", "Wine directory import was cancelled")
 
+            #self.open_button.disconnect(self.open_button_handler_id)
 
+            #self.reconnect_open_button()
+            #self.load_script_list()
+            ## Restore the script list in the flowbox
+            GLib.idle_add(self.create_script_list)
 
     def disconnect_open_button(self):
         """
@@ -7682,15 +7816,6 @@ class WineCharmApp(Gtk.Application):
         if hasattr(self, 'open_button_handler_id'):
             self.open_button.disconnect(self.open_button_handler_id)
         
-        # Update button appearance
-        #for child in self.open_button_box:
-        #    self.open_button_box.remove(child)
-        
-        # Create new settings button content
-        #settings_icon = Gtk.Image.new_from_icon_name("preferences-system-symbolic")
-        #settings_label = Gtk.Label(label="Settings")
-        #self.open_button_box.append(settings_icon)
-        #self.open_button_box.append(settings_label)
         self.set_open_button_label("Settings")
         self.set_open_button_icon_visible(False)
         # Connect new click handler
@@ -7704,15 +7829,6 @@ class WineCharmApp(Gtk.Application):
         if hasattr(self, 'open_button_handler_id'):
             self.open_button.disconnect(self.open_button_handler_id)
         
-        # Update button appearance
-        #for child in self.open_button_box:
-        #    self.open_button_box.remove(child)
-        
-        # Restore original open button content
-        #open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
-        #open_label = Gtk.Label(label="Open")
-        #self.open_button_box.append(open_icon)
-        #self.open_button_box.append(open_label)
         self.set_open_button_label("Open")
         self.set_open_button_icon_visible(True)
         # Reconnect original click handler
@@ -8751,13 +8867,138 @@ class WineCharmApp(Gtk.Application):
         dialog.close()
 
 ############################################### 4444444444444444444444444 New initialize template
+    def on_cancel_restore_backup_dialog_response(self, dialog, response):
+        """
+        Handle cancel dialog response
+        """
+        if response == "cancel":
+            self.stop_processing = True
+            dialog.close()
+        else:
+            self.stop_processing = False
+            dialog.close()
+            #GLib.timeout_add_seconds(0.5, dialog.close)
+
+    def on_cancel_restore_backup_clicked(self, button):
+        """
+        Handle cancel button click
+        """
+        dialog = Adw.MessageDialog.new(
+            self.window,
+            "Cancel Restoring Backup?",
+            "Do you want to cancel the backup extraction process?"
+        )
+        dialog.add_response("continue", "Continue")
+        dialog.add_response("cancel", "Cancel Creation")
+        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.connect("response", self.on_cancel_restore_backup_dialog_response)
+        dialog.present()
+
+    def connect_open_button_with_restore_backup_cancel(self):
+        """
+        Connect cancel handler to the open button
+        """
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_restore_backup_clicked)
+        
+        self.set_open_button_icon_visible(False)
+
+    def cleanup_cancelled_restore(self, temp_dir):
+        """
+        Clean up temporary directory and reset UI after cancelled restore
+        """
+        try:
+            if temp_dir.exists():
+                #shutil.rmtree(temp_dir)
+                print(f"Removed temporary directory: {temp_dir}")
+        except Exception as e:
+            print(f"Error cleaning up temporary directory: {e}")
+        finally:
+            self.stop_processing = False
+            GLib.idle_add(self.on_restore_completed)
+            if not self.stop_processing:
+                GLib.idle_add(self.show_info_dialog, "Cancelled", "Restore operation was cancelled")
+
+    def show_restore_overwrite_confirmation_dialog(self, temp_dir, dest_dir):
+        """
+        Show confirmation dialog for overwriting existing directory during restore
+        """
+        dialog = Adw.MessageDialog(
+            modal=True,
+            transient_for=self.window,
+            heading="Overwrite Existing Directory?",
+            body=f"The directory {dest_dir.name} already exists. Do you want to overwrite it?"
+        )
+
+        dialog.add_response("overwrite", "Overwrite")
+        dialog.set_response_appearance("overwrite", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.add_response("cancel", "Cancel")
+        dialog.set_default_response("cancel")
+
+        dialog.connect("response", self.on_restore_overwrite_response, temp_dir, dest_dir)
+        dialog.present()
+
+    def on_restore_overwrite_response(self, dialog, response_id, temp_dir, dest_dir):
+        """
+        Handle response from restore overwrite confirmation dialog
+        """
+        if response_id == "overwrite":
+            print(f"User chose to overwrite the directory: {dest_dir}")
+            try:
+                #shutil.rmtree(dest_dir)
+                #temp_dir.rename(dest_dir)
+                GLib.idle_add(self.on_restore_completed)
+            except Exception as e:
+                print(f"Error during overwrite: {e}")
+                GLib.idle_add(self.show_info_dialog, "Error", f"Failed to overwrite directory: {e}")
+                GLib.idle_add(self.cleanup_cancelled_restore, temp_dir)
+        else:
+            print("User canceled the overwrite")
+            GLib.idle_add(self.cleanup_cancelled_restore, temp_dir)
+
+    def extract_tar_to_temp(self, tar_file, temp_dir):
+        """
+        Extract tar.zst file to temporary directory
+        """
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        user = os.getenv('USER')
+        
+        try:
+            subprocess.run(
+                ["tar", "-xvf", tar_file, "-C", str(temp_dir), "--transform", f"s|XOUSERXO|{user}|g", "--transform", f"s|%USERNAME%|{user}|g"],
+                check=True
+            )
+            print(f"Successfully extracted to {temp_dir}")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"Error extracting file: {e}")
+            raise Exception(f"Failed to extract archive: {e}")
+
+    def extract_wzt_to_temp(self, wzt_file, temp_dir):
+        """
+        Extract WZT file to temporary directory
+        """
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        user = os.getenv('USER')
+        
+        try:
+            subprocess.run(
+                ["tar", "-xvf", wzt_file, "-C", str(temp_dir), "--transform", f"s|XOUSERXO|{user}|g", "--transform", f"s|%USERNAME%|{user}|g"],
+                check=True
+            )
+            print(f"Successfully extracted to {temp_dir}")
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"Error extracting WZT file: {e}")
+            raise Exception(f"Failed to extract WZT file: {e}")
 
 
 
 
 
+#########################################################################################
 
-###################################3 55555555555555555555 initiliaze
 
 
 
