@@ -28,17 +28,16 @@ is not resetting the play functionality.
  
  # Todo WineCharm 0.97
  - BUGS and Features
-    - [ ] Cancellable
-        - [ ] Initialize Template
+    - [x] Cancellable
+        - [x] Initialize Template
         - [x] Create Prefix
         - [x] Create Bottle
-    - [ ] These need to extract in a temporary directoy then moved when overwriting. if overwriting is canceled, delete the extracted directory
-        - [ ] Restore Bottle
-        - [ ] Import Wine Directory
-        - [ ] Restore Prefix
-        - [ ] Restore WZT
-    - [ ] Show Error dialog as button for launch
-        - [ ] Show an (i) button beside play button to show log instead of Launch error dialog
+    - [x] These need to extract in a temporary directoy then moved when overwriting. if overwriting is canceled, delete the extracted directory
+        - [x] Restore Bottle
+        - [x] Import Wine Directory
+        - [x] Restore Prefix
+        - [x] Restore WZT
+    
     - [x] Search in Settings
     - [x] Search in Script options
     
@@ -66,15 +65,16 @@ is not resetting the play functionality.
             - [x] Show GUI progress of tarring using progressbar 
             - [x] Allow cancellation of bundle creation, while it is running using same open/bottling button
             - [x] Revert scripts with actual path, if interrupted or due to power failure or other reasons. (self repair)
-                - [ ] create a file/mechanism which will repair broken wineprefix
-                    - [ ] create a file WINEZGUIDIR/bottling_unfinished.yml and add file list with path and wineprefix info to the yml file; and copy the .charm .txt & .yml & *.reg files to WINEZGUIDIR/bottling/
-                    - [ ] if found WINEZGUIDIR/bottling_unfinished.yml on app launch repair the wineprefix, replace the files in the wineprefix
 
-        - [ ] Launch script, if sha256sum is missing, and exe is found update sha256sum in the .charm file
-        
-        - [ ] If setup is launched with a different runner, newly created script must use the runner as specified in the setup .charm file. If this script has runner, create new .charm files should use it.
-                
-        - [ ] Import Runner
+    - [ ] create a file/mechanism which will repair broken wineprefix
+        - [ ] create a file WINEZGUIDIR/bottling_unfinished.yml and add file list with path and wineprefix info to the yml file; and copy the .charm .txt & .yml & *.reg files to WINEZGUIDIR/bottling/
+        - [ ] if found WINEZGUIDIR/bottling_unfinished.yml on app launch repair the wineprefix, replace the files in the wineprefix
+
+    - [ ] make the extraction and copying slow process immediately kill-able, like tar command and copy directory. 
+    - [ ] Launch script, if sha256sum is missing, and exe is found update sha256sum in the .charm file
+    - [ ] If setup is launched with a different runner, newly created script must use the runner as specified in the setup .charm file. If this script has runner, create new .charm files should use it.
+    - [ ] Import Runner
+
         - [x] Import Game Directory
      - [ ] Settings level
          - [x] Download
@@ -105,12 +105,12 @@ is not resetting the play functionality.
     - [x] Run Other Exe in wineprefix  (open other exe)
     - [x] Import Game directory
     - [x] Winetricks CLI (install dxvk vkd3d)
-    - [ ] Import Runner inside prefix
+          - [ ] Import Runner inside prefix
     - [x] Set Environment Variable
     - [x] Save drive_c/user directory to file (with %USERNAME%)
     - [x] Load file for drive_c/user directory
-    - [ ] About
-        - [ ] Name, Size, Gamedir size, Prefix size, if gamedir in prefix then combined.
+        - [ ] About
+          - [ ] Name, Size, Gamedir size, Prefix size, if gamedir in prefix then combined.
     - [x] Change Runner
     - [x] Rename prefix directory
     - [x] Set Application Category
