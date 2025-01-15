@@ -67,7 +67,8 @@ is not resetting the play functionality.
             - [x] Revert scripts with actual path, if interrupted or due to power failure or other reasons. (self repair)
 
     - [ ] create a file/mechanism which will repair broken wineprefix
-        - [ ] create a file WINEZGUIDIR/bottling_unfinished.yml and add file list with path and wineprefix info to the yml file; and copy the .charm .txt & .yml & *.reg files to WINEZGUIDIR/bottling/
+        - [ ] create a file WINEZGUIDIR/backup_unfinished.yml and add file list with path and wineprefix info to the yml file; and copy the .charm .txt & .yml & *.reg files to WINEZGUIDIR/bottling/
+            - [ ] Required for all tar -cvf where files are changes, like prefix and bottle creation.
         - [ ] if found WINEZGUIDIR/bottling_unfinished.yml on app launch repair the wineprefix, replace the files in the wineprefix
 
     - [ ] make the extraction and copying slow process immediately kill-able, like tar command and copy directory. 
