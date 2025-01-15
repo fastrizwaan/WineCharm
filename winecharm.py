@@ -358,10 +358,10 @@ class WineCharmApp(Gtk.Application):
         steps = [
             ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
             ("Replace symbolic links with directories", lambda: self.remove_symlinks_and_create_directories(template_dir)),
-           # ("Installing corefonts", f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
-           # ("Installing openal", f"WINEPREFIX='{template_dir}' winetricks -q openal"),
-           # ("Installing vkd3d", f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-           # ("Installing dxvk", f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+            ("Installing corefonts", f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+            ("Installing openal", f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+            ("Installing vkd3d", f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+            ("Installing dxvk", f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
         ]
         
         # Set total steps and initialize progress UI
@@ -3525,11 +3525,11 @@ class WineCharmApp(Gtk.Application):
                             'env_vars': env_vars  # Include environment variables
                         }, yml_path)
 
-                        ### rizvan TEMPorary for restore wzt commentign next 4 lines
+                        
                         ## Add the new script data directly to the script list
-                        #self.new_scripts.add(Path(yml_path).stem)
-                        #print(f"Created {yml_path}")
-                        #created_charm_files = True  # Mark that at least one .charm file was created
+                        self.new_scripts.add(Path(yml_path).stem)
+                        print(f"Created {yml_path}")
+                        created_charm_files = True  # Mark that at least one .charm file was created
 
                     except Exception as e:
                         print(f"Error parsing INFOFILE {info_file_path}: {e}")
