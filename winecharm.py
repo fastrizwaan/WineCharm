@@ -8707,7 +8707,7 @@ class WineCharmApp(Gtk.Application):
         try:
             # Extract only directories by filtering those that end with '/'
             extracted_prefix_name = subprocess.check_output(
-                ["bash", "-c", f"tar -tf '{file_path}' | grep '/$' | head -n1 | cut -f1 -d '/'"]
+                ["bash", "-c", f"tar -tf '{file_path}' | head -n2 | grep '/$' | cut -f1 -d '/'"]
             ).decode('utf-8').strip()
 
             if not extracted_prefix_name:
