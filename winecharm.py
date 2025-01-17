@@ -8172,7 +8172,7 @@ class WineCharmApp(Gtk.Application):
                                 shutil.move(str(backup_dir), str(extracted_prefix))
                                 print(f"Restored original directory from: {backup_dir}")
                             GLib.idle_add(self.on_restore_completed)
-                            GLib.idle_add(self.show_info_dialog, "Cancelled", "Restore process was cancelled")
+                            #GLib.idle_add(self.show_info_dialog, "Cancelled", "Restore process was cancelled")
                             return
 
                         GLib.idle_add(self.show_initializing_step, step_text)
