@@ -95,6 +95,7 @@ class WineCharmApp(Gtk.Application):
         self.current_backup_path = None
         self.current_process = None
         self.process_lock = threading.Lock()
+        
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
         self.script_buttons = {}
@@ -2895,7 +2896,7 @@ class WineCharmApp(Gtk.Application):
                 try:
                     steps = [
                         (f"Replace \"{usershome}\" with '~' in script files", 
-                        lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
+                        lambda: self.replace_strings_in_files(wineprefix, find_replace_pairs)),
                         ("Reverting user-specific .reg changes", 
                         lambda: self.reverse_process_reg_files(wineprefix)),
                         ("Creating backup archive", 
@@ -3270,13 +3271,13 @@ class WineCharmApp(Gtk.Application):
             try:
                 # Basic steps that are always needed
                 basic_steps = [
-                    (f"Replace \"{usershome}\" with '~' in files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_pairs)),
+                    (f"Replace \"{usershome}\" with '~' in files", lambda: self.replace_strings_in_files(wineprefix, find_replace_pairs)),
                     ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
-                    (f"Replace \"/media/{user}\" with '/media/%USERNAME%' in files", lambda: self.replace_strings_in_specific_files(wineprefix, find_replace_media_username)),
+                    (f"Replace \"/media/{user}\" with '/media/%USERNAME%' in files", lambda: self.replace_strings_in_files(wineprefix, find_replace_media_username)),
                     ("Updating exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
                     ("Creating Bottle archive", lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
                     ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
-                    (f"Revert %USERNAME% with \"{user}\" in script files", lambda: self.replace_strings_in_specific_files(wineprefix, restore_media_username)),
+                    (f"Revert %USERNAME% with \"{user}\" in script files", lambda: self.replace_strings_in_files(wineprefix, restore_media_username)),
                     ("Reverting exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(exe_file))))
                 ]
                 
@@ -8241,22 +8242,6 @@ class WineCharmApp(Gtk.Application):
             ("Renaming and Merging User Directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
         ]
 
-    def on_extraction_complete(self, success, message):
-        """
-        Handle the completion of the extraction process.
-        """
-        GLib.idle_add(self.hide_processing_spinner)
-        self.disconnect_open_button()
-        GLib.idle_add(self.reconnect_open_button)
-
-        if success:
-            print(message)
-            # Perform any UI updates necessary after a successful extraction
-            #GLib.idle_add(self.show_info_dialog, "Extraction Completed", message)
-        else:
-            print(f"Extraction failed: {message}")
-            GLib.idle_add(self.show_info_dialog, "Extraction Error", message)
-
     def perform_replacements(self, directory):
         user = os.getenv('USER')
         usershome = os.path.expanduser('~')
@@ -8289,44 +8274,6 @@ class WineCharmApp(Gtk.Application):
 
         self.replace_strings_in_files(directory, find_replace_pairs)
         
-        
-    def replace_strings_in_specific_files(self, wineprefix, find_replace_pairs):
-        """
-        Replace strings in files with interruption support
-        """
-        if self.stop_processing:
-            raise Exception("Operation cancelled by user")
-
-        for root, dirs, files in os.walk(wineprefix):
-            if self.stop_processing:
-                raise Exception("Operation cancelled by user")
-                
-            for file in files:
-                if self.stop_processing:
-                    raise Exception("Operation cancelled by user")
-                    
-                file_path = Path(root) / file
-                
-                # Only process text files
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                except (UnicodeDecodeError, IOError):
-                    continue
-
-                modified = False
-                new_content = content
-                
-                for find_str, replace_str in find_replace_pairs.items():
-                    if find_str in new_content:
-                        new_content = new_content.replace(find_str, replace_str)
-                        modified = True
-
-                if modified:
-                    if self.stop_processing:
-                        raise Exception("Operation cancelled by user")
-                    with open(file_path, 'w', encoding='utf-8') as f:
-                        f.write(new_content)
 
     def replace_strings_in_files(self, directory, find_replace_pairs):
         for root, dirs, files in os.walk(directory):
@@ -8780,49 +8727,6 @@ class WineCharmApp(Gtk.Application):
             return None
 
 
-    def perform_restore_steps(self, file_path):
-        """
-        Perform the restore process in steps, showing progress for each.
-        """
-        steps = [
-            ("Checking Uncompressed Size", lambda: self.check_disk_space_and_show_step(file_path)),
-            ("Extracting Backup File", lambda: self.extract_backup(file_path)),
-            ("Processing Registry Files", lambda: self.process_reg_files(self.extract_prefix_dir(file_path))),
-            ("Performing Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(file_path))),
-            ("Replacing Symbolic Links with Directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
-            ("Renaming and merging user directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
-            ("Add Shortcuts to Script List", lambda: self.add_charm_files_to_script_list(self.extract_prefix_dir(file_path))),
-
-        ]
-        #for wzt restore
-#            ("Create Exe Shortcuts", lambda: self.create_scripts_for_exe_files(self.extract_prefix_dir(file_path)))
-        def perform_steps():
-            for step_text, step_func in steps:
-                # Queue the UI update safely in the main thread
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    # Perform the restore step and check the result
-                    result = step_func()
-                    if result is False:
-                        # Stop further steps if a step fails
-                        print(f"Step '{step_text}' failed, aborting restore process.")
-                        break
-
-                    # Mark the step as done in the main thread
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                except Exception as e:
-                    print(f"Error during step '{step_text}': {e}")
-                    GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
-                    break
-
-            # Once complete, update the UI in the main thread
-            GLib.idle_add(self.on_restore_completed)
-
-        # Start the restore process in a new thread
-        threading.Thread(target=perform_steps).start()
-
-
-
     def check_disk_space_and_show_step(self, file_path):
         """
         Check available disk space and the uncompressed size of the backup file, showing this as a step.
@@ -8935,17 +8839,256 @@ class WineCharmApp(Gtk.Application):
             dialog.close()
 
 
-########   tar interruptible? #################################################################################
+########   import interruptible? #################################################################################
 
 
+    def custom_copytree(self, src, dst):
+        """
+        Custom copy implementation that can be cancelled and tracks the current process
+        """
+        try:
+            # Create a new process group
+            def preexec_function():
+                os.setpgrp()
+
+            # Use cp for copying with process tracking
+            copy_process = subprocess.Popen(
+                ['cp', '-r', str(src) + '/.', str(dst)],
+                preexec_fn=preexec_function,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            with self.process_lock:
+                self.current_process = copy_process
+
+            while copy_process.poll() is None:
+                if self.stop_processing:
+                    print("Cancellation requested, terminating copy process...")
+                    self._kill_current_process()
+                    
+                    # Clean up partially copied files
+                    if Path(dst).exists():
+                        print(f"Cleaning up partially copied files at {dst}")
+                        shutil.rmtree(dst, ignore_errors=True)
+                    
+                    raise Exception("Operation cancelled by user")
+                time.sleep(0.1)
+
+            if copy_process.returncode != 0:
+                stderr = copy_process.stderr.read().decode() if copy_process.stderr else ""
+                raise Exception(f"Copy failed with return code {copy_process.returncode}: {stderr}")
+
+        except Exception as e:
+            print(f"Error during copy: {e}")
+            raise
+        finally:
+            with self.process_lock:
+                self.current_process = None
+
+    def import_wine_directory(self, src, dst):
+        """
+        Import the Wine directory with improved safety, rollback capability, and cancellation support.
+        """
+        self.stop_processing = False
+        backup_dir = dst.parent / f"{dst.name}_backup_{int(time.time())}"
+        
+        # Clear the flowbox and initialize progress UI
+        GLib.idle_add(self.flowbox.remove_all)
+        
+        steps = [
+            ("Backing up existing directory", lambda: self.backup_existing_directory(dst, backup_dir)),
+            ("Copying Wine directory", lambda: self.custom_copytree(src, dst)),
+            ("Processing registry files", lambda: self.process_reg_files(dst)),
+            ("Performing Replacements", lambda: self.perform_replacements(dst)),
+            ("Creating scripts for .exe files", lambda: self.create_scripts_for_exe_files(dst)),
+        ]
+        
+        self.total_steps = len(steps)
+        self.show_processing_spinner("Importing Wine Directory...")
+        self.connect_open_button_with_import_wine_directory_cancel()
+
+        def perform_import_steps():
+            try:
+                for index, (step_text, step_func) in enumerate(steps, 1):
+                    if self.stop_processing:
+                        GLib.idle_add(lambda: self.handle_import_cancellation(dst, backup_dir))
+                        return
+                        
+                    GLib.idle_add(self.show_initializing_step, step_text)
+                    try:
+                        step_func()
+                        GLib.idle_add(self.mark_step_as_done, step_text)
+                        GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
+                    except Exception as step_error:
+                        if "Operation cancelled by user" in str(step_error):
+                            GLib.idle_add(lambda: self.handle_import_cancellation(dst, backup_dir))
+                        else:
+                            print(f"Error during step '{step_text}': {step_error}")
+                            GLib.idle_add(
+                                lambda error=step_error, text=step_text: self.handle_import_error(
+                                    dst, 
+                                    backup_dir, 
+                                    f"An error occurred during '{text}': {error}"
+                                )
+                            )
+                        return
+
+                if not self.stop_processing:
+                    self.cleanup_backup(backup_dir)
+                    GLib.idle_add(self.on_import_wine_directory_completed)
+                    
+            except Exception as import_error:
+                print(f"Error during import process: {import_error}")
+                GLib.idle_add(
+                    lambda error=import_error: self.handle_import_error(
+                        dst, 
+                        backup_dir, 
+                        f"Import failed: {error}"
+                    )
+                )
+
+        threading.Thread(target=perform_import_steps).start()
+
+    def backup_existing_directory(self, dst, backup_dir):
+        """
+        Safely backup the existing directory if it exists.
+        """
+        if dst.exists():
+            try:
+                # Create the parent directory if it doesn't exist
+                backup_dir.parent.mkdir(parents=True, exist_ok=True)
+                # First create the destination directory
+                dst.rename(backup_dir)
+                print(f"Created backup of existing directory: {backup_dir}")
+            except Exception as e:
+                raise Exception(f"Failed to create backup: {e}")
+
+    def handle_import_cancellation(self, dst, backup_dir):
+        """
+        Handle import cancellation by restoring from backup.
+        """
+        try:
+            if dst.exists():
+                shutil.rmtree(dst)
+                print(f"Removed incomplete import directory: {dst}")
+            
+            if backup_dir.exists():
+                # Create the parent directory if it doesn't exist
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                backup_dir.rename(dst)
+                print(f"Restored original directory from backup")
+                
+        except Exception as e:
+            print(f"Error during cancellation cleanup: {e}")
+            # Still show cancelled message but also show error
+            GLib.idle_add(self.show_info_dialog, "Error", 
+                        f"Wine directory import was cancelled but encountered errors during cleanup: {e}\n"
+                        f"Backup directory may still exist at: {backup_dir}")
+            return
+        
+        self.stop_processing = False
+        GLib.idle_add(self.on_import_wine_directory_completed)
+        GLib.idle_add(self.show_info_dialog, "Cancelled", "Wine directory import was cancelled")
 
 
+#################3 Replace strings update with interruption
 
+    def replace_strings_in_files(self, directory, find_replace_pairs):
+        """
+        Replace strings in files with interruption support, progress tracking and error handling
+        """
+        try:
+            # Count total files for progress tracking
+            total_files = sum(1 for _, _, files in os.walk(directory) 
+                            for _ in files)
+            processed_files = 0
 
+            for root, dirs, files in os.walk(directory):
+                if self.stop_processing:
+                    raise Exception("Operation cancelled by user")
 
+                for file in files:
+                    if self.stop_processing:
+                        raise Exception("Operation cancelled by user")
 
+                    processed_files += 1
+                    file_path = Path(root) / file
 
+                    # Update progress
+                    if hasattr(self, 'progress_bar'):
+                        GLib.idle_add(
+                            lambda: self.progress_bar.set_fraction(processed_files / total_files)
+                        )
 
+                    # Skip binary files
+                    if self.is_binary_file(file_path):
+                        print(f"Skipping binary file: {file_path}")
+                        continue
+
+                    # Skip files where permission is denied
+                    if not os.access(file_path, os.R_OK | os.W_OK):
+                        print(f"Skipping file: {file_path} (Permission denied)")
+                        continue
+
+                    try:
+                        # Read file content
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+
+                        modified = False
+                        new_content = content
+
+                        # Perform replacements
+                        for find_str, replace_str in find_replace_pairs.items():
+                            if find_str in new_content:
+                                new_content = new_content.replace(find_str, replace_str)
+                                modified = True
+
+                        # Write modified content if changes were made
+                        if modified:
+                            if self.stop_processing:
+                                raise Exception("Operation cancelled by user")
+                            
+                            # Create temporary file
+                            temp_path = file_path.with_suffix(file_path.suffix + '.tmp')
+                            try:
+                                with open(temp_path, 'w', encoding='utf-8') as f:
+                                    f.write(new_content)
+                                # Atomic replace
+                                temp_path.replace(file_path)
+                                print(f"Replacements applied to file: {file_path}")
+                            except Exception as e:
+                                if temp_path.exists():
+                                    temp_path.unlink()
+                                raise e
+
+                    except (UnicodeDecodeError, FileNotFoundError, PermissionError) as e:
+                        print(f"Skipping file: {file_path} ({e})")
+                        continue
+
+        except Exception as e:
+            if "Operation cancelled by user" in str(e):
+                print("String replacement operation cancelled")
+            raise
+
+    def is_binary_file(self, file_path):
+        """
+        Check if a file is binary with interruption support
+        """
+        try:
+            if self.stop_processing:
+                raise Exception("Operation cancelled by user")
+                
+            with open(file_path, 'rb') as f:
+                chunk = f.read(1024)
+                if b'\0' in chunk:
+                    return True
+        except Exception as e:
+            if "Operation cancelled by user" in str(e):
+                raise
+            print(f"Could not check file {file_path} ({e})")
+        return False
 
 
 
