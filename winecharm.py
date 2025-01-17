@@ -457,23 +457,6 @@ class WineCharmApp(Gtk.Application):
             child = child.get_next_sibling()
 
     def show_initializing_step(self, step_text):
-        button = Gtk.Button()
-        button.set_size_request(450, 36)
-        button.add_css_class("flat")
-        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        checkbox = Gtk.CheckButton()
-        label = Gtk.Label(label=step_text)
-        label.set_xalign(0)
-        hbox.append(checkbox)
-        hbox.append(label)
-        button.set_child(hbox)
-        button.checkbox = checkbox
-        button.label = label
-        self.flowbox.append(button)
-        button.set_visible(True)
-        self.flowbox.queue_draw()  # Ensure the flowbox redraws itself to show the new button
-
-    def show_initializing_step(self, step_text):
         """
         Show a new processing step in the flowbox
         """
@@ -3064,10 +3047,8 @@ class WineCharmApp(Gtk.Application):
 
 ##### /BACKUP PREFIX xx
 
-
-
-
-    def restore_from_backup(self, action=None, param=None):
+####################### Restore Backup (prefix, bottle, .tar.zst)
+        def restore_from_backup(self, action=None, param=None):
         # Step 1: Create required directories (if needed)
         self.create_required_directories()
 
@@ -4706,13 +4687,26 @@ class WineCharmApp(Gtk.Application):
             print(f"Error opening file manager: {e}")
 
     def open_script_file(self, script, script_key, *args):
+        """
+        Open the file manager to show the script's location.
+        """
         wineprefix = Path(script).parent
         print(f"Opening file manager for {wineprefix}")
-        command = ["xdg-open", str(script)]
+        
+        # Ensure we're using the updated script path
+        script_data = self.script_list.get(script_key)
+        if script_data:
+            script_path = Path(script_data['script_path']).expanduser().resolve()
+        else:
+            print(f"Error: Script key {script_key} not found in script_list.")
+            return
+        
+        command = ["xdg-open", str(script_path)]
         try:
             subprocess.Popen(command)
         except Exception as e:
             print(f"Error opening file manager: {e}")
+
             
     def show_delete_wineprefix_confirmation(self, script, button):
         """
@@ -5228,28 +5222,6 @@ class WineCharmApp(Gtk.Application):
 
         # Close the dialog
         dialog.close()
-
-
-    def open_script_file(self, script, script_key, *args):
-        """
-        Open the file manager to show the script's location.
-        """
-        wineprefix = Path(script).parent
-        print(f"Opening file manager for {wineprefix}")
-        
-        # Ensure we're using the updated script path
-        script_data = self.script_list.get(script_key)
-        if script_data:
-            script_path = Path(script_data['script_path']).expanduser().resolve()
-        else:
-            print(f"Error: Script key {script_key} not found in script_list.")
-            return
-        
-        command = ["xdg-open", str(script_path)]
-        try:
-            subprocess.Popen(command)
-        except Exception as e:
-            print(f"Error opening file manager: {e}")
 
     def rename_script_and_icon(self, script_path, old_progname, new_name):
         """
@@ -8867,17 +8839,17 @@ class WineCharmApp(Gtk.Application):
         dialog.close()
 
 ############################################### 4444444444444444444444444 New initialize template
-    def on_cancel_restore_backup_dialog_response(self, dialog, response):
+
+
+    def connect_open_button_with_restore_backup_cancel(self):
         """
-        Handle cancel dialog response
+        Connect cancel handler to the open button
         """
-        if response == "cancel":
-            self.stop_processing = True
-            dialog.close()
-        else:
-            self.stop_processing = False
-            dialog.close()
-            #GLib.timeout_add_seconds(0.5, dialog.close)
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_restore_backup_clicked)
+        
+        self.set_open_button_icon_visible(False)
 
     def on_cancel_restore_backup_clicked(self, button):
         """
@@ -8894,106 +8866,17 @@ class WineCharmApp(Gtk.Application):
         dialog.connect("response", self.on_cancel_restore_backup_dialog_response)
         dialog.present()
 
-    def connect_open_button_with_restore_backup_cancel(self):
+    def on_cancel_restore_backup_dialog_response(self, dialog, response):
         """
-        Connect cancel handler to the open button
+        Handle cancel dialog response
         """
-        if self.open_button_handler_id is not None:
-            self.open_button.disconnect(self.open_button_handler_id)
-            self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_restore_backup_clicked)
-        
-        self.set_open_button_icon_visible(False)
-
-    def cleanup_cancelled_restore(self, temp_dir):
-        """
-        Clean up temporary directory and reset UI after cancelled restore
-        """
-        try:
-            if temp_dir.exists():
-                #shutil.rmtree(temp_dir)
-                print(f"Removed temporary directory: {temp_dir}")
-        except Exception as e:
-            print(f"Error cleaning up temporary directory: {e}")
-        finally:
-            self.stop_processing = False
-            GLib.idle_add(self.on_restore_completed)
-            if not self.stop_processing:
-                GLib.idle_add(self.show_info_dialog, "Cancelled", "Restore operation was cancelled")
-
-    def show_restore_overwrite_confirmation_dialog(self, temp_dir, dest_dir):
-        """
-        Show confirmation dialog for overwriting existing directory during restore
-        """
-        dialog = Adw.MessageDialog(
-            modal=True,
-            transient_for=self.window,
-            heading="Overwrite Existing Directory?",
-            body=f"The directory {dest_dir.name} already exists. Do you want to overwrite it?"
-        )
-
-        dialog.add_response("overwrite", "Overwrite")
-        dialog.set_response_appearance("overwrite", Adw.ResponseAppearance.DESTRUCTIVE)
-        dialog.add_response("cancel", "Cancel")
-        dialog.set_default_response("cancel")
-
-        dialog.connect("response", self.on_restore_overwrite_response, temp_dir, dest_dir)
-        dialog.present()
-
-    def on_restore_overwrite_response(self, dialog, response_id, temp_dir, dest_dir):
-        """
-        Handle response from restore overwrite confirmation dialog
-        """
-        if response_id == "overwrite":
-            print(f"User chose to overwrite the directory: {dest_dir}")
-            try:
-                #shutil.rmtree(dest_dir)
-                #temp_dir.rename(dest_dir)
-                GLib.idle_add(self.on_restore_completed)
-            except Exception as e:
-                print(f"Error during overwrite: {e}")
-                GLib.idle_add(self.show_info_dialog, "Error", f"Failed to overwrite directory: {e}")
-                GLib.idle_add(self.cleanup_cancelled_restore, temp_dir)
+        if response == "cancel":
+            self.stop_processing = True
+            dialog.close()
         else:
-            print("User canceled the overwrite")
-            GLib.idle_add(self.cleanup_cancelled_restore, temp_dir)
-
-    def extract_tar_to_temp(self, tar_file, temp_dir):
-        """
-        Extract tar.zst file to temporary directory
-        """
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        user = os.getenv('USER')
-        
-        try:
-            subprocess.run(
-                ["tar", "-xvf", tar_file, "-C", str(temp_dir), "--transform", f"s|XOUSERXO|{user}|g", "--transform", f"s|%USERNAME%|{user}|g"],
-                check=True
-            )
-            print(f"Successfully extracted to {temp_dir}")
-            return True
-        except subprocess.CalledProcessError as e:
-            print(f"Error extracting file: {e}")
-            raise Exception(f"Failed to extract archive: {e}")
-
-    def extract_wzt_to_temp(self, wzt_file, temp_dir):
-        """
-        Extract WZT file to temporary directory
-        """
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        user = os.getenv('USER')
-        
-        try:
-            subprocess.run(
-                ["tar", "-xvf", wzt_file, "-C", str(temp_dir), "--transform", f"s|XOUSERXO|{user}|g", "--transform", f"s|%USERNAME%|{user}|g"],
-                check=True
-            )
-            print(f"Successfully extracted to {temp_dir}")
-            return True
-        except subprocess.CalledProcessError as e:
-            print(f"Error extracting WZT file: {e}")
-            raise Exception(f"Failed to extract WZT file: {e}")
-
-
+            self.stop_processing = False
+            dialog.close()
+            #GLib.timeout_add_seconds(0.5, dialog.close)
 
 
 
