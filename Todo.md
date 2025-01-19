@@ -24,7 +24,10 @@ Refactoring winecharm
 - [x] play/stop button, row highlight should be manageed.
 
 
-is not resetting the play functionality.
+# Todo 0.98
+- [ ] keep margin/padding for button, so that they don't overlap the text
+- [ ] Arch, Template feature working required
+- [ ] 
  
  # Todo WineCharm 0.97
  - BUGS and Features
