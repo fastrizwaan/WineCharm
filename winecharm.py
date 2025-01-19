@@ -104,7 +104,7 @@ class WineCharmApp(Gtk.Application):
             ("🛠️ Settings...", self.show_options_for_settings),
             ("☠️ Kill all...", self.on_kill_all_clicked),
             ("🍾 Restore...", self.restore_from_backup),
-            ("📂 Import Wine Directory", self.on_import_wine_directory_clicked),
+            ("📥 Import Wine Directory", self.on_import_wine_directory_clicked),
             ("❓ Help...", self.on_help_clicked),
             ("📖 About...", self.on_about_clicked),
             ("🚪 Quit...", self.quit_app)
@@ -734,6 +734,12 @@ class WineCharmApp(Gtk.Application):
         # Add the sort submenu to the main menu
         menu.append_submenu("🔠 Sort", sort_submenu)
 
+        # Create a "Open" submenu and add open filemanager and terminal at winezguidir
+        open_submenu = Gio.Menu()
+        open_submenu.append("Open Filemanager", "win.open_filemanager_winecharm")
+        open_submenu.append("Open Terminal", "win.open_terminal_winecharm")
+
+        menu.append_submenu("📂 Open", open_submenu)
         self.menu_button.set_menu_model(menu)
 
         # Add other existing options in the hamburger menu
@@ -745,6 +751,9 @@ class WineCharmApp(Gtk.Application):
 
         # Create actions for sorting options
         self.create_sort_actions()
+
+        # Create actions for open options
+        self.create_open_actions()
 
         # Rest of the UI setup...
         self.vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -834,7 +843,80 @@ class WineCharmApp(Gtk.Application):
         self.script_list = {key: value for key, value in sorted_scripts}
         GLib.idle_add(self.create_script_list)
 
-        
+    def create_open_actions(self):
+        """
+        Create actions for the open options in the Open submenu.
+        """
+        open_filemanager_action = Gio.SimpleAction.new("open_filemanager_winecharm", None)
+        open_filemanager_action.connect("activate", self.open_filemanager_winecharm)
+        self.window.add_action(open_filemanager_action)
+
+        open_terminal_action = Gio.SimpleAction.new("open_terminal_winecharm", None)
+        open_terminal_action.connect("activate", self.open_terminal_winecharm)
+        self.window.add_action(open_terminal_action)
+
+    def open_filemanager_winecharm(self, action, param):
+        wineprefix = Path(self.winecharmdir)  # Replace with the actual wineprefix path
+        print(f"Opening file manager for {wineprefix}")
+        command = ["xdg-open", str(wineprefix)]
+        try:
+            subprocess.Popen(command)
+        except Exception as e:
+            print(f"Error opening file manager: {e}")
+
+    def open_terminal_winecharm(self, action, param):
+        wineprefix = Path(self.winecharmdir).expanduser().resolve()
+
+        print(f"Opening terminal for {wineprefix}")
+
+        self.ensure_directory_exists(wineprefix)
+
+        if shutil.which("flatpak-spawn"):
+            command = [
+                "wcterm", "bash", "--norc", "-c",
+                (
+                    rf'export PS1="[\u@\h:\w]\\$ "; '
+                    f'cd {shlex.quote(str(wineprefix))}; '
+                    'exec bash --norc -i'
+                )
+            ]
+        else:
+            # List of terminal commands to check
+            terminal_commands = [
+                ("ptyxis", ["ptyxis", "--"]),
+                ("gnome-terminal", ["gnome-terminal", "--wait", "--"]),
+                ("konsole", ["konsole", "-e"]),
+                ("xfce4-terminal", ["xfce4-terminal", "--disable-server", "-x"]),
+            ]
+
+            # Find the first available terminal
+            terminal_command = None
+            for terminal, command_prefix in terminal_commands:
+                if shutil.which(terminal):
+                    terminal_command = command_prefix
+                    break
+
+            if not terminal_command:
+                print("No suitable terminal emulator found.")
+                return
+
+            command = terminal_command + [
+                "bash", "--norc", "-c",
+                (
+                    rf'export PS1="[\u@\h:\w]\\$ "; '
+                    f'cd {shlex.quote(str(wineprefix))}; '
+                    'exec bash --norc -i'
+                )
+            ]
+
+        print(f"Running command: {command}")
+
+        try:
+            subprocess.Popen(command)
+        except Exception as e:
+            print(f"Error opening terminal: {e}")
+
+
     def on_key_pressed(self, controller, keyval, keycode, state):
         if keyval == Gdk.KEY_Escape:
             self.search_button.set_active(False)
