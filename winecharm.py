@@ -5745,14 +5745,25 @@ class WineCharmApp(Gtk.Application):
                             updated = True
 
                 # Regenerate sha256sum if missing
-                if 'sha256sum' not in script_data:
-                    sha256_hash = hashlib.sha256()
-                    with open(script_file, "rb") as f:
-                        for byte_block in iter(lambda: f.read(4096), b""):
-                            sha256_hash.update(byte_block)
-                    script_data['sha256sum'] = sha256_hash.hexdigest()
-                    updated = True
-                    print(f"Warning: sha256sum missing in {script_file}. Regenerated hash.")
+                should_generate_hash = False
+                if 'sha256sum' not in script_data or script_data['sha256sum'] == None :
+                    should_generate_hash = True
+
+                if should_generate_hash:
+                    if 'exe_file' in script_data or script_data['exe_file']:
+                        # Generate hash from exe_file if it exists
+                        exe_path = Path(script_data['exe_file']).expanduser().resolve()
+                        if os.path.exists(exe_path):
+                            sha256_hash = hashlib.sha256()
+                            with open(exe_path, "rb") as f:
+                                for byte_block in iter(lambda: f.read(4096), b""):
+                                    sha256_hash.update(byte_block)
+                            script_data['sha256sum'] = sha256_hash.hexdigest()
+                            updated = True
+                            print(f"Generated sha256sum from exe_file in {script_file}")
+                        else:
+                            print(f"Warning: exe_file not found, not updating sha256sum from script file: {script_file}")
+
 
                 # If updates are needed, rewrite the file
                 if updated:
@@ -5777,6 +5788,7 @@ class WineCharmApp(Gtk.Application):
 
         print(f"Loaded {len(self.script_list)} scripts.")
 
+##########################
 
 
     def add_desktop_shortcut(self, script, script_key, *args):

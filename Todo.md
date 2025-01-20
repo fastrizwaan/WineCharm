@@ -27,7 +27,7 @@ Refactoring winecharm
 # Todo 0.98
 - [ ] keep margin/padding for button, so that they don't overlap the text
 - [ ] Arch, Template feature working required
-- [ ] 
+- [ ] single wine prefix set template winecharm-single
  
  # Todo WineCharm 0.97
  - BUGS and Features
