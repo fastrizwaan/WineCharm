@@ -28,6 +28,8 @@ Refactoring winecharm
 - [ ] keep margin/padding for button, so that they don't overlap the text
 - [ ] Arch, Template feature working required
 - [ ] single wine prefix set template winecharm-single
+- [ ] disable change prefix name when using single prefix
+
  
  # Todo WineCharm 0.97
  - BUGS and Features
