@@ -94,6 +94,7 @@ class WineCharmApp(Gtk.Application):
         self.processing_thread = None
         self.current_backup_path = None
         self.current_process = None
+        self.runner_to_use = None
         self.process_lock = threading.Lock()
         
         # Register the SIGINT signal handler
@@ -1717,6 +1718,9 @@ class WineCharmApp(Gtk.Application):
         if not self.running_processes:
             print("All processes ended.")
 
+        # Revert the runner to default
+        self.runner_to_use = None
+        
         # Call check_running_processes_on_startup to update UI
         self.check_running_processes_on_startup()
 
@@ -1801,6 +1805,9 @@ class WineCharmApp(Gtk.Application):
                     "runner": str(runner_path),
                     "wineprefix": str(wineprefix)
                 }
+                
+                # Set the current runner for all the following scripts which will be created by this script's exe_file
+                self.runner_to_use = runner_path
 
                 self.set_play_stop_button_state(play_stop_button, True)
                 self.update_row_highlight(row, True)
@@ -2523,6 +2530,12 @@ class WineCharmApp(Gtk.Application):
 
 
     def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False):
+        # If the launch script has a different runner use that runner
+        if self.runner_to_use:
+            runner_to_use = self.replace_home_with_tilde_in_path(str(self.runner_to_use))
+        else:
+            runner_to_use = ""
+
         self.create_required_directories()
         exe_file = Path(exe_path).resolve()
         exe_name = exe_file.stem
@@ -2585,7 +2598,7 @@ class WineCharmApp(Gtk.Application):
             'progname': progname,
             'args': "",
             'sha256sum': sha256_hash.hexdigest(),
-            'runner': "",
+            'runner': runner_to_use,
             'wine_debug': "WINEDEBUG=fixme-all DXVK_LOG_LEVEL=none",  # Set a default or allow it to be empty
             'env_vars': ""  # Initialize with an empty string or set a default if necessary
         }
