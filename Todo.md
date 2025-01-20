@@ -76,7 +76,7 @@ Refactoring winecharm
 
     - [x] make the extraction and copying slow process immediately kill-able, like tar command and copy directory. 
     - [x] Launch script, if sha256sum is missing, and exe is found update sha256sum in the .charm file
-    - [ ] If setup is launched with a different runner, newly created script must use the runner as specified in the setup .charm file. If this script has runner, create new .charm files should use it.
+    - [x] If setup is launched with a different runner, newly created script must use the runner as specified in the setup .charm file. If this script has runner, create new .charm files should use it.
     - [ ] Import Runner
 
         - [x] Import Game Directory
