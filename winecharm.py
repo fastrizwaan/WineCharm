@@ -821,6 +821,7 @@ class WineCharmApp(Gtk.Application):
         else:
             self.flowbox.set_max_children_per_line(4)
 
+        self.flowbox.set_homogeneous(True)
         self.flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
         self.scrolled.set_child(self.flowbox)
 
@@ -2786,20 +2787,17 @@ class WineCharmApp(Gtk.Application):
 
 
     def show_info_dialog(self, title, message, callback=None):
-        """
-        Show an information dialog with an optional callback when closed.
-        Uses Adw.MessageDialog with non-deprecated constructor parameters.
-        """
-        dialog = Adw.MessageDialog(
-            transient_for=self.window,
-            modal=True,
+        dialog = Adw.AlertDialog(
             heading=title,
-            body=message,
-            close_response="ok",    # Instead of set_close_response()
-            default_response="ok"   # Instead of set_default_response()
+            body=message
         )
-
+        
+        # Add response using non-deprecated method
         dialog.add_response("ok", "OK")
+        
+        # Configure dialog properties
+        dialog.props.default_response = "ok"
+        dialog.props.close_response = "ok"
 
         def on_response(d, r):
             d.close()
@@ -2807,7 +2805,7 @@ class WineCharmApp(Gtk.Application):
                 callback()
 
         dialog.connect("response", on_response)
-        dialog.present()
+        dialog.present(self.window)
 
         
     def reverse_process_reg_files(self, wineprefix):
@@ -7266,88 +7264,104 @@ class WineCharmApp(Gtk.Application):
         # Add System Wine to the list if available
         system_wine_display, _ = self.get_system_wine()
         if system_wine_display:
-            all_runners.insert(0, (system_wine_display, ""))  # Empty string for System Wine
+            all_runners.insert(0, (system_wine_display, ""))
 
         if not all_runners:
             self.show_no_runners_available_dialog()
             return
 
-        # Get the default runner from settings
+        # Get default runner from settings
         settings = self.load_settings()
-        default_runner = settings.get('runner', '')
-        default_runner = os.path.abspath(os.path.expanduser(default_runner))
+        default_runner = os.path.abspath(os.path.expanduser(settings.get('runner', '')))
 
-        # Build the list of runner paths in all_runners
+        # Build runner paths list
         runner_paths_in_list = [
-            os.path.abspath(os.path.expanduser(runner_path)) for _, runner_path in all_runners
+            os.path.abspath(os.path.expanduser(rp)) for _, rp in all_runners
         ]
 
-        # Check if default_runner is in runner_paths_in_list
+        # Validate default runner
         if default_runner and default_runner not in runner_paths_in_list:
             if self.validate_runner(default_runner):
                 runner_name = Path(default_runner).parent.name
                 all_runners.append((f"{runner_name} (from settings)", default_runner))
             else:
-                print(f"Default runner from settings not found or invalid: {default_runner}")
+                print(f"Invalid default runner: {default_runner}")
                 default_runner = ''
 
-        dialog = Adw.MessageDialog(
-            modal=True,
-            transient_for=self.window,
-            heading="Set Default Runner",
-            body="Select the default runner for the application:"
-        )
-
-        # Create a horizontal box for the ComboBox and download icon
+        # Create widgets
         runner_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-
-        # Create the ComboBox for runners
-        runner_combo = Gtk.ComboBoxText()
-        combo_runner_paths = []  # Store runner paths corresponding to indices
-
+        
+        # Create StringList and populate it
+        runner_list = Gtk.StringList()
+        combo_runner_paths = []
         for display_name, runner_path in all_runners:
-            runner_combo.append_text(display_name)
+            runner_list.append(display_name)
             combo_runner_paths.append(os.path.abspath(os.path.expanduser(runner_path)))
 
-        # Set the active item to the current default runner
-        selected_index = 0
-        for index, runner_path in enumerate(combo_runner_paths):
-            if runner_path == default_runner:
-                selected_index = index
-                break
+        # Create factory with proper item rendering
+        factory = Gtk.SignalListItemFactory()
+        factory.connect("setup", self._on_dropdown_factory_setup)
+        factory.connect("bind", self._on_dropdown_factory_bind)
 
-        runner_combo.set_active(selected_index)
-        runner_combo.set_hexpand(True)
+        # Find selected index
+        selected_index = next((i for i, rp in enumerate(combo_runner_paths) if rp == default_runner), 0)
 
-        # Create a download icon button
-        download_button = Gtk.Button()
-        download_icon = Gtk.Image.new_from_icon_name("emblem-downloads-symbolic")
-        download_button.set_child(download_icon)
-        download_button.set_tooltip_text("Download Runner")
+        # Create dropdown with factory
+        runner_dropdown = Gtk.DropDown(
+            model=runner_list,
+            factory=factory,
+            selected=selected_index
+        )
+        runner_dropdown.set_hexpand(True)
+
+        # Create download button
+        download_button = Gtk.Button(
+            icon_name="emblem-downloads-symbolic",
+            tooltip_text="Download Runner"
+        )
         download_button.connect("clicked", lambda btn: self.on_download_runner_clicked_default(dialog))
 
-        # Add the ComboBox and download button to the hbox
-        runner_hbox.append(runner_combo)
+        # Assemble widgets
+        runner_hbox.append(runner_dropdown)
         runner_hbox.append(download_button)
-
-        # Add the hbox to the content box
+        
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         content_box.append(runner_hbox)
 
-        # Add OK and Cancel buttons to the dialog
+        # Create and configure dialog
+        dialog = Adw.AlertDialog(
+            heading="Set Default Runner",
+            body="Select the default runner for the application:",
+            extra_child=content_box
+        )
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("ok", "OK")
-        dialog.set_default_response("ok")
-        dialog.set_close_response("cancel")
-        dialog.set_extra_child(content_box)
+        dialog.props.default_response = "ok"
+        dialog.props.close_response = "cancel"
 
-        dialog.connect("response", self.on_set_default_runner_response, runner_combo, all_runners)
-        dialog.present()
+        # Connect signals
+        dialog.connect("response", self.on_set_default_runner_response, runner_dropdown, all_runners)
+        dialog.present(self.window)
 
-    def on_set_default_runner_response(self, dialog, response_id, runner_combo, all_runners):
+    def _on_dropdown_factory_setup(self, factory, list_item):
+        """Setup factory items for the dropdown"""
+        label = Gtk.Label()
+        label.set_xalign(0)
+        label.set_margin_start(6)
+        label.set_margin_end(6)
+        list_item.set_child(label)
+
+    def _on_dropdown_factory_bind(self, factory, list_item):
+        """Bind data to factory items"""
+        label = list_item.get_child()
+        string_obj = list_item.get_item()
+        if string_obj and isinstance(string_obj, Gtk.StringObject):
+            label.set_label(string_obj.get_string())
+
+    def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, all_runners):
         if response_id == "ok":
-            selected_index = runner_combo.get_active()
-            if selected_index < 0:
+            selected_index = runner_dropdown.get_selected()
+            if selected_index == Gtk.INVALID_LIST_POSITION:
                 print("No runner selected.")
             else:
                 new_runner_display, new_runner_path = all_runners[selected_index]
