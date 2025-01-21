@@ -46,7 +46,8 @@ class WineCharmApp(Gtk.Application):
         self.templates_dir = self.winecharmdir / "Templates"
         self.runners_dir = self.winecharmdir / "Runners"
         self.default_template = self.templates_dir / "WineCharm-win64"
-        
+        self.single_prefixes_dir = self.prefixes_dir / "WineCharm-Single"
+
         self.applicationsdir = Path(os.path.expanduser("~/.local/share/applications")).resolve()
         self.tempdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/tmp")).resolve()
         self.iconsdir = Path(os.path.expanduser("~/.local/share/icons")).resolve()
@@ -296,14 +297,22 @@ class WineCharmApp(Gtk.Application):
         self.script_list = {}
         self.load_script_list()
         self.create_script_list()
+        self.single_prefix = False
+        self.load_settings()
+        print(f"Single Prefix: {self.single_prefix}")
         #self.check_running_processes_and_update_buttons()
-        
+
         missing_programs = self.check_required_programs()
         if missing_programs:
             self.show_missing_programs_dialog(missing_programs)
         else:
-            if not self.default_template.exists():
+            if not self.default_template.exists() and not self.single_prefix:
                 self.initialize_template(self.default_template, self.on_template_initialized)
+            if not self.default_template.exists() and self.single_prefix:
+                self.initialize_template(self.default_template, self.on_template_initialized)
+                self.copy_template(self.single_prefixes_dir)
+            elif self.default_template.exists() and not self.single_prefixes_dir.exists() and self.single_prefix:
+                self.copy_template(self.single_prefixes_dir)
             else:
                 self.set_dynamic_variables()
                 # Process the command-line file if the template already exists
@@ -447,7 +456,7 @@ class WineCharmApp(Gtk.Application):
     
     def process_cli_file_later(self, file_path):
         # Use GLib.idle_add to ensure this runs after the main loop starts
-        GLib.idle_add(self.show_processing_spinner)
+        GLib.idle_add(self.show_processing_spinner, "hello world")
         GLib.idle_add(self.process_cli_file, file_path)
 
     def set_open_button_label(self, text):
@@ -588,12 +597,14 @@ class WineCharmApp(Gtk.Application):
             self.template = self.expand_and_resolve_path(settings.get('template', self.default_template))
             self.arch = settings.get('arch', "win64")
             self.icon_view = settings.get('icon_view', False)
+            self.single_prefix = settings.get('single-prefix', False)
         else:
             self.template = self.expand_and_resolve_path(self.default_template)
             self.arch = "win64"
             self.runner = ""
             self.template = self.default_template  # Set template to the initialized one
             self.icon_view = False
+            self.single_prefix = False
 
         self.save_settings()
 
@@ -605,7 +616,8 @@ class WineCharmApp(Gtk.Application):
             'runner': self.replace_home_with_tilde_in_path(str(self.settings.get('runner', ''))),
             'wine_debug': "WINEDEBUG=fixme-all DXVK_LOG_LEVEL=none",
             'env_vars': '',
-            'icon_view': self.icon_view
+            'icon_view': self.icon_view,
+            'single-prefix': self.single_prefix
         }
 
         try:
@@ -627,6 +639,7 @@ class WineCharmApp(Gtk.Application):
             self.arch = settings.get('arch', "win64")
             self.icon_view = settings.get('icon_view', False)
             self.env_vars = settings.get('env_vars', '')
+            self.single_prefix = settings.get('single-prefix', False)
             return settings
 
         # If no settings file, return an empty dictionary
@@ -1720,7 +1733,7 @@ class WineCharmApp(Gtk.Application):
 
         # Revert the runner to default
         self.runner_to_use = None
-        
+
         # Call check_running_processes_on_startup to update UI
         self.check_running_processes_on_startup()
 
@@ -2562,10 +2575,14 @@ class WineCharmApp(Gtk.Application):
             #print(f"Removed old script_key {script_key} from script_list")
 
         # Handle prefix directory
-        if prefix_dir is None:
+        if prefix_dir is None and self.single_prefix:
+            if not self.single_prefixes_dir.exists():
+                self.copy_template(self.single_prefixes_dir)
+            prefix_dir = self.single_prefixes_dir 
+        elif prefix_dir is None:
             prefix_dir = self.prefixes_dir / f"{exe_no_space}-{sha256sum}"
             if not prefix_dir.exists():
-                if self.template.exists():
+                if self.template.exists() and not prefix_dir.exists():
                     self.copy_template(prefix_dir)
                 else:
                     self.ensure_directory_exists(prefix_dir)
@@ -4916,10 +4933,17 @@ class WineCharmApp(Gtk.Application):
             if missing_programs:
                 self.show_missing_programs_dialog(missing_programs)
             else:
-                if not self.default_template.exists():
+                if not self.default_template.exists() and not self.single_prefix:
                     self.initialize_template(self.default_template, self.on_template_initialized)
+                if not self.default_template.exists() and self.single_prefix:
+                    self.initialize_template(self.default_template, self.on_template_initialized)
+                    self.copy_template(self.single_prefixes_dir)
+                elif self.default_template.exists() and not self.single_prefixes_dir.exists() and self.single_prefix:
+                    self.copy_template(self.single_prefixes_dir)
                 else:
                     self.set_dynamic_variables()
+
+
 
     def process_cli_file(self, file_path):
         print(f"Processing CLI file: {file_path}")
@@ -7113,7 +7137,8 @@ class WineCharmApp(Gtk.Application):
             ("Template Backup", "document-save-symbolic", self.backup_template),
             ("Template Restore", "document-revert-symbolic", self.restore_template),
             ("Template Delete", "user-trash-symbolic", self.delete_template),
-            ("Set Wine Arch", "preferences-system-symbolic", self.set_wine_arch)
+            ("Set Wine Arch", "preferences-system-symbolic", self.set_wine_arch),
+            ("Single Prefix Mode", "folder-symbolic", self.single_prefix_mode),
         ]
 
         # Initial population of options
@@ -7161,8 +7186,73 @@ class WineCharmApp(Gtk.Application):
                 self.settings_flowbox.append(option_button)
                 option_button.connect("clicked", lambda btn, cb=callback: cb())
 
+#####################  single prefix mode
 
+    def single_prefix_mode(self):
+        # Create message dialog
+        dialog = Adw.MessageDialog(
+            transient_for=self.window,
+            title="Single Prefix Mode",
+            body="Choose prefix mode for new games:\nSingle prefix saves space but makes it harder to backup individual games."
+        )
 
+        # Create a vertical box for the radio buttons
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        
+        # Create radio buttons as checkboxes
+        single_prefix_radio = Gtk.CheckButton(label="Single Prefix Mode")
+        multiple_prefix_radio = Gtk.CheckButton(label="Multiple Prefix Mode")
+        
+        # Make them behave as radio buttons by setting the group
+        multiple_prefix_radio.set_group(single_prefix_radio)
+        
+        # Set the active radio button based on current setting
+        single_prefix_radio.set_active(self.single_prefix)
+        multiple_prefix_radio.set_active(not self.single_prefix)
+        
+        # Add the radio buttons to the box
+        vbox.append(single_prefix_radio)
+        vbox.append(multiple_prefix_radio)
+        
+        # Add the box to the dialog
+        dialog.set_extra_child(vbox)
+        
+        # Add response buttons
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("apply", "Apply")
+        dialog.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("cancel")
+        
+        # Connect the response signal
+        dialog.connect("response", lambda dialog, response: self.on_single_prefix_mode_response(
+            dialog, response, single_prefix_radio.get_active())
+        )
+        
+        # Present the dialog
+        dialog.present()
+
+    def on_single_prefix_mode_response(self, dialog, response_id, is_single_prefix):
+        if response_id == "apply":
+            # Update the setting
+            self.single_prefix = is_single_prefix
+            self.save_settings()
+            if not self.default_template.exists() and not self.single_prefix:
+                self.initialize_template(self.default_template, self.on_template_initialized)
+            if not self.default_template.exists() and self.single_prefix:
+                self.initialize_template(self.default_template, self.on_template_initialized)
+                self.copy_template(self.single_prefixes_dir)
+            elif self.default_template.exists() and not self.single_prefixes_dir.exists() and self.single_prefix:
+                self.copy_template(self.single_prefixes_dir)
+            else:
+                self.set_dynamic_variables()
+            print(f"{'Single' if is_single_prefix else 'Multiple'} Prefix Mode enabled")
+        else:
+            print("Prefix mode change cancelled")
+        
+        # Close the dialog
+        dialog.close()
+
+##################### / single prefix mode
 
     # Implement placeholders for each setting's callback function
     def set_default_runner(self, action=None):
