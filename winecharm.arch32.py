@@ -45,8 +45,8 @@ class WineCharmApp(Gtk.Application):
         self.prefixes_dir = self.winecharmdir / "Prefixes"
         self.templates_dir = self.winecharmdir / "Templates"
         self.runners_dir = self.winecharmdir / "Runners"
-        self.default_template = self.templates_dir / "WineCharm-win64"
-        self.default_32bit_template = self.templates_dir / "WineCharm-win32"
+        self.default_template_win64 = self.templates_dir / "WineCharm-win64"
+        self.default_template_win32 = self.templates_dir / "WineCharm-win32"
         self.single_prefix_dir_win64 = self.prefixes_dir / "WineCharm-Single_win64"
         self.single_prefix_dir_win32 = self.prefixes_dir / "WineCharm-Single_win32"
 
@@ -306,15 +306,15 @@ class WineCharmApp(Gtk.Application):
         #self.check_running_processes_and_update_buttons()
 
         if self.arch == 'win32':
-            if not self.default_32bit_template.exists():
+            if not self.default_template_win32.exists():
                 # Pass arch parameter for 32-bit
-                self.initialize_template(self.default_32bit_template, 
+                self.initialize_template(self.default_template_win32, 
                                     self.on_template_initialized, 
                                     arch='win32')
         else:  # win64
-            if not self.default_template.exists():
+            if not self.default_template_win64.exists():
                 # Pass arch parameter for 64-bit
-                self.initialize_template(self.default_template, 
+                self.initialize_template(self.default_template_win64, 
                                     self.on_template_initialized, 
                                     arch='win64')
 
@@ -323,19 +323,19 @@ class WineCharmApp(Gtk.Application):
             self.show_missing_programs_dialog(missing_programs)
         else:
 
-            if self.arch == 'win32' and not self.default_32bit_template.exists() and not self.single_prefix:
-                self.initialize_template(self.default_32bit_template, self.on_template_initialized, arch='win32')
-                self.template = self.default_32bit_template
-            elif self.arch == 'win32' and not self.default_32bit_template.exists() and self.single_prefix:
-                self.initialize_template(self.default_32bit_template, self.on_template_initialized, arch='win32')
-                self.template = self.default_32bit_template
+            if self.arch == 'win32' and not self.default_template_win32.exists() and not self.single_prefix:
+                self.initialize_template(self.default_template_win32, self.on_template_initialized, arch='win32')
+                self.template = self.default_template_win32
+            elif self.arch == 'win32' and not self.default_template_win32.exists() and self.single_prefix:
+                self.initialize_template(self.default_template_win32, self.on_template_initialized, arch='win32')
+                self.template = self.default_template_win32
                 self.copy_template(self.single_prefix_dir_win32)
-            elif not self.default_template.exists() and not self.single_prefix:
-                self.initialize_template(self.default_template, self.on_template_initialized, arch='win64')
-            elif not self.default_template.exists() and self.single_prefix:
-                self.initialize_template(self.default_template, self.on_template_initialized, arch='win64')
+            elif not self.default_template_win64.exists() and not self.single_prefix:
+                self.initialize_template(self.default_template_win64, self.on_template_initialized, arch='win64')
+            elif not self.default_template_win64.exists() and self.single_prefix:
+                self.initialize_template(self.default_template_win64, self.on_template_initialized, arch='win64')
                 self.copy_template(self.single_prefix_dir_win64)
-            elif self.default_template.exists() and not self.single_prefix_dir_win64.exists() and self.single_prefix:
+            elif self.default_template_win64.exists() and not self.single_prefix_dir_win64.exists() and self.single_prefix:
                 self.copy_template(self.single_prefix_dir_win64)
             else:
                 self.set_dynamic_variables()
@@ -614,15 +614,15 @@ class WineCharmApp(Gtk.Application):
         # Check if Settings.yaml exists and set the template and arch accordingly
         if self.settings_file.exists():
             settings = self.load_settings()  # Assuming load_settings() returns a dictionary
-            self.template = self.expand_and_resolve_path(settings.get('template', self.default_template))
+            self.template = self.expand_and_resolve_path(settings.get('template', self.default_template_win64))
             self.arch = settings.get('arch', "win64")
             self.icon_view = settings.get('icon_view', False)
             self.single_prefix = settings.get('single-prefix', False)
         else:
-            self.template = self.expand_and_resolve_path(self.default_template)
+            self.template = self.expand_and_resolve_path(self.default_template_win64)
             self.arch = "win64"
             self.runner = ""
-            self.template = self.default_template  # Set template to the initialized one
+            self.template = self.default_template_win64  # Set template to the initialized one
             self.icon_view = False
             self.single_prefix = False
 
@@ -654,7 +654,7 @@ class WineCharmApp(Gtk.Application):
                 settings = yaml.safe_load(settings_file) or {}
 
             # Expand and resolve paths when loading
-            self.template = self.expand_and_resolve_path(settings.get('template', self.default_template))
+            self.template = self.expand_and_resolve_path(settings.get('template', self.default_template_win64))
             self.runner = self.expand_and_resolve_path(settings.get('runner', ''))
             self.arch = settings.get('arch', "win64")
             self.icon_view = settings.get('icon_view', False)
@@ -2600,10 +2600,10 @@ class WineCharmApp(Gtk.Application):
                 # Use architecture-specific single prefix directory
                 if self.arch == 'win32':
                     prefix_dir = self.single_prefix_dir_win32
-                    template_to_use = self.default_32bit_template
+                    template_to_use = self.default_template_win32
                 else:
                     prefix_dir = self.single_prefix_dir_win64
-                    template_to_use = self.default_template
+                    template_to_use = self.default_template_win64
                 
                 # Create prefix from template if needed
                 if not prefix_dir.exists():
@@ -2612,7 +2612,7 @@ class WineCharmApp(Gtk.Application):
                 # Create new unique prefix per executable
                 prefix_dir = self.prefixes_dir / f"{exe_no_space}-{sha256sum[:10]}"
                 if not prefix_dir.exists():
-                    template_to_use = self.default_32bit_template if self.arch == 'win32' else self.default_template
+                    template_to_use = self.default_template_win32 if self.arch == 'win32' else self.default_template_win64
                     if template_to_use.exists():
                         self.copy_template(prefix_dir, template_to_use)
                     else:
@@ -4961,12 +4961,12 @@ class WineCharmApp(Gtk.Application):
             if missing_programs:
                 self.show_missing_programs_dialog(missing_programs)
             else:
-                if not self.default_template.exists() and not self.single_prefix:
-                    self.initialize_template(self.default_template, self.on_template_initialized)
-                if not self.default_template.exists() and self.single_prefix:
-                    self.initialize_template(self.default_template, self.on_template_initialized)
+                if not self.default_template_win64.exists() and not self.single_prefix:
+                    self.initialize_template(self.default_template_win64, self.on_template_initialized)
+                if not self.default_template_win64.exists() and self.single_prefix:
+                    self.initialize_template(self.default_template_win64, self.on_template_initialized)
                     self.copy_template(self.single_prefix_dir_win64)
-                elif self.default_template.exists() and not self.single_prefix_dir_win64.exists() and self.single_prefix:
+                elif self.default_template_win64.exists() and not self.single_prefix_dir_win64.exists() and self.single_prefix:
                     self.copy_template(self.single_prefix_dir_win64)
                 else:
                     self.set_dynamic_variables()
@@ -7264,19 +7264,19 @@ class WineCharmApp(Gtk.Application):
             # Update the setting
             self.single_prefix = is_single_prefix
             self.save_settings()
-            if self.arch == 'win32' and not self.default_32bit_template.exists() and not self.single_prefix:
-                self.initialize_template(self.default_32bit_template, self.on_template_initialized, arch='win32')
-                self.template = self.default_32bit_template
-            elif self.arch == 'win32' and not self.default_32bit_template.exists() and self.single_prefix:
-                self.initialize_template(self.default_32bit_template, self.on_template_initialized, arch='win32')
-                self.template = self.default_32bit_template
+            if self.arch == 'win32' and not self.default_template_win32.exists() and not self.single_prefix:
+                self.initialize_template(self.default_template_win32, self.on_template_initialized, arch='win32')
+                self.template = self.default_template_win32
+            elif self.arch == 'win32' and not self.default_template_win32.exists() and self.single_prefix:
+                self.initialize_template(self.default_template_win32, self.on_template_initialized, arch='win32')
+                self.template = self.default_template_win32
                 self.copy_template(self.single_prefix_dir_win32)
-            elif not self.default_template.exists() and not self.single_prefix:
-                self.initialize_template(self.default_template, self.on_template_initialized, arch='win64')
-            elif not self.default_template.exists() and self.single_prefix:
-                self.initialize_template(self.default_template, self.on_template_initialized, arch='win64')
+            elif not self.default_template_win64.exists() and not self.single_prefix:
+                self.initialize_template(self.default_template_win64, self.on_template_initialized, arch='win64')
+            elif not self.default_template_win64.exists() and self.single_prefix:
+                self.initialize_template(self.default_template_win64, self.on_template_initialized, arch='win64')
                 self.copy_template(self.single_prefix_dir_win64)
-            elif self.default_template.exists() and not self.single_prefix_dir_win64.exists() and self.single_prefix:
+            elif self.default_template_win64.exists() and not self.single_prefix_dir_win64.exists() and self.single_prefix:
                 self.copy_template(self.single_prefix_dir_win64)
             else:
                 self.set_dynamic_variables()
@@ -9372,10 +9372,26 @@ class WineCharmApp(Gtk.Application):
                 new_arch = 'win32' if win32_radio.get_active() else 'win64'
                 if new_arch != self.arch:
                     # Update template if using default
-                    if self.template in [self.default_template, self.default_32bit_template]:
-                        self.template = self.default_32bit_template if new_arch == 'win32' else self.default_template
+                    if self.template in [self.default_template_win64, self.default_template_win32]:
+                        self.template = self.default_template_win32 if new_arch == 'win32' else self.default_template_win64
                     self.arch = new_arch
                     self.save_settings()
+                    if self.arch == 'win32' and not self.default_template_win32.exists() and not self.single_prefix:
+                        self.initialize_template(self.default_template_win32, self.on_template_initialized, arch='win32')
+                        self.template = self.default_template_win32
+                    elif self.arch == 'win32' and not self.default_template_win32.exists() and self.single_prefix:
+                        self.initialize_template(self.default_template_win32, self.on_template_initialized, arch='win32')
+                        self.template = self.default_template_win32
+                        self.copy_template(self.single_prefix_dir_win32)
+                    elif not self.default_template_win64.exists() and not self.single_prefix:
+                        self.initialize_template(self.default_template_win64, self.on_template_initialized, arch='win64')
+                    elif not self.default_template_win64.exists() and self.single_prefix:
+                        self.initialize_template(self.default_template_win64, self.on_template_initialized, arch='win64')
+                        self.copy_template(self.single_prefix_dir_win64)
+                    elif self.default_template_win64.exists() and not self.single_prefix_dir_win64.exists() and self.single_prefix:
+                        self.copy_template(self.single_prefix_dir_win64)
+                    else:
+                        self.set_dynamic_variables()
                     print(f"Architecture set to {new_arch}")
             dialog.close()
 
