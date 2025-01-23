@@ -29,7 +29,7 @@ Refactoring winecharm
 - [ ] Arch, Template feature working required
 - [ ] single wine prefix set template winecharm-single
 - [ ] disable change prefix name when using single prefix
-
+- [ ] do not remove search "Removed existing charm file" from single_prefix 
  
  # Todo WineCharm 0.97
  - BUGS and Features
