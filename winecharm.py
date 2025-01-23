@@ -45,8 +45,10 @@ class WineCharmApp(Gtk.Application):
         self.prefixes_dir = self.winecharmdir / "Prefixes"
         self.templates_dir = self.winecharmdir / "Templates"
         self.runners_dir = self.winecharmdir / "Runners"
-        self.default_template = self.templates_dir / "WineCharm-win64"
-        self.single_prefixes_dir = self.prefixes_dir / "WineCharm-Single"
+        self.default_template_win64 = self.templates_dir / "WineCharm-win64"
+        self.default_template_win32 = self.templates_dir / "WineCharm-win32"
+        self.single_prefix_dir_win64 = self.prefixes_dir / "WineCharm-Single_win64"
+        self.single_prefix_dir_win32 = self.prefixes_dir / "WineCharm-Single_win32"
 
         self.applicationsdir = Path(os.path.expanduser("~/.local/share/applications")).resolve()
         self.tempdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/tmp")).resolve()
@@ -59,7 +61,7 @@ class WineCharmApp(Gtk.Application):
         self.runner = ""  # which wine
         self.wine_version = ""  # runner --version
         self.template = ""  # default: WineCharm-win64, if not found in Settings.yaml
-        self.arch = ""  # default: win
+        self.arch = "win64"  # default: win
                 
         self.connect("activate", self.on_activate)
         self.connect("startup", self.on_startup)
@@ -293,38 +295,49 @@ class WineCharmApp(Gtk.Application):
 
     def on_startup(self, app):
         self.create_main_window()
-        # Clear or initialize the script list
         self.script_list = {}
         self.load_script_list()
         self.create_script_list()
         self.single_prefix = False
         self.load_settings()
         print(f"Single Prefix: {self.single_prefix}")
-        #self.check_running_processes_and_update_buttons()
 
+        # Unified template initialization logic
+        def initialize_template_if_needed(template_path, arch, single_prefix_dir=None):
+            if not template_path.exists():
+                print(f"Initializing {arch} template...")
+                self.initialize_template(template_path, self.on_template_initialized, arch=arch)
+                return True
+            elif self.single_prefix and single_prefix_dir and not single_prefix_dir.exists():
+                print(f"Copying {arch} template to single prefix...")
+                self.copy_template(single_prefix_dir)
+            return False
+
+        # Determine which templates need initialization based on settings
+        arch_templates = [
+            (self.arch == 'win32', self.default_template_win32, 'win32', self.single_prefix_dir_win32),
+            (True, self.default_template_win64, 'win64', self.single_prefix_dir_win64)  # Always check win64
+        ]
+
+        needs_initialization = False
+        for check, template, arch, single_dir in arch_templates:
+            if check and not self.single_prefix:
+                needs_initialization |= initialize_template_if_needed(template, arch, single_dir)
+
+        # Set dynamic variables if no initialization needed 
+        if not needs_initialization:
+            self.set_dynamic_variables()
+            if self.command_line_file:
+                print("Processing command-line file after UI initialization")
+                self.process_cli_file_later(self.command_line_file)
+
+        # Common post-init tasks
         missing_programs = self.check_required_programs()
         if missing_programs:
             self.show_missing_programs_dialog(missing_programs)
-        else:
-            if not self.default_template.exists() and not self.single_prefix:
-                self.initialize_template(self.default_template, self.on_template_initialized)
-            if not self.default_template.exists() and self.single_prefix:
-                self.initialize_template(self.default_template, self.on_template_initialized)
-                self.copy_template(self.single_prefixes_dir)
-            elif self.default_template.exists() and not self.single_prefixes_dir.exists() and self.single_prefix:
-                self.copy_template(self.single_prefixes_dir)
-            else:
-                self.set_dynamic_variables()
-                # Process the command-line file if the template already exists
-                if self.command_line_file:
-                    print("Template exists. Processing command-line file after UI initialization.")
-                    self.process_cli_file_later(self.command_line_file)
-        # After loading scripts and building the UI, check for running processes
+        
         self.check_running_processes_on_startup()
-
-        # Start fetching runner URLs asynchronously
         threading.Thread(target=self.maybe_fetch_runner_urls).start()
-
 
     def remove_symlinks_and_create_directories(self, wineprefix):
         """
@@ -353,33 +366,41 @@ class WineCharmApp(Gtk.Application):
                 except Exception as e:
                     print(f"Error processing {item}: {e}")
 
-    def initialize_template(self, template_dir, callback):
+    def initialize_template(self, template_dir, callback, arch='win64'):
         """
-        Modified template initialization with proper Path handling and interruption support
+        Modified template initialization with architecture support
         """
         template_dir = Path(template_dir) if not isinstance(template_dir, Path) else template_dir
         
         self.create_required_directories()
         self.initializing_template = True
         self.stop_processing = False
+        self.current_arch = arch  # Store current architecture
         
         # Disconnect open button handler
         if self.open_button_handler_id is not None:
             self.open_button.disconnect(self.open_button_handler_id)
             self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_template_init_clicked)
         
+        # Architecture-specific steps
         steps = [
-            ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-            ("Replace symbolic links with directories", lambda: self.remove_symlinks_and_create_directories(template_dir)),
-            ("Installing corefonts", f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
-            ("Installing openal", f"WINEPREFIX='{template_dir}' winetricks -q openal"),
-            ("Installing vkd3d", f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-            ("Installing dxvk", f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+            ("Initializing wineprefix", 
+            f"WINEARCH={arch} WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
+            ("Replace symbolic links with directories", 
+            lambda: self.remove_symlinks_and_create_directories(template_dir)),
+            #("Installing corefonts", 
+            #f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+            ("Installing openal", 
+            f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+            #("Installing vkd3d", 
+            #f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+            #("Installing dxvk", 
+            #f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
         ]
         
         # Set total steps and initialize progress UI
         self.total_steps = len(steps)
-        self.show_processing_spinner("Initializing Template...")
+        self.show_processing_spinner(f"Initializing {arch} Template...")
 
         def initialize():
             for index, (step_text, command) in enumerate(steps, 1):
@@ -392,7 +413,9 @@ class WineCharmApp(Gtk.Application):
                     if callable(command):
                         command()
                     else:
-                        process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                        process = subprocess.Popen(command, shell=True, 
+                                                stdout=subprocess.PIPE, 
+                                                stderr=subprocess.PIPE)
                         while process.poll() is None:
                             if self.stop_processing:
                                 process.terminate()
@@ -408,7 +431,6 @@ class WineCharmApp(Gtk.Application):
                             raise subprocess.CalledProcessError(process.returncode, command)
                     
                     GLib.idle_add(self.mark_step_as_done, step_text)
-                    # Update progress bar only if it exists
                     if hasattr(self, 'progress_bar'):
                         GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
                     
@@ -418,15 +440,23 @@ class WineCharmApp(Gtk.Application):
                     return
                     
             if not self.stop_processing:
-                GLib.idle_add(callback)
+                GLib.idle_add(lambda: self.on_template_initialized(arch))
                 GLib.idle_add(self.hide_processing_spinner)
                 self.disconnect_open_button()
                 GLib.idle_add(self.reset_ui_after_template_init)
         threading.Thread(target=initialize).start()
 
-    def on_template_initialized(self):
-        print("Template initialization complete.")
+    def on_template_initialized(self, arch=None):
+        print(f"Template initialization complete for {arch if arch else 'default'} architecture.")
         self.initializing_template = False
+        
+        # Update architecture setting if we were initializing a specific arch
+        if arch:
+            self.arch = arch
+            # Set template path based on architecture
+            self.template = self.default_template_win32 if arch == 'win32' \
+                else self.default_template_win64
+            self.save_settings()
         
         # Ensure the spinner is stopped after initialization
         self.hide_processing_spinner()
@@ -442,7 +472,6 @@ class WineCharmApp(Gtk.Application):
         print("Template initialization completed and UI updated.")
         self.show_initializing_step("Initialization Complete!")
         self.mark_step_as_done("Initialization Complete!")
-        self.hide_processing_spinner()
         GLib.timeout_add_seconds(0.5, self.create_script_list)
         
         # Check if there's a command-line file to process after initialization
@@ -451,7 +480,6 @@ class WineCharmApp(Gtk.Application):
             self.process_cli_file_later(self.command_line_file)
             self.command_line_file = None  # Reset after processing
 
-        #
         self.set_dynamic_variables()
     
     def process_cli_file_later(self, file_path):
@@ -594,15 +622,15 @@ class WineCharmApp(Gtk.Application):
         # Check if Settings.yaml exists and set the template and arch accordingly
         if self.settings_file.exists():
             settings = self.load_settings()  # Assuming load_settings() returns a dictionary
-            self.template = self.expand_and_resolve_path(settings.get('template', self.default_template))
+            self.template = self.expand_and_resolve_path(settings.get('template', self.default_template_win64))
             self.arch = settings.get('arch', "win64")
             self.icon_view = settings.get('icon_view', False)
             self.single_prefix = settings.get('single-prefix', False)
         else:
-            self.template = self.expand_and_resolve_path(self.default_template)
+            self.template = self.expand_and_resolve_path(self.default_template_win64)
             self.arch = "win64"
             self.runner = ""
-            self.template = self.default_template  # Set template to the initialized one
+            self.template = self.default_template_win64  # Set template to the initialized one
             self.icon_view = False
             self.single_prefix = False
 
@@ -634,7 +662,7 @@ class WineCharmApp(Gtk.Application):
                 settings = yaml.safe_load(settings_file) or {}
 
             # Expand and resolve paths when loading
-            self.template = self.expand_and_resolve_path(settings.get('template', self.default_template))
+            self.template = self.expand_and_resolve_path(settings.get('template', self.default_template_win64))
             self.runner = self.expand_and_resolve_path(settings.get('runner', ''))
             self.arch = settings.get('arch', "win64")
             self.icon_view = settings.get('icon_view', False)
@@ -2574,19 +2602,29 @@ class WineCharmApp(Gtk.Application):
             # Remove the entry from script_list
             #del self.script_list[script_key]
             #print(f"Removed old script_key {script_key} from script_list")
-
-        # Handle prefix directory
-        if prefix_dir is None and self.single_prefix:
-            if not self.single_prefixes_dir.exists():
-                self.copy_template(self.single_prefixes_dir)
-            prefix_dir = self.single_prefixes_dir 
-        elif prefix_dir is None:
-            prefix_dir = self.prefixes_dir / f"{exe_no_space}-{sha256sum}"
-            if not prefix_dir.exists():
-                if self.template.exists() and not prefix_dir.exists():
-                    self.copy_template(prefix_dir)
+        # Determine prefix directory
+        if prefix_dir is None:
+            if self.single_prefix:
+                # Use architecture-specific single prefix directory
+                if self.arch == 'win32':
+                    prefix_dir = self.single_prefix_dir_win32
+                    template_to_use = self.default_template_win32
                 else:
-                    self.ensure_directory_exists(prefix_dir)
+                    prefix_dir = self.single_prefix_dir_win64
+                    template_to_use = self.default_template_win64
+                
+                # Create prefix from template if needed
+                if not prefix_dir.exists():
+                    self.copy_template(prefix_dir, template_to_use)
+            else:
+                # Create new unique prefix per executable
+                prefix_dir = self.prefixes_dir / f"{exe_no_space}-{sha256sum[:10]}"
+                if not prefix_dir.exists():
+                    template_to_use = self.default_template_win32 if self.arch == 'win32' else self.default_template_win64
+                    if template_to_use.exists():
+                        self.copy_template(prefix_dir, template_to_use)
+                    else:
+                        self.ensure_directory_exists(prefix_dir)
 
         wineprefix_name = prefix_dir.name
 
@@ -2650,6 +2688,7 @@ class WineCharmApp(Gtk.Application):
         print(f"Created new charm file: {yaml_file_path} with script_key {script_key}")
         
         GLib.idle_add(self.create_script_list)
+
 
 
     def extract_icon(self, exe_file, wineprefix, exe_no_space, progname):
@@ -4823,21 +4862,18 @@ class WineCharmApp(Gtk.Application):
             productname_match = re.search(r'Product Name\s+:\s+(.+)', product_output)
             return productname_match.group(1).strip() if productname_match else None
 
-    def copy_template(self, prefix_dir):
-        try:
-            if self.initializing_template:
-                 print(f"Template is being initialized, skipping copy_template!!!!")
-                 return
-            print(f"Copying default template to {prefix_dir}")
-            shutil.copytree(self.template, prefix_dir, symlinks=True)
-        except shutil.Error as e:
-            for src, dst, err in e.args[0]:
-                if not os.path.exists(dst):
-                    shutil.copy2(src, dst)
-                else:
-                    print(f"Skipping {src} -> {dst} due to error: {err}")
-        except Exception as e:
-            print(f"Error copying template: {e}")
+    def copy_template(self, dest_dir, source_template=None):
+        if source_template is None:
+            source_template = self.template
+        source_template = Path(source_template)
+        dest_dir = Path(dest_dir)
+        
+        if source_template.exists():
+            shutil.copytree(source_template, dest_dir, symlinks=True, dirs_exist_ok=True)
+            print(f"Copied template {source_template} to {dest_dir}")
+        else:
+            print(f"Template {source_template} does not exist. Creating empty prefix.")
+            self.ensure_directory_exists(dest_dir)
 
     def create_desktop_entry(self, progname, script_path, icon_path, wineprefix, category = "Game"):
 #        return; # do not create
@@ -7187,69 +7223,85 @@ class WineCharmApp(Gtk.Application):
 #####################  single prefix mode
 
     def single_prefix_mode(self):
-        # Create message dialog
         dialog = Adw.MessageDialog(
             transient_for=self.window,
             title="Single Prefix Mode",
             body="Choose prefix mode for new games:\nSingle prefix saves space but makes it harder to backup individual games."
         )
 
-        # Create a vertical box for the radio buttons
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         
-        # Create radio buttons as checkboxes
+        # Create radio buttons with fresh state
         single_prefix_radio = Gtk.CheckButton(label="Single Prefix Mode")
         multiple_prefix_radio = Gtk.CheckButton(label="Multiple Prefix Mode")
-        
-        # Make them behave as radio buttons by setting the group
         multiple_prefix_radio.set_group(single_prefix_radio)
         
-        # Set the active radio button based on current setting
-        single_prefix_radio.set_active(self.single_prefix)
-        multiple_prefix_radio.set_active(not self.single_prefix)
-        
-        # Add the radio buttons to the box
+        # Always refresh from settings before showing dialog
+        self.load_settings()  # Ensure latest values
+        current_state = self.single_prefix
+        single_prefix_radio.set_active(current_state)
+        multiple_prefix_radio.set_active(not current_state)
+
         vbox.append(single_prefix_radio)
         vbox.append(multiple_prefix_radio)
-        
-        # Add the box to the dialog
         dialog.set_extra_child(vbox)
-        
-        # Add response buttons
+
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("apply", "Apply")
         dialog.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
         dialog.set_default_response("cancel")
-        
-        # Connect the response signal
-        dialog.connect("response", lambda dialog, response: self.on_single_prefix_mode_response(
-            dialog, response, single_prefix_radio.get_active())
-        )
-        
-        # Present the dialog
+
+        def on_response(dialog, response):
+            if response == "apply":
+                new_state = single_prefix_radio.get_active()
+                if new_state != current_state:
+                    self.handle_prefix_mode_change(new_state)
+            dialog.close()
+
+        dialog.connect("response", on_response)
         dialog.present()
 
-    def on_single_prefix_mode_response(self, dialog, response_id, is_single_prefix):
-        if response_id == "apply":
-            # Update the setting
-            self.single_prefix = is_single_prefix
-            self.save_settings()
-            if not self.default_template.exists() and not self.single_prefix:
-                self.initialize_template(self.default_template, self.on_template_initialized)
-            if not self.default_template.exists() and self.single_prefix:
-                self.initialize_template(self.default_template, self.on_template_initialized)
-                self.copy_template(self.single_prefixes_dir)
-            elif self.default_template.exists() and not self.single_prefixes_dir.exists() and self.single_prefix:
-                self.copy_template(self.single_prefixes_dir)
-            else:
-                self.set_dynamic_variables()
-            print(f"{'Single' if is_single_prefix else 'Multiple'} Prefix Mode enabled")
-        else:
-            print("Prefix mode change cancelled")
+    def handle_prefix_mode_change(self, new_state):
+        previous_state = self.single_prefix
+        self.single_prefix = new_state
         
-        # Close the dialog
-        dialog.close()
+        try:
+            # Determine architecture-specific paths
+            template_dir = (self.default_template_win32 if self.arch == 'win32' 
+                            else self.default_template_win64)
+            single_dir = (self.single_prefix_dir_win32 if self.arch == 'win32'
+                        else self.single_prefix_dir_win64)
 
+            # Initialize template if needed
+            if not template_dir.exists():
+                self.initialize_template(template_dir, 
+                                    lambda: self.finalize_prefix_mode_change(single_dir),
+                                    arch=self.arch)
+            else:
+                self.finalize_prefix_mode_change(single_dir)
+                
+            self.save_settings()
+            print(f"Prefix mode changed to {'Single' if new_state else 'Multiple'}")
+            
+        except Exception as e:
+            print(f"Error changing prefix mode: {e}")
+            self.single_prefix = previous_state  # Rollback on error
+            self.save_settings()
+            self.show_error_dialog("Mode Change Failed", str(e))
+        
+        finally:
+            self.set_dynamic_variables()
+
+    def finalize_prefix_mode_change(self, single_dir):
+        if self.single_prefix:
+            if not single_dir.exists():
+                print("Creating single prefix copy...")
+                self.copy_template(single_dir)
+        else:
+            print("Reverting to multiple prefixes")
+            if single_dir.exists():
+                print("Cleaning up single prefix directory...")
+                shutil.rmtree(single_dir, ignore_errors=True)
 ##################### / single prefix mode
 
     # Implement placeholders for each setting's callback function
@@ -7869,10 +7921,79 @@ class WineCharmApp(Gtk.Application):
         print("Deleting the template...")
         # Add functionality to delete the template.
 
-    def set_wine_arch(self, action=None):
-        print("Setting the Wine architecture...")
-        # Add functionality to set Wine architecture.
+    def set_wine_arch(self):
+        dialog = Adw.MessageDialog(
+            transient_for=self.window,
+            title="Set Wine Architecture",
+            body="Select the default architecture for new prefixes:"
+        )
 
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        win32_radio = Gtk.CheckButton(label="32-bit (win32)")
+        win64_radio = Gtk.CheckButton(label="64-bit (win64)")
+        win64_radio.set_group(win32_radio)
+        
+        current_arch = self.arch
+        win32_radio.set_active(current_arch == 'win32')
+        win64_radio.set_active(current_arch == 'win64')
+
+        vbox.append(win32_radio)
+        vbox.append(win64_radio)
+        dialog.set_extra_child(vbox)
+
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("ok", "OK")
+        dialog.set_default_response("ok")
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+
+        def handle_architecture_change(new_arch):
+            # Determine paths based on selected architecture
+            new_template = self.default_template_win32 if new_arch == 'win32' else self.default_template_win64
+            single_prefix_dir = self.single_prefix_dir_win32 if new_arch == 'win32' else self.single_prefix_dir_win64
+            
+            # Only proceed if architecture actually changed
+            if new_arch == self.arch:
+                return
+
+            # Update settings first
+            self.arch = new_arch
+            self.template = new_template
+            self.save_settings()
+            print(f" => New Template = {new_template}")
+            new_template = Path(new_template).expanduser().resolve()
+            print(f" => New Template = {new_template}")
+            # Check template existence without initializing
+            if not new_template.exists():
+                print(f"Initializing new {new_arch} template...")
+                self.on_back_button_clicked(None)
+                self.initialize_template(new_template, 
+                                    lambda: self.finalize_arch_change(single_prefix_dir),
+                                    arch=new_arch)
+            else:
+                print(f"Using existing {new_arch} template")
+                finalize_arch_change(single_prefix_dir)
+
+        def finalize_arch_change(single_prefix_dir):
+            # Handle single prefix copy if needed
+            
+            if self.single_prefix and not single_prefix_dir.exists():
+                print(f"Copying to {single_prefix_dir.name}...")
+                self.copy_template(single_prefix_dir)
+            self.set_dynamic_variables()
+            self.show_options_for_settings()
+
+        def on_response(dialog, response):
+            if response == "ok":
+                new_arch = 'win32' if win32_radio.get_active() else 'win64'
+                if new_arch != current_arch:
+                    self.main_frame.set_child(None)
+                    #self.show_processing_spinner(f"Configuring {new_arch}...")
+                    handle_architecture_change(new_arch)
+            dialog.close()
+
+        dialog.connect("response", on_response)
+        dialog.present()
+        
 ################
     def backup_runner(self, action=None):
         """
