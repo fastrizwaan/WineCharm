@@ -853,10 +853,10 @@ class WineCharmApp(Gtk.Application):
         self.flowbox.set_valign(Gtk.Align.START)
         self.flowbox.set_halign(Gtk.Align.FILL)
 
-        if self.icon_view:
-            self.flowbox.set_max_children_per_line(8)
-        else:
-            self.flowbox.set_max_children_per_line(4)
+        #if self.icon_view:
+        #    self.flowbox.set_max_children_per_line(8)
+        #else:
+        #    self.flowbox.set_max_children_per_line(4)
 
         self.flowbox.set_homogeneous(True)
         self.flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -8943,6 +8943,7 @@ class WineCharmApp(Gtk.Application):
         Called when the restore process is complete. Updates UI, restores scripts, and resets the open button.
         """
         # Reconnect open button and reset its label
+        
         if self.open_button_handler_id is not None:
             self.open_button.disconnect(self.open_button_handler_id)
         self.disconnect_open_button()
