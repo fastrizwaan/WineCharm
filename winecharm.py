@@ -7326,9 +7326,6 @@ class WineCharmApp(Gtk.Application):
                 self.copy_template(single_dir)
         else:
             print("Reverting to multiple prefixes")
-            if single_dir.exists():
-                print("Cleaning up single prefix directory...")
-                shutil.rmtree(single_dir, ignore_errors=True)
 ##################### / single prefix mode
 
     # Implement placeholders for each setting's callback function
