@@ -2598,19 +2598,8 @@ class WineCharmApp(Gtk.Application):
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
         sha256sum = sha256_hash.hexdigest()[:10]
-
-        # Check if a script with the same sha256sum already exists
         script_key = sha256_hash.hexdigest()
-        if script_key in self.script_list:
-            # Remove the existing .charm file and its entry from the script list
-            existing_script_path = Path(self.script_list[script_key]['script_path']).expanduser().resolve()
-            if existing_script_path.exists():
-                existing_script_path.unlink()  # Remove the existing file
-                print(f"Removed existing charm file: {existing_script_path}")
 
-            # Remove the entry from script_list
-            #del self.script_list[script_key]
-            #print(f"Removed old script_key {script_key} from script_list")
         # Determine prefix directory
         if prefix_dir is None:
             if self.single_prefix:
@@ -2634,7 +2623,32 @@ class WineCharmApp(Gtk.Application):
                         self.copy_template(prefix_dir, template_to_use)
                     else:
                         self.ensure_directory_exists(prefix_dir)
+            # Resolve the generated or selected prefix directory
+            prefix_dir = Path(prefix_dir).resolve()
+        else:
+            # Resolve the user-provided prefix directory
+            prefix_dir = Path(prefix_dir).expanduser().resolve()
 
+        # Check if a script with the same sha256sum and wineprefix already exists
+        if script_key in self.script_list:
+            existing_script_data = self.script_list[script_key]
+            existing_script_path = Path(existing_script_data['script_path']).expanduser().resolve()
+            existing_wineprefix = existing_script_path.parent
+
+            current_wineprefix = prefix_dir
+
+            # Compare resolved paths to ensure accuracy
+            if existing_wineprefix == current_wineprefix:
+                # Remove existing .charm file and its entry
+                if existing_script_path.exists():
+                    existing_script_path.unlink()
+                    print(f"Removed existing charm file: {existing_script_path}")
+                del self.script_list[script_key]
+                print(f"Removed old script_key {script_key} from script_list")
+            else:
+                print(f"Existing charm file in different prefix '{existing_wineprefix}' left intact.")
+
+        # Proceed to create the YAML configuration and charm file
         wineprefix_name = prefix_dir.name
 
         # Extract product name using exiftool
