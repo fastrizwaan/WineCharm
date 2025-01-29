@@ -7304,45 +7304,6 @@ class WineCharmApp(Gtk.Application):
 #####################  single prefix mode
 
     def single_prefix_mode(self):
-        dialog = Adw.MessageDialog(
-            transient_for=self.window,
-            title="Single Prefix Mode",
-            body="Choose prefix mode for new games:\nSingle prefix saves space but makes it harder to backup individual games."
-        )
-
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        
-        # Create radio buttons with fresh state
-        single_prefix_radio = Gtk.CheckButton(label="Single Prefix Mode")
-        multiple_prefix_radio = Gtk.CheckButton(label="Multiple Prefix Mode")
-        multiple_prefix_radio.set_group(single_prefix_radio)
-        
-        # Always refresh from settings before showing dialog
-        self.load_settings()  # Ensure latest values
-        current_state = self.single_prefix
-        single_prefix_radio.set_active(current_state)
-        multiple_prefix_radio.set_active(not current_state)
-
-        vbox.append(single_prefix_radio)
-        vbox.append(multiple_prefix_radio)
-        dialog.set_extra_child(vbox)
-
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("apply", "Apply")
-        dialog.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
-        dialog.set_default_response("cancel")
-
-        def on_response(dialog, response):
-            if response == "apply":
-                new_state = single_prefix_radio.get_active()
-                if new_state != current_state:
-                    self.handle_prefix_mode_change(new_state)
-            dialog.close()
-
-        dialog.connect("response", on_response)
-        dialog.present()
-
-    def single_prefix_mode(self):
         dialog = Adw.AlertDialog(
             heading="Single Prefix Mode",
             body="Choose prefix mode for new games:\nSingle prefix saves space but makes it harder to backup individual games."
