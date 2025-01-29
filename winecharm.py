@@ -74,7 +74,6 @@ class WineCharmApp(Gtk.Application):
         self.selected_script = None
         self.selected_script_name = None
         self.selected_row = None
-        self.spinner = None
         self.initializing_template = False
         self.running_processes = {}
         self.script_buttons = {}
@@ -535,14 +534,14 @@ class WineCharmApp(Gtk.Application):
             step_box.set_margin_bottom(6)
             
             # Add status icon and label
-            step_icon = self.spinner = Gtk.Spinner()
+            step_spinner = Gtk.Spinner()
             step_label = Gtk.Label(label=step_text)
             step_label.set_halign(Gtk.Align.START)
             step_label.set_hexpand(True)
             
-            step_box.append(step_icon)
+            step_box.append(step_spinner)
             step_box.append(step_label)
-            self.spinner.start()
+            step_spinner.start()
 
             
             # Add to flowbox
@@ -551,16 +550,16 @@ class WineCharmApp(Gtk.Application):
             self.flowbox.append(flowbox_child)
             
             # Store reference
-            self.step_boxes.append((step_box, step_icon, step_label))
+            self.step_boxes.append((step_box, step_spinner, step_label))
 
     def mark_step_as_done(self, step_text):
         """
         Mark a step as completed in the flowbox
         """
         if hasattr(self, 'step_boxes'):
-            for step_box, step_icon, step_label in self.step_boxes:
+            for step_box, step_spinner, step_label in self.step_boxes:
                 if step_label.get_text() == step_text:
-                    step_box.remove(step_icon)
+                    step_box.remove(step_spinner)
                     done_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
                     step_box.prepend(done_icon)
                     break
@@ -2582,6 +2581,7 @@ class WineCharmApp(Gtk.Application):
 
     def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False):
         # If the launch script has a different runner use that runner
+        #self.show_processing_spinner("Copying Files...")
         if self.runner_to_use:
             runner_to_use = self.replace_home_with_tilde_in_path(str(self.runner_to_use))
         else:
@@ -2613,14 +2613,18 @@ class WineCharmApp(Gtk.Application):
                 
                 # Create prefix from template if needed
                 if not prefix_dir.exists():
-                    self.copy_template(prefix_dir, template_to_use)
+                    #self.copy_template(prefix_dir, template_to_use)
+                    print("--->if not prefix_dir.exists():")
+                    self.custom_copytree(template_to_use, prefix_dir)
             else:
                 # Create new unique prefix per executable
                 prefix_dir = self.prefixes_dir / f"{exe_no_space}-{sha256sum[:10]}"
                 if not prefix_dir.exists():
                     template_to_use = self.default_template_win32 if self.arch == 'win32' else self.default_template_win64
                     if template_to_use.exists():
-                        self.copy_template(prefix_dir, template_to_use)
+                        #self.copy_template(prefix_dir, template_to_use)
+                        print("===>if template_to_use.exists():")
+                        self.custom_copytree(template_to_use, prefix_dir)
                     else:
                         self.ensure_directory_exists(prefix_dir)
             # Resolve the generated or selected prefix directory
@@ -2862,14 +2866,16 @@ class WineCharmApp(Gtk.Application):
         dialog.props.close_response = "ok"
 
         def on_response(d, r):
-            d.close()
+            #d.close()
             if callback is not None:
                 callback()
 
         dialog.connect("response", on_response)
         dialog.present(self.window)
 
-        
+
+
+
     def reverse_process_reg_files(self, wineprefix):
         print(f"Starting to process .reg files in {wineprefix}")
         
@@ -3812,12 +3818,6 @@ class WineCharmApp(Gtk.Application):
             self.open_button.disconnect(self.open_button_handler_id)
             self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_bottle_clicked, script_key)
         
-        #if not hasattr(self, 'spinner') or not self.spinner:
-        #    self.spinner = Gtk.Spinner()
-        #    self.spinner.start()
-        #    self.open_button_box.append(self.spinner)
-
-        #self.set_open_button_label("Cancel")
         self.set_open_button_icon_visible(False)
 
     def cleanup_cancelled_bottle(self, script, script_key):
@@ -4892,7 +4892,8 @@ class WineCharmApp(Gtk.Application):
         dest_dir = Path(dest_dir)
         
         if source_template.exists():
-            shutil.copytree(source_template, dest_dir, symlinks=True, dirs_exist_ok=True)
+            #shutil.copytree(source_template, dest_dir, symlinks=True, dirs_exist_ok=True)
+            self.custom_copytree(source_template, dest_dir)
             print(f"Copied template {source_template} to {dest_dir}")
         else:
             print(f"Template {source_template} does not exist. Creating empty prefix.")
@@ -5320,6 +5321,71 @@ class WineCharmApp(Gtk.Application):
 
         print("FileDialog operation complete.")
 
+    def import_wine_directory(self, src, dst):
+        """
+        Import the Wine directory with improved safety, rollback capability, and cancellation support.
+        """
+        self.stop_processing = False
+        backup_dir = dst.parent / f"{dst.name}_backup_{int(time.time())}"
+        
+        # Clear the flowbox and initialize progress UI
+        GLib.idle_add(self.flowbox.remove_all)
+        
+        steps = [
+            ("Backing up existing directory", lambda: self.backup_existing_directory(dst, backup_dir)),
+            ("Copying Wine directory", lambda: self.custom_copytree(src, dst)),
+            ("Processing registry files", lambda: self.process_reg_files(dst)),
+            ("Performing Replacements", lambda: self.perform_replacements(dst)),
+            ("Renaming and Merging User Directories", lambda: self.rename_and_merge_user_directories(dst)),
+            ("Creating scripts for .exe files", lambda: self.create_scripts_for_exe_files(dst)),
+        ]
+        
+        self.total_steps = len(steps)
+        self.show_processing_spinner("Importing Wine Directory...")
+        self.connect_open_button_with_import_wine_directory_cancel()
+
+        def perform_import_steps():
+            try:
+                for index, (step_text, step_func) in enumerate(steps, 1):
+                    if self.stop_processing:
+                        GLib.idle_add(lambda: self.handle_import_cancellation(dst, backup_dir))
+                        return
+                        
+                    GLib.idle_add(self.show_initializing_step, step_text)
+                    try:
+                        step_func()
+                        GLib.idle_add(self.mark_step_as_done, step_text)
+                        GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
+                    except Exception as step_error:
+                        if "Operation cancelled by user" in str(step_error):
+                            GLib.idle_add(lambda: self.handle_import_cancellation(dst, backup_dir))
+                        else:
+                            print(f"Error during step '{step_text}': {step_error}")
+                            GLib.idle_add(
+                                lambda error=step_error, text=step_text: self.handle_import_error(
+                                    dst, 
+                                    backup_dir, 
+                                    f"An error occurred during '{text}': {error}"
+                                )
+                            )
+                        return
+
+                if not self.stop_processing:
+                    self.cleanup_backup(backup_dir)
+                    GLib.idle_add(self.on_import_wine_directory_completed)
+                    
+            except Exception as import_error:
+                print(f"Error during import process: {import_error}")
+                GLib.idle_add(
+                    lambda error=import_error: self.handle_import_error(
+                        dst, 
+                        backup_dir, 
+                        f"Import failed: {error}"
+                    )
+                )
+
+        threading.Thread(target=perform_import_steps).start()
+
     def on_import_wine_directory_completed(self):
         """
         Called when the import process is complete. Updates UI, restores scripts, and resets the open button.
@@ -5331,8 +5397,8 @@ class WineCharmApp(Gtk.Application):
         self.hide_processing_spinner()
 
         # This will disconnect open_button handler, use this then reconnect the open
-        if self.open_button_handler_id is not None:
-            self.open_button.disconnect(self.open_button_handler_id)
+        #if self.open_button_handler_id is not None:
+        #    self.open_button.disconnect(self.open_button_handler_id)
 
         self.reconnect_open_button()
         self.load_script_list()
@@ -5452,68 +5518,15 @@ class WineCharmApp(Gtk.Application):
         self.set_open_button_icon_visible(False)
 
 
-    def import_wine_directory(self, src, dst):
-        """
-        Import the Wine directory with improved safety and rollback capability.
-        Args:
-            src: Source directory path (Path object)
-            dst: Destination directory path (Path object)
-        """
-        self.stop_processing = False
-        
-        # Generate backup directory name with timestamp
-        backup_dir = dst.parent / f"{dst.name}_backup_{int(time.time())}"
-        
-        # Clear the flowbox and initialize progress UI
-        GLib.idle_add(self.flowbox.remove_all)
-        
-        steps = [
-            ("Backing up existing directory", lambda: self.backup_existing_directory(dst, backup_dir)),
-            ("Copying Wine directory", lambda: self.custom_copytree(src, dst)),
-            ("Processing registry files", lambda: self.process_reg_files(dst)),
-            ("Performing Replacements", lambda: self.perform_replacements(dst)),
-            ("Creating scripts for .exe files", lambda: self.create_scripts_for_exe_files(dst)),
-        ]
-        
-        # Set total steps and initialize progress UI
-        self.total_steps = len(steps)
-        self.show_processing_spinner("Importing Wine Directory...")
-        self.connect_open_button_with_import_wine_directory_cancel()
-
-        def perform_import_steps():
-            try:
-                for index, (step_text, step_func) in enumerate(steps, 1):
-                    if self.stop_processing:
-                        GLib.idle_add(lambda: self.handle_import_cancellation(dst, backup_dir))
-                        return
-                        
-                    GLib.idle_add(self.show_initializing_step, step_text)
-                    try:
-                        step_func()
-                        GLib.idle_add(self.mark_step_as_done, step_text)
-                        GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
-                    except Exception as e:
-                        print(f"Error during step '{step_text}': {e}")
-                        GLib.idle_add(lambda: self.handle_import_error(dst, backup_dir, f"An error occurred during '{step_text}': {e}"))
-                        return
-
-                if not self.stop_processing:
-                    # Success - remove the backup
-                    self.cleanup_backup(backup_dir)
-                    GLib.idle_add(self.on_import_wine_directory_completed)
-                    
-            except Exception as e:
-                print(f"Error during import process: {e}")
-                GLib.idle_add(lambda: self.handle_import_error(dst, backup_dir, f"Import failed: {e}"))
-
-        threading.Thread(target=perform_import_steps).start()
-
     def backup_existing_directory(self, dst, backup_dir):
         """
         Safely backup the existing directory if it exists.
         """
         if dst.exists():
             try:
+                # Create the parent directory if it doesn't exist
+                backup_dir.parent.mkdir(parents=True, exist_ok=True)
+                # First create the destination directory
                 dst.rename(backup_dir)
                 print(f"Created backup of existing directory: {backup_dir}")
             except Exception as e:
@@ -5529,6 +5542,8 @@ class WineCharmApp(Gtk.Application):
                 print(f"Removed incomplete import directory: {dst}")
             
             if backup_dir.exists():
+                # Create the parent directory if it doesn't exist
+                dst.parent.mkdir(parents=True, exist_ok=True)
                 backup_dir.rename(dst)
                 print(f"Restored original directory from backup")
                 
@@ -5610,16 +5625,6 @@ class WineCharmApp(Gtk.Application):
         if self.open_button_handler_id is not None:
             self.open_button.disconnect(self.open_button_handler_id)
         
-        if not hasattr(self, 'spinner') or not self.spinner:  # Ensure spinner is not created multiple times
-            self.spinner = Gtk.Spinner()
-            self.spinner.start()
-            self.open_button_box.append(self.spinner)
-
-        if self.spinner:
-            self.spinner.stop()
-            self.open_button_box.remove(self.spinner)
-            self.spinner = None 
-
         #self.set_open_button_label("Importing...")
         self.set_open_button_icon_visible(False)  # Hide the open-folder icon
         print("Open button disconnected and spinner shown.")
@@ -5629,15 +5634,12 @@ class WineCharmApp(Gtk.Application):
         Reconnect the open button's handler and reset its label.
         """
         # disconnect before reconnecting
-        #self.disconnect_open_button()
+        self.disconnect_open_button()
 
         if self.open_button_handler_id is not None:
             self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
         
-        if self.spinner:
-            self.spinner.stop()
-            #self.open_button_box.remove(self.spinner)
-            self.spinner = None  # Ensure the spinner reference is cleared
+
 
         self.set_open_button_label("Open")
         self.set_open_button_icon_visible(True)
@@ -5743,46 +5745,84 @@ class WineCharmApp(Gtk.Application):
 
     def custom_copytree(self, src, dst):
         """
-        Custom recursive copy function that ensures no overwriting of files or symlinks.
-        Args:
-            src (str): The source directory path.
-            dst (str): The destination directory path.
+        Custom copy implementation that preserves symlinks with smooth progress tracking
         """
-        self.ensure_directory_exists(dst)  # Ensure the destination directory exists
+        try:
+            # Count total files for progress tracking
+            total_files = sum(1 for _, _, files in os.walk(src) 
+                            for _ in files)
+            if total_files == 0:
+                raise Exception("No files found to copy")
 
-        # Iterate over all items in the source directory
-        for item in os.listdir(src):
-            s = os.path.join(src, item)  # Source item path
-            d = os.path.join(dst, item)  # Destination item path
+            processed_files = 0
 
-            # If the item is a symlink, replicate the symlink in the destination
-            if os.path.islink(s):
-                linkto = os.readlink(s)
-                # Create a symlink in the destination pointing to the same location as the source
-                if not os.path.exists(d):  # Avoid overwriting existing symlinks
-                    try:
-                        os.symlink(linkto, d)
-                    except FileExistsError:
-                        print(f"Symlink already exists: {d}, skipping.")
-                else:
-                    # Log or print a message if the symlink already exists
-                    print(f"Skipping existing symlink: {d}")
+            def update_progress():
+                if hasattr(self, 'progress_bar'):
+                    GLib.idle_add(
+                        lambda: self.progress_bar.set_fraction(processed_files / total_files)
+                    )
+                return True
 
-            # If the item is a directory, call custom_copytree recursively
-            elif os.path.isdir(s):
-                self.custom_copytree(s, d)
+            # Create destination if it doesn't exist
+            os.makedirs(dst, exist_ok=True)
 
-            # If the item is a file, copy it only if it doesn't already exist
-            elif os.path.isfile(s):
-                if not os.path.exists(d):  # Only copy if the file does not exist
-                    try:
-                        shutil.copy2(s, d)
-                    except FileExistsError:
-                        print(f"File already exists: {d}, skipping.")
-                else:
-                    # Optional: Print a message or log that the file already exists and is being skipped
-                    print(f"Skipping existing file: {d}")
+            def preexec_function():
+                os.setpgrp()
 
+            # Use cp -a to preserve all attributes including symlinks
+            copy_process = subprocess.Popen(
+                ['cp', '-a', str(src) + '/.', str(dst)],
+                preexec_fn=preexec_function,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            with self.process_lock:
+                self.current_process = copy_process
+
+            # Monitor the source files being processed
+            last_processed_size = 0
+            while copy_process.poll() is None:
+                if self.stop_processing:
+                    print("Cancellation requested, terminating copy process...")
+                    self._kill_current_process()
+                    
+                    # Clean up partially copied files
+                    if Path(dst).exists():
+                        print(f"Cleaning up partially copied files at {dst}")
+                        shutil.rmtree(dst, ignore_errors=True)
+                    
+                    raise Exception("Operation cancelled by user")
+
+                # Get current total size of destination
+                current_size = sum(os.path.getsize(os.path.join(root, file))
+                                for root, _, files in os.walk(dst)
+                                for file in files)
+                
+                # If size has increased, update progress
+                if current_size > last_processed_size:
+                    processed_files += 1
+                    if processed_files > total_files:  # Ensure we don't exceed 100%
+                        processed_files = total_files
+                    update_progress()
+                    last_processed_size = current_size
+                
+                time.sleep(0.1)  # Prevent too frequent checks
+
+            if copy_process.returncode != 0:
+                stderr = copy_process.stderr.read().decode() if copy_process.stderr else ""
+                raise Exception(f"Copy failed with return code {copy_process.returncode}: {stderr}")
+
+            # Ensure we show 100% at the end
+            processed_files = total_files
+            update_progress()
+
+        except Exception as e:
+            print(f"Error during copy: {e}")
+            raise
+        finally:
+            with self.process_lock:
+                self.current_process = None
 
 
                 
@@ -7474,7 +7514,7 @@ class WineCharmApp(Gtk.Application):
         else:
             print("Set default runner canceled.")
 
-        dialog.close()
+        #dialog.close()
 
     def on_download_runner_clicked_default(self, dialog):
         """
@@ -8955,13 +8995,13 @@ class WineCharmApp(Gtk.Application):
         """
         # Reconnect open button and reset its label
         
-        if self.open_button_handler_id is not None:
-            self.open_button.disconnect(self.open_button_handler_id)
-        self.disconnect_open_button()
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)
-        self.reconnect_open_button()
+        #if self.open_button_handler_id is not None:
+         #   self.open_button.disconnect(self.open_button_handler_id)
+        #self.disconnect_open_button()
+        #self.set_open_button_label("Open")
+        #self.set_open_button_icon_visible(True)
         self.hide_processing_spinner()
+        self.reconnect_open_button()
 
 
         # Restore the script list in the flowbox
@@ -9211,160 +9251,6 @@ class WineCharmApp(Gtk.Application):
             dialog.close()
 
 
-########   import interruptible? #################################################################################
-
-
-    def custom_copytree(self, src, dst):
-        """
-        Custom copy implementation that can be cancelled and tracks the current process
-        """
-        try:
-            # Create a new process group
-            def preexec_function():
-                os.setpgrp()
-
-            # Use cp for copying with process tracking
-            copy_process = subprocess.Popen(
-                ['cp', '-r', str(src) + '/.', str(dst)],
-                preexec_fn=preexec_function,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
-            with self.process_lock:
-                self.current_process = copy_process
-
-            while copy_process.poll() is None:
-                if self.stop_processing:
-                    print("Cancellation requested, terminating copy process...")
-                    self._kill_current_process()
-                    
-                    # Clean up partially copied files
-                    if Path(dst).exists():
-                        print(f"Cleaning up partially copied files at {dst}")
-                        shutil.rmtree(dst, ignore_errors=True)
-                    
-                    raise Exception("Operation cancelled by user")
-                time.sleep(0.1)
-
-            if copy_process.returncode != 0:
-                stderr = copy_process.stderr.read().decode() if copy_process.stderr else ""
-                raise Exception(f"Copy failed with return code {copy_process.returncode}: {stderr}")
-
-        except Exception as e:
-            print(f"Error during copy: {e}")
-            raise
-        finally:
-            with self.process_lock:
-                self.current_process = None
-
-    def import_wine_directory(self, src, dst):
-        """
-        Import the Wine directory with improved safety, rollback capability, and cancellation support.
-        """
-        self.stop_processing = False
-        backup_dir = dst.parent / f"{dst.name}_backup_{int(time.time())}"
-        
-        # Clear the flowbox and initialize progress UI
-        GLib.idle_add(self.flowbox.remove_all)
-        
-        steps = [
-            ("Backing up existing directory", lambda: self.backup_existing_directory(dst, backup_dir)),
-            ("Copying Wine directory", lambda: self.custom_copytree(src, dst)),
-            ("Processing registry files", lambda: self.process_reg_files(dst)),
-            ("Performing Replacements", lambda: self.perform_replacements(dst)),
-            ("Renaming and Merging User Directories", lambda: self.rename_and_merge_user_directories(dst)),
-            ("Creating scripts for .exe files", lambda: self.create_scripts_for_exe_files(dst)),
-        ]
-        
-        self.total_steps = len(steps)
-        self.show_processing_spinner("Importing Wine Directory...")
-        self.connect_open_button_with_import_wine_directory_cancel()
-
-        def perform_import_steps():
-            try:
-                for index, (step_text, step_func) in enumerate(steps, 1):
-                    if self.stop_processing:
-                        GLib.idle_add(lambda: self.handle_import_cancellation(dst, backup_dir))
-                        return
-                        
-                    GLib.idle_add(self.show_initializing_step, step_text)
-                    try:
-                        step_func()
-                        GLib.idle_add(self.mark_step_as_done, step_text)
-                        GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
-                    except Exception as step_error:
-                        if "Operation cancelled by user" in str(step_error):
-                            GLib.idle_add(lambda: self.handle_import_cancellation(dst, backup_dir))
-                        else:
-                            print(f"Error during step '{step_text}': {step_error}")
-                            GLib.idle_add(
-                                lambda error=step_error, text=step_text: self.handle_import_error(
-                                    dst, 
-                                    backup_dir, 
-                                    f"An error occurred during '{text}': {error}"
-                                )
-                            )
-                        return
-
-                if not self.stop_processing:
-                    self.cleanup_backup(backup_dir)
-                    GLib.idle_add(self.on_import_wine_directory_completed)
-                    
-            except Exception as import_error:
-                print(f"Error during import process: {import_error}")
-                GLib.idle_add(
-                    lambda error=import_error: self.handle_import_error(
-                        dst, 
-                        backup_dir, 
-                        f"Import failed: {error}"
-                    )
-                )
-
-        threading.Thread(target=perform_import_steps).start()
-
-    def backup_existing_directory(self, dst, backup_dir):
-        """
-        Safely backup the existing directory if it exists.
-        """
-        if dst.exists():
-            try:
-                # Create the parent directory if it doesn't exist
-                backup_dir.parent.mkdir(parents=True, exist_ok=True)
-                # First create the destination directory
-                dst.rename(backup_dir)
-                print(f"Created backup of existing directory: {backup_dir}")
-            except Exception as e:
-                raise Exception(f"Failed to create backup: {e}")
-
-    def handle_import_cancellation(self, dst, backup_dir):
-        """
-        Handle import cancellation by restoring from backup.
-        """
-        try:
-            if dst.exists():
-                shutil.rmtree(dst)
-                print(f"Removed incomplete import directory: {dst}")
-            
-            if backup_dir.exists():
-                # Create the parent directory if it doesn't exist
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                backup_dir.rename(dst)
-                print(f"Restored original directory from backup")
-                
-        except Exception as e:
-            print(f"Error during cancellation cleanup: {e}")
-            # Still show cancelled message but also show error
-            GLib.idle_add(self.show_info_dialog, "Error", 
-                        f"Wine directory import was cancelled but encountered errors during cleanup: {e}\n"
-                        f"Backup directory may still exist at: {backup_dir}")
-            return
-        
-        self.stop_processing = False
-        GLib.idle_add(self.on_import_wine_directory_completed)
-        GLib.idle_add(self.show_info_dialog, "Cancelled", "Wine directory import was cancelled")
-
-
 #################3 Replace strings update with interruption
 
     def replace_strings_in_files(self, directory, find_replace_pairs):
@@ -9465,10 +9351,6 @@ class WineCharmApp(Gtk.Application):
 
 
 ##################################################################################### 
-
-
-
-
 
 
 
