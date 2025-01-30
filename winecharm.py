@@ -3855,16 +3855,16 @@ class WineCharmApp(Gtk.Application):
         """
         Handle cancel button click
         """
-        dialog = Adw.MessageDialog.new(
-            self.window,
-            "Cancel Bottle Creation",
-            "Do you want to cancel the bottle creation process?"
+        dialog = Adw.AlertDialog(
+            heading="Cancel Bottle Creation",
+            body="Do you want to cancel the bottle creation process?"
         )
         dialog.add_response("continue", "Continue")
         dialog.add_response("cancel", "Cancel Creation")
         dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.connect("response", self.on_cancel_bottle_dialog_response, script_key)
-        dialog.present()
+        dialog.present(self.window)
+
 
     def on_cancel_bottle_dialog_response(self, dialog, response, script_key):
         """
