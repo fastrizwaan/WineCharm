@@ -7651,25 +7651,29 @@ class WineCharmApp(Gtk.Application):
 #### RUNNER download issue with progress and cancel        
     def on_settings_download_runner_clicked(self, callback=None):
         """
-        Handle the "Runner Download" option click using modern Adw.AlertDialog and DropDowns.
+        Handle the "Runner Download" option click.
+        Use the cached runners loaded at startup, or notify if not available.
         """
         if not self.runner_data:
             self.show_info_dialog(
                 "Runner data not available",
                 "Please try again in a moment or restart the application."
             )
-            if callback is not None:
+            if callback:
                 GLib.idle_add(callback)
             return
 
-        # Create main content box
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        content_box.set_margin_top(10)
-        content_box.set_margin_bottom(10)
-        content_box.set_margin_start(10)
-        content_box.set_margin_end(10)
+        # Create selection dialog using Adw.AlertDialog
+        dialog = Adw.AlertDialog(
+            heading="Download Wine Runner",
+            body="Select the runners you wish to download."
+        )
 
-        # Create dropdowns using modern patterns
+        # Dialog content setup
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        dialog.set_extra_child(content_box)
+
+        # Dropdown setup
         dropdown_data = [
             ("Wine Proton", self.runner_data.get("proton", [])),
             ("Wine Stable", self.runner_data.get("stable", [])),
@@ -7678,95 +7682,93 @@ class WineCharmApp(Gtk.Application):
             ("Wine-WoW64", self.runner_data.get("wow64", []))
         ]
 
-        self.category_widgets = {}
-
+        combo_boxes = {}
         for label_text, file_list in dropdown_data:
             hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-            label = Gtk.Label(label=label_text)
-            label.set_xalign(0)
-            label.set_width_chars(12)
-
-            # Create model with "Choose..." as first item
-            string_list = Gtk.StringList()
-            string_list.append("Choose...")
-            for file in file_list:
-                string_list.append(file['name'])
-
-            # Create factory for dropdown items
-            factory = Gtk.SignalListItemFactory()
-            factory.connect("setup", self._on_dropdown_factory_setup)
-            factory.connect("bind", self._on_dropdown_factory_bind)
-
-            # Create dropdown
-            dropdown = Gtk.DropDown(
-                model=string_list,
-                factory=factory,
-                selected=0
-            )
-
-            self.category_widgets[label_text] = {
-                "dropdown": dropdown,
-                "model": string_list,
-                "file_list": file_list
-            }
-
+            label = Gtk.Label(label=label_text, xalign=0, width_chars=12)
+            
+            # Create dropdown with StringList model
+            names = ["Choose..."] + [file['name'] for file in file_list]
+            model = Gtk.StringList.new(names)
+            dropdown = Gtk.DropDown(model=model)
+            dropdown.set_selected(0)
+            
+            combo_boxes[label_text] = {"dropdown": dropdown, "file_list": file_list}
             hbox.append(label)
             hbox.append(dropdown)
             content_box.append(hbox)
 
-        # Create and configure AlertDialog
-        dialog = Adw.AlertDialog(
-            heading="Download Wine Runner",
-            body="Select the runners you wish to download:",
-            extra_child=content_box
-        )
+        # Configure dialog buttons
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("download", "Download")
         dialog.set_default_response("download")
         dialog.set_close_response("cancel")
 
-        dialog.connect("response", self.on_download_runner_response, callback)
+        dialog.connect("response", self.on_download_runner_response, combo_boxes, callback)
         dialog.present(self.window)
 
-    def on_download_runner_response(self, dialog, response_id, callback=None):
+
+    def on_download_runner_response(self, dialog, response_id, combo_boxes, callback=None):
+        """Handle response from runner selection dialog."""
         if response_id == "download":
             selected_runners = {}
-            
-            for category, widget_data in self.category_widgets.items():
-                dropdown = widget_data["dropdown"]
-                model = widget_data["model"]
-                file_list = widget_data["file_list"]
+            for label, data in combo_boxes.items():
+                dropdown = data['dropdown']
+                file_list = data['file_list']
+                selected_pos = dropdown.get_selected()
                 
-                selected_index = dropdown.get_selected()
-                if selected_index > 0:  # Skip "Choose..." at index 0
-                    selected_string = model.get_string(selected_index)
-                    selected_runner = next((r for r in file_list if r['name'] == selected_string), None)
+                if selected_pos != 0:
+                    model = dropdown.get_model()
+                    selected_name = model.get_string(selected_pos)
+                    selected_runner = next((r for r in file_list if r['name'] == selected_name), None)
                     if selected_runner:
-                        selected_runners[category] = selected_runner
+                        selected_runners[label] = selected_runner
 
             if selected_runners:
-                # Create progress dialog using AlertDialog
+                # Create progress dialog
                 progress_dialog = Adw.AlertDialog(
                     heading="Downloading Runners",
-                    body="",
-                    extra_child=self.create_progress_content()
+                    body=""
                 )
-                progress_dialog.add_response("close", "Close")
-                progress_dialog.set_default_response("close")
-                progress_dialog.set_close_response("close")
+                
+                # Progress UI setup
+                content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+                progress_dialog.set_extra_child(content_box)
+                
+                progress_label = Gtk.Label(label="Starting download...")
+                runner_progress_bar = Gtk.ProgressBar()
+                total_progress_bar = Gtk.ProgressBar()
+                content_box.append(progress_label)
+                content_box.append(runner_progress_bar)
+                content_box.append(total_progress_bar)
+
+                # Add cancel button
+                progress_dialog.add_response("cancel", "Cancel")
+                progress_dialog.set_close_response("cancel")
+                
+                # Create cancellation event
+                cancel_event = threading.Event()
+                progress_dialog.connect("response", 
+                    lambda d, r: cancel_event.set() if r == "cancel" else None
+                )
+                
                 progress_dialog.present(self.window)
 
                 # Start download thread
                 threading.Thread(
                     target=self.download_runners_thread,
-                    args=(selected_runners, progress_dialog, callback)
+                    args=(selected_runners, progress_dialog, total_progress_bar,
+                        runner_progress_bar, progress_label, callback, cancel_event),
+                    daemon=True
                 ).start()
             else:
-                if callback: GLib.idle_add(callback)
+                if callback:
+                    GLib.idle_add(callback)
         else:
-            if callback: GLib.idle_add(callback)
+            if callback:
+                GLib.idle_add(callback)
 
-    def create_progress_content(self):
+    def cxreate_progress_content(self):
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         
         # Set individual margins for proper spacing
@@ -7786,70 +7788,119 @@ class WineCharmApp(Gtk.Application):
         return content_box
 
 
-    def download_runners_thread(self, selected_runners, progress_dialog, callback):
-        total = len(selected_runners)
-        for idx, (category, runner) in enumerate(selected_runners.items()):
-            GLib.idle_add(self.progress_label.set_label, f"Downloading {runner['name']}...")
-            
-            def progress_cb(progress):
-                GLib.idle_add(self.runner_progress.set_fraction, progress)
-            
-            try:
-                self.download_and_extract_runner(
-                    runner['name'],
-                    runner['url'],
-                    progress_callback=progress_cb
-                )
-            except Exception as e:
-                print(f"Download failed: {str(e)}")
-            
-            GLib.idle_add(self.total_progress.set_fraction, (idx + 1) / total)
-            GLib.idle_add(self.runner_progress.set_fraction, 0.0)
-        
-        #GLib.idle_add(progress_dialog.close)
-        if callback: GLib.idle_add(callback)
-
-    def download_and_extract_runner(self, runner_name, download_url, progress_callback=None):
-        """
-        Download and extract the selected runner.
-        Args:
-            runner_name: The name of the runner.
-            download_url: The full URL to download the runner.
-            progress_callback: Callback function to update download progress.
-        """
-        runner_tar_path = self.runners_dir / f"{runner_name}.tar.xz"
-        runner_extract_path = self.runners_dir
-
-        # Ensure the runners directory exists
-        self.runners_dir.mkdir(parents=True, exist_ok=True)
-
-        def reporthook(block_num, block_size, total_size):
-            if progress_callback:
-                downloaded = block_num * block_size
-                if total_size > 0:
-                    percent = downloaded / total_size
-                    GLib.idle_add(progress_callback, percent)
+    def download_runners_thread(self, selected_runners, progress_dialog, total_progress_bar,
+                            runner_progress_bar, progress_label, callback, cancel_event):
+        """Threaded download process with cancellation support."""
+        total_runners = len(selected_runners)
+        download_success = True
+        current_file = None
+        was_cancelled = False  # Track cancellation explicitly
 
         try:
-            print(f"Downloading {runner_name} from {download_url}")
-            urllib.request.urlretrieve(download_url, runner_tar_path, reporthook)
-            print(f"Download complete: {runner_tar_path}")
+            for idx, (label, runner) in enumerate(selected_runners.items()):
+                if cancel_event.is_set():
+                    download_success = False
+                    was_cancelled = True
+                    break
 
-            # Extract the .tar.xz file
-            print(f"Extracting {runner_tar_path} to {runner_extract_path}")
-            runner_extract_path.mkdir(exist_ok=True)
-            subprocess.run(["tar", "-xf", str(runner_tar_path), "-C", str(runner_extract_path)], check=True)
-            print(f"Extraction complete: {runner_extract_path}")
+                current_file = self.runners_dir / f"{runner['name']}.tar.xz"
+                
+                # Update UI
+                GLib.idle_add(progress_label.set_text, f"Downloading {runner['name']}...")
+                GLib.idle_add(runner_progress_bar.set_fraction, 0.0)
 
-            # Clean up the downloaded .tar.xz file if desired
+                try:
+                    self.download_and_extract_runner(
+                        runner['name'],
+                        runner['url'],
+                        lambda p: GLib.idle_add(runner_progress_bar.set_fraction, p),
+                        cancel_event
+                    )
+                except Exception as e:
+                    download_success = False
+                    if "cancelled" in str(e).lower():
+                        was_cancelled = True
+                        break
+                    else:
+                        GLib.idle_add(
+                            self.show_info_dialog,
+                            "Download Error",
+                            f"Failed to download {runner['name']}: {e}"
+                        )
+
+                # Update total progress
+                GLib.idle_add(total_progress_bar.set_fraction, (idx + 1) / total_runners)
+
+        finally:
+            # Cleanup partial file if exists
+            if current_file and current_file.exists():
+                current_file.unlink(missing_ok=True)
+            
+            # Handle final status in one place
+            if was_cancelled:
+                GLib.idle_add(
+                    self.show_info_dialog,
+                    "Download Cancelled",
+                    "The download was cancelled. Partially downloaded files have been deleted.",
+                    callback
+                )
+            elif download_success:
+                
+                GLib.idle_add(progress_dialog.close)
+                GLib.idle_add(
+                    self.show_info_dialog,
+                    "Download Complete",
+                    "The runners have been successfully downloaded and extracted.",
+                    callback
+                )
+            else:
+                GLib.idle_add(
+                    self.show_info_dialog,
+                    "Download Incomplete",
+                    "Some runners failed to download.",
+                    callback
+                )
+
+    def download_and_extract_runner(self, runner_name, download_url, progress_callback, cancel_event):
+        """Download and extract runner with cancellation support."""
+        runner_tar_path = self.runners_dir / f"{runner_name}.tar.xz"
+        self.runners_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            with urllib.request.urlopen(download_url) as response:
+                total_size = int(response.headers.get('Content-Length', 0))
+                downloaded = 0
+                
+                with open(runner_tar_path, 'wb') as f:
+                    while True:
+                        # Check for cancellation before each chunk
+                        if cancel_event.is_set():
+                            raise Exception("Download cancelled by user")
+                            
+                        # Read smaller chunks for more responsive cancellation
+                        chunk = response.read(4096)  # Reduced from 8192 to 4KB chunks
+                        if not chunk:
+                            break
+                            
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        
+                        # Add intermediate cancellation check
+                        if cancel_event.is_set():
+                            raise Exception("Download cancelled by user")
+                        
+                        if total_size > 0 and progress_callback:
+                            progress = downloaded / total_size
+                            GLib.idle_add(progress_callback, progress)
+
+            # Extract the file
+            subprocess.run(["tar", "-xf", str(runner_tar_path), "-C", str(self.runners_dir)], check=True)
             runner_tar_path.unlink()
-            print(f"Removed downloaded archive: {runner_tar_path}")
 
         except Exception as e:
-            print(f"Error downloading or extracting {runner_name}: {e}")
+            if runner_tar_path.exists():
+                runner_tar_path.unlink()
             raise
-
-        print(f"Runner {runner_name} is ready in {runner_extract_path}")
 
 # Please fix the download runner method to have cancel capability, show cancel button instead of OK
 #### /RUNNER download issue with progress and cancel        
