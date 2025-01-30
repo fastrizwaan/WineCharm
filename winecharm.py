@@ -4030,7 +4030,7 @@ class WineCharmApp(Gtk.Application):
             
     def show_delete_wineprefix_confirmation(self, script, button):
         """
-        Show an Adw.MessageDialog to confirm the deletion of the Wine prefix.
+        Show an Adw.AlertDialog to confirm the deletion of the Wine prefix.
         
         Args:
             script: The script that contains information about the Wine prefix.
@@ -4042,10 +4042,8 @@ class WineCharmApp(Gtk.Application):
         charm_files = list(wineprefix.rglob("*.charm"))
 
         # Create a confirmation dialog
-        dialog = Adw.MessageDialog(
-            modal=True,
-            transient_for=self.window,  # Assuming self.window is the main application window
-            title="Delete Wine Prefix",
+        dialog = Adw.AlertDialog(
+            heading="Delete Wine Prefix",
             body=f"Deleting {wineprefix.name} will remove:"
         )
 
