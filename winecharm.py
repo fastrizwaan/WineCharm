@@ -4082,7 +4082,7 @@ class WineCharmApp(Gtk.Application):
         Handle the response from the delete Wine prefix confirmation dialog.
         
         Args:
-            dialog: The Adw.MessageDialog instance.
+            dialog: The Adw.AlertDialog instance.
             response_id: The ID of the response clicked by the user.
             wineprefix: The path to the Wine prefix that is potentially going to be deleted.
         """
@@ -4169,13 +4169,10 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Create a new dialog for selecting shortcuts
-        dialog = Adw.MessageDialog(
-            modal=True,
-            transient_for=self.window,
-            title="Delete Shortcuts",
+        dialog = Adw.AlertDialog(
+            heading="Delete Shortcuts",
             body=f"Select the shortcuts you want to delete for {wine_prefix_dir.name}:"
         )
-
         # A dictionary to store the checkboxes and corresponding charm files
         checkbox_dict = {}
 
@@ -4216,7 +4213,7 @@ class WineCharmApp(Gtk.Application):
         dialog.connect("response", self.on_delete_shortcuts_response, checkbox_dict)
 
         # Present the dialog
-        dialog.present()
+        dialog.present(self.window)
 
 
     def on_delete_shortcuts_response(self, dialog, response_id, checkbox_dict):
@@ -4224,7 +4221,7 @@ class WineCharmApp(Gtk.Application):
         Handle the response from the delete shortcut dialog.
         
         Args:
-            dialog: The Adw.MessageDialog instance.
+            dialog: The Adw.AlertDialog instance.
             response_id: The ID of the response clicked by the user.
             checkbox_dict: Dictionary mapping checkboxes to charm files.
         """
