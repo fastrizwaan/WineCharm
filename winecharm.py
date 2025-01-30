@@ -4407,10 +4407,8 @@ class WineCharmApp(Gtk.Application):
         if not current_name:  # In case the current name is missing
             current_name = "New Shortcut"
 
-        # Create an Adw.MessageDialog for renaming
-        dialog = Adw.MessageDialog(
-            modal=True,
-            transient_for=self.window,  # Assuming self.window is the main application window
+        # Create an Adw.AlertDialog for renaming
+        dialog = Adw.AlertDialog(
             title="Rename Shortcut",
             body="Enter the new name for the shortcut:"
         )
@@ -4432,7 +4430,7 @@ class WineCharmApp(Gtk.Application):
         dialog.connect("response", self.on_show_rename_shortcut_dialog_response, entry, script_key)
 
         # Present the dialog
-        dialog.present()
+        dialog.present(self.window)
 
     def on_show_rename_shortcut_dialog_response(self, dialog, response_id, entry, script_key):
         """
