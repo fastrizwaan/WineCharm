@@ -7985,77 +7985,82 @@ class WineCharmApp(Gtk.Application):
         # Add functionality to delete the template.
 
     def set_wine_arch(self):
-        dialog = Adw.MessageDialog(
-            transient_for=self.window,
-            title="Set Wine Architecture",
+        """
+        Allow the user to set the Wine architecture using Adw.AlertDialog.
+        """
+        # Create AlertDialog
+        dialog = Adw.AlertDialog(
+            heading="Set Wine Architecture",
             body="Select the default architecture for new prefixes:"
         )
 
+        # Create radio buttons for architecture selection
         vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         win32_radio = Gtk.CheckButton(label="32-bit (win32)")
         win64_radio = Gtk.CheckButton(label="64-bit (win64)")
         win64_radio.set_group(win32_radio)
-        
+
+        # Set current selection
         current_arch = self.arch
         win32_radio.set_active(current_arch == 'win32')
         win64_radio.set_active(current_arch == 'win64')
 
+        # Add radio buttons to dialog
         vbox.append(win32_radio)
         vbox.append(win64_radio)
         dialog.set_extra_child(vbox)
 
+        # Configure dialog buttons
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("ok", "OK")
         dialog.set_default_response("ok")
         dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
 
+        # Response handler
+        def on_response(dialog, response):
+            if response == "ok":
+                new_arch = 'win32' if win32_radio.get_active() else 'win64'
+                if new_arch != current_arch:
+                    self.main_frame.set_child(None)
+                    handle_architecture_change(new_arch)
+            dialog.close()
+
+        # Architecture change handler
         def handle_architecture_change(new_arch):
             # Determine paths based on selected architecture
             new_template = self.default_template_win32 if new_arch == 'win32' else self.default_template_win64
             single_prefix_dir = self.single_prefix_dir_win32 if new_arch == 'win32' else self.single_prefix_dir_win64
-            
-            # Only proceed if architecture actually changed
-            if new_arch == self.arch:
-                return
 
-            # Update settings first
+            # Update settings
             self.arch = new_arch
             self.template = new_template
             self.save_settings()
-            print(f" => New Template = {new_template}")
+            
+            # Resolve template path
             new_template = Path(new_template).expanduser().resolve()
-            print(f" => New Template = {new_template}")
-            # Check template existence without initializing
+            
+            # Initialize new template if needed
             if not new_template.exists():
                 print(f"Initializing new {new_arch} template...")
                 self.on_back_button_clicked(None)
                 self.initialize_template(new_template, 
-                                    lambda: self.finalize_arch_change(single_prefix_dir),
+                                    lambda: finalize_arch_change(single_prefix_dir),
                                     arch=new_arch)
             else:
                 print(f"Using existing {new_arch} template")
                 finalize_arch_change(single_prefix_dir)
 
+        # Finalization handler
         def finalize_arch_change(single_prefix_dir):
-            # Handle single prefix copy if needed
-            
             if self.single_prefix and not single_prefix_dir.exists():
                 print(f"Copying to {single_prefix_dir.name}...")
                 self.copy_template(single_prefix_dir)
             self.set_dynamic_variables()
             self.show_options_for_settings()
 
-        def on_response(dialog, response):
-            if response == "ok":
-                new_arch = 'win32' if win32_radio.get_active() else 'win64'
-                if new_arch != current_arch:
-                    self.main_frame.set_child(None)
-                    #self.show_processing_spinner(f"Configuring {new_arch}...")
-                    handle_architecture_change(new_arch)
-            dialog.close()
-
+        # Connect response signal and present dialog
         dialog.connect("response", on_response)
-        dialog.present()
+        dialog.present(self.window)
         
 ################
     def backup_runner(self, action=None):
