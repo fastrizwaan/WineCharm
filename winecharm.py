@@ -3605,17 +3605,15 @@ class WineCharmApp(Gtk.Application):
         if directory_size_gb > 3:
             print("Size Greater than 3GB")
             # Show confirmation dialog
-            dialog = Adw.MessageDialog.new(
-            self.window,
-            "Large Game Directory",
-            f"The game directory size is {directory_size_gb}GB. Do you want to continue?"
+            dialog = Adw.AlertDialog(
+                heading="Large Game Directory",
+                body=f"The game directory size is {directory_size_gb}GB. Do you want to continue?"
             )
             dialog.add_response("cancel", "Cancel")
             dialog.add_response("continue", "Continue")
             dialog.set_response_appearance("continue", Adw.ResponseAppearance.SUGGESTED)
-        #dialog.connect("response", perform_backup_steps, script, script_key, backup_path)
             dialog.connect("response", self.on_backup_confirmation_response, script, script_key)
-            dialog.present()
+            dialog.present(self.window)
             print("----------------------------------------------------------")
         else:
             self.show_create_bottle_dialog(script, script_key)
