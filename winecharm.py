@@ -2034,19 +2034,18 @@ class WineCharmApp(Gtk.Application):
             return None
 
     def show_error_with_log_dialog(self, title, message, log_file_path):
-        # Create the main error message dialog
-        dialog = Adw.MessageDialog(
-            transient_for=self.window,
-            modal=True,
+        """
+        Show an error dialog with an option to view log content.
+        """
+        # Create the main error dialog
+        dialog = Adw.AlertDialog(
             heading=title,
             body=message
         )
 
-        # Add buttons to the main dialog
-        dialog.add_response("show_log", "Show Log")
+        # Add buttons to the dialog
         dialog.add_response("close", "Close")
-
-        # Set default and close responses
+        dialog.add_response("show_log", "Show Log")
         dialog.set_default_response("close")
         dialog.set_close_response("close")
 
@@ -2064,54 +2063,49 @@ class WineCharmApp(Gtk.Application):
 
         threading.Thread(target=load_log_content, daemon=True).start()
 
-        # Function to show a separate dialog with the log content
+        # Function to show the log content dialog
         def show_log_dialog():
-            # Create a new dialog for the log content
-            log_dialog = Adw.MessageDialog(
-                transient_for=self.window,
-                modal=True,
+            log_dialog = Adw.AlertDialog(
                 heading="Log Content",
                 body=""
             )
 
-            # Create a ScrolledWindow for the log content
+            # Create scrolled text view for log content
             scrolled_window = Gtk.ScrolledWindow()
             scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
             scrolled_window.set_min_content_width(640)
             scrolled_window.set_min_content_height(480)
 
-            # Create a TextView to display the log content
             log_view = Gtk.TextView()
-            log_view.set_editable(False)  # Make it read-only
+            log_view.set_editable(False)
             log_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
             scrolled_window.set_child(log_view)
 
-            # Load the log content into the TextView
+            # Set log content
             GLib.idle_add(lambda: log_view.get_buffer().set_text(log_content))
 
-            # Add the ScrolledWindow to the log dialog
+            # Add content to dialog
             log_dialog.set_extra_child(scrolled_window)
 
-            # Add a close button to the log dialog
+            # Configure dialog buttons
             log_dialog.add_response("close", "Close")
             log_dialog.set_default_response("close")
             log_dialog.set_close_response("close")
 
-            # Show the log dialog
-            log_dialog.present()
+            # Present the log dialog
+            log_dialog.present(self.window)
 
-        # Handle responses from the main dialog
+        # Handle main dialog responses
         def on_response(dialog, response):
             if response == "show_log":
-                show_log_dialog()  # Show the log content in a new dialog
-            else:
-                dialog.close()  # Close the main dialog
+                show_log_dialog()
+            dialog.close()
 
-        # Connect the response handler to the main dialog
+        # Connect response handler
         dialog.connect("response", on_response)
 
-        # Show the main dialog
-        dialog.present()
+        # Present the main dialog
+        dialog.present(self.window)
 
     def monitor_process(self, script_key):
         process_info = self.running_processes.get(script_key)
