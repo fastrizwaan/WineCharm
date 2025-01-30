@@ -7768,26 +7768,6 @@ class WineCharmApp(Gtk.Application):
             if callback:
                 GLib.idle_add(callback)
 
-    def cxreate_progress_content(self):
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        
-        # Set individual margins for proper spacing
-        content_box.set_margin_start(10)
-        content_box.set_margin_end(10)
-        content_box.set_margin_top(10)
-        content_box.set_margin_bottom(10)
-        
-        self.progress_label = Gtk.Label(label="Starting download...")
-        self.runner_progress = Gtk.ProgressBar()
-        self.total_progress = Gtk.ProgressBar()
-        
-        content_box.append(self.progress_label)
-        content_box.append(self.runner_progress)
-        content_box.append(self.total_progress)
-        
-        return content_box
-
-
     def download_runners_thread(self, selected_runners, progress_dialog, total_progress_bar,
                             runner_progress_bar, progress_label, callback, cancel_event):
         """Threaded download process with cancellation support."""
