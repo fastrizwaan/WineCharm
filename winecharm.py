@@ -3201,16 +3201,16 @@ class WineCharmApp(Gtk.Application):
         """
         Handle cancel button click during backup
         """
-        dialog = Adw.MessageDialog.new(
-            self.window,
-            "Cancel Backup",
-            "Do you want to cancel the backup process?"
+        dialog = Adw.AlertDialog(
+            heading="Cancel Backup",
+            body="Do you want to cancel the backup process?"
         )
+
         dialog.add_response("continue", "Continue")
         dialog.add_response("cancel", "Cancel Backup")
         dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.connect("response", self.on_cancel_backup_dialog_response, script_key)
-        dialog.present()
+        dialog.present(self.window)
 
     def on_cancel_backup_dialog_response(self, dialog, response, script_key):
         """
