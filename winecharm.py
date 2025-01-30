@@ -4279,7 +4279,7 @@ class WineCharmApp(Gtk.Application):
 
     def show_wine_arguments_entry(self, script, script_key, *args):
         """
-        Show an Adw.MessageDialog to allow the user to edit Wine arguments.
+        Show an Adw.AlertDialog to allow the user to edit Wine arguments.
 
         Args:
             script_key: The sha256sum key for the script.
@@ -4311,10 +4311,8 @@ class WineCharmApp(Gtk.Application):
         if not current_args:  # This checks if args is None, empty string, or any falsy value
             current_args = "-opengl -SkipBuildPatchPrereq"
 
-        # Create an Adw.MessageDialog
-        dialog = Adw.MessageDialog(
-            modal=True,
-            transient_for=self.window,  # Assuming self.window is the main application window
+        # Create an Adw.AlertDialog
+        dialog = Adw.AlertDialog(
             title="Edit Wine Arguments",
             body="Modify the Wine arguments for this script:"
         )
@@ -4336,7 +4334,7 @@ class WineCharmApp(Gtk.Application):
         dialog.connect("response", self.on_wine_arguments_dialog_response, entry, script_key)
 
         # Present the dialog
-        dialog.present()
+        dialog.present(self.window)
 
 
     def on_wine_arguments_dialog_response(self, dialog, response_id, entry, script_key):
