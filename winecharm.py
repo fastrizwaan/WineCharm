@@ -4342,7 +4342,7 @@ class WineCharmApp(Gtk.Application):
         Handle the response from the Wine arguments dialog.
         
         Args:
-            dialog: The Adw.MessageDialog instance.
+            dialog: The Adw.AlertDialog instance.
             response_id: The ID of the response clicked by the user.
             entry: The Gtk.Entry widget where the user modified the Wine arguments.
             script_key: The key for the script in the script_list.
@@ -4385,7 +4385,7 @@ class WineCharmApp(Gtk.Application):
 
     def show_rename_shortcut_entry(self, script, script_key, *args):
         """
-        Show an Adw.MessageDialog to allow the user to rename a shortcut.
+        Show an Adw.AlertDialog to allow the user to rename a shortcut.
 
         Args:
             script_key: The sha256sum key for the script.
@@ -9182,16 +9182,15 @@ class WineCharmApp(Gtk.Application):
         """
         Handle cancel button click with immediate process termination
         """
-        dialog = Adw.MessageDialog.new(
-            self.window,
-            "Cancel Restoring Backup?",
-            "This will immediately stop the extraction process. Any partially extracted files will be cleaned up."
+        dialog = Adw.AlertDialog(
+            title="Cancel Restoring Backup?",
+            body="This will immediately stop the extraction process. Any partially extracted files will be cleaned up."
         )
         dialog.add_response("continue", "Continue")
         dialog.add_response("cancel", "Cancel Restore")
         dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.connect("response", self.on_cancel_restore_backup_dialog_response)
-        dialog.present()
+        dialog.present(self.window,)
 
     def on_cancel_restore_backup_dialog_response(self, dialog, response):
         """
