@@ -8085,51 +8085,44 @@ class WineCharmApp(Gtk.Application):
             self.show_info_dialog("No Runners Available", "No runners found to backup.")
             return
 
-        # Create the MessageDialog
-        dialog = Adw.MessageDialog(
-            modal=True,
-            transient_for=self.window,
+        # Create the AlertDialog
+        dialog = Adw.AlertDialog(
             heading="Backup Runner",
             body="Select a runner to backup:"
         )
 
-        # Create the ComboBox for runners
-        runner_combo = Gtk.ComboBoxText()
-        combo_runner_paths = []  # Store runner paths corresponding to indices
+        # Create the DropDown for runners
+        display_names = [display_name for display_name, _ in all_runners]
+        model = Gtk.StringList.new(display_names)
+        dropdown = Gtk.DropDown(model=model)
+        dropdown.set_selected(0)
+        combo_runner_paths = [os.path.abspath(os.path.expanduser(runner_path)) for _, runner_path in all_runners]
 
-        for display_name, runner_path in all_runners:
-            runner_combo.append_text(display_name)
-            combo_runner_paths.append(os.path.abspath(os.path.expanduser(runner_path)))
-
-        runner_combo.set_active(0)
-        runner_combo.set_hexpand(True)
-
-        # Add the ComboBox to the content box
+        # Add the DropDown to the content box
         content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        content_box.append(runner_combo)
+        content_box.append(dropdown)
 
-        # Add OK and Cancel buttons to the dialog
+        # Configure dialog buttons
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("ok", "OK")
         dialog.set_default_response("ok")
         dialog.set_close_response("cancel")
         dialog.set_extra_child(content_box)
 
-        dialog.connect("response", self.on_backup_runner_response, runner_combo, combo_runner_paths)
-        dialog.present()
+        dialog.connect("response", self.on_backup_runner_response, dropdown, combo_runner_paths)
+        dialog.present(self.window)
 
-
-
-    def on_backup_runner_response(self, dialog, response_id, runner_combo, combo_runner_paths):
+    def on_backup_runner_response(self, dialog, response_id, dropdown, combo_runner_paths):
         if response_id == "ok":
-            selected_index = runner_combo.get_active()
-            if selected_index < 0:
+            selected_index = dropdown.get_selected()
+            if selected_index < 0 or selected_index >= len(combo_runner_paths):
                 print("No runner selected.")
                 self.show_info_dialog("No Runner Selected", "Please select a runner to backup.")
                 dialog.close()
                 return
             runner_path = combo_runner_paths[selected_index]
-            runner_name = runner_combo.get_active_text()
+            model = dropdown.get_model()
+            runner_name = model.get_string(selected_index)
             print(f"Selected runner to backup: {runner_name} -> {runner_path}")
 
             # Present a Gtk.FileDialog to select the destination to save the backup archive
