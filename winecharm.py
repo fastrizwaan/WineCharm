@@ -2593,7 +2593,9 @@ class WineCharmApp(Gtk.Application):
                 sha256_hash.update(byte_block)
         sha256sum = sha256_hash.hexdigest()[:10]
         script_key = sha256_hash.hexdigest()
-
+        # string to path
+        self.template = Path(self.template).expanduser().resolve()
+        print(f"         => create_yaml_file -> self.template = {self.template}")
         # Determine prefix directory
         if prefix_dir is None:
             if self.single_prefix:
@@ -2605,12 +2607,24 @@ class WineCharmApp(Gtk.Application):
                     prefix_dir = self.single_prefix_dir_win64
                     template_to_use = self.default_template_win64
                 
+
                 # Create prefix from template if needed
                 if not prefix_dir.exists():
                     #self.copy_template(prefix_dir, template_to_use)
                     print("--->if not prefix_dir.exists():")
                     self.custom_copytree(self.template, prefix_dir)
             else:
+                # if the user has deleted the current in use runner and open an exe, it should use the default arch based runner.
+                if not self.template.exists():
+                    # Use architecture-specific single prefix directory
+                    if self.arch == 'win32':
+                        template_to_use = self.default_template_win32
+                    else:
+                        template_to_use = self.default_template_win64
+                    print(f"Error: {self.template} has been deleted, using {template_to_use}")
+                    GLib.idle_add(self.show_info_dialog, "Template Deleted", f"{self.template}.name has been deleted, using {template_to_use}.name")
+                    self.template = template_to_use
+
                 # Create new unique prefix per executable
                 prefix_dir = self.prefixes_dir / f"{exe_no_space}-{sha256sum[:10]}"
                 if not prefix_dir.exists():
@@ -7945,6 +7959,9 @@ class WineCharmApp(Gtk.Application):
             # Update settings
             self.arch = new_arch
             self.template = new_template
+ 
+            self.settings['template'] = self.replace_home_with_tilde_in_path(str(new_template))
+            self.settings['arch'] = self.replace_home_with_tilde_in_path(str(new_arch))
             self.save_settings()
             
             # Resolve template path
@@ -9341,7 +9358,8 @@ class WineCharmApp(Gtk.Application):
         """Delete a template directory with safety checks and settings updates"""
         self.load_settings()  # Ensure fresh settings
         current_arch = self.settings.get('arch', 'win64')
-        
+        self.template = self.settings.get('template', self.default_template_win64)
+        print("-="*50)
         # Resolve default template paths for current architecture
         default_templates = {
             'win64': self.default_template_win64.expanduser().resolve(),
@@ -9359,6 +9377,15 @@ class WineCharmApp(Gtk.Application):
                 is_current_default = (tpl_path == current_default)
                 templates.append((display_name, tpl_path, arch, is_current_default))
 
+        print(f"""
+        current_arch = {current_arch}
+        self.template = {self.template}
+        current_default = {current_default}
+        tpl_path = {tpl_path}
+        arch = {arch}
+        is_current_default = {is_current_default}
+        Path(self.template).expanduser().resolve()={Path(self.template).expanduser().resolve()}
+        """)
         if not templates:
             self.show_info_dialog("No Templates", "No templates found to delete.")
             return
@@ -9391,11 +9418,11 @@ class WineCharmApp(Gtk.Application):
                     display_name, template_path, template_arch, is_current_default = templates[selected_idx]
                     
                     # Immediate prevention checks
-                    if is_current_default:
+                    if is_current_default or self.template:
                         self.show_info_dialog(
                             "Protected Template",
-                            f"Cannot delete the active default {current_arch} template!\n"
-                            "Switch architectures first to delete this template."
+                            f"Cannot delete the active / default {current_arch} template!\n"
+                            "Switch architectures / template first to delete this template."
                         )
                         return
 
