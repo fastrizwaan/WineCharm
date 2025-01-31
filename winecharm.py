@@ -2609,16 +2609,15 @@ class WineCharmApp(Gtk.Application):
                 if not prefix_dir.exists():
                     #self.copy_template(prefix_dir, template_to_use)
                     print("--->if not prefix_dir.exists():")
-                    self.custom_copytree(template_to_use, prefix_dir)
+                    self.custom_copytree(self.template, prefix_dir)
             else:
                 # Create new unique prefix per executable
                 prefix_dir = self.prefixes_dir / f"{exe_no_space}-{sha256sum[:10]}"
                 if not prefix_dir.exists():
-                    template_to_use = self.default_template_win32 if self.arch == 'win32' else self.default_template_win64
-                    if template_to_use.exists():
-                        #self.copy_template(prefix_dir, template_to_use)
-                        print("===>if template_to_use.exists():")
-                        self.custom_copytree(template_to_use, prefix_dir)
+                    if self.template.exists():
+                        print("===>if self.template.exists():")
+                        print(f"->>>{self.template} is being copied")
+                        self.custom_copytree(self.template, prefix_dir)
                     else:
                         self.ensure_directory_exists(prefix_dir)
             # Resolve the generated or selected prefix directory
@@ -5184,7 +5183,7 @@ class WineCharmApp(Gtk.Application):
         self.create_script_list()
         GLib.idle_add(self.save_settings)
 
-
+############# IMPORT Wine Directory
     def rename_and_merge_user_directories(self, wineprefix):
         # Get the current username from the environment
         current_username = os.getenv("USER") or os.getenv("USERNAME")
@@ -9429,8 +9428,117 @@ class WineCharmApp(Gtk.Application):
         dialog.connect("response", on_response, dropdown, templates)
         dialog.present(self.window)
 
-    
+################## import template
+    def import_template(self, action=None, param=None):
+        """Import a Wine directory as a template into the templates directory."""
+        file_dialog = Gtk.FileDialog.new()
+        file_dialog.set_modal(True)
+        file_dialog.select_folder(self.window, None, self.on_import_template_response)
 
+    def on_import_template_response(self, dialog, result):
+        try:
+            folder = dialog.select_folder_finish(result)
+            if folder:
+                src = Path(folder.get_path())
+                if not (src / "system.reg").exists():
+                    GLib.idle_add(self.show_info_dialog, "Invalid Template", 
+                                "Selected directory is not a valid Wine prefix")
+                    return
+
+                template_name = src.name
+                dst = self.templates_dir / template_name
+                backup_dir = self.templates_dir / f"{template_name}_backup_{int(time.time())}"
+
+                steps = [
+                    ("Verifying template", lambda: self.verify_template_source(src)),
+                    ("Backing up existing template", lambda: self.backup_existing_directory(dst, backup_dir)),
+                    ("Copying template files", lambda: self.custom_copytree(src, dst)),
+                    ("Processing registry files", lambda: self.process_reg_files(dst)),
+                    ("Standardizing user directories", lambda: self.rename_and_merge_user_directories(dst)),
+                    ("Cleaning template files", lambda: self.clean_template_files(dst)),
+                ]
+
+                self.show_processing_spinner(f"Importing {template_name}")
+                self.connect_open_button_with_import_wine_directory_cancel()
+                threading.Thread(target=self.process_template_import, args=(steps, dst, backup_dir)).start()
+
+        except GLib.Error as e:
+            print(f"Template import error: {e}")
+
+    def process_template_import(self, steps, dst, backup_dir):
+        """Handle template import with error handling and rollback"""
+        self.stop_processing = False
+        self.total_steps = len(steps)
+        
+        try:
+            for index, (step_text, step_func) in enumerate(steps, 1):
+                if self.stop_processing:
+                    raise Exception("Operation cancelled by user")
+                    
+                GLib.idle_add(self.show_initializing_step, step_text)
+                step_func()
+                GLib.idle_add(self.mark_step_as_done, step_text)
+                GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
+
+            GLib.idle_add(self.show_info_dialog, "Success", 
+                        f"Template '{dst.name}' imported successfully")
+            self.cleanup_backup(backup_dir)
+
+        except Exception as e:
+            GLib.idle_add(self.handle_template_import_error, dst, backup_dir, str(e))
+            
+        finally:
+            GLib.idle_add(self.on_import_template_directory_completed)
+
+    def verify_template_source(self, src):
+        """Validate the source directory contains a valid Wine prefix"""
+        required_files = ["system.reg", "userdef.reg", "dosdevices"]
+        missing = [f for f in required_files if not (src / f).exists()]
+        if missing:
+            raise Exception(f"Missing required Wine files: {', '.join(missing)}")
+
+    def clean_template_files(self, template_path):
+        """Remove unnecessary files from the template"""
+        # Remove any existing charm files
+        for charm_file in template_path.glob("*.charm"):
+            charm_file.unlink()
+        
+        # Clean desktop files
+        applications_dir = template_path / "drive_c/users" / os.getenv("USER") / "Desktop"
+        if applications_dir.exists():
+            for desktop_file in applications_dir.glob("*.desktop"):
+                desktop_file.unlink()
+
+    def handle_template_import_error(self, dst, backup_dir, error_msg):
+        """Handle template import errors and cleanup"""
+        try:
+            if dst.exists():
+                shutil.rmtree(dst)
+            if backup_dir.exists():
+                backup_dir.rename(dst)
+        except Exception as e:
+            error_msg += f"\nCleanup error: {str(e)}"
+        
+        self.show_info_dialog("Template Import Failed", error_msg)
+    
+    def on_import_template_directory_completed(self):
+        """
+        Called when the template import process is complete. Updates UI, restores scripts, and resets the open button.
+        """
+        # Reconnect open button and reset its label
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)
+        
+        self.hide_processing_spinner()
+
+        # This will disconnect open_button handler, use this then reconnect the open
+        #if self.open_button_handler_id is not None:
+        #    self.open_button.disconnect(self.open_button_handler_id)
+
+        self.reconnect_open_button()
+        self.show_options_for_settings()
+        print("Template directory import completed.")
+        
 
 
 
