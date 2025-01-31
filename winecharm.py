@@ -9243,7 +9243,202 @@ class WineCharmApp(Gtk.Application):
 
 
 ##################################################################################### 
+    def get_template_arch(self, template_path):
+        """Extract architecture from template's system.reg file"""
+        system_reg = Path(template_path) / "system.reg"
+        if not system_reg.exists():
+            return "win64"  # Default assumption
+        
+        try:
+            with open(system_reg, "r") as f:
+                for line in f:
+                    if line.startswith("#arch="):
+                        return line.strip().split("=")[1].lower()
+        except Exception as e:
+            print(f"Error reading {system_reg}: {e}")
+        
+        return "win64"  # Fallback if not found
 
+    def set_default_template(self, action=None):
+        """Set default template with architecture auto-detection and update"""
+        # Collect templates with architecture info
+        templates = []
+        for template_dir in self.templates_dir.iterdir():
+            if template_dir.is_dir() and (template_dir / "system.reg").exists():
+                arch = self.get_template_arch(template_dir)
+                display_name = f"{template_dir.name} ({arch.upper()})"
+                templates.append((display_name, str(template_dir.resolve()), arch))
+
+        # Add default templates if they exist
+        default_templates = [
+            (self.default_template_win64, "win64"),
+            (self.default_template_win32, "win32")
+        ]
+        for dt_path, dt_arch in default_templates:
+            if dt_path.exists() and not any(str(dt_path) == t[1] for t in templates):
+                display_name = f"{dt_path.name} ({dt_arch.upper()})"
+                templates.append((display_name, str(dt_path.resolve()), dt_arch))
+
+        if not templates:
+            self.show_info_dialog("No Templates", "No valid templates found.")
+            return
+
+        # Create dropdown list
+        template_list = Gtk.StringList()
+        current_template = self.expand_and_resolve_path(self.settings.get('template', ""))
+        current_index = 0
+        
+        # Sort templates and find current selection
+        sorted_templates = sorted(templates, key=lambda x: x[0].lower())
+        for i, (display, path, arch) in enumerate(sorted_templates):
+            template_list.append(display)
+            if Path(path) == current_template:
+                current_index = i
+
+        dropdown = Gtk.DropDown(model=template_list, selected=current_index)
+        dropdown.set_hexpand(True)
+
+        # Dialog layout
+        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        content.append(Gtk.Label(label="Select template:"))
+        content.append(dropdown)
+
+        dialog = Adw.AlertDialog(
+            heading="Set Default Template",
+            body="Template architecture will be set automatically",
+            extra_child=content
+        )
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("ok", "Save")
+        dialog.set_default_response("ok")
+
+        def on_response(dialog, response_id):
+            if response_id == "ok":
+                selected_idx = dropdown.get_selected()
+                if selected_idx != Gtk.INVALID_LIST_POSITION:
+                    # Get selected template data
+                    display_name, template_path, arch = sorted_templates[selected_idx]
+                    
+                    # Update settings
+                    self.settings['template'] = self.replace_home_with_tilde_in_path(template_path)
+                    self.settings['arch'] = arch
+                    
+                    # Update instance variables
+                    self.template = Path(template_path).resolve()
+                    self.arch = arch
+                    
+                    self.save_settings()
+                    
+                    self.show_info_dialog(
+                        "Template Updated",
+                        f"Set default template to:\n{display_name}\n"
+                        f"Architecture: {arch.upper()}"
+                    )
+        dialog.connect("response", on_response)
+        dialog.present(self.window)
+
+############# Delete template
+    def delete_template(self, action=None):
+        """Delete a template directory with safety checks and settings updates"""
+        self.load_settings()  # Ensure fresh settings
+        current_arch = self.settings.get('arch', 'win64')
+        
+        # Resolve default template paths for current architecture
+        default_templates = {
+            'win64': self.default_template_win64.expanduser().resolve(),
+            'win32': self.default_template_win32.expanduser().resolve()
+        }
+        current_default = default_templates[current_arch]
+
+        # Collect templates with architecture info
+        templates = []
+        for template_dir in self.templates_dir.iterdir():
+            tpl_path = template_dir.resolve()
+            if template_dir.is_dir() and (template_dir / "system.reg").exists():
+                arch = self.get_template_arch(template_dir)
+                display_name = f"{template_dir.name} ({arch.upper()})"
+                is_current_default = (tpl_path == current_default)
+                templates.append((display_name, tpl_path, arch, is_current_default))
+
+        if not templates:
+            self.show_info_dialog("No Templates", "No templates found to delete.")
+            return
+
+        # Create dialog components
+        dialog = Adw.AlertDialog(
+            heading="Delete Template",
+            body="Select a template to permanently delete:"
+        )
+
+        # Create dropdown with template names
+        model = Gtk.StringList.new([name for name, _, _, _ in templates])
+        dropdown = Gtk.DropDown(model=model)
+        dropdown.set_selected(0)
+
+        # Add to dialog content
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        content_box.append(dropdown)
+        dialog.set_extra_child(content_box)
+
+        # Configure dialog buttons
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("delete", "Delete")
+        dialog.set_default_response("delete")
+
+        def on_response(dialog, response_id, dropdown, templates):
+            if response_id == "delete":
+                selected_idx = dropdown.get_selected()
+                if 0 <= selected_idx < len(templates):
+                    display_name, template_path, template_arch, is_current_default = templates[selected_idx]
+                    
+                    # Immediate prevention checks
+                    if is_current_default:
+                        self.show_info_dialog(
+                            "Protected Template",
+                            f"Cannot delete the active default {current_arch} template!\n"
+                            "Switch architectures first to delete this template."
+                        )
+                        return
+
+                    # Deletion execution
+                    def perform_deletion():
+                        try:
+                            shutil.rmtree(template_path)
+                            # Clear settings reference if needed
+                            if self.settings.get('template', '') == str(template_path):
+                                self.settings['template'] = ''
+                                self.save_settings()
+                            self.show_info_dialog("Deleted", f"Removed: {display_name}")
+                        except Exception as e:
+                            self.show_info_dialog("Error", f"Deletion failed: {str(e)}")
+
+                    # Additional confirmation for non-default templates
+                    confirm_dialog = Adw.AlertDialog(
+                        heading="Confirm Deletion",
+                        body=f"Permanently delete:\n{display_name}?"
+                    )
+                    confirm_dialog.add_response("cancel", "Keep")
+                    confirm_dialog.add_response("delete", "Delete Forever")
+                    confirm_dialog.connect("response", 
+                        lambda d, r: perform_deletion() if r == "delete" else None
+                    )
+                    confirm_dialog.present(self.window)
+
+            dialog.close()
+
+        dialog.connect("response", on_response, dropdown, templates)
+        dialog.present(self.window)
+
+    
+
+
+
+
+
+
+
+
+        
 
 
 
