@@ -9792,7 +9792,10 @@ class WineCharmApp(Gtk.Application):
                                 args=(template_path, dest_path)
                             ).start()
                     except GLib.Error as e:
-                        print(f"Backup failed: {e}")
+                        if e.domain == 'gtk-dialog-error-quark' and e.code == 2:
+                            print("Backup Template Cancelled!")
+                            return
+                        print(f"Backup Template failedfailed: {e}")
 
                 file_dialog.save(self.window, None, on_save_response)
         dialog.close()
