@@ -402,7 +402,7 @@ class WineCharmApp(Gtk.Application):
         
         # Set total steps and initialize progress UI
         self.total_steps = len(steps)
-        self.show_processing_spinner(f"Initializing {arch} Template...")
+        self.show_processing_spinner(f"Initializing {template_dir.name} Template...")
 
         def initialize():
             for index, (step_text, command) in enumerate(steps, 1):
@@ -7173,6 +7173,7 @@ class WineCharmApp(Gtk.Application):
             ("Template Set Default", "document-new-symbolic", self.set_default_template),
             ("Template Configure", "preferences-other-symbolic", self.configure_template),
             ("Template Import", "folder-download-symbolic", self.import_template),
+            ("Template Create", "document-new-symbolic", self.create_template),
             ("Template Clone", "folder-copy-symbolic", self.clone_template),
             ("Template Backup", "document-save-symbolic", self.backup_template),
             ("Template Restore", "document-revert-symbolic", self.restore_template_from_backup),
@@ -10316,6 +10317,45 @@ class WineCharmApp(Gtk.Application):
         finally:
             GLib.idle_add(self.on_template_restore_completed)
 
+########### Create Template
+    def create_template(self, action=None):
+        dialog = Adw.AlertDialog(
+            heading="Create Template",
+            body="Enter a name and select architecture:"
+        )
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        
+        entry = Gtk.Entry()
+        entry.set_placeholder_text("Template Name")
+        content_box.append(entry)
+        
+        radio_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        win32_radio = Gtk.CheckButton(label="32-bit (win32)")
+        win64_radio = Gtk.CheckButton(label="64-bit (win64)")
+        win64_radio.set_group(win32_radio)
+        win64_radio.set_active(True)
+        radio_box.append(win32_radio)
+        radio_box.append(win64_radio)
+        content_box.append(radio_box)
+        
+        dialog.set_extra_child(content_box)
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("ok", "OK")
+        dialog.set_default_response("ok")
+        
+        def on_response(dialog, response):
+            if response == "ok":
+                name = entry.get_text().strip()
+                if not name:
+                    self.show_info_dialog("Invalid Name", "Please enter a valid name.")
+                else:
+                    arch = "win32" if win32_radio.get_active() else "win64"
+                    prefix_dir = self.templates_dir / name
+                    self.initialize_template(prefix_dir, callback=None, arch=arch)
+            dialog.close()
+        
+        dialog.connect("response", on_response)
+        dialog.present(self.window)
 
 
 
