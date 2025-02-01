@@ -10203,7 +10203,115 @@ class WineCharmApp(Gtk.Application):
         print("Template restore completed successfully")
 
 
+################ clone template
+    def clone_template(self, action=None):
+        """
+        Allow the user to clone a template with an editable name suggestion.
+        """
+        all_templates = [t.name for t in self.templates_dir.iterdir() if t.is_dir()]
+        if not all_templates:
+            self.show_info_dialog("No Templates Available", "No templates found to clone.")
+            return
 
+        dialog = Adw.AlertDialog(
+            heading="Clone Template",
+            body="Select a template to clone and enter a new name:"
+        )
+
+        # Template selection dropdown
+        model = Gtk.StringList.new(all_templates)
+        dropdown = Gtk.DropDown(model=model)
+        dropdown.set_selected(0)
+
+        # Editable name entry with placeholder
+        entry = Gtk.Entry()
+        entry.set_placeholder_text("Set Template Clone Name")
+        entry.set_activates_default(True)
+        
+        # Connect signals
+        dropdown.connect("notify::selected", self.on_template_selected_for_clone, entry, all_templates)
+        entry.connect("changed", self.on_clone_name_changed, dropdown, all_templates)
+
+        # Container layout
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        content_box.append(dropdown)
+        content_box.append(entry)
+
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("ok", "OK")
+        dialog.set_default_response("ok")
+        dialog.set_close_response("cancel")
+        dialog.set_extra_child(content_box)
+
+        dialog.connect("response", self.on_clone_template_response, dropdown, entry, all_templates)
+        dialog.present(self.window)
+
+    def on_template_selected_for_clone(self, dropdown, _pspec, entry, templates):
+        """Update entry text when template selection changes"""
+        selected_index = dropdown.get_selected()
+        if 0 <= selected_index < len(templates):
+            template_name = templates[selected_index]
+            new_name = f"{template_name} (clone)"
+            entry.set_text(new_name)
+            entry.set_position(len(new_name))  # Move cursor to end
+
+    def on_clone_name_changed(self, entry, dropdown, templates):
+        """Real-time validation of clone name"""
+        new_name = entry.get_text().strip()
+        dest_path = self.templates_dir / new_name
+        
+        # Clear previous error styling
+        entry.remove_css_class("error")
+        
+        # Validate new name
+        if not new_name:
+            entry.add_css_class("error")
+        elif dest_path.exists():
+            entry.add_css_class("error")
+
+    def on_clone_template_response(self, dialog, response_id, dropdown, entry, templates):
+        if response_id == "ok":
+            selected_index = dropdown.get_selected()
+            new_name = entry.get_text().strip()
+
+            if 0 <= selected_index < len(templates):
+                source_name = templates[selected_index]
+                source_path = self.templates_dir / source_name
+                dest_path = self.templates_dir / new_name
+
+                # Final validation
+                if not new_name:
+                    self.show_info_dialog("Invalid Name", "Please enter a name for the clone.")
+                    return
+                if dest_path.exists():
+                    self.show_info_dialog("Error", "A template with this name already exists.")
+                    return
+
+                # Start cloning process
+                self.show_processing_spinner("Cloning template...")
+                threading.Thread(
+                    target=self.perform_template_clone,
+                    args=(source_path, dest_path),
+                    daemon=True
+                ).start()
+
+        dialog.close()
+
+    def perform_template_clone(self, source_path, dest_path):
+        """Perform the actual directory copy with error handling"""
+        try:
+            self.custom_copytree(source_path, dest_path)
+            GLib.idle_add(self.show_info_dialog, 
+                "Clone Successful", 
+                f"Successfully cloned to {dest_path.name}"
+            )
+        except Exception as e:
+            GLib.idle_add(self.show_info_dialog,
+                "Clone Error",
+                f"An error occurred: {str(e)}"
+            )
+        finally:
+            GLib.idle_add(self.on_template_restore_completed)
 
 
 
