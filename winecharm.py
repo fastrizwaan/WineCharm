@@ -7175,7 +7175,7 @@ class WineCharmApp(Gtk.Application):
             ("Template Import", "folder-download-symbolic", self.import_template),
             ("Template Clone", "folder-copy-symbolic", self.clone_template),
             ("Template Backup", "document-save-symbolic", self.backup_template),
-            ("Template Restore", "document-revert-symbolic", self.restore_template),
+            ("Template Restore", "document-revert-symbolic", self.restore_template_from_backup),
             ("Template Delete", "user-trash-symbolic", self.delete_template),
             ("Set Wine Arch", "preferences-system-symbolic", self.set_wine_arch),
             ("Single Prefix Mode", "folder-symbolic", self.single_prefix_mode),
@@ -9566,6 +9566,649 @@ class WineCharmApp(Gtk.Application):
         self.show_options_for_settings()
         print("Template directory import completed.")
         
+##################### Import runner
+    def import_runner(self, action=None, param=None):
+        """Import a Wine runner into the runners directory."""
+        file_dialog = Gtk.FileDialog.new()
+        file_dialog.set_modal(True)
+        file_dialog.select_folder(self.window, None, self.on_import_runner_response)
+
+    def on_import_runner_response(self, dialog, result):
+        try:
+            folder = dialog.select_folder_finish(result)
+            if folder:
+                src = Path(folder.get_path())
+                if not self.verify_runner_source(src):
+                    GLib.idle_add(self.show_info_dialog, "Invalid Runner", 
+                                "Selected directory is not a valid Wine runner")
+                    return
+
+                runner_name = src.name
+                dst = self.runners_dir / runner_name
+                backup_dir = self.runners_dir / f"{runner_name}_backup_{int(time.time())}"
+
+                steps = [
+                    ("Verifying runner", lambda: self.verify_runner_binary(src)),
+                    ("Backing up existing runner", lambda: self.backup_existing_directory(dst, backup_dir)),
+                    ("Copying runner files", lambda: self.custom_copytree(src, dst)),
+                    ("Validating installation", lambda: self.validate_runner(dst / "bin/wine")),
+                    ("Setting permissions", lambda: self.set_runner_permissions(dst)),
+                ]
+
+                self.show_processing_spinner(f"Importing {runner_name}")
+                self.connect_open_button_with_import_wine_directory_cancel()
+                threading.Thread(target=self.process_runner_import, args=(steps, dst, backup_dir)).start()
+
+        except GLib.Error as e:
+            print(f"Runner import error: {e}")
+
+    def process_runner_import(self, steps, dst, backup_dir):
+        """Handle runner import with error handling and rollback"""
+        self.stop_processing = False
+        self.total_steps = len(steps)
+        
+        try:
+            for index, (step_text, step_func) in enumerate(steps, 1):
+                if self.stop_processing:
+                    raise Exception("Operation cancelled by user")
+                    
+                GLib.idle_add(self.show_initializing_step, step_text)
+                step_func()
+                GLib.idle_add(self.mark_step_as_done, step_text)
+                GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
+
+            GLib.idle_add(self.show_info_dialog, "Success", 
+                        f"Runner '{dst.name}' imported successfully")
+            self.cleanup_backup(backup_dir)
+            GLib.idle_add(self.refresh_runner_list)
+
+        except Exception as e:
+            GLib.idle_add(self.handle_runner_import_error, dst, backup_dir, str(e))
+            
+        finally:
+            GLib.idle_add(self.on_import_runner_directory_completed)
+
+    def verify_runner_source(self, src):
+        """Validate the source directory contains a valid Wine runner"""
+        wine_binary = src / "bin/wine"
+        return wine_binary.exists() and self.validate_runner(wine_binary)
+
+    def verify_runner_binary(self, src):
+        """Explicit validation check for the runner binary"""
+        wine_binary = src / "bin/wine"
+        if not wine_binary.exists():
+            raise Exception("Missing Wine binary (bin/wine)")
+        if not self.validate_runner(wine_binary):
+            raise Exception("Wine binary validation failed")
+
+    def set_runner_permissions(self, runner_path):
+        """Set executable permissions for critical runner files"""
+        wine_binary = runner_path / "bin/wine"
+        wineserver = runner_path / "bin/wineserver"
+        
+        try:
+            wine_binary.chmod(0o755)
+            wineserver.chmod(0o755)
+            for bin_file in (runner_path / "bin").glob("*"):
+                if bin_file.is_file():
+                    bin_file.chmod(0o755)
+        except Exception as e:
+            print(f"Warning: Could not set permissions - {e}")
+
+    def handle_runner_import_error(self, dst, backup_dir, error_msg):
+        """Handle runner import errors and cleanup"""
+        try:
+            if dst.exists():
+                shutil.rmtree(dst)
+            if backup_dir.exists():
+                backup_dir.rename(dst)
+        except Exception as e:
+            error_msg += f"\nCleanup error: {str(e)}"
+        
+        self.show_info_dialog("Runner Import Failed", error_msg)
+
+    def on_import_runner_directory_completed(self):
+        """Finalize runner import UI updates"""
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)
+        self.hide_processing_spinner()
+        self.reconnect_open_button()
+        self.show_options_for_settings()
+        print("Runner import process completed.")
+
+    def refresh_runner_list(self):
+        """Refresh the runner list in settings UI"""
+        if hasattr(self, 'runner_dropdown'):
+            all_runners = self.get_all_runners()
+            string_objs = [Gtk.StringObject.new(r[0]) for r in all_runners]
+            self.runner_dropdown.set_model(Gtk.StringList.new([r[0] for r in all_runners]))
+
+########################## fix default runner to handle arch difference
+    def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, all_runners):
+        if response_id == "ok":
+            selected_index = runner_dropdown.get_selected()
+            if selected_index == Gtk.INVALID_LIST_POSITION:
+                print("No runner selected.")
+                return
+
+            new_runner_display, new_runner_path = all_runners[selected_index]
+            print(f"Selected new default runner: {new_runner_display} -> {new_runner_path}")
+
+            # Check architecture compatibility for non-system runners
+            if new_runner_path:  # Skip check for System Wine
+                runner_path = Path(new_runner_path).expanduser().resolve().parent.parent
+                
+                print(f"runner_path = {runner_path}")
+                # Determine runner architecture
+                if (runner_path / "bin/wine64").exists():
+                    runner_arch = "win64"
+                elif (runner_path / "bin/wine").exists():
+                    runner_arch = "win32"
+                else:
+                    self.show_info_dialog(
+                        "Invalid Runner",
+                        "Selected runner is missing Wine binaries (bin/wine or bin/wine64)"
+                    )
+                    return
+
+                # Get template architecture from settings
+                template_arch = self.settings.get("arch", "win64")
+                
+                # Check for 32-bit runner with 64-bit template
+                if template_arch == "win64" and runner_arch == "win32":
+                    self.show_info_dialog(
+                        "Architecture Mismatch",
+                        "Cannot use 32-bit runner with 64-bit template.\n\n"
+                        f"Template: {self.template} ({template_arch})\n"
+                        f"Runner: {new_runner_path} ({runner_arch})"
+                    )
+                    return
+
+            # Update settings
+            new_runner_value = "" if new_runner_display.startswith("System Wine") else new_runner_path
+            self.settings["runner"] = self.replace_home_with_tilde_in_path(new_runner_value)
+            self.save_settings()
+
+            # Provide feedback
+            confirmation_message = f"The default runner has been set to {new_runner_display}"
+            if new_runner_path:
+                confirmation_message += f" ({runner_arch})"
+            self.show_info_dialog("Default Runner Updated", confirmation_message)
+        else:
+            print("Set default runner canceled.")
+
+##### Template Backup
+    def backup_template(self, action=None):
+        """
+        Allow the user to backup a template with interruptible process.
+        """
+        all_templates = [t.name for t in self.templates_dir.iterdir() if t.is_dir()]
+        if not all_templates:
+            self.show_info_dialog("No Templates Available", "No templates found to backup.")
+            return
+
+        dialog = Adw.AlertDialog(
+            heading="Backup Template",
+            body="Select a template to backup:"
+        )
+        model = Gtk.StringList.new(all_templates)
+        dropdown = Gtk.DropDown(model=model)
+        dropdown.set_selected(0)
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        content_box.append(dropdown)
+
+        dialog.add_response("cancel", "Cancel")
+        dialog.add_response("ok", "OK")
+        dialog.set_default_response("ok")
+        dialog.set_close_response("cancel")
+        dialog.set_extra_child(content_box)
+
+        dialog.connect("response", self.on_backup_template_response, dropdown, all_templates)
+        dialog.present(self.window)
+
+    def on_backup_template_response(self, dialog, response_id, dropdown, templates):
+        if response_id == "ok":
+            selected_index = dropdown.get_selected()
+            if 0 <= selected_index < len(templates):
+                template_name = templates[selected_index]
+                template_path = self.templates_dir / template_name
+
+                file_dialog = Gtk.FileDialog.new()
+                file_dialog.set_initial_name(f"{template_name}.template")
+                file_filter = Gtk.FileFilter()
+                file_filter.set_name("Template Archives")
+                file_filter.add_pattern("*.template")
+                filters = Gio.ListStore.new(Gtk.FileFilter)
+                filters.append(file_filter)
+                file_dialog.set_filters(filters)
+
+                def on_save_response(dlg, result):
+                    try:
+                        save_file = dlg.save_finish(result)
+                        if save_file:
+                            dest_path = save_file.get_path()
+                            threading.Thread(
+                                target=self.create_template_backup,
+                                args=(template_path, dest_path)
+                            ).start()
+                    except GLib.Error as e:
+                        print(f"Backup failed: {e}")
+
+                file_dialog.save(self.window, None, on_save_response)
+        dialog.close()
+
+    def create_template_backup(self, template_path, dest_path):
+        """
+        Create compressed template archive using zstd compression with interruptible progress.
+        """
+        self.stop_processing = False
+        self.current_backup_path = dest_path
+        usershome = os.path.expanduser('~')
+        current_username = os.getenv("USER") or os.getenv("USERNAME")
+        if not current_username:
+            raise Exception("Unable to determine the current username from the environment.")
+        find_replace_pairs = {usershome: '~', f'\'{usershome}': '\'~\''}
+        find_replace_media_username = {f'/media/{current_username}/': '/media/%USERNAME%/'}
+        restore_media_username = {'/media/%USERNAME%/': f'/media/{current_username}/'}
+
+        def perform_backup_steps():
+            try:
+                steps = [
+                    (f"Replace \"{usershome}\" with '~' in files", lambda: self.replace_strings_in_files(template_path, find_replace_pairs)),
+                    ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(template_path)),
+                    (f"Replace \"/media/{current_username}\" with '/media/%USERNAME%' in files", lambda: self.replace_strings_in_files(template_path, find_replace_media_username)),
+                    ("Creating backup archive", lambda: run_backup()),
+                    ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(template_path)),
+                    (f"Revert %USERNAME% with \"{current_username}\" in script files", lambda: self.replace_strings_in_files(template_path, restore_media_username)),
+                ]
+
+                self.total_steps = len(steps)
+                
+                for step_text, step_func in steps:
+                    if self.stop_processing:
+                        GLib.idle_add(self.cleanup_cancelled_template_backup)
+                        return
+
+                    GLib.idle_add(self.show_initializing_step, step_text)
+                    try:
+                        # Run step and handle output
+                        step_func()
+                        if self.stop_processing:
+                            GLib.idle_add(self.cleanup_cancelled_template_backup)
+                            return
+                        GLib.idle_add(self.mark_step_as_done, step_text)
+                    except Exception as e:
+                        if not self.stop_processing:
+                            GLib.idle_add(self.show_info_dialog, "Backup Failed", 
+                                        f"Error during '{step_text}': {e}")
+                        GLib.idle_add(self.cleanup_cancelled_template_backup)
+                        return
+
+                GLib.idle_add(self.show_info_dialog, "Backup Complete", 
+                            f"Template saved to {dest_path}")
+            finally:
+                GLib.idle_add(self.hide_processing_spinner)
+                GLib.idle_add(self.revert_open_button)
+
+        def run_backup():
+            if self.stop_processing:
+                raise Exception("Operation cancelled by user")
+
+            cmd = [
+                'tar',
+                '-I', 'zstd -T0',
+                '--transform', f"s|{template_path.name}/drive_c/users/{current_username}|{template_path.name}/drive_c/users/%USERNAME%|g",
+                '-cvf', dest_path,
+                '-C', str(template_path.parent),
+                template_path.name
+            ]
+
+            # Start process with piped output
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                universal_newlines=True
+            )
+
+            # Start output reader thread
+            def read_output():
+                while True:
+                    output = process.stdout.readline()
+                    if output == '' and process.poll() is not None:
+                        break
+                    if output:
+                        print(output.strip())
+
+            output_thread = threading.Thread(target=read_output)
+            output_thread.start()
+
+            # Monitor process with periodic checks
+            while process.poll() is None:
+                if self.stop_processing:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=2)
+                        if Path(dest_path).exists():
+                            Path(dest_path).unlink()
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                    raise Exception("Backup cancelled by user")
+                time.sleep(0.1)
+
+            output_thread.join()
+
+            if process.returncode != 0 and not self.stop_processing:
+                raise Exception(f"Backup failed with code {process.returncode}")
+
+        self.show_processing_spinner("Exporting...")
+        self.connect_cancel_button_for_template_backup()
+        threading.Thread(target=perform_backup_steps, daemon=True).start()
+
+    def connect_cancel_button_for_template_backup(self):
+        if hasattr(self, 'open_button_handler_id') and self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+        self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_template_backup_clicked)
+        self.set_open_button_label("Cancel")
+        self.set_open_button_icon_visible(False)
+
+    def on_cancel_template_backup_clicked(self, button):
+        dialog = Adw.AlertDialog(
+            heading="Cancel Backup",
+            body="Do you want to cancel the template backup process?"
+        )
+        dialog.add_response("continue", "Continue")
+        dialog.add_response("cancel", "Cancel Backup")
+        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.connect("response", self.on_cancel_template_backup_dialog_response)
+        dialog.present(self.window)
+
+    def on_cancel_template_backup_dialog_response(self, dialog, response):
+        if response == "cancel":
+            self.stop_processing = True
+        dialog.close()
+
+    def cleanup_cancelled_template_backup(self):
+        try:
+            if hasattr(self, 'current_backup_path') and self.current_backup_path and Path(self.current_backup_path).exists():
+                Path(self.current_backup_path).unlink()
+        except Exception as e:
+            print(f"Error deleting partial backup file: {e}")
+        finally:
+            self.hide_processing_spinner()
+            self.show_info_dialog("Cancelled", "Template backup was cancelled")
+            self.revert_open_button()
+
+    def revert_open_button(self):
+        """
+        Cleanup after template restore completion.
+        """
+        self.hide_processing_spinner()
+        self.reconnect_open_button()
+        self.show_options_for_settings()
+        print("Template created successfully")
+    
+
+#################### NEW RESTORE template like restore wzt
+    def restore_template_from_backup(self, action=None, param=None):
+        # Step 1: Create required directories if needed
+        self.create_required_directories()
+
+        # Step 2: Create a new Gtk.FileDialog instance
+        file_dialog = Gtk.FileDialog.new()
+
+        # Step 3: Create file filter for .wzt files only
+        file_filter_wzt = Gtk.FileFilter()
+        file_filter_wzt.set_name("WineCharm Template Files (*.template)")
+        file_filter_wzt.add_pattern("*.template")
+
+        # Step 4: Set the filter on the dialog
+        filter_model = Gio.ListStore.new(Gtk.FileFilter)
+        filter_model.append(file_filter_wzt)  # Only WZT files for templates
+        file_dialog.set_filters(filter_model)
+
+        # Step 5: Open the dialog and handle the response
+        file_dialog.open(self.window, None, self.on_restore_template_file_dialog_response)
+
+    def on_restore_template_file_dialog_response(self, dialog, result):
+        try:
+            file = dialog.open_finish(result)
+            if file:
+                file_path = file.get_path()
+                print(f"Selected template file: {file_path}")
+                self.restore_template_tar_zst(file_path)
+        except GLib.Error as e:
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"An error occurred: {e}")
+
+    def restore_template_tar_zst(self, file_path):
+        """
+        Restore a template from a .wzt backup file to the templates directory.
+        """
+        self.stop_processing = False
+        
+        try:
+            # Determine extracted template directory
+            extracted_template = self.extract_template_dir(file_path)
+            if not extracted_template:
+                raise Exception("Failed to determine template directory name")
+            
+            # Handle existing directory
+            backup_dir = None
+            if extracted_template.exists():
+                timestamp = int(time.time())
+                backup_dir = extracted_template.parent / f"{extracted_template.name}_backup_{timestamp}"
+                shutil.move(str(extracted_template), str(backup_dir))
+                print(f"Backed up existing template directory to: {backup_dir}")
+
+            # UI setup
+            GLib.idle_add(self.flowbox.remove_all)
+            self.show_processing_spinner("Restoring Template")
+            self.connect_open_button_with_restore_backup_cancel()
+
+            def restore_process():
+                try:
+                    # Get WZT restore steps modified for templates
+                    restore_steps = self.get_template_restore_steps(file_path)
+
+                    for step_text, step_func in restore_steps:
+                        if self.stop_processing:
+                            # Handle cancellation by restoring backup
+                            if backup_dir and backup_dir.exists():
+                                if extracted_template.exists():
+                                    shutil.rmtree(extracted_template)
+                                shutil.move(str(backup_dir), str(extracted_template))
+                                print(f"Restored original template directory from: {backup_dir}")
+                            GLib.idle_add(self.on_template_restore_completed)
+                            return
+
+                        GLib.idle_add(self.show_initializing_step, step_text)
+                        try:
+                            step_func()
+                            GLib.idle_add(self.mark_step_as_done, step_text)
+                        except Exception as e:
+                            print(f"Error during step '{step_text}': {e}")
+                            # Restore backup on failure
+                            if backup_dir and backup_dir.exists():
+                                if extracted_template.exists():
+                                    shutil.rmtree(extracted_template)
+                                shutil.move(str(backup_dir), str(extracted_template))
+                            GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
+                            return
+
+                    # Cleanup backup after successful restore
+                    if backup_dir and backup_dir.exists():
+                        shutil.rmtree(backup_dir)
+                        print(f"Removed backup directory: {backup_dir}")
+
+                    GLib.idle_add(self.on_template_restore_completed)
+
+                except Exception as e:
+                    print(f"Error during template restore: {e}")
+                    if backup_dir and backup_dir.exists():
+                        if extracted_template.exists():
+                            shutil.rmtree(extracted_template)
+                        shutil.move(str(backup_dir), str(extracted_template))
+                    GLib.idle_add(self.show_info_dialog, "Error", f"Template restore failed: {str(e)}")
+
+            # Start restore thread
+            threading.Thread(target=restore_process).start()
+
+        except Exception as e:
+            print(f"Error initiating template restore: {e}")
+            GLib.idle_add(self.show_info_dialog, "Error", f"Failed to start template restore: {str(e)}")
+
+    def extract_template_backup(self, file_path):
+        """
+        Extract template backup to templates directory with process management.
+        """
+        current_username = os.getenv("USER") or os.getenv("USERNAME")
+        if not current_username:
+            raise Exception("Unable to determine current username")
+
+        try:
+            # Create new process group
+            def preexec_function():
+                os.setpgrp()
+
+            # Get template name from archive
+            list_process = subprocess.Popen(
+                ['tar', '-tf', file_path],
+                stdout=subprocess.PIPE,
+                preexec_fn=preexec_function,
+                universal_newlines=True
+            )
+            
+            with self.process_lock:
+                self.current_process = list_process
+            
+            if self.stop_processing:
+                self._kill_current_process()
+                raise Exception("Operation cancelled by user")
+                
+            output, _ = list_process.communicate()
+            extracted_template_name = output.splitlines()[0].split('/')[0]
+            extracted_template_dir = Path(self.templates_dir) / extracted_template_name
+
+            print(f"Extracting template to: {extracted_template_dir}")
+
+            # Extract archive
+            extract_process = subprocess.Popen(
+                ['tar', '-xf', file_path, '-C', self.templates_dir,
+                "--transform", rf"s|XOUSERXO|{current_username}|g", 
+                "--transform", rf"s|%USERNAME%|{current_username}|g"],
+                preexec_fn=preexec_function
+            )
+            
+            with self.process_lock:
+                self.current_process = extract_process
+
+            while extract_process.poll() is None:
+                if self.stop_processing:
+                    print("Cancelling template extraction...")
+                    self._kill_current_process()
+                    if extracted_template_dir.exists():
+                        shutil.rmtree(extracted_template_dir, ignore_errors=True)
+                    raise Exception("Operation cancelled by user")
+                time.sleep(0.1)
+
+            if extract_process.returncode != 0:
+                raise Exception(f"Template extraction failed with code {extract_process.returncode}")
+
+            return extracted_template_dir
+
+        except Exception as e:
+            print(f"Template extraction error: {e}")
+            if "Operation cancelled by user" not in str(e):
+                raise
+            return None
+        finally:
+            with self.process_lock:
+                self.current_process = None
+
+    def extract_template_dir(self, file_path):
+        """
+        Determine template directory name from backup file.
+        """
+        try:
+            extracted_template_name = subprocess.check_output(
+                ["bash", "-c", f"tar -tf '{file_path}' | head -n2 | grep '/$' | head -n1 | cut -f1 -d '/'"]
+            ).decode('utf-8').strip()
+
+            if not extracted_template_name:
+                raise Exception("No directory found in template archive")
+
+            return Path(self.templates_dir) / extracted_template_name
+        
+        except subprocess.CalledProcessError as e:
+            print(f"Error extracting template directory: {e}")
+            return None
+        except Exception as e:
+            print(f"Error: {e}")
+            return None
+
+    def get_template_restore_steps(self, file_path):
+        """
+        Return steps for template restore using WZT format.
+        """
+        return [
+            ("Checking Disk Space", lambda: self.check_template_disk_space(file_path)),
+            ("Extracting Template File", lambda: self.extract_template_backup(file_path)),
+            ("Processing Configuration Files", lambda: self.perform_replacements(self.extract_template_dir(file_path))),
+            ("Updating Shortcut List", lambda: self.find_and_save_lnk_files(self.extract_template_dir(file_path))),
+            ("Finalizing Template Structure", lambda: self.remove_symlinks_and_create_directories(self.extract_template_dir(file_path)))
+        ]
+
+    def check_template_disk_space(self, file_path):
+        """
+        Check disk space in templates directory against backup size.
+        """
+        try:
+            # Get available space in templates directory
+            df_output = subprocess.check_output(['df', '--output=avail', str(self.templates_dir)]).decode().splitlines()[1]
+            available_space = int(df_output.strip()) * 1024  # Convert KB to bytes
+
+            # Get compressed size
+            compressed_size = Path(file_path).stat().st_size
+
+            # Quick check if compressed size is less than 1/4 available space
+            if compressed_size * 4 <= available_space:
+                print(f"Quick space check passed for template")
+                return True
+
+            # Full check with uncompressed size
+            uncompressed_size = self.get_total_uncompressed_size(file_path)
+            if available_space >= uncompressed_size:
+                print(f"Template disk space check passed")
+                return True
+            
+            # Show error if insufficient space
+            GLib.idle_add(
+                self.show_info_dialog, "Insufficient Space",
+                f"Need {uncompressed_size/(1024*1024):.1f}MB, only {available_space/(1024*1024):.1f}MB available."
+            )
+            return False
+
+        except subprocess.CalledProcessError as e:
+            print(f"Disk check error: {e}")
+            return False
+
+    def on_template_restore_completed(self):
+        """
+        Cleanup after template restore completion.
+        """
+        self.hide_processing_spinner()
+        self.reconnect_open_button()
+        self.show_options_for_settings()
+        print("Template restore completed successfully")
+
+
+
+
+
+
+
+
 
 
 
@@ -9574,20 +10217,6 @@ class WineCharmApp(Gtk.Application):
 
 
         
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 def parse_args():
     """
