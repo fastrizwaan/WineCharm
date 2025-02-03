@@ -100,7 +100,7 @@ class WineCharmApp(Gtk.Application):
         self.process_lock = threading.Lock()
         self.called_from_settings = False
         self.open_button_handler_id = None
-        
+
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
         self.script_buttons = {}
@@ -925,18 +925,27 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error opening file manager: {e}")
 
-    def open_terminal_winecharm(self, action, param):
-        wineprefix = Path(self.winecharmdir).expanduser().resolve()
+    def open_terminal_winecharm(self, param=None, action=None):
+        # Set wineprefix to self.template
+        wineprefix = Path(self.template).expanduser().resolve()
 
         print(f"Opening terminal for {wineprefix}")
 
         self.ensure_directory_exists(wineprefix)
 
+        # Load settings to get the runner
+        settings = self.load_settings()
+        runner = settings.get('runner', 'wine')  # Default to 'wine' if runner is not specified
+        runner_path = Path(runner).expanduser().resolve()
+        runner_dir = runner_path.parent.resolve()
+
         if shutil.which("flatpak-spawn"):
             command = [
                 "wcterm", "bash", "--norc", "-c",
                 (
-                    rf'export PS1="[\u@\h:\w]\\$ "; '
+                    rf'export PS1="[\u@\h:\w]\$ "; '
+                    f'export WINEPREFIX={shlex.quote(str(wineprefix))}; '
+                    f'export PATH={shlex.quote(str(runner_dir))}:$PATH; '
                     f'cd {shlex.quote(str(wineprefix))}; '
                     'exec bash --norc -i'
                 )
@@ -964,7 +973,9 @@ class WineCharmApp(Gtk.Application):
             command = terminal_command + [
                 "bash", "--norc", "-c",
                 (
-                    rf'export PS1="[\u@\h:\w]\\$ "; '
+                    rf'export PS1="[\u@\h:\w]\$ "; '
+                    f'export WINEPREFIX={shlex.quote(str(wineprefix))}; '
+                    f'export PATH={shlex.quote(str(runner_dir))}:$PATH; '
                     f'cd {shlex.quote(str(wineprefix))}; '
                     'exec bash --norc -i'
                 )
@@ -976,6 +987,7 @@ class WineCharmApp(Gtk.Application):
             subprocess.Popen(command)
         except Exception as e:
             print(f"Error opening terminal: {e}")
+
 
 
     def on_key_pressed(self, controller, keyval, keycode, state):
@@ -7184,6 +7196,7 @@ class WineCharmApp(Gtk.Application):
             ("Runner Delete", "user-trash-symbolic", self.delete_runner),
             ("Template Set Default", "document-new-symbolic", self.set_default_template),
             ("Template Configure", "preferences-other-symbolic", self.configure_template),
+            ("Template Terminal", "preferences-other-symbolic", self.open_terminal_winecharm),
             ("Template Import", "folder-download-symbolic", self.import_template),
             ("Template Create", "document-new-symbolic", self.create_template),
             ("Template Clone", "folder-copy-symbolic", self.clone_template),
