@@ -36,7 +36,7 @@ Refactoring winecharm
 - [ ] open filemanager at template
 - [ ] show recommended dxvk, vkd3d, openal, corefonts (get them separate, arial, times, etc. for progress) and show show all winetricks dlls with a window with checkbox
 - [ ] show winetricks dlls 
-- [ ] fix the following error which is there for initializing template, startup with scripts installed.
+- [x] fix the following error which is there for initializing template, startup with scripts installed.
     /usr/lib/python3.12/site-packages/gi/overrides/GObject.py:491: Warning: ../gobject/gsignal.c:2684: instance '0x55d9ea6653c0' has no handler with id '634'
  
  # Todo WineCharm 0.97
