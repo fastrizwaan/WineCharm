@@ -99,7 +99,8 @@ class WineCharmApp(Gtk.Application):
         self.runner_to_use = None
         self.process_lock = threading.Lock()
         self.called_from_settings = False
-
+        self.open_button_handler_id = None
+        
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
         self.script_buttons = {}
@@ -500,6 +501,7 @@ class WineCharmApp(Gtk.Application):
         GLib.idle_add(self.process_cli_file, file_path)
 
     def set_open_button_label(self, label_text):
+        
         """Helper method to update the open button's label"""
         box = self.open_button.get_child()
         if not box:
@@ -5621,10 +5623,12 @@ class WineCharmApp(Gtk.Application):
         """
         Disconnect the open button's handler and update its label to "Importing...".
         """
-        if self.open_button_handler_id is not None:
+        if hasattr(self, 'open_button_handler_id') and self.open_button_handler_id is not None:
             self.open_button.disconnect(self.open_button_handler_id)
+            self.open_button_handler_id = None  # Reset the handler ID after disconnecting
         
-        #self.set_open_button_label("Importing...")
+        # Update the label and hide the icon
+        self.set_open_button_label("Importing...")
         self.set_open_button_icon_visible(False)  # Hide the open-folder icon
         print("Open button disconnected and spinner shown.")
 
@@ -5632,17 +5636,17 @@ class WineCharmApp(Gtk.Application):
         """
         Reconnect the open button's handler and reset its label.
         """
-        # disconnect before reconnecting
+        # Disconnect before reconnecting
         self.disconnect_open_button()
 
-        if self.open_button_handler_id is not None:
+        if hasattr(self, 'open_button') and self.open_button is not None:
             self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
         
-
-
+        # Reset the label and show the icon
         self.set_open_button_label("Open")
         self.set_open_button_icon_visible(True)
         print("Open button reconnected and UI reset.")
+
         
     def create_scripts_for_exe_files(self, wineprefix):
         exe_files = self.find_exe_files(wineprefix)
