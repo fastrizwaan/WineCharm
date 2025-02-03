@@ -98,7 +98,8 @@ class WineCharmApp(Gtk.Application):
         self.current_process = None
         self.runner_to_use = None
         self.process_lock = threading.Lock()
-        
+        self.called_from_settings = False
+
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
         self.script_buttons = {}
@@ -475,8 +476,14 @@ class WineCharmApp(Gtk.Application):
         print("Template initialization completed and UI updated.")
         self.show_initializing_step("Initialization Complete!")
         self.mark_step_as_done("Initialization Complete!")
-        GLib.timeout_add_seconds(0.5, self.create_script_list)
         
+        # If not called from settings create script list else go to settings
+        if not self.called_from_settings:
+            GLib.timeout_add_seconds(0.5, self.create_script_list)
+        
+        if self.called_from_settings:
+            self.on_template_restore_completed()
+            
         # Check if there's a command-line file to process after initialization
         if self.command_line_file:
             print("Processing command-line file after template initialization")
@@ -485,7 +492,8 @@ class WineCharmApp(Gtk.Application):
 
         self.set_dynamic_variables()
         self.reconnect_open_button()
-    
+        self.called_from_settings = False
+
     def process_cli_file_later(self, file_path):
         # Use GLib.idle_add to ensure this runs after the main loop starts
         GLib.idle_add(self.show_processing_spinner, "hello world")
@@ -7972,6 +7980,7 @@ class WineCharmApp(Gtk.Application):
             if not new_template.exists():
                 print(f"Initializing new {new_arch} template...")
                 self.on_back_button_clicked(None)
+                self.called_from_settings = True
                 self.initialize_template(new_template, 
                                     lambda: finalize_arch_change(single_prefix_dir),
                                     arch=new_arch)
@@ -10351,7 +10360,9 @@ class WineCharmApp(Gtk.Application):
                 else:
                     arch = "win32" if win32_radio.get_active() else "win64"
                     prefix_dir = self.templates_dir / name
+                    self.called_from_settings = True
                     self.initialize_template(prefix_dir, callback=None, arch=arch)
+
             dialog.close()
         
         dialog.connect("response", on_response)
