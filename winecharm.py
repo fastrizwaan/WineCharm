@@ -298,11 +298,11 @@ class WineCharmApp(Gtk.Application):
         self.create_main_window()
         self.script_list = {}
         self.load_script_list()
-        self.create_script_list()
+
         self.single_prefix = False
         self.load_settings()
         print(f"Single Prefix: {self.single_prefix}")
-        # Unified template initialization logic
+
         def initialize_template_if_needed(template_path, arch, single_prefix_dir=None):
             if not template_path.exists():
                 self.set_open_button_label("Initializing")
@@ -314,25 +314,37 @@ class WineCharmApp(Gtk.Application):
                 self.copy_template(single_prefix_dir)
             return False
 
-        # Determine which templates need initialization based on settings
-        arch_templates = [
-            (self.arch == 'win32', self.default_template_win32, 'win32', self.single_prefix_dir_win32),
-            (True, self.default_template_win64, 'win64', self.single_prefix_dir_win64)  # Always check win64
-        ]
+        # Corrected conditions: Only check current arch when single_prefix is False
+        arch_templates = []
+        if self.single_prefix:
+            # Check both templates if single_prefix is enabled
+            arch_templates = [
+                (True, self.default_template_win32, 'win32', self.single_prefix_dir_win32),
+                (True, self.default_template_win64, 'win64', self.single_prefix_dir_win64)
+            ]
+        else:
+            # Check only the current arch's template
+            if self.arch == 'win32':
+                arch_templates = [
+                    (True, self.default_template_win32, 'win32', self.single_prefix_dir_win32)
+                ]
+            else:
+                arch_templates = [
+                    (True, self.default_template_win64, 'win64', self.single_prefix_dir_win64)
+                ]
 
         needs_initialization = False
         for check, template, arch, single_dir in arch_templates:
-            if check and not self.single_prefix:
+            if check:
                 needs_initialization |= initialize_template_if_needed(template, arch, single_dir)
 
-        # Set dynamic variables if no initialization needed 
         if not needs_initialization:
+            self.create_script_list()
             self.set_dynamic_variables()
             if self.command_line_file:
                 print("Processing command-line file after UI initialization")
                 self.process_cli_file_later(self.command_line_file)
 
-        # Common post-init tasks
         missing_programs = self.check_required_programs()
         if missing_programs:
             self.show_missing_programs_dialog(missing_programs)
@@ -875,7 +887,7 @@ class WineCharmApp(Gtk.Application):
         key_controller.connect("key-pressed", self.on_key_pressed)
         self.window.add_controller(key_controller)
 
-        GLib.timeout_add_seconds(0.5, self.create_script_list)
+        self.create_script_list()
 
     def create_sort_actions(self):
         """
@@ -2381,6 +2393,8 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(self.process_ended, script_key)
 
     def check_running_processes_on_startup(self):
+        if not hasattr(self, 'script_ui_data') or not self.script_ui_data:
+            return
         for script_key, script_data in self.script_list.items():
             wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
             target_exe_path = Path(script_data['exe_file']).expanduser().resolve()
@@ -5065,6 +5079,10 @@ class WineCharmApp(Gtk.Application):
 
 
     def show_processing_spinner(self, label_text):
+
+        # Clear existing content
+        self.flowbox.remove_all()
+
         if hasattr(self, 'progress_bar'):
             self.vbox.remove(self.progress_bar)
             del self.progress_bar
