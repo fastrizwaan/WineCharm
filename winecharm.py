@@ -155,6 +155,13 @@ class WineCharmApp(Gtk.Application):
         self.runner_data = None  # Will hold the runner data after fetching
         self.settings = self.load_settings()  # Add this line
 
+        # Set keyboard accelerators
+        self.set_accels_for_action("win.search", ["<Ctrl>f"])
+        self.set_accels_for_action("win.open", ["<Ctrl>o"])
+        self.set_accels_for_action("win.on_kill_all_clicked", ["<Ctrl>k"])
+        self.set_accels_for_action("win.toggle_view", ["<Ctrl>v"])
+        self.set_accels_for_action("win.back", ["<Ctrl>BackSpace"])
+
     def ensure_directory_exists(self, directory):
         directory = Path(directory)  # Ensure it's a Path object
         if not directory.exists():
@@ -889,6 +896,35 @@ class WineCharmApp(Gtk.Application):
 
         self.create_script_list()
 
+        # Add keyboard actions
+        self.add_keyboard_actions()
+
+    def add_keyboard_actions(self):
+        # Search action
+        search_action = Gio.SimpleAction.new("search", None)
+        search_action.connect("activate", lambda *_: self.search_button.set_active(not self.search_button.get_active()))
+        self.window.add_action(search_action)
+
+        # Open action (fixed signature)
+        open_action = Gio.SimpleAction.new("open", None)
+        open_action.connect("activate", lambda *_: self.on_open_button_clicked(None))
+        self.window.add_action(open_action)
+
+        # Toggle view action
+        toggle_view_action = Gio.SimpleAction.new("toggle_view", None)
+        toggle_view_action.connect("activate", lambda *_: self.on_view_toggle_button_clicked(self.view_toggle_button))
+        self.window.add_action(toggle_view_action)
+
+        # Kill all action
+        kill_all_action = Gio.SimpleAction.new("kill_all", None)
+        kill_all_action.connect("activate", self.on_kill_all_clicked)
+        self.window.add_action(kill_all_action)
+
+        # Back navigation action
+        back_action = Gio.SimpleAction.new("back", None)
+        back_action.connect("activate", lambda *_: self.on_back_button_clicked(None))
+        self.window.add_action(back_action)
+
     def create_sort_actions(self):
         """
         Create a single sorting action for the sorting options in the Sort submenu.
@@ -1222,9 +1258,22 @@ class WineCharmApp(Gtk.Application):
         if self.main_frame.get_child() != self.scrolled:
             self.main_frame.set_child(self.scrolled)
 
+        # Cleanup accelerator group when leaving options view
+        if hasattr(self, 'accel_group'):
+            self.window.remove_accel_group(self.accel_group)
+            del self.accel_group
+            
         # Restore the script list
         self.create_script_list()
 
+    def setup_accelerator_context(self):
+        controller = Gtk.ShortcutController()
+        shortcut = Gtk.Shortcut(
+            trigger=Gtk.ShortcutTrigger.parse_string("<Ctrl>BackSpace"),
+            action=Gtk.CallbackAction.new(lambda *_: self.on_back_button_clicked(None))
+        )
+        controller.add_shortcut(shortcut)
+        self.window.add_controller(controller)
         
     def wrap_text_at_20_chars(self):
         text="Speedpro Installer Setup"
@@ -3275,6 +3324,9 @@ class WineCharmApp(Gtk.Application):
         """
         Display the options for a specific script with search functionality.
         """
+        # Add accelerator context for options view
+        self.setup_accelerator_context()
+
         self.search_button.set_active(False)
         # Store current script info for search functionality
         self.current_script = Path(ui_state['script_path'])
@@ -7178,6 +7230,9 @@ class WineCharmApp(Gtk.Application):
         """
         Display the settings options with search functionality using existing search mechanism.
         """
+        # Add accelerator context for settings view
+        self.setup_accelerator_context()
+
         self.search_button.set_active(False)
         # Ensure the search button is visible and the search entry is cleared
         self.search_button.set_visible(True)

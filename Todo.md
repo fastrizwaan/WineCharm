@@ -31,6 +31,7 @@ Refactoring winecharm
 - [ ] disable change prefix name when using single prefix
 - [x] do not remove search "Removed existing charm file" from single_prefix 
 - [x] Create template
+- [ ] Runner getting wrong "~/WineCharm" or pwd is used for runner while creating bottle.
 - [ ] template configure
 - [ ] open terminal at template
 - [ ] open filemanager at template
