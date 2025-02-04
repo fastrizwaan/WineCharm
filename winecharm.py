@@ -6880,51 +6880,47 @@ class WineCharmApp(Gtk.Application):
         
         dialog.present(self.window)
 
-        
+            
     def rename_prefix_directory(self, script, script_key, *args):
-        """
-        Show a dialog to allow the user to rename the Wine prefix directory.
-
-        :param script_key: The unique key for identifying the script.
-        """
-        # Retrieve script data using the script key
         script_data = self.script_list.get(script_key)
-        
-        # Debug: Print all keys to identify possible mismatches
         if script_data is None:
-            print(f"Error: Script key {script_key} not found in script_list.")
-            print("Available script keys:", list(self.script_list.keys()))
+            print(f"Error: Script key {script_key} not found")
             return
 
-        # Get the current Wine prefix path
         wineprefix = Path(script_data.get('wineprefix')).expanduser().resolve()
         if not wineprefix.exists():
-            print(f"Error: Wine prefix directory '{wineprefix}' does not exist.")
+            print(f"Error: Wine prefix '{wineprefix}' doesn't exist")
             return
 
-        # Create a dialog to prompt the user for the new directory name
+        if self.single_prefix:  # Added confirmation check
+            confirm_dialog = Adw.AlertDialog(
+                heading="Single Prefix Mode Warning",
+                body="You're in Single Prefix mode! Renaming will affect ALL scripts using this prefix.",
+                body_use_markup=True
+            )
+            confirm_dialog.add_response("cancel", "Cancel")
+            confirm_dialog.add_response("proceed", "Proceed Anyway")
+            confirm_dialog.set_response_appearance("proceed", Adw.ResponseAppearance.DESTRUCTIVE)
+            confirm_dialog.connect("response", lambda d, r: self.show_rename_dialog(wineprefix, script_key) if r == "proceed" else None)
+            confirm_dialog.present(self.window)
+        else:
+            self.show_rename_dialog(wineprefix, script_key)
+
+    def show_rename_dialog(self, wineprefix, script_key):
+        """Helper to show the actual rename dialog"""
         dialog = Adw.AlertDialog(
             title="Rename Wine Prefix",
-            body=f"Enter a new name for the Wine prefix directory:\n(Current: {wineprefix.name})"
+            body=f"Enter new name for prefix directory:\nCurrent: {wineprefix.name}"
         )
-
-        # Create an entry field with the current directory name
+        
         entry = Gtk.Entry()
         entry.set_text(wineprefix.name)
-
-        # Add the entry field to the dialog
         dialog.set_extra_child(entry)
 
-        # Add "OK" and "Cancel" buttons
-        dialog.add_response("ok", "OK")
-        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
         dialog.add_response("cancel", "Cancel")
-        dialog.set_default_response("cancel")
-
-        # Connect the response signal to handle the user's input
+        dialog.add_response("ok", "Rename")
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
         dialog.connect("response", self.on_rename_prefix_dialog_response, entry, script_key, wineprefix)
-
-        # Present the dialog
         dialog.present(self.window)
 
 
