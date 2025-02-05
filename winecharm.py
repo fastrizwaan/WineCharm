@@ -10446,7 +10446,26 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
 
+    def process_cli_file(self, file_path):
+        print(f"Processing CLI file: {file_path}")
+        abs_file_path = str(Path(file_path).resolve())
+        print(f"Resolved absolute CLI file path: {abs_file_path}")
 
+        try:
+            if not Path(abs_file_path).exists():
+                print(f"File does not exist: {abs_file_path}")
+                return
+            self.create_yaml_file(abs_file_path, None)
+
+        except Exception as e:
+            print(f"Error processing file: {e}")
+        finally:
+            if self.initializing_template:
+                pass  # Keep showing spinner
+            else:
+                GLib.timeout_add_seconds(1, self.hide_processing_spinner)
+                
+            GLib.timeout_add_seconds(0.5, self.create_script_list)
 
 
 
