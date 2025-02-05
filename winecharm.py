@@ -4166,7 +4166,7 @@ class WineCharmApp(Gtk.Application):
         dialog.connect("response", self.on_delete_wineprefix_confirmation_response, wineprefix)
 
         # Present the dialog (use present instead of show to avoid deprecation warning)
-        dialog.present()
+        dialog.present(self.window)
 
 
     def on_delete_wineprefix_confirmation_response(self, dialog, response_id, wineprefix):
