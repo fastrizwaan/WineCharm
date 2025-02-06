@@ -30,8 +30,19 @@ gi.require_version('Adw', '1')
 
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 
+
+
 class WineCharmApp(Gtk.Application):
     def __init__(self):
+        self.count = 0
+        self.log_file_path = os.path.expanduser('~/logfile.log')
+        creation_date_and_time = datetime.now()
+        log_message = f"=>{creation_date_and_time}\n" + "-"*50 + "\n"
+
+        #with open(self.log_file_path, 'a') as log_file:
+        #    log_file.write(log_message)
+
+        self.print_method_name()
         super().__init__(application_id='io.github.fastrizwaan.WineCharm', flags=Gio.ApplicationFlags.HANDLES_OPEN)
         self.window = None  # Initialize window as None
         Adw.init()
@@ -39,7 +50,6 @@ class WineCharmApp(Gtk.Application):
         # Move the global variables to instance attributes
         self.debug = False
         self.version = "0.96"
-        
         # Paths and directories
         self.winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
         self.prefixes_dir = self.winecharmdir / "Prefixes"
@@ -161,8 +171,23 @@ class WineCharmApp(Gtk.Application):
         self.set_accels_for_action("win.on_kill_all_clicked", ["<Ctrl>k"])
         self.set_accels_for_action("win.toggle_view", ["<Ctrl>v"])
         self.set_accels_for_action("win.back", ["<Ctrl>BackSpace"])
+        print("__init__ end" + " - "*50)
 
+        self.count = 0
+
+    def print_method_name(self):
+        self.count = self.count + 1 
+        current_frame = sys._getframe(1)  # Get the caller's frame
+        method_name = current_frame.f_code.co_name
+        print(f"=>{self.count} {method_name}")
+        # uncomment below to write to log file
+        # log_message = f"=>{self.count} {method_name}\n"
+
+        # with open(self.log_file_path, 'a') as log_file:
+        #     log_file.write(log_message)
+        
     def ensure_directory_exists(self, directory):
+        self.print_method_name()
         directory = Path(directory)  # Ensure it's a Path object
         if not directory.exists():
             try:
@@ -175,6 +200,7 @@ class WineCharmApp(Gtk.Application):
             #print(f"Directory already exists: {directory}")
 
     def create_required_directories(self):
+        self.print_method_name()
         winecharm_data_dir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data")).resolve()
         self.tempdir =  winecharm_data_dir / "tmp"
         self.winecharmdir = winecharm_data_dir / "winecharm"
@@ -189,10 +215,12 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_settings_clicked(self, action=None, param=None):
+        self.print_method_name()
         print("Settings action triggered")
         # You can add code here to open a settings window or dialog.
 
     def find_matching_processes(self, exe_name_pattern):
+        self.print_method_name()
         matching_processes = []
         
         for proc in psutil.process_iter(['pid', 'name', 'exe', 'cmdline']):
@@ -218,6 +246,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_kill_all_clicked(self, action=None, param=None):
+        self.print_method_name()
         try:
             winecharm_pids = []
             wine_exe_pids = []
@@ -267,10 +296,12 @@ class WineCharmApp(Gtk.Application):
         GLib.timeout_add_seconds(0.5, self.load_script_list)
 
     def on_help_clicked(self, action=None, param=None):
+        self.print_method_name()
         print("Help action triggered")
         # You can add code here to show a help dialog or window.
 
     def on_about_clicked(self, action=None, param=None):
+        self.print_method_name()
         about_dialog = Adw.AboutWindow(
             transient_for=self.window,
             application_name="WineCharm",
@@ -286,10 +317,12 @@ class WineCharmApp(Gtk.Application):
         about_dialog.present()
 
     def quit_app(self, action=None, param=None):
+        self.print_method_name()
         self.quit()
 
 
     def get_default_icon_path(self):
+        #self.print_method_name()
         xdg_data_dirs = os.getenv("XDG_DATA_DIRS", "").split(":")
         icon_relative_path = "icons/hicolor/128x128/apps/org.winehq.Wine.png"
 
@@ -302,6 +335,7 @@ class WineCharmApp(Gtk.Application):
         return Path("/app/share/icons/hicolor/128x128/apps/org.winehq.Wine.png")
 
     def on_startup(self, app):
+        self.print_method_name()
         self.create_main_window()
         self.script_list = {}
         self.load_script_list()
@@ -311,6 +345,7 @@ class WineCharmApp(Gtk.Application):
         print(f"Single Prefix: {self.single_prefix}")
 
         def initialize_template_if_needed(template_path, arch, single_prefix_dir=None):
+            self.print_method_name()
             if not template_path.exists():
                 self.set_open_button_label("Initializing")
                 print(f"Initializing {arch} template...")
@@ -348,9 +383,36 @@ class WineCharmApp(Gtk.Application):
         if not needs_initialization:
             self.create_script_list()
             self.set_dynamic_variables()
+            #if self.command_line_file:
+            #    print("Processing command-line file after UI initialization")
+            #    self.process_cli_file_later(self.command_line_file)
+
+            # Check if the command_line_file exists and is either .exe or .msi
             if self.command_line_file:
-                print("Processing command-line file after UI initialization")
-                self.process_cli_file_later(self.command_line_file)
+                print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+                print(self.command_line_file)
+
+                file_extension = Path(self.command_line_file).suffix.lower()
+                if file_extension in ['.exe', '.msi']:
+                    print("A"*100)
+                    print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
+                    print("Trying to process file inside on template initialized")
+
+                    GLib.idle_add(self.show_processing_spinner)
+                    self.process_cli_file_later(self.command_line_file)
+                elif file_extension in ['.wzt', '.bottle', '.prefix']:
+                    print("B"*100)
+                    self.restore_prefix_bottle_wzt_tar_zst(self.command_line_file)
+
+                else:
+                    print("C"*100)
+                    print(f"Invalid file type: def on_open: {file_extension}. Only .exe or .msi files are allowed.")
+                    GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
+                    self.command_line_file = None
+                    return False
+        print(" | "*50)
+        self.create_script_list()
+
 
         missing_programs = self.check_required_programs()
         if missing_programs:
@@ -360,6 +422,7 @@ class WineCharmApp(Gtk.Application):
         threading.Thread(target=self.maybe_fetch_runner_urls).start()
 
     def remove_symlinks_and_create_directories(self, wineprefix):
+        self.print_method_name()
         """
         Remove all symbolic link files in the specified directory (drive_c/users/{user}) and 
         create normal directories in their place.
@@ -387,6 +450,7 @@ class WineCharmApp(Gtk.Application):
                     print(f"Error processing {item}: {e}")
 
     def initialize_template(self, template_dir, callback, arch='win64'):
+        self.print_method_name()
         """
         Modified template initialization with architecture support
         """
@@ -411,10 +475,10 @@ class WineCharmApp(Gtk.Application):
             f"WINEARCH={arch} WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
             ("Replace symbolic links with directories", 
             lambda: self.remove_symlinks_and_create_directories(template_dir)),
-            #("Installing corefonts", 
-            #f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
-            #("Installing openal", 
-            #f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+            ("Installing arial", 
+            f"WINEPREFIX='{template_dir}' winetricks -q arial"),
+            ("Installing openal", 
+            f"WINEPREFIX='{template_dir}' winetricks -q openal"),
             #("Installing vkd3d", 
             #f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
             #("Installing dxvk", 
@@ -426,6 +490,7 @@ class WineCharmApp(Gtk.Application):
         self.show_processing_spinner(f"Initializing {template_dir.name} Template...")
 
         def initialize():
+            self.print_method_name()
             for index, (step_text, command) in enumerate(steps, 1):
                 if self.stop_processing:
                     GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
@@ -470,6 +535,7 @@ class WineCharmApp(Gtk.Application):
         threading.Thread(target=initialize).start()
 
     def on_template_initialized(self, arch=None):
+        self.print_method_name()
         print(f"Template initialization complete for {arch if arch else 'default'} architecture.")
         self.initializing_template = False
         
@@ -484,8 +550,8 @@ class WineCharmApp(Gtk.Application):
         # Ensure the spinner is stopped after initialization
         self.hide_processing_spinner()
         
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)
+        #self.set_open_button_label("Open")
+        #self.set_open_button_icon_visible(True)
         self.search_button.set_sensitive(True)
         self.view_toggle_button.set_sensitive(True)
         
@@ -504,23 +570,85 @@ class WineCharmApp(Gtk.Application):
         if self.called_from_settings:
             self.on_template_restore_completed()
             
-        # Check if there's a command-line file to process after initialization
+        ## Check if there's a command-line file to process after initialization
+        #if self.command_line_file:
+        #    print("Processing command-line file after template initialization")
+        #    self.process_cli_file_later(self.command_line_file)
+        #    self.command_line_file = None  # Reset after processing
+
+        # Check if the command_line_file exists and is either .exe or .msi
         if self.command_line_file:
-            print("Processing command-line file after template initialization")
-            self.process_cli_file_later(self.command_line_file)
-            self.command_line_file = None  # Reset after processing
+            print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+            print(self.command_line_file)
+
+            file_extension = Path(self.command_line_file).suffix.lower()
+            if file_extension in ['.exe', '.msi']:
+                print("A"*100)
+                print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
+                print("Trying to process file inside on template initialized")
+
+                GLib.idle_add(self.show_processing_spinner, "on_template_initialized")
+                self.process_cli_file_in_thread(self.command_line_file)
+            elif file_extension in ['.wzt', '.bottle', '.prefix']:
+                print("B"*100)
+                self.restore_prefix_bottle_wzt_tar_zst(self.command_line_file)
+
+            else:
+                print("C"*100)
+                print(f"Invalid file type: def on_open: {file_extension}. Only .exe or .msi files are allowed.")
+                GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
+                self.command_line_file = None
+                return False
+
+
+        if not self.called_from_settings:
+            GLib.timeout_add_seconds(0.5, self.create_script_list)
+        
+        if self.called_from_settings:
+            self.show_options_for_settings()
+            self.called_from_settings = False
 
         self.set_dynamic_variables()
-        self.reconnect_open_button()
-        self.called_from_settings = False
+        #self.reconnect_open_button()
+        
 
     def process_cli_file_later(self, file_path):
+        self.count = 0
+        self.print_method_name()
+        #__init__()
+        #self.create_main_window()
+        print("D"*100)
         # Use GLib.idle_add to ensure this runs after the main loop starts
-        GLib.idle_add(self.show_processing_spinner, "hello world")
-        GLib.idle_add(self.process_cli_file, file_path)
+        #GLib.idle_add(self.show_processing_spinner, "hello world")
+                # Check if the command_line_file exists and is either .exe or .msi
+        if file_path:
+            print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+            print(file_path)
+
+            file_extension = Path(file_path).suffix.lower()
+            if file_extension in ['.exe', '.msi']:
+                print("A"*100)
+                print(f"Processing file: {file_path} (Valid extension: {file_extension})")
+                print("Trying to process file inside on template initialized")
+
+                GLib.idle_add(self.show_processing_spinner, "Processing")
+                self.process_cli_file_in_thread(file_path)
+            elif file_extension in ['.wzt', '.bottle', '.prefix']:
+                print("B"*100)
+                GLib.idle_add(self.show_processing_spinner, "Restoring")
+                self.restore_prefix_bottle_wzt_tar_zst(file_path)
+
+            else:
+                print("C"*100)
+                print(f"Invalid file type: def on_open: {file_extension}. Only .exe or .msi files are allowed.")
+                GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
+                self.command_line_file = None
+                return False
+        #GLib.idle_add(self.process_cli_file_in_thread, file_path)
+        self.create_script_list()
 
     def set_open_button_label(self, label_text):
-        
+        self.print_method_name()
         """Helper method to update the open button's label"""
         box = self.open_button.get_child()
         if not box:
@@ -535,6 +663,7 @@ class WineCharmApp(Gtk.Application):
             child = child.get_next_sibling()
 
     def show_initializing_step(self, step_text):
+        self.print_method_name()
         """
         Show a new processing step in the flowbox
         """
@@ -582,6 +711,7 @@ class WineCharmApp(Gtk.Application):
             self.step_boxes.append((step_box, step_spinner, step_label))
 
     def mark_step_as_done(self, step_text):
+        self.print_method_name()
         """
         Mark a step as completed in the flowbox
         """
@@ -594,6 +724,7 @@ class WineCharmApp(Gtk.Application):
                     break
 
     def check_required_programs(self):
+        self.print_method_name()
         if shutil.which("flatpak-spawn"):
             return []
             
@@ -627,6 +758,7 @@ class WineCharmApp(Gtk.Application):
         return [prog for prog in required_programs if not shutil.which(prog)]
 
     def show_missing_programs_dialog(self, missing_programs):
+        self.print_method_name()
         if not missing_programs:
             return
             
@@ -656,6 +788,7 @@ class WineCharmApp(Gtk.Application):
 
         
     def set_dynamic_variables(self):
+        self.print_method_name()
         # Check if Settings.yaml exists and set the template and arch accordingly
         if self.settings_file.exists():
             settings = self.load_settings()  # Assuming load_settings() returns a dictionary
@@ -674,6 +807,7 @@ class WineCharmApp(Gtk.Application):
         self.save_settings()
 
     def save_settings(self):
+        self.print_method_name()
         """Save current settings to the Settings.yaml file."""
         settings = {
             'template': self.replace_home_with_tilde_in_path(str(self.template)),
@@ -693,6 +827,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error saving settings: {e}")
 
     def load_settings(self):
+        self.print_method_name()
         """Load settings from the Settings.yaml file."""
         if self.settings_file.exists():
             with open(self.settings_file, 'r') as settings_file:
@@ -711,6 +846,7 @@ class WineCharmApp(Gtk.Application):
         return {}
         
     def set_open_button_icon_visible(self, visible):
+        self.print_method_name()
         box = self.open_button.get_child()
         child = box.get_first_child()
         while child:
@@ -719,6 +855,7 @@ class WineCharmApp(Gtk.Application):
             child = child.get_next_sibling()
             
     def on_activate(self, *args):
+        self.print_method_name()
         if not self.window:
             self.window = Adw.ApplicationWindow(application=self)
         self.window.present()
@@ -726,11 +863,13 @@ class WineCharmApp(Gtk.Application):
  
 
     def handle_sigint(self, signum, frame):
+        self.print_method_name()
         if self.SOCKET_FILE.exists():
             self.SOCKET_FILE.unlink()
         self.quit()
 
     def create_main_window(self):
+        self.print_method_name()
 
         self.window = Gtk.ApplicationWindow(application=self)
         self.window.set_title("Wine Charm")
@@ -900,6 +1039,7 @@ class WineCharmApp(Gtk.Application):
         self.add_keyboard_actions()
 
     def add_keyboard_actions(self):
+        self.print_method_name()
         # Search action
         search_action = Gio.SimpleAction.new("search", None)
         search_action.connect("activate", lambda *_: self.search_button.set_active(not self.search_button.get_active()))
@@ -926,6 +1066,7 @@ class WineCharmApp(Gtk.Application):
         self.window.add_action(back_action)
 
     def create_sort_actions(self):
+        self.print_method_name()
         """
         Create a single sorting action for the sorting options in the Sort submenu.
         """
@@ -936,6 +1077,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_sort(self, action, param):
+        self.print_method_name()
         """
         Handle sorting by parsing the parameter to determine the sorting key and order.
         """
@@ -953,6 +1095,7 @@ class WineCharmApp(Gtk.Application):
         GLib.idle_add(self.create_script_list)
 
     def create_open_actions(self):
+        self.print_method_name()
         """
         Create actions for the open options in the Open submenu.
         """
@@ -965,6 +1108,7 @@ class WineCharmApp(Gtk.Application):
         self.window.add_action(open_terminal_action)
 
     def open_filemanager_winecharm(self, action, param):
+        self.print_method_name()
         wineprefix = Path(self.winecharmdir)  # Replace with the actual wineprefix path
         print(f"Opening file manager for {wineprefix}")
         command = ["xdg-open", str(wineprefix)]
@@ -974,6 +1118,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error opening file manager: {e}")
 
     def open_terminal_winecharm(self, param=None, action=None):
+        self.print_method_name()
         # Set wineprefix to self.template
         wineprefix = Path(self.template).expanduser().resolve()
 
@@ -1039,6 +1184,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_key_pressed(self, controller, keyval, keycode, state):
+        self.print_method_name()
         if keyval == Gdk.KEY_Escape:
             self.search_button.set_active(False)
             
@@ -1053,6 +1199,7 @@ class WineCharmApp(Gtk.Application):
                 self.filter_script_list("")
 
     def on_search_button_clicked(self, button):
+        self.print_method_name()
         try:
             if self.search_active:
                 # Before removing search entry, make sure it's in the vbox
@@ -1095,10 +1242,12 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_search_entry_activated(self, entry):
+        self.print_method_name()
         search_term = entry.get_text().lower()
         self.filter_script_list(search_term)
 
     def on_search_entry_changed(self, entry):
+        self.print_method_name()
         search_term = entry.get_text().lower()
         # Check if we're in settings view
         if hasattr(self, 'settings_flowbox') and self.settings_flowbox.get_parent() is not None:
@@ -1109,6 +1258,7 @@ class WineCharmApp(Gtk.Application):
             self.filter_script_list(search_term)
 
     def filter_script_list(self, search_term):
+        self.print_method_name()
         """
         Filters the script list based on the search term and updates the UI accordingly.
         
@@ -1152,9 +1302,11 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_open_button_clicked(self, button):
+        self.print_method_name()
         self.open_file_dialog()
 
     def open_file_dialog(self):
+        self.print_method_name()
         file_dialog = Gtk.FileDialog.new()
         filter_model = Gio.ListStore.new(Gtk.FileFilter)
         filter_model.append(self.create_file_filter())
@@ -1162,6 +1314,7 @@ class WineCharmApp(Gtk.Application):
         file_dialog.open(self.window, None, self.on_open_file_dialog_response)
 
     def create_file_filter(self):
+        self.print_method_name()
         file_filter = Gtk.FileFilter()
         file_filter.set_name("EXE and MSI files")
         file_filter.add_mime_type("application/x-ms-dos-executable")
@@ -1170,6 +1323,7 @@ class WineCharmApp(Gtk.Application):
         return file_filter
 
     def on_open_file_dialog_response(self, dialog, result):
+        self.print_method_name()
         try:
             file = dialog.open_finish(result)
             if file:
@@ -1202,6 +1356,7 @@ class WineCharmApp(Gtk.Application):
             self.monitoring_active = True
 
     def process_cli_file_in_thread(self, file_path):
+        self.print_method_name()
         """
         Process CLI file in a background thread with proper Path handling
         """
@@ -1212,11 +1367,14 @@ class WineCharmApp(Gtk.Application):
             print(f"Resolved absolute CLI file path: {abs_file_path}")
 
             if not abs_file_path.exists():
+                ext = abs_file_path.suffix.lower()
+                if ext in ['.bottle', '.prefix', '.wzt']:
+                    GLib.idle_add(self.restore_prefix_bottle_wzt_tar_zst, str(abs_file_path))
+                else:
+                    self.create_yaml_file(str(abs_file_path), None)
+            else:
                 print(f"File does not exist: {abs_file_path}")
                 return
-
-            # Perform the heavy processing here
-            self.create_yaml_file(str(abs_file_path), None)
 
         except Exception as e:
             print(f"Error processing file in background: {e}")
@@ -1225,10 +1383,11 @@ class WineCharmApp(Gtk.Application):
                 pass  # Keep showing spinner
             else:
                 GLib.idle_add(self.hide_processing_spinner)
-            
+
             GLib.timeout_add_seconds(0.5, self.create_script_list)
 
     def on_back_button_clicked(self, button):
+        self.print_method_name()
         # If search is active, toggle it off first
         if self.search_active:
             self.search_button.set_active(False)
@@ -1267,6 +1426,7 @@ class WineCharmApp(Gtk.Application):
         self.create_script_list()
 
     def setup_accelerator_context(self):
+        self.print_method_name()
         controller = Gtk.ShortcutController()
         shortcut = Gtk.Shortcut(
             trigger=Gtk.ShortcutTrigger.parse_string("<Ctrl>BackSpace"),
@@ -1276,6 +1436,7 @@ class WineCharmApp(Gtk.Application):
         self.window.add_controller(controller)
         
     def wrap_text_at_20_chars(self):
+        #self.print_method_name()
         text="Speedpro Installer Setup"
         if len(text) < 20:
             return text
@@ -1297,6 +1458,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def wrap_text_at_20_chars(self, text):
+        #self.print_method_name()
         if len(text) <= 20:
             # If text is already short enough, assign it all to label1
             label1 = text
@@ -1334,6 +1496,7 @@ class WineCharmApp(Gtk.Application):
         return label1, label2, label3
         
     def find_charm_files(self, prefixdir=None):
+        self.print_method_name()
         """
         Finds .charm files within the provided prefix directory, searching up to 2 levels deep.
         
@@ -1374,6 +1537,7 @@ class WineCharmApp(Gtk.Application):
         return scripts
 
     def replace_open_button_with_launch(self, script, row, script_key):
+        self.print_method_name()
         script_data = self.extract_yaml_info(script_key)
         if not script_data:
             return None
@@ -1404,6 +1568,7 @@ class WineCharmApp(Gtk.Application):
         self.launch_button.set_visible(True)
 
     def replace_launch_button(self, ui_state, row, script_key):
+        self.print_method_name()
         """
         Replace the open button with a launch button.
         """
@@ -1446,6 +1611,7 @@ class WineCharmApp(Gtk.Application):
 
 ############################### 1050 - 1682 ########################################
     def create_script_list(self):
+        self.print_method_name()
         # Clear the flowbox
         self.flowbox.remove_all()
 
@@ -1470,6 +1636,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def create_script_row(self, script_key, script_data):
+        #self.print_method_name()
         """
         Creates a row for a given script in the UI, including the play and options buttons.
 
@@ -1501,7 +1668,7 @@ class WineCharmApp(Gtk.Application):
             # Icon view mode: Larger icon size and vertically oriented layout
             icon = self.load_icon(script, 64, 64)
             icon_image = Gtk.Image.new_from_paintable(icon)
-            button.set_size_request(64, 64)
+            button.set_size_request(160, 100)
             icon_image.set_pixel_size(64)
             hbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
 
@@ -1557,6 +1724,11 @@ class WineCharmApp(Gtk.Application):
         # Play button
         play_button = Gtk.Button.new_from_icon_name("media-playback-start-symbolic")
         play_button.set_tooltip_text("Play")
+        if self.icon_view:
+            play_button.set_size_request(50, 40)
+        else:
+            play_button.set_size_request(50, -1)
+        
         play_button.set_visible(False)  # Initially hidden
         buttons_box.append(play_button)
 
@@ -1594,16 +1766,20 @@ class WineCharmApp(Gtk.Application):
         return overlay
        
     def show_buttons(self, play_button, options_button):
+        self.print_method_name()
         play_button.set_visible(True)
         options_button.set_visible(True)
 
     def hide_buttons(self, play_button, options_button):
+        self.print_method_name()
         if play_button is not None:
             play_button.set_visible(False)
         if options_button is not None:
             options_button.set_visible(False)
 
     def on_script_row_clicked(self, script_key):
+        self.count = 0
+        self.print_method_name()
         """
         Handles the click event on a script row, manages row highlighting, and play/stop button state.
         
@@ -1670,6 +1846,7 @@ class WineCharmApp(Gtk.Application):
                 print(f"Preserving 'blue' highlight for clicked but not running script_key: {script_key}")
 
     def set_play_stop_button_state(self, button, is_playing):
+        #self.print_method_name()
         if is_playing:
             button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
             button.set_tooltip_text("Stop")
@@ -1678,6 +1855,7 @@ class WineCharmApp(Gtk.Application):
             button.set_tooltip_text("Play")
 
     def update_row_highlight(self, row, highlight):
+        #self.print_method_name()
         if highlight:
             row.add_css_class("highlighted")
         else:
@@ -1685,6 +1863,7 @@ class WineCharmApp(Gtk.Application):
             row.remove_css_class("highlighted")
 
     def find_and_remove_wine_created_shortcuts(self):
+        self.print_method_name()
         """
         Searches for .desktop files in self.applicationsdir/wine and deletes any
         that contain references to self.prefixes_dir.
@@ -1713,6 +1892,7 @@ class WineCharmApp(Gtk.Application):
                         print(f"Error processing {desktop_file_path}: {e}")
 
     def toggle_play_stop(self, script_key, play_stop_button, row):
+        self.print_method_name()
         if script_key in self.running_processes:
             # Process is running; terminate it
             self.terminate_script(script_key)
@@ -1725,6 +1905,7 @@ class WineCharmApp(Gtk.Application):
             self.update_row_highlight(row, True)
 
     def process_ended(self, script_key):
+        self.print_method_name()
         # Get UI elements for the script
         print(f"--> I'm called by {script_key}")
         ui_state = self.script_ui_data.get(script_key)
@@ -1861,6 +2042,7 @@ class WineCharmApp(Gtk.Application):
         self.check_running_processes_on_startup()
 
     def launch_script(self, script_key, play_stop_button, row):
+        self.print_method_name()
         # Reload the script data from the .charm file
         script_data = self.reload_script_data_from_charm(script_key)
         if not script_data:
@@ -1977,6 +2159,7 @@ class WineCharmApp(Gtk.Application):
             )
 
     def get_runner(self, script_data):
+        self.print_method_name()
         """
         Extracts and resolves the runner from the script data.
 
@@ -2041,6 +2224,7 @@ class WineCharmApp(Gtk.Application):
         return runner_path
 
     def find_command_in_path(self, command):
+        self.print_method_name()
         """
         Checks if a command exists in the system's PATH.
         Returns the absolute path if found, otherwise None.
@@ -2079,6 +2263,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def handle_ui_error(self, play_stop_button, row, title, message, tooltip):
+        self.print_method_name()
         """
         Updates the UI to reflect an error state and shows an info dialog.
         """
@@ -2090,6 +2275,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def reload_script_data_from_charm(self, script_key):
+        self.print_method_name()
         script_data = self.script_list.get(script_key)
         if not script_data:
             print(f"Error: Script with key {script_key} not found in script_list.")
@@ -2120,6 +2306,7 @@ class WineCharmApp(Gtk.Application):
             return None
 
     def show_error_with_log_dialog(self, title, message, log_file_path):
+        self.print_method_name()
         """
         Show an error dialog with an option to view log content.
         """
@@ -2140,6 +2327,7 @@ class WineCharmApp(Gtk.Application):
 
         # Load the log content asynchronously
         def load_log_content():
+            self.print_method_name()
             nonlocal log_content
             try:
                 with open(log_file_path, 'r') as log_file:
@@ -2151,6 +2339,7 @@ class WineCharmApp(Gtk.Application):
 
         # Function to show the log content dialog
         def show_log_dialog():
+            self.print_method_name()
             log_dialog = Adw.AlertDialog(
                 heading="Log Content",
                 body=""
@@ -2183,6 +2372,7 @@ class WineCharmApp(Gtk.Application):
 
         # Handle main dialog responses
         def on_response(dialog, response):
+            self.print_method_name()
             if response == "show_log":
                 show_log_dialog()
             dialog.close()
@@ -2194,6 +2384,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def monitor_process(self, script_key):
+        self.print_method_name()
         process_info = self.running_processes.get(script_key)
         if not process_info:
             return
@@ -2236,6 +2427,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def get_child_pid_async(self, script_key):
+        self.print_method_name()
         # Run get_child_pid in a separate thread
         if script_key not in self.running_processes:
             print("Process already ended, nothing to get child PID for")
@@ -2266,6 +2458,7 @@ class WineCharmApp(Gtk.Application):
         print(f"exe_name = {exe_name}")
 
         def run_get_child_pid():
+            self.print_method_name()
             try:
                 print("---------------------------------------------")
                 print(f"Looking for child processes of: {exe_name}")
@@ -2349,6 +2542,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def add_child_pids_to_running_processes(self, script_key, child_pids):
+        self.print_method_name()
         # Add the child PIDs to the running_processes dictionary
         if script_key in self.running_processes:
             process_info = self.running_processes.get(script_key)
@@ -2367,6 +2561,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def terminate_script(self, script_key):
+        self.print_method_name()
         process_info = self.running_processes.get(script_key)
         if not process_info:
             print(f"No running process found for script_key: {script_key}")
@@ -2435,6 +2630,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def monitor_external_process(self, script_key, pid):
+        self.print_method_name()
         try:
             proc = psutil.Process(pid)
             proc.wait()  # Wait for the process to terminate
@@ -2445,6 +2641,7 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(self.process_ended, script_key)
 
     def check_running_processes_on_startup(self):
+        self.print_method_name()
         if not hasattr(self, 'script_ui_data') or not self.script_ui_data:
             return
         for script_key, script_data in self.script_list.items():
@@ -2519,6 +2716,7 @@ class WineCharmApp(Gtk.Application):
                         play_button.set_tooltip_text("Play")
 
     def monitor_multiple_processes(self, script_key, pids):
+        self.print_method_name()
         try:
             procs = [psutil.Process(pid) for pid in pids if psutil.pid_exists(pid)]
             psutil.wait_procs(procs)
@@ -2530,6 +2728,7 @@ class WineCharmApp(Gtk.Application):
 
        
     def update_ui_for_running_script_on_startup(self, script_key):
+        self.print_method_name()
         ui_state = self.script_ui_data.get(script_key)
         if not ui_state:
             print(f"No UI state found for script_key: {script_key}")
@@ -2552,6 +2751,7 @@ class WineCharmApp(Gtk.Application):
 ############################### 1050 - 1682 ########################################
 
     def update_running_processes(self, current_running_processes):
+        self.print_method_name()
         """
         Update `self.running_processes` to match `current_running_processes`.
         Remove processes that have ended externally.
@@ -2567,6 +2767,7 @@ class WineCharmApp(Gtk.Application):
         self.running_processes = current_running_processes
 
     def update_ui_for_running_process(self, current_running_processes):
+        self.print_method_name()
         """
         Update the UI to reflect the state of running processes.
         
@@ -2634,6 +2835,7 @@ class WineCharmApp(Gtk.Application):
                 print(f"Updated launch button for script_key: {script_key}")
 
     def extract_yaml_info(self, script_key):
+        self.print_method_name()
         script_data = self.script_list.get(script_key)
         if script_data:
             return script_data
@@ -2642,6 +2844,7 @@ class WineCharmApp(Gtk.Application):
             return {}
 
     def determine_progname(self, productname, exe_no_space, exe_name):
+        self.print_method_name()
         """
         Determine the program name based on the product name extracted by exiftool, or fallback to executable name.
         Args:
@@ -2662,6 +2865,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner_override=None):
+        self.print_method_name()
         # Determine runner_to_use
         if runner_override is not None:
             runner_to_use = runner_override
@@ -2816,6 +3020,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def extract_icon(self, exe_file, wineprefix, exe_no_space, progname):
+        self.print_method_name()
         self.create_required_directories()
         icon_path = wineprefix / f"{progname.replace(' ', '_')}.png"
         #print(f"------ {wineprefix}")
@@ -2849,6 +3054,7 @@ class WineCharmApp(Gtk.Application):
         return icon_path if icon_path.exists() else None
 
     def find_lnk_files(self, wineprefix):
+        self.print_method_name()
         drive_c = wineprefix / "drive_c" 
         lnk_files = []
 
@@ -2869,6 +3075,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def add_lnk_file_to_processed(self, wineprefix, lnk_file):
+        self.print_method_name()
         found_lnk_files_path = wineprefix / "found_lnk_files.yaml"
         if found_lnk_files_path.exists():
             with open(found_lnk_files_path, 'r') as file:
@@ -2884,6 +3091,7 @@ class WineCharmApp(Gtk.Application):
             yaml.dump(found_lnk_files, file, default_flow_style=False, width=1000)
 
     def is_lnk_file_processed(self, wineprefix, lnk_file):
+        self.print_method_name()
         found_lnk_files_path = wineprefix / "found_lnk_files.yaml"
         if found_lnk_files_path.exists():
             with open(found_lnk_files_path, 'r') as file:
@@ -2892,6 +3100,7 @@ class WineCharmApp(Gtk.Application):
         return False
 
     def create_scripts_for_lnk_files(self, wineprefix, parent_runner=None):
+        self.print_method_name()
         lnk_files = self.find_lnk_files(wineprefix)
         exe_files = self.extract_exe_files_from_lnk(lnk_files, wineprefix)
         product_name_map = {}
@@ -2910,6 +3119,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def extract_exe_files_from_lnk(self, lnk_files, wineprefix):
+        self.print_method_name()
         exe_files = []
         for lnk_file in lnk_files:
             if not self.is_lnk_file_processed(wineprefix, lnk_file):
@@ -2936,6 +3146,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def show_info_dialog(self, title, message, callback=None):
+        self.print_method_name()
         dialog = Adw.AlertDialog(
             heading=title,
             body=message
@@ -2949,6 +3160,7 @@ class WineCharmApp(Gtk.Application):
         dialog.props.close_response = "ok"
 
         def on_response(d, r):
+            self.print_method_name()
             #d.close()
             if callback is not None:
                 callback()
@@ -2960,6 +3172,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def reverse_process_reg_files(self, wineprefix):
+        self.print_method_name()
         print(f"Starting to process .reg files in {wineprefix}")
         
         # Get current username from the environment
@@ -3023,6 +3236,7 @@ class WineCharmApp(Gtk.Application):
 
 ##### BACKUP PREFIX
     def show_backup_prefix_dialog(self, script, script_key, button):
+        self.print_method_name()
         self.stop_processing = False
         wineprefix = Path(script).parent
         # Extract exe_file from script_data
@@ -3058,6 +3272,7 @@ class WineCharmApp(Gtk.Application):
         print("FileDialog presented for saving the backup.")
 
     def on_backup_prefix_dialog_response(self, dialog, result, script, script_key):
+        self.print_method_name()
         try:
             # Retrieve the selected file (save location) using save_finish()
             backup_file = dialog.save_finish(result)
@@ -3075,6 +3290,7 @@ class WineCharmApp(Gtk.Application):
             print(f"An error occurred: {e}")
 
     def on_backup_prefix_completed(self, script_key, backup_path):
+        self.print_method_name()
         """
         Called when the backup process is complete. Updates the UI safely.
         """
@@ -3085,6 +3301,7 @@ class WineCharmApp(Gtk.Application):
             self.show_info_dialog("Warning", "Backup completed but there was an error updating the UI")
 
     def _complete_backup_ui_update(self, script_key, backup_path):
+        self.print_method_name()
         """
         Performs the actual UI updates on the main thread after backup completion
         """
@@ -3134,6 +3351,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def backup_prefix(self, script, script_key, backup_path):
+        self.print_method_name()
         """
         Backs up the Wine prefix in a stepwise manner, indicating progress via spinner and label updates.
         """
@@ -3154,6 +3372,7 @@ class WineCharmApp(Gtk.Application):
             find_replace_pairs = {usershome: '~'}
             
             def perform_backup_steps():
+                self.print_method_name()
                 try:
                     steps = [
                         (f"Replace \"{usershome}\" with '~' in script files", 
@@ -3204,6 +3423,7 @@ class WineCharmApp(Gtk.Application):
             self.cleanup_cancelled_backup(script, script_key)
 
     def create_backup_archive(self, wineprefix, backup_path):
+        self.print_method_name()
         """
         Create a backup archive with interruption support
         """
@@ -3244,6 +3464,7 @@ class WineCharmApp(Gtk.Application):
             raise Exception(f"Backup failed: {stderr}")
 
     def connect_open_button_with_backup_cancel(self, script_key):
+        self.print_method_name()
         """
         Connect cancel handler to the open button for backup process
         """
@@ -3254,6 +3475,7 @@ class WineCharmApp(Gtk.Application):
         self.set_open_button_icon_visible(False)
 
     def cleanup_cancelled_backup(self, script, script_key):
+        self.print_method_name()
         """
         Clean up after backup is cancelled
         """
@@ -3287,6 +3509,7 @@ class WineCharmApp(Gtk.Application):
                 self.show_info_dialog("Warning", "There was an error updating the UI")
 
     def on_cancel_backup_clicked(self, button, script_key):
+        self.print_method_name()
         """
         Handle cancel button click during backup
         """
@@ -3302,6 +3525,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def on_cancel_backup_dialog_response(self, dialog, response, script_key):
+        self.print_method_name()
         """
         Handle cancel dialog response for backup
         """
@@ -3312,6 +3536,7 @@ class WineCharmApp(Gtk.Application):
 ##### /BACKUP PREFIX xx
 
     def show_options_for_script(self, ui_state, row, script_key):
+        self.print_method_name()
         """
         Display the options for a specific script with search functionality.
         """
@@ -3395,6 +3620,7 @@ class WineCharmApp(Gtk.Application):
         self.replace_launch_button(ui_state, row, script_key)
 
     def populate_script_options(self, filter_text=""):
+        self.print_method_name()
         """
         Populate the script options flowbox with filtered options.
         """
@@ -3439,6 +3665,7 @@ class WineCharmApp(Gtk.Application):
 ######################### CREATE BOTTLE
     # Get directory size method
     def get_directory_size(self, path):
+        self.print_method_name()
         if not path.exists():
             print(f"The provided path '{path}' does not exist.")
             return 0
@@ -3451,6 +3678,7 @@ class WineCharmApp(Gtk.Application):
             return 0
 
     def create_bottle(self, script, script_key, backup_path):
+        self.print_method_name()
         """
         Backs up the Wine prefix in a stepwise manner, indicating progress via spinner and label updates.
         """
@@ -3532,6 +3760,7 @@ class WineCharmApp(Gtk.Application):
             """)
 
         def perform_backup_steps():
+            self.print_method_name()
             try:
                 # Basic steps that are always needed
                 basic_steps = [
@@ -3592,6 +3821,7 @@ class WineCharmApp(Gtk.Application):
         self.processing_thread.start()
 
     def on_create_bottle_completed(self, script_key, backup_path):
+        self.print_method_name()
         """
         Called when the bottle creation process is complete. Schedules UI updates safely.
         """
@@ -3602,6 +3832,7 @@ class WineCharmApp(Gtk.Application):
             self.show_info_dialog("Warning", "Bottle created but there was an error updating the UI")
 
     def _complete_bottle_creation_ui_update(self, script_key, backup_path):
+        self.print_method_name()
         """
         Performs the actual UI updates on the main thread after bottle creation completion
         """
@@ -3648,6 +3879,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_backup_confirmation_response(self, dialog, response_id, script, script_key):
+        self.print_method_name()
         if response_id == "continue":
             dialog.close()
             self.show_create_bottle_dialog(script, script_key)
@@ -3655,6 +3887,7 @@ class WineCharmApp(Gtk.Application):
             return
 
     def create_bottle_selected(self, script, script_key, button):
+        self.print_method_name()
         self.stop_processing = False
         # Step 1: Check if the executable file exists
         # Extract exe_file from script_data
@@ -3711,23 +3944,25 @@ class WineCharmApp(Gtk.Application):
             self.show_create_bottle_dialog(script, script_key)
 
     def show_create_bottle_dialog(self, script, script_key):
+        self.print_method_name()
 
-            creation_date_and_time = datetime.now().strftime("%Y%m%d%H%M")
-            # Suggest the backup file name
-            default_backup_name = f"{script.stem}-{creation_date_and_time}.bottle"
+        creation_date_and_time = datetime.now().strftime("%Y%m%d%H%M")
+        # Suggest the backup file name
+        default_backup_name = f"{script.stem}-{creation_date_and_time}.bottle"
 
-            # Create a Gtk.FileDialog instance for saving the file
-            file_dialog = Gtk.FileDialog.new()
+        # Create a Gtk.FileDialog instance for saving the file
+        file_dialog = Gtk.FileDialog.new()
 
-            # Set the initial file name using set_initial_name() method
-            file_dialog.set_initial_name(default_backup_name)
+        # Set the initial file name using set_initial_name() method
+        file_dialog.set_initial_name(default_backup_name)
 
-            # Open the dialog asynchronously to select the save location
-            file_dialog.save(self.window, None, self.on_create_bottle_dialog_response, script, script_key)
+        # Open the dialog asynchronously to select the save location
+        file_dialog.save(self.window, None, self.on_create_bottle_dialog_response, script, script_key)
 
-            print("FileDialog presented for saving the backup.")
+        print("FileDialog presented for saving the backup.")
 
     def on_create_bottle_dialog_response(self, dialog, result, script, script_key):
+        self.print_method_name()
         try:
             # Retrieve the selected file (save location) using save_finish()
             backup_file = dialog.save_finish(result)
@@ -3745,6 +3980,7 @@ class WineCharmApp(Gtk.Application):
             print(f"An error occurred: {e}")
 
     def create_bottle_archive(self, script_key, wineprefix, backup_path):
+        self.print_method_name()
         """
         Create a bottle archive with interruption support
         """
@@ -3895,6 +4131,7 @@ class WineCharmApp(Gtk.Application):
         print(f"Backup archive created at {backup_path}")
 
     def connect_open_button_with_bottling_cancel(self, script_key):
+        self.print_method_name()
         """
         Connect cancel handler to the open button
         """
@@ -3905,6 +4142,7 @@ class WineCharmApp(Gtk.Application):
         self.set_open_button_icon_visible(False)
 
     def cleanup_cancelled_bottle(self, script, script_key):
+        self.print_method_name()
         """
         Clean up after bottle creation is cancelled
         """
@@ -3944,6 +4182,7 @@ class WineCharmApp(Gtk.Application):
                         print(f"Error deleting partial backup file: {e}")
 
     def on_cancel_bottle_clicked(self, button, script_key):
+        self.print_method_name()
         """
         Handle cancel button click
         """
@@ -3959,6 +4198,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_cancel_bottle_dialog_response(self, dialog, response, script_key):
+        self.print_method_name()
         """
         Handle cancel dialog response
         """
@@ -3988,6 +4228,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def show_log_file(self, script, script_key, *args):
+        self.print_method_name()
         log_file_path = Path(script.parent) / f"{script.stem}.log"
         if log_file_path.exists() and log_file_path.stat().st_size > 0:
             try:
@@ -3997,6 +4238,8 @@ class WineCharmApp(Gtk.Application):
 
 
     def open_terminal(self, script, script_key, *args):
+        self.count = 0
+        self.print_method_name()
         script_data = self.extract_yaml_info(script_key)
         if not script_data:
             return None
@@ -4085,11 +4328,14 @@ class WineCharmApp(Gtk.Application):
 
 
     def install_dxvk_vkd3d(self, script, button):
+        self.print_method_name()
         wineprefix = Path(script).parent
         self.run_winetricks_script("vkd3d dxvk", wineprefix)
         self.create_script_list()
 
     def open_filemanager(self, script, script_key, *args):
+        self.count = 0
+        self.print_method_name()
         wineprefix = Path(script).parent
         print(f"Opening file manager for {wineprefix}")
         command = ["xdg-open", str(wineprefix)]
@@ -4099,6 +4345,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error opening file manager: {e}")
 
     def open_script_file(self, script, script_key, *args):
+        self.print_method_name()
         """
         Open the file manager to show the script's location.
         """
@@ -4121,6 +4368,8 @@ class WineCharmApp(Gtk.Application):
 
             
     def show_delete_wineprefix_confirmation(self, script, button):
+        self.count = 0
+        self.print_method_name()
         """
         Show an Adw.AlertDialog to confirm the deletion of the Wine prefix.
         
@@ -4167,9 +4416,10 @@ class WineCharmApp(Gtk.Application):
 
         # Present the dialog (use present instead of show to avoid deprecation warning)
         dialog.present(self.window)
-
+        
 
     def on_delete_wineprefix_confirmation_response(self, dialog, response_id, wineprefix):
+        self.print_method_name()
         """
         Handle the response from the delete Wine prefix confirmation dialog.
         
@@ -4215,6 +4465,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def get_script_keys_from_wineprefix(self, wineprefix):
+        self.print_method_name()
         """
         Retrieve the list of script_keys for a given Wine prefix.
         
@@ -4233,6 +4484,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def show_delete_shortcut_confirmation(self, script, script_key, button, *args):
+        self.print_method_name()
         """
         Show a dialog with checkboxes to allow the user to select shortcuts for deletion.
         
@@ -4309,6 +4561,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_delete_shortcuts_response(self, dialog, response_id, checkbox_dict):
+        self.print_method_name()
         """
         Handle the response from the delete shortcut dialog.
         
@@ -4354,6 +4607,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def get_script_key_from_shortcut(self, shortcut_file):
+        self.print_method_name()
         """
         Retrieve the script_key for a given shortcut file.
         
@@ -4370,6 +4624,7 @@ class WineCharmApp(Gtk.Application):
         return None
 
     def show_wine_arguments_entry(self, script, script_key, *args):
+        self.print_method_name()
         """
         Show an Adw.AlertDialog to allow the user to edit Wine arguments.
 
@@ -4430,6 +4685,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_wine_arguments_dialog_response(self, dialog, response_id, entry, script_key):
+        self.print_method_name()
         """
         Handle the response from the Wine arguments dialog.
         
@@ -4476,6 +4732,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def show_rename_shortcut_entry(self, script, script_key, *args):
+        self.print_method_name()
         """
         Show an Adw.AlertDialog to allow the user to rename a shortcut.
 
@@ -4525,6 +4782,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def on_show_rename_shortcut_dialog_response(self, dialog, response_id, entry, script_key):
+        self.print_method_name()
         """
         Handle the response from the Rename Shortcut dialog.
 
@@ -4627,6 +4885,7 @@ class WineCharmApp(Gtk.Application):
         dialog.close()
 
     def rename_script_and_icon(self, script_path, old_progname, new_name):
+        self.print_method_name()
         """
         Rename the script file and its associated icon file.
 
@@ -4671,6 +4930,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def show_change_icon_dialog(self, script, script_key, *args):
+        self.print_method_name()
         # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
         if script_data:
@@ -4698,6 +4958,7 @@ class WineCharmApp(Gtk.Application):
         file_dialog.open(self.window, None, lambda dlg, res: self.on_change_icon_response(dlg, res, script_path))
 
     def on_change_icon_response(self, dialog, result, script_path):
+        self.print_method_name()
         try:
             file = dialog.open_finish(result)
             if file:
@@ -4716,6 +4977,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def change_icon(self, script_path, new_icon_path):
+        self.print_method_name()
         script_path = Path(script_path)
         icon_path = script_path.with_suffix(".png")
         backup_icon_path = icon_path.with_suffix(".bak")
@@ -4728,6 +4990,7 @@ class WineCharmApp(Gtk.Application):
         
 
     def extract_and_change_icon(self, script_path, exe_path):
+        self.print_method_name()
         script_path = Path(script_path)
         icon_path = script_path.with_suffix(".png")
         backup_icon_path = icon_path.with_suffix(".bak")
@@ -4740,6 +5003,7 @@ class WineCharmApp(Gtk.Application):
             shutil.move(extracted_icon_path, icon_path)
             
     def reset_shortcut_confirmation(self, script, script_key, button=None):
+        self.print_method_name()
         script_data = self.script_list.get(script_key)
         if script_data:
             exe_file = Path(script_data.get('exe_file'))
@@ -4764,6 +5028,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_reset_shortcut_confirmation_response(self, dialog, response_id, script_key):
+        self.print_method_name()
         if response_id == "reset":
             # Proceed with resetting the shortcut
             script_data = self.script_list.get(script_key)
@@ -4779,6 +5044,7 @@ class WineCharmApp(Gtk.Application):
         dialog.close()
   
     def reset_shortcut(self, script, script_key, *args):
+        self.print_method_name()
         """
         Reset the shortcut by recreating the YAML file for the script.
         
@@ -4835,6 +5101,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def callback_wrapper(self, callback, script, script_key, button=None, *args):
+        self.print_method_name()
         # Ensure button is a valid GTK button object, not a string
         if button is None or not hasattr(button, 'get_parent'):
             raise ValueError("Invalid button object passed to replace_button_with_overlay.")
@@ -4853,6 +5120,7 @@ class WineCharmApp(Gtk.Application):
             return callback(script, script_key, button, *args)
 
     def update_execute_button_icon(self, ui_state):
+        self.print_method_name()
         """
         Update the launch button icon based on process state.
         """
@@ -4867,6 +5135,7 @@ class WineCharmApp(Gtk.Application):
             self.launch_button.set_child(launch_icon)
 
     def run_winetricks_script(self, script_name, wineprefix):
+        self.print_method_name()
         command = f"WINEPREFIX={shlex.quote(str(wineprefix))} winetricks {script_name}"
         try:
             subprocess.run(command, shell=True, check=True)
@@ -4875,6 +5144,10 @@ class WineCharmApp(Gtk.Application):
             print(f"Error running winetricks script {script_name}: {e}")
 
     def process_file(self, file_path):
+        self.print_method_name()
+        print("""
+         = = = = = = > process - file < = = = = = =  
+        """)
         try:
             print("process_file")
             abs_file_path = str(Path(file_path).resolve())
@@ -4893,6 +5166,7 @@ class WineCharmApp(Gtk.Application):
             GLib.timeout_add_seconds(0.5, self.create_script_list)
 
     def on_confirm_action(self, button, script, action_type, parent, original_button):
+        self.print_method_name()
         try:
             if action_type == "wineprefix":
                 # Delete the wineprefix directory
@@ -4919,11 +5193,13 @@ class WineCharmApp(Gtk.Application):
             self.on_back_button_clicked(None)
 
     def on_cancel_button_clicked(self, button, parent, original_button):
+        self.print_method_name()
         # Restore the original button as the child of the FlowBoxChild
         parent.set_child(original_button)
         original_button.set_sensitive(True)
 
     def run_command(self, command):
+        self.print_method_name()
         try:
             result = subprocess.run(
                 command,
@@ -4938,6 +5214,7 @@ class WineCharmApp(Gtk.Application):
             return None
     
     def find_exe_path(self, wineprefix, exe_name):
+        self.print_method_name()
         drive_c = Path(wineprefix) / "drive_c"
         for root, dirs, files in os.walk(drive_c):
             for file in files:
@@ -4946,6 +5223,7 @@ class WineCharmApp(Gtk.Application):
         return None
 
     def get_product_name(self, exe_file):
+        self.print_method_name()
         product_cmd = [
             'exiftool', shlex.quote(str(exe_file))
         ]
@@ -4959,6 +5237,7 @@ class WineCharmApp(Gtk.Application):
             return productname_match.group(1).strip() if productname_match else None
 
     def copy_template(self, dest_dir, source_template=None):
+        self.print_method_name()
         if source_template is None:
             source_template = self.template
         source_template = Path(source_template)
@@ -4973,6 +5252,7 @@ class WineCharmApp(Gtk.Application):
             self.ensure_directory_exists(dest_dir)
 
     def create_desktop_entry(self, progname, script_path, icon_path, wineprefix, category = "Game"):
+        self.print_method_name()
 #        return; # do not create
         # Create desktop shortcut based on flatpak sandbox or system
         if shutil.which("flatpak-spawn"):
@@ -5018,7 +5298,9 @@ class WineCharmApp(Gtk.Application):
             print(f"Error creating desktop entry: {e}")
 
     def start_socket_server(self):
+        self.print_method_name()
         def server_thread():
+            self.print_method_name()
             socket_dir = self.SOCKET_FILE.parent
 
             # Ensure the directory for the socket file exists
@@ -5047,36 +5329,40 @@ class WineCharmApp(Gtk.Application):
                                 GLib.timeout_add_seconds(0.5, self.show_info_dialog, title, body)
                             elif command == "process_file":
                                 file_path = command_parts[1]
-                                GLib.idle_add(self.process_cli_file, file_path)
+                                GLib.idle_add(self.process_cli_file_later, file_path)
 
         # Run the server in a separate thread
         threading.Thread(target=server_thread, daemon=True).start()
 
 
     def initialize_app(self):
+        self.count = 0
+        print("--------------- INITIALIZE_APP ------------------")
+        self.print_method_name()
         if not hasattr(self, 'window') or not self.window:
             # Call the startup code
             self.create_main_window()
-            self.create_script_list()
+            #self.create_script_list()
             #self.check_running_processes_and_update_buttons()
             
             missing_programs = self.check_required_programs()
             if missing_programs:
                 self.show_missing_programs_dialog(missing_programs)
             else:
-                if not self.default_template.exists() and not self.single_prefix:
-                    self.initialize_template(self.default_template, self.on_template_initialized)
-                if not self.default_template.exists() and self.single_prefix:
-                    self.initialize_template(self.default_template, self.on_template_initialized)
-                    self.copy_template(self.single_prefixes_dir)
-                elif self.default_template.exists() and not self.single_prefixes_dir.exists() and self.single_prefix:
-                    self.copy_template(self.single_prefixes_dir)
-                else:
-                    self.set_dynamic_variables()
+                # if not self.default_template.exists() and not self.single_prefix:
+                #     self.initialize_template(self.default_template, self.on_template_initialized)
+                # if not self.default_template.exists() and self.single_prefix:
+                #     self.initialize_template(self.default_template, self.on_template_initialized)
+                #     self.copy_template(self.single_prefixes_dir)
+                # elif self.default_template.exists() and not self.single_prefixes_dir.exists() and self.single_prefix:
+                #     self.copy_template(self.single_prefixes_dir)
+                # else:
+                #     self.set_dynamic_variables()
 
-
+                self.set_dynamic_variables()
 
     def process_cli_file_in_thread(self, file_path):
+        self.print_method_name()
         """Process CLI file in a background thread with step-based progress"""
         self.stop_processing = False
         
@@ -5113,6 +5399,7 @@ class WineCharmApp(Gtk.Application):
         finally:
             # Clean up and update UI
             def cleanup():
+                self.print_method_name()
                 if not self.initializing_template:
                     self.hide_processing_spinner()
                 self.create_script_list()
@@ -5122,6 +5409,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def show_processing_spinner(self, label_text):
+        self.print_method_name()
 
         # Clear existing content
         self.flowbox.remove_all()
@@ -5153,6 +5441,7 @@ class WineCharmApp(Gtk.Application):
         self.menu_button.set_sensitive(False)
 
     def hide_processing_spinner(self):
+        self.print_method_name()
         """Restore UI state after process completion with safe widget removal"""
         try:
             if hasattr(self, 'progress_bar'):
@@ -5178,37 +5467,101 @@ class WineCharmApp(Gtk.Application):
             print(f"Error in hide_processing_spinner: {e}")
 
     def on_open(self, app, files, *args):
+        print("---------------------- ON_OPEN ------------------")
+        self.count = 0
+        self.print_method_name()
         # Ensure the application is fully initialized
-        print("1. on_open method called")
-        
+        #print("1. on_open method called")
+
         # Initialize the application if it hasn't been already
         self.initialize_app()
-        print("2. self.initialize_app initiated")
-        
+        #print("2. self.initialize_app initiated")
+
         # Present the window as soon as possible
         GLib.idle_add(self.window.present)
-        print("3. self.window.present() Complete")
-        
-        # Check if the command_line_file exists and is either .exe or .msi
-        if self.command_line_file:
-            print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-            print(self.command_line_file)
-            
-            file_extension = Path(self.command_line_file).suffix.lower()
-            if file_extension in ['.exe', '.msi']:
-                print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
-                print("Trying to process file inside on template initialized")
+        #print("3. self.window.present() Complete")
 
-                GLib.idle_add(self.show_processing_spinner)
-                self.process_cli_file(self.command_line_file)
+        self.script_list = {}
+        self.load_script_list()
+
+        self.single_prefix = False
+        self.load_settings()
+        print(f"Single Prefix: {self.single_prefix}")
+
+        def initialize_template_if_needed(template_path, arch, single_prefix_dir=None):
+            self.print_method_name()
+            if not template_path.exists():
+                self.initializing_template = True
+                self.set_open_button_label("Initializing")
+                print(f"Initializing {arch} template...")
+                self.initialize_template(template_path, self.on_template_initialized, arch=arch)
+                return True
+            elif self.single_prefix and single_prefix_dir and not single_prefix_dir.exists():
+                print(f"Copying {arch} template to single prefix...")
+                self.copy_template(single_prefix_dir)
+            return False
+
+        # Corrected conditions: Only check current arch when single_prefix is False
+        arch_templates = []
+        if self.single_prefix:
+            # Check both templates if single_prefix is enabled
+            arch_templates = [
+                (True, self.default_template_win32, 'win32', self.single_prefix_dir_win32),
+                (True, self.default_template_win64, 'win64', self.single_prefix_dir_win64)
+            ]
+        else:
+            # Check only the current arch's template
+            if self.arch == 'win32':
+                arch_templates = [
+                    (True, self.default_template_win32, 'win32', self.single_prefix_dir_win32)
+                ]
             else:
-                print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
-                GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
-                self.command_line_file = None
-                return False
+                arch_templates = [
+                    (True, self.default_template_win64, 'win64', self.single_prefix_dir_win64)
+                ]
+
+        needs_initialization = False
+        for check, template, arch, single_dir in arch_templates:
+            if check:
+                needs_initialization |= initialize_template_if_needed(template, arch, single_dir)
+
+        if not needs_initialization:
+            self.create_script_list()
+            self.set_dynamic_variables()
+            #if self.command_line_file:
+            #    print("Processing command-line file after UI initialization")
+            #    self.process_cli_file_later(self.command_line_file)
+
+            # Check if the command_line_file exists and is either .exe or .msi
+            if self.command_line_file:
+                print("+++++++++++++++++++  On Open  ++++++++++++++++++++++++++++++")
+                print(self.command_line_file)
+
+                file_extension = Path(self.command_line_file).suffix.lower()
+                if file_extension in ['.exe', '.msi']:
+                    print("A"*100)
+                    print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
+                    print("Trying to process file inside on template initialized")
+
+                    GLib.idle_add(self.show_processing_spinner, "if not needs_initialization:")
+                    self.process_cli_file_later(self.command_line_file)
+                elif file_extension in ['.wzt', '.bottle', '.prefix']:
+                    print("B"*100)
+                    self.restore_prefix_bottle_wzt_tar_zst(self.command_line_file)
+
+                else:
+                    print("C"*100)
+                    print(f"Invalid file type: def on_open: {file_extension}. Only .exe or .msi files are allowed.")
+                    GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
+                    self.command_line_file = None
+                    return False
+
+        print(" = "*50)
         self.check_running_processes_on_startup()
+
         
     def load_icon(self, script, x, y):
+        #self.print_method_name()
         
         icon_name = script.stem + ".png"
         icon_dir = script.parent
@@ -5238,6 +5591,7 @@ class WineCharmApp(Gtk.Application):
 
                 
     def create_icon_title_widget(self, script):
+        self.print_method_name()
         # Find the matching script data from self.script_list
         script_data = next((data for key, data in self.script_list.items() if Path(data['script_path']) == script), None)
 
@@ -5266,6 +5620,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_view_toggle_button_clicked(self, button):
+        self.print_method_name()
         # Toggle the icon view state
         self.icon_view = not self.icon_view
 
@@ -5282,6 +5637,7 @@ class WineCharmApp(Gtk.Application):
 
 ############# IMPORT Wine Directory
     def rename_and_merge_user_directories(self, wineprefix):
+        self.print_method_name()
         # Get the current username from the environment
         current_username = os.getenv("USER") or os.getenv("USERNAME")
         if not current_username:
@@ -5329,6 +5685,7 @@ class WineCharmApp(Gtk.Application):
                     print(f"Merged and removed directory: {user_dir}")
 
     def merge_directories(self, source_dir, target_dir):
+        self.print_method_name()
         """
         Recursively merge contents of source_dir into target_dir.
         """
@@ -5352,6 +5709,7 @@ class WineCharmApp(Gtk.Application):
         source_dir.rmdir()
 
     def on_import_wine_directory_clicked(self, action, param):
+        self.print_method_name()
         # Create a new Gtk.FileDialog for selecting a directory
         file_dialog = Gtk.FileDialog.new()
 
@@ -5364,6 +5722,7 @@ class WineCharmApp(Gtk.Application):
         print("FileDialog presented for importing Wine directory.")
 
     def on_import_directory_response(self, dialog, result):
+        self.print_method_name()
         try:
             # Retrieve the selected directory using select_folder_finish() in GTK 4
             folder = dialog.select_folder_finish(result)
@@ -5399,6 +5758,7 @@ class WineCharmApp(Gtk.Application):
         print("FileDialog operation complete.")
 
     def import_wine_directory(self, src, dst):
+        self.print_method_name()
         """
         Import the Wine directory with improved safety, rollback capability, and cancellation support.
         """
@@ -5422,6 +5782,7 @@ class WineCharmApp(Gtk.Application):
         self.connect_open_button_with_import_wine_directory_cancel()
 
         def perform_import_steps():
+            self.print_method_name()
             try:
                 for index, (step_text, step_func) in enumerate(steps, 1):
                     if self.stop_processing:
@@ -5464,6 +5825,7 @@ class WineCharmApp(Gtk.Application):
         threading.Thread(target=perform_import_steps).start()
 
     def on_import_wine_directory_completed(self):
+        self.print_method_name()
         """
         Called when the import process is complete. Updates UI, restores scripts, and resets the open button.
         """
@@ -5485,6 +5847,7 @@ class WineCharmApp(Gtk.Application):
         print("Wine directory import completed and script list restored.")
 
     def copy_wine_directory(self, src, dst):
+        self.print_method_name()
         try:
             self.custom_copytree(src, dst)
             print(f"Successfully copied Wine directory to {dst}")
@@ -5506,6 +5869,7 @@ class WineCharmApp(Gtk.Application):
             print("Completed importing Wine directory process.")
 
     def show_import_wine_directory_overwrite_confirmation_dialog(self, src, dest_dir):
+        self.print_method_name()
         """
         Show a confirmation dialog asking the user whether to overwrite the existing directory.
         """
@@ -5528,6 +5892,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_import_wine_directory_overwrite_response(self, dialog, response_id, src, dest_dir):
+        self.print_method_name()
         """
         Handle the response from the overwrite confirmation dialog.
         """
@@ -5555,6 +5920,7 @@ class WineCharmApp(Gtk.Application):
             # No need to restore the script list as it wasn't cleared
 
     def on_cancel_import_wine_direcotory_dialog_response(self, dialog, response):
+        self.print_method_name()
         """
         Handle cancel dialog response
         """
@@ -5567,6 +5933,7 @@ class WineCharmApp(Gtk.Application):
             #GLib.timeout_add_seconds(0.5, dialog.close)
 
     def on_cancel_import_wine_directory_clicked(self, button):
+        self.print_method_name()
         """
         Handle cancel button click
         """
@@ -5582,6 +5949,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def connect_open_button_with_import_wine_directory_cancel(self):
+        self.print_method_name()
         """
         Connect cancel handler to the open button
         """
@@ -5593,6 +5961,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def backup_existing_directory(self, dst, backup_dir):
+        self.print_method_name()
         """
         Safely backup the existing directory if it exists.
         """
@@ -5607,6 +5976,7 @@ class WineCharmApp(Gtk.Application):
                 raise Exception(f"Failed to create backup: {e}")
 
     def handle_import_cancellation(self, dst, backup_dir):
+        self.print_method_name()
         """
         Handle import cancellation by restoring from backup.
         """
@@ -5634,6 +6004,7 @@ class WineCharmApp(Gtk.Application):
         GLib.idle_add(self.show_info_dialog, "Cancelled", "Wine directory import was cancelled")
 
     def handle_import_error(self, dst, backup_dir, error_message):
+        self.print_method_name()
         """
         Handle errors during import by restoring from backup.
         """
@@ -5657,6 +6028,7 @@ class WineCharmApp(Gtk.Application):
         GLib.idle_add(self.show_info_dialog, "Error", error_message)
 
     def cleanup_backup(self, backup_dir):
+        self.print_method_name()
         """
         Clean up backup directory after successful import.
         """
@@ -5670,6 +6042,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def cleanup_cancelled_import(self, temp_dir):
+        self.print_method_name()
         """
         Clean up temporary directory and reset UI after cancelled import
         """
@@ -5693,6 +6066,7 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(self.create_script_list)
 
     def disconnect_open_button(self):
+        self.print_method_name()
         """
         Disconnect the open button's handler and update its label to "Importing...".
         """
@@ -5706,6 +6080,7 @@ class WineCharmApp(Gtk.Application):
         print("Open button disconnected and spinner shown.")
 
     def reconnect_open_button(self):
+        self.print_method_name()
         """
         Reconnect the open button's handler and reset its label.
         """
@@ -5722,6 +6097,7 @@ class WineCharmApp(Gtk.Application):
 
         
     def create_scripts_for_exe_files(self, wineprefix):
+        self.print_method_name()
         exe_files = self.find_exe_files(wineprefix)
         for exe_file in exe_files:
             self.create_yaml_file(exe_file, wineprefix, use_exe_name=True)
@@ -5729,6 +6105,7 @@ class WineCharmApp(Gtk.Application):
         GLib.timeout_add_seconds(0.5, self.create_script_list)
 
     def find_exe_files(self, wineprefix):
+        self.print_method_name()
         drive_c = Path(wineprefix) / "drive_c"
         exclude_patterns = [
             "windows", "dw20.exe", "BsSndRpt*.exe", "Rar.exe", "tdu2k.exe",
@@ -5759,6 +6136,7 @@ class WineCharmApp(Gtk.Application):
         return exe_files_found
 
     def process_reg_files(self, wineprefix):
+        self.print_method_name()
         print(f"Starting to process .reg files in {wineprefix}")
         
         # Get current username from the environment
@@ -5820,6 +6198,7 @@ class WineCharmApp(Gtk.Application):
         print(f"Completed processing .reg files in {wineprefix}")
 
     def custom_copytree(self, src, dst):
+        self.print_method_name()
         """
         Custom copy implementation that preserves symlinks with smooth progress tracking
         """
@@ -5836,6 +6215,7 @@ class WineCharmApp(Gtk.Application):
                 if hasattr(self, 'progress_bar'):
                     GLib.idle_add(
                         lambda: self.progress_bar.set_fraction(processed_files / total_files)
+                        if hasattr(self, 'progress_bar') else None
                     )
                 return True
 
@@ -5903,16 +6283,19 @@ class WineCharmApp(Gtk.Application):
 
                 
     def disable_open_button(self):
+        self.print_method_name()
         if self.open_button:
             self.open_button.set_sensitive(False)
         print("Open button disabled.")
 
     def enable_open_button(self):
+        self.print_method_name()
         if self.open_button:
             self.open_button.set_sensitive(True)
         print("Open button enabled.")
 
     def replace_home_with_tilde_in_path(self, path_str):
+        #self.print_method_name()
         """Replace the user's home directory with '~' in the given path string."""
         user_home = os.getenv("HOME")
         if path_str.startswith(user_home):
@@ -5920,10 +6303,12 @@ class WineCharmApp(Gtk.Application):
         return path_str
 
     def expand_and_resolve_path(self, path):
+        self.print_method_name()
         """Expand '~' to the home directory and resolve the absolute path."""
         return Path(path).expanduser().resolve()
         
     def load_script_list(self, prefixdir=None):
+        self.print_method_name()
         """
         Loads all .charm files from the specified directory (or the default self.prefixes_dir)
         into the self.script_list dictionary.
@@ -6020,6 +6405,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def add_desktop_shortcut(self, script, script_key, *args):
+        self.print_method_name()
         """
         Show a dialog with checkboxes to allow the user to select shortcuts for desktop creation.
         """
@@ -6101,6 +6487,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def on_add_desktop_shortcut_response(self, dialog, response_id, checkbox_dict, category_dropdown):
+        self.print_method_name()
         """
         Handle the response from the create desktop shortcut dialog.
         
@@ -6177,6 +6564,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def remove_desktop_shortcut(self, script, script_key, *args):
+        self.print_method_name()
         """
         Show a dialog with checkboxes to allow the user to select desktop shortcuts for deletion.
         """
@@ -6230,6 +6618,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def on_remove_desktop_shortcut_response(self, dialog, response_id, checkbox_dict):
+        self.print_method_name()
         """Handle desktop shortcut deletion response"""
         if response_id == "delete":
             deleted_count = 0
@@ -6274,6 +6663,7 @@ class WineCharmApp(Gtk.Application):
         dialog.close()
 ########################
     def show_save_user_dirs_dialog(self, script, script_key, button):
+        self.print_method_name()
         default_backup_name = f"{script.stem}_user_dirs_backup.tar.zst"
 
         file_dialog = Gtk.FileDialog.new()
@@ -6282,6 +6672,7 @@ class WineCharmApp(Gtk.Application):
         file_dialog.save(self.window, None, lambda dlg, res: self.on_save_user_dirs_dialog_response(dlg, res, script, script_key))
 
     def on_save_user_dirs_dialog_response(self, dialog, result, script, script_key):
+        self.print_method_name()
         try:
             backup_file = dialog.save_finish(result)
             if backup_file:
@@ -6295,6 +6686,7 @@ class WineCharmApp(Gtk.Application):
             print(f"An error occurred while saving the backup: {e}")
 
     def save_user_dirs(self, script, script_key, backup_path):
+        self.print_method_name()
         wineprefix = Path(script).parent
 
         # Define the user's directory in Wineprefix (usually found at drive_c/users)
@@ -6334,6 +6726,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def show_load_user_dirs_dialog(self, script, script_key, button):
+        self.print_method_name()
         # Create a Gtk.FileDialog instance for loading the file
         file_dialog = Gtk.FileDialog.new()
 
@@ -6354,6 +6747,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_load_user_dirs_dialog_response(self, dialog, result, script, script_key):
+        self.print_method_name()
         try:
             backup_file = dialog.open_finish(result)
             if backup_file:
@@ -6367,6 +6761,7 @@ class WineCharmApp(Gtk.Application):
             print(f"An error occurred while loading the backup: {e}")
 
     def load_user_dirs(self, script, script_key, backup_path):
+        self.print_method_name()
         wineprefix = Path(script).parent
         users_dir = wineprefix / "drive_c" / "users"
         if not wineprefix.exists():
@@ -6403,6 +6798,7 @@ class WineCharmApp(Gtk.Application):
 
 ########################
     def import_game_directory(self, script, script_key, *args):
+        self.print_method_name()
         script_data = self.script_list.get(script_key)
         if not script_data:
             print(f"Error: Script key {script_key} not found in script_list.")
@@ -6456,6 +6852,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def copy_game_directory(self, src, exe_name, dst, script_path, script_key):
+        self.print_method_name()
         dst_path = dst / src.name
 
         # Create the destination directory if it doesn't exist
@@ -6489,6 +6886,7 @@ class WineCharmApp(Gtk.Application):
         threading.Thread(target=perform_import_steps).start()
 
     def on_import_game_directory_completed(self, script_key):
+        self.print_method_name()
         """
         Called when the import process is complete. Updates UI, restores scripts, and resets the open button.
         """
@@ -6508,6 +6906,7 @@ class WineCharmApp(Gtk.Application):
         print("Game directory import completed.")
 
     def update_exe_file_path_in_script(self, script_path, new_exe_file):
+        self.print_method_name()
         """
         Update the .charm file to point to the new location of exe_file.
         """
@@ -6534,6 +6933,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error updating script path: {e}")
 
     def update_runner_path_in_script(self, script_path, new_runner):
+        self.print_method_name()
         """
         Update the .charm file to point to the new location of runner.
         """
@@ -6561,6 +6961,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def get_do_not_bundle_directories(self):
+        self.print_method_name()
         # Return a list of directories that should not be bundled
         return [
             "/", "/boot", "/dev", "/etc", "/home", "/media", "/mnt", "/opt",
@@ -6572,6 +6973,7 @@ class WineCharmApp(Gtk.Application):
         ]
 
     def has_enough_disk_space(self, source, destination):
+        self.print_method_name()
         source_size = sum(f.stat().st_size for f in source.glob('**/*') if f.is_file())
         destination_free_space = shutil.disk_usage(destination.parent).free
         return destination_free_space > source_size
@@ -6580,6 +6982,7 @@ class WineCharmApp(Gtk.Application):
 
 ########### 
     def run_other_exe(self, script, script_key, *args):
+        self.print_method_name()
         """copy_game_directory
         Open a file dialog to allow the user to select an EXE or MSI file and run it.
         """
@@ -6593,6 +6996,7 @@ class WineCharmApp(Gtk.Application):
         file_dialog.open(self.window, None, lambda dlg, res: self.on_run_other_exe_response(dlg, res, script, script_key))
 
     def on_run_other_exe_response(self, dialog, result, script, script_key):
+        self.print_method_name()
         script_data = self.script_list.get(script_key)
         if not script_data:
             return None
@@ -6647,6 +7051,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error running EXE: {e}")
 
     def set_environment_variables(self, script, script_key, *args):
+        self.print_method_name()
         """
         Show a dialog to allow the user to set environment variables for a script.
         Ensures that the variables follow the 'X=Y' pattern, where X is a valid
@@ -6688,6 +7093,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_env_vars_dialog_response(self, dialog, response_id, entry, script_key):
+        self.print_method_name()
         """
         Handle the response from the environment variables dialog.
         Ensure the variables follow the 'X=Y' format and are separated by semicolons.
@@ -6720,6 +7126,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def validate_environment_variables(self, env_vars):
+        self.print_method_name()
         """
         Validate the environment variables string to ensure it follows the 'X=Y' pattern.
         Multiple variables should be separated by semicolons.
@@ -6744,6 +7151,7 @@ class WineCharmApp(Gtk.Application):
         return True
 
     def change_runner(self, script, script_key, *args):
+        self.print_method_name()
         """
         Display a dialog to change the runner for the given script.
         """
@@ -6812,6 +7220,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def on_change_runner_response(self, dialog, response_id, dropdown, all_runners, script_key):
+        self.print_method_name()
         """Handle runner selection response"""
         if response_id == "ok":
             selected_idx = dropdown.get_selected()
@@ -6833,6 +7242,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def get_valid_runners(self, runners_dir, is_bundled=False):
+        self.print_method_name()
         """
         Get a list of valid runners from a given directory.
 
@@ -6857,6 +7267,7 @@ class WineCharmApp(Gtk.Application):
         return valid_runners
 
     def validate_runner(self, wine_binary):
+        self.print_method_name()
         """
         Validate the Wine runner by checking if `wine --version` executes successfully.
 
@@ -6876,6 +7287,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_download_runner_clicked(self, dialog):
+        self.print_method_name()
         """
         Handle the "Download Runner" button click from the change_runner dialog.
         """
@@ -6892,6 +7304,7 @@ class WineCharmApp(Gtk.Application):
         self.change_runner(self.selected_script, self.selected_script_key)
 
     def get_system_wine(self):
+        self.print_method_name()
         """
         Check if System Wine is available and return its version.
         """
@@ -6904,6 +7317,7 @@ class WineCharmApp(Gtk.Application):
             return None, None
 
     def show_no_runners_available_dialog(self):
+        self.print_method_name()
         """
         Show a dialog when no runners are available, prompting the user to download one.
         """
@@ -6925,6 +7339,7 @@ class WineCharmApp(Gtk.Application):
 
             
     def rename_prefix_directory(self, script, script_key, *args):
+        self.print_method_name()
         script_data = self.script_list.get(script_key)
         if script_data is None:
             print(f"Error: Script key {script_key} not found")
@@ -6950,6 +7365,7 @@ class WineCharmApp(Gtk.Application):
             self.show_rename_dialog(wineprefix, script_key)
 
     def show_rename_dialog(self, wineprefix, script_key):
+        self.print_method_name()
         """Helper to show the actual rename dialog"""
         dialog = Adw.AlertDialog(
             title="Rename Wine Prefix",
@@ -6968,6 +7384,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_rename_prefix_dialog_response(self, dialog, response, entry, script_key, old_wineprefix):
+        self.print_method_name()
         """
         Handle the user's response to the rename prefix dialog.
 
@@ -7014,6 +7431,7 @@ class WineCharmApp(Gtk.Application):
         #dialog.destroy()
 
     def update_charm_files_with_new_prefix(self, new_wineprefix, old_wineprefix):
+        self.print_method_name()
         """
         Update all .charm files within the newly renamed prefix directory to reflect the new prefix path.
 
@@ -7044,6 +7462,7 @@ class WineCharmApp(Gtk.Application):
                 print(f"Error updating .charm file {charm_file}: {e}")
 
     def update_script_data_references(self, script_key, new_wineprefix):
+        self.print_method_name()
         """
         Update internal script data references related to the old prefix.
 
@@ -7084,11 +7503,8 @@ class WineCharmApp(Gtk.Application):
             # Reload script list from files
             self.load_script_list()
 
-    def set_wine_arch(self, script, script_key, *args):
-        print(f"Setting Wine architecture for {script} with script_key {script_key}")
-        # Add functionality to set Wine architecture (e.g., 32-bit or 64-bit).
-
     def wine_config(self, script, script_key, *args):
+        self.print_method_name()
         script_data = self.script_list.get(script_key)
         if not script_data:
             return None
@@ -7140,6 +7556,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error running EXE: {e}")
 
     def wine_registry_editor(self, script, script_key, *args):
+        self.print_method_name()
         script_data = self.script_list.get(script_key)
         if not script_data:
             return None
@@ -7192,19 +7609,23 @@ class WineCharmApp(Gtk.Application):
 
 #########   ######
     def replace_open_button_with_settings(self):
-        # Remove existing click handler from open button
-        if hasattr(self, 'open_button_handler_id'):
+        self.print_method_name()
+        # Remove existing click handler from open button only if it exists
+        if hasattr(self, 'open_button_handler_id') and self.open_button_handler_id is not None:
             self.open_button.disconnect(self.open_button_handler_id)
         
         self.set_open_button_label("Settings")
         self.set_open_button_icon_visible(False)
+        
         # Connect new click handler
         self.open_button_handler_id = self.open_button.connect(
             "clicked",
             lambda btn: print("Settings clicked")
         )
 
+
     def restore_open_button(self):
+        self.print_method_name()
         # Remove settings click handler
         if hasattr(self, 'open_button_handler_id'):
             self.open_button.disconnect(self.open_button_handler_id)
@@ -7218,6 +7639,7 @@ class WineCharmApp(Gtk.Application):
         )
 
     def show_options_for_settings(self, action=None, param=None):
+        self.print_method_name()
         """
         Display the settings options with search functionality using existing search mechanism.
         """
@@ -7282,6 +7704,7 @@ class WineCharmApp(Gtk.Application):
         self.selected_row = None
 
     def populate_settings_options(self, filter_text=""):
+        self.print_method_name()
         """
         Populate the settings flowbox with filtered options.
         """
@@ -7315,6 +7738,7 @@ class WineCharmApp(Gtk.Application):
 #####################  single prefix mode
 
     def single_prefix_mode(self):
+        self.print_method_name()
         dialog = Adw.AlertDialog(
             heading="Single Prefix Mode",
             body="Choose prefix mode for new games:\nSingle prefix saves space but makes it harder to backup individual games."
@@ -7343,6 +7767,7 @@ class WineCharmApp(Gtk.Application):
         dialog.set_default_response("cancel")
 
         def on_response(dialog, response):
+            self.print_method_name()
             if response == "apply":
                 new_state = single_prefix_radio.get_active()
                 if new_state != current_state:
@@ -7353,6 +7778,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def handle_prefix_mode_change(self, new_state):
+        self.print_method_name()
         previous_state = self.single_prefix
         self.single_prefix = new_state
         
@@ -7384,6 +7810,7 @@ class WineCharmApp(Gtk.Application):
             self.set_dynamic_variables()
 
     def finalize_prefix_mode_change(self, single_dir):
+        self.print_method_name()
         if self.single_prefix:
             if not single_dir.exists():
                 print("Creating single prefix copy...")
@@ -7394,6 +7821,7 @@ class WineCharmApp(Gtk.Application):
 
     # Implement placeholders for each setting's callback function
     def set_default_runner(self, action=None):
+        self.print_method_name()
         """
         Display a dialog to set the default runner for the application.
         Updates the Settings.yaml file.
@@ -7484,6 +7912,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def _on_dropdown_factory_setup(self, factory, list_item):
+        self.print_method_name()
         """Setup factory items for the dropdown"""
         label = Gtk.Label()
         label.set_xalign(0)
@@ -7492,6 +7921,7 @@ class WineCharmApp(Gtk.Application):
         list_item.set_child(label)
 
     def _on_dropdown_factory_bind(self, factory, list_item):
+        self.print_method_name()
         """Bind data to factory items"""
         label = list_item.get_child()
         string_obj = list_item.get_item()
@@ -7499,6 +7929,7 @@ class WineCharmApp(Gtk.Application):
             label.set_label(string_obj.get_string())
 
     def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, all_runners):
+        self.print_method_name()
         if response_id == "ok":
             selected_index = runner_dropdown.get_selected()
             if selected_index == Gtk.INVALID_LIST_POSITION:
@@ -7527,6 +7958,7 @@ class WineCharmApp(Gtk.Application):
         #dialog.close()
 
     def on_download_runner_clicked_default(self, dialog):
+        self.print_method_name()
         """
         Handle the "Download Runner" button click from the set_default_runner dialog.
         """
@@ -7535,6 +7967,7 @@ class WineCharmApp(Gtk.Application):
         self.on_settings_download_runner_clicked(callback=self.on_download_complete_default_runner)
 
     def on_download_complete_default_runner(self):
+        self.print_method_name()
         """
         Callback method to handle the completion of the runner download.
         Reopens the set_default_runner dialog.
@@ -7545,6 +7978,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def maybe_fetch_runner_urls(self):
+        self.print_method_name()
         """
         Fetch the runner URLs only if the cache is older than 1 day or missing.
         """
@@ -7562,6 +7996,7 @@ class WineCharmApp(Gtk.Application):
         self.runner_data = self.load_runner_data_from_cache()
 
     def cache_is_stale(self):
+        self.print_method_name()
         """
         Check if the cache file is older than 24 hours or missing.
         """
@@ -7577,6 +8012,7 @@ class WineCharmApp(Gtk.Application):
         return (now - last_modified) > timedelta(hours=1)
 
     def fetch_runner_urls_from_github(self):
+        self.print_method_name()
         """
         Fetch the runner URLs dynamically from the GitHub API.
         """
@@ -7596,6 +8032,7 @@ class WineCharmApp(Gtk.Application):
             return None
 
     def parse_runner_data(self, release_data):
+        self.print_method_name()
         """
         Parse runner data from the GitHub API response.
         """
@@ -7620,6 +8057,7 @@ class WineCharmApp(Gtk.Application):
         return categories
 
     def get_runner_category(self, url):
+        #self.print_method_name()
         """
         Determine the category of the runner based on its URL.
         """
@@ -7638,6 +8076,7 @@ class WineCharmApp(Gtk.Application):
             return "devel"
 
     def save_runner_data_to_cache(self, runner_data):
+        self.print_method_name()
         """
         Save the runner data to the cache file in YAML format.
         """
@@ -7649,6 +8088,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error saving runner data to cache: {e}")
 
     def load_runner_data_from_cache(self):
+        self.print_method_name()
         """
         Load runner data from the cache file.
         """
@@ -7661,6 +8101,7 @@ class WineCharmApp(Gtk.Application):
 
 #### RUNNER download issue with progress and cancel        
     def on_settings_download_runner_clicked(self, callback=None):
+        self.print_method_name()
         """
         Handle the "Runner Download" option click.
         Use the cached runners loaded at startup, or notify if not available.
@@ -7720,6 +8161,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_download_runner_response(self, dialog, response_id, combo_boxes, callback=None):
+        self.print_method_name()
         """Handle response from runner selection dialog."""
         if response_id == "download":
             selected_runners = {}
@@ -7781,6 +8223,7 @@ class WineCharmApp(Gtk.Application):
 
     def download_runners_thread(self, selected_runners, progress_dialog, total_progress_bar,
                             runner_progress_bar, progress_label, callback, cancel_event):
+        self.print_method_name()
         """Threaded download process with cancellation support."""
         total_runners = len(selected_runners)
         download_success = True
@@ -7853,6 +8296,7 @@ class WineCharmApp(Gtk.Application):
                 )
 
     def download_and_extract_runner(self, runner_name, download_url, progress_callback, cancel_event):
+        self.print_method_name()
         """Download and extract runner with cancellation support."""
         runner_tar_path = self.runners_dir / f"{runner_name}.tar.xz"
         self.runners_dir.mkdir(parents=True, exist_ok=True)
@@ -7895,13 +8339,8 @@ class WineCharmApp(Gtk.Application):
 
 # Please fix the download runner method to have cancel capability, show cancel button instead of OK
 #### /RUNNER download issue with progress and cancel        
-
-    def import_runner(self, action=None):
-        print("Importing a runner...")
-        # Add functionality to import a runner.
-
-
     def delete_runner(self, action=None):
+        self.print_method_name()
         """
         Allow the user to delete a selected runner using modern Adw.AlertDialog and DropDown.
         """
@@ -7942,6 +8381,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def on_delete_runner_response(self, dialog, response_id, dropdown, runner_dirs):
+        self.print_method_name()
         """Handle delete dialog response with proper DropDown integration."""
         if response_id == "delete":
             selected_idx = dropdown.get_selected()
@@ -7966,36 +8406,8 @@ class WineCharmApp(Gtk.Application):
 
         dialog.close()
 
-
-    def set_default_template(self, action=None):
-        print("Setting the default template...")
-        # Add functionality to set the default template.
-
-    def configure_template(self, action=None):
-        print("Configuring the template...")
-        # Add functionality to configure the template.
-
-    def import_template(self, action=None):
-        print("Importing a template...")
-        # Add functionality to import a template.
-
-    def clone_template(self, action=None):
-        print("Cloning the template...")
-        # Add functionality to clone the template.
-
-    def backup_template(self, action=None):
-        print("Backing up the template...")
-        # Add functionality to back up the template.
-
-    def restore_template(self, action=None):
-        print("Restoring a template from backup...")
-        # Add functionality to restore a template.
-
-    def delete_template(self, action=None):
-        print("Deleting the template...")
-        # Add functionality to delete the template.
-
     def set_wine_arch(self):
+        self.print_method_name()
         """
         Allow the user to set the Wine architecture using Adw.AlertDialog.
         """
@@ -8029,6 +8441,7 @@ class WineCharmApp(Gtk.Application):
 
         # Response handler
         def on_response(dialog, response):
+            self.print_method_name()
             if response == "ok":
                 new_arch = 'win32' if win32_radio.get_active() else 'win64'
                 if new_arch != current_arch:
@@ -8038,6 +8451,7 @@ class WineCharmApp(Gtk.Application):
 
         # Architecture change handler
         def handle_architecture_change(new_arch):
+            self.print_method_name()
             # Determine paths based on selected architecture
             new_template = self.default_template_win32 if new_arch == 'win32' else self.default_template_win64
             single_prefix_dir = self.single_prefix_dir_win32 if new_arch == 'win32' else self.single_prefix_dir_win64
@@ -8063,22 +8477,26 @@ class WineCharmApp(Gtk.Application):
                                     arch=new_arch)
             else:
                 print(f"Using existing {new_arch} template")
+                self.show_options_for_settings()
                 finalize_arch_change(single_prefix_dir)
 
         # Finalization handler
         def finalize_arch_change(single_prefix_dir):
+            self.print_method_name()
             if self.single_prefix and not single_prefix_dir.exists():
                 print(f"Copying to {single_prefix_dir.name}...")
                 self.copy_template(single_prefix_dir)
             self.set_dynamic_variables()
             self.show_options_for_settings()
 
+        self.show_options_for_settings()
         # Connect response signal and present dialog
         dialog.connect("response", on_response)
         dialog.present(self.window)
         
 ################
     def backup_runner(self, action=None):
+        self.print_method_name()
         """
         Allow the user to backup a runner.
         """
@@ -8118,6 +8536,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def on_backup_runner_response(self, dialog, response_id, dropdown, combo_runner_paths):
+        self.print_method_name()
         if response_id == "ok":
             selected_index = dropdown.get_selected()
             if selected_index < 0 or selected_index >= len(combo_runner_paths):
@@ -8150,6 +8569,7 @@ class WineCharmApp(Gtk.Application):
 
             # Define the callback for when the file dialog is closed
             def on_save_file_dialog_response(dialog, result):
+                self.print_method_name()
                 try:
                     save_file = dialog.save_finish(result)
                     if save_file:
@@ -8170,6 +8590,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def create_runner_backup(self, runner_path, destination_path):
+        self.print_method_name()
         """
         Create a backup archive of the runner at runner_path, saving it to destination_path.
         """
@@ -8208,6 +8629,7 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(self.show_info_dialog, "Backup Error", f"Failed to create runner backup: {e}")
 ########### Restore RUnner
     def restore_runner(self, action=None):
+        self.print_method_name()
         """
         Allow the user to restore a runner from a backup archive.
         """
@@ -8230,6 +8652,7 @@ class WineCharmApp(Gtk.Application):
 
         # Define the callback for when the file dialog is closed
         def on_open_file_dialog_response(dialog, result):
+            self.print_method_name()
             try:
                 file = dialog.open_finish(result)
                 if file:
@@ -8251,6 +8674,7 @@ class WineCharmApp(Gtk.Application):
         file_dialog.open(self.window, None, on_open_file_dialog_response)
 
     def extract_runner_archive(self, archive_path):
+        self.print_method_name()
         """
         Extract the runner archive to runners_dir.
         """
@@ -8271,6 +8695,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def archive_contains_wine(self, archive_path):
+        self.print_method_name()
         """
         Check if the archive contains bin/wine.
         """
@@ -8291,6 +8716,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_cancel_template_init_clicked(self, button):
+        self.print_method_name()
         """
         Handle cancel button click during template initialization
         """
@@ -8305,6 +8731,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def on_cancel_template_init_dialog_response(self, dialog, response):
+        self.print_method_name()
         """
         Handle cancel dialog response for template initialization
         """
@@ -8313,6 +8740,7 @@ class WineCharmApp(Gtk.Application):
         dialog.close()
 
     def cleanup_cancelled_template_init(self, template_dir):
+        self.print_method_name()
         """
         Clean up after template initialization is cancelled, create a basic template,
         and update settings.yml
@@ -8363,6 +8791,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def reset_ui_after_template_init(self):
+        self.print_method_name()
         """
         Reset UI elements after template initialization and show confirmation
         """
@@ -8379,6 +8808,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_cancel_import_clicked(self, button):
+        self.print_method_name()
         """
         Handle cancel button click during wine directory import
         """
@@ -8393,6 +8823,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def on_cancel_import_dialog_response(self, dialog, response):
+        self.print_method_name()
         """
         Handle cancel dialog response for wine directory import
         """
@@ -8405,6 +8836,7 @@ class WineCharmApp(Gtk.Application):
 ####################### Restore Backup (prefix, bottle, .tar.zst)
 
     def restore_from_backup(self, action=None, param=None):
+        self.print_method_name()
         # Step 1: Create required directories (if needed)
         self.create_required_directories()
 
@@ -8448,6 +8880,7 @@ class WineCharmApp(Gtk.Application):
         file_dialog.open(self.window, None, self.on_restore_file_dialog_response)
 
     def get_total_uncompressed_size(self, archive_path):
+        self.print_method_name()
         """
         Calculate the total uncompressed size of a tar archive without extracting it.
 
@@ -8484,6 +8917,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def check_disk_space_and_uncompressed_size(self, prefixes_dir, file_path):
+        self.print_method_name()
         """
         Check the available disk space and uncompressed size of the backup file.
 
@@ -8517,6 +8951,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def on_restore_file_dialog_response(self, dialog, result):
+        self.print_method_name()
         try:
             # Retrieve the selected file using open_finish() for Gtk.FileDialog in GTK 4
             file = dialog.open_finish(result)
@@ -8535,6 +8970,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def restore_prefix_bottle_wzt_tar_zst(self, file_path):
+        self.print_method_name()
         """
         Restore from a .prefix or .bottle which is a .tar.zst compressed file.
         """
@@ -8621,6 +9057,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def get_restore_steps(self, file_path):
+        self.print_method_name()
         """
         Return the list of steps for restoring a prefix/bottle backup.
         """
@@ -8635,6 +9072,7 @@ class WineCharmApp(Gtk.Application):
         ]
 
     def get_wzt_restore_steps(self, file_path):
+        self.print_method_name()
         """
         Return the list of steps for restoring a WZT backup.
         """
@@ -8649,6 +9087,7 @@ class WineCharmApp(Gtk.Application):
         ]
 
     def perform_replacements(self, directory):
+        self.print_method_name()
         user = os.getenv('USER')
         usershome = os.path.expanduser('~')
         datadir = os.getenv('DATADIR', '/usr/share')
@@ -8682,6 +9121,7 @@ class WineCharmApp(Gtk.Application):
         
 
     def replace_strings_in_files(self, directory, find_replace_pairs):
+        self.print_method_name()
         for root, dirs, files in os.walk(directory):
             for file in files:
                 file_path = os.path.join(root, file)
@@ -8711,6 +9151,7 @@ class WineCharmApp(Gtk.Application):
                     print(f"Skipping file: {file_path} ({e})")
 
     def is_binary_file(self, file_path):
+        self.print_method_name()
         try:
             with open(file_path, 'rb') as f:
                 chunk = f.read(1024)
@@ -8721,6 +9162,7 @@ class WineCharmApp(Gtk.Application):
         return False
         
     def process_sh_files(self, directory):
+        self.print_method_name()
         """
         Process all .sh files and convert them to .charm files.
         """
@@ -8796,6 +9238,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Scripts created for .exe files in {directory}")
 
     def load_and_fix_yaml(self, yaml_file_path, filename):
+        self.print_method_name()
         """
         Load data from the specified YAML file, fixing missing spaces around colons.
         """
@@ -8828,6 +9271,7 @@ class WineCharmApp(Gtk.Application):
             return ""
 
     def create_charm_file(self, info_data, yml_path):
+        self.print_method_name()
         """
         Create a .charm file with the provided information.
         """
@@ -8873,6 +9317,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def extract_infofile_path_from_sh(self, file_path):
+        self.print_method_name()
         variables = {}
         with open(file_path, 'r') as file:
             for line in file:
@@ -8885,6 +9330,7 @@ class WineCharmApp(Gtk.Application):
         return variables
                 
     def find_sh_files(self, directory):
+        self.print_method_name()
         sh_files = []
         for root, dirs, files in os.walk(directory):
             for file in files:
@@ -8893,6 +9339,7 @@ class WineCharmApp(Gtk.Application):
         return sh_files
 
     def find_and_save_lnk_files(self, wineprefix):
+        self.print_method_name()
         drive_c = wineprefix / "drive_c" / "ProgramData"
         found_lnk_files_path = wineprefix / "found_lnk_files.yaml"
         lnk_files = []
@@ -8923,6 +9370,7 @@ class WineCharmApp(Gtk.Application):
         self.load_script_list(wineprefix)
 
     def parse_info_file(self, file_path):
+        self.print_method_name()
         info_data = {}
         with open(file_path, 'r') as file:
             for line in file:
@@ -8934,6 +9382,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def add_charm_files_to_script_list(self, extracted_prefix_dir):
+        self.print_method_name()
         """
         Find all .charm files in the extracted prefix directory and add them to self.script_list.
         
@@ -8986,6 +9435,7 @@ class WineCharmApp(Gtk.Application):
 
         
     def on_restore_completed(self):
+        self.print_method_name()
         """
         Called when the restore process is complete. Updates UI, restores scripts, and resets the open button.
         """
@@ -9006,6 +9456,7 @@ class WineCharmApp(Gtk.Application):
         print("Restore process completed and script list restored.")
 
     def extract_backup(self, file_path):
+        self.print_method_name()
         """
         Extract the .tar.zst backup to the Wine prefixes directory with proper process management.
         """
@@ -9079,6 +9530,7 @@ class WineCharmApp(Gtk.Application):
                 self.current_process = None
 
     def _kill_current_process(self):
+        self.print_method_name()
         """
         Helper method to kill the current process and its process group.
         """
@@ -9107,6 +9559,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def extract_prefix_dir(self, file_path):
+        self.print_method_name()
         """
         Return the extracted prefix directory for the backup file.
         This method ensures that only the first directory is returned, not individual files.
@@ -9122,7 +9575,7 @@ class WineCharmApp(Gtk.Application):
 
             # Print the correct path for debugging
             extracted_prefix_path = Path(self.prefixes_dir) / extracted_prefix_name
-            print("#" * 100)
+            print("_" * 100)
             print(extracted_prefix_name)
             print(extracted_prefix_path)
             
@@ -9136,6 +9589,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def check_disk_space_and_show_step(self, file_path):
+        self.print_method_name()
         """
         Check available disk space and the uncompressed size of the backup file, showing this as a step.
         First checks if compressed file size is < 1/4 of available space for quick approval.
@@ -9161,6 +9615,7 @@ class WineCharmApp(Gtk.Application):
         return True
 
     def check_disk_space_quick(self, prefixes_dir, file_path):
+        self.print_method_name()
         """
         Quick check of disk space by comparing compressed file size with available space.
         Only if compressed size is > 1/4 of available space, we need the full uncompressed check.
@@ -9197,6 +9652,7 @@ class WineCharmApp(Gtk.Application):
             return False, 0, 0
 
     def connect_open_button_with_restore_backup_cancel(self):
+        self.print_method_name()
         """
         Connect cancel handler to the open button
         """
@@ -9207,6 +9663,7 @@ class WineCharmApp(Gtk.Application):
         self.set_open_button_icon_visible(False)
 
     def on_cancel_restore_backup_clicked(self, button):
+        self.print_method_name()
         """
         Handle cancel button click with immediate process termination
         """
@@ -9221,6 +9678,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window,)
 
     def on_cancel_restore_backup_dialog_response(self, dialog, response):
+        self.print_method_name()
         """
         Handle cancel dialog response with cleanup
         """
@@ -9249,6 +9707,7 @@ class WineCharmApp(Gtk.Application):
 #################3 Replace strings update with interruption
 
     def replace_strings_in_files(self, directory, find_replace_pairs):
+        self.print_method_name()
         """
         Replace strings in files with interruption support, progress tracking and error handling
         """
@@ -9327,6 +9786,7 @@ class WineCharmApp(Gtk.Application):
             raise
 
     def is_binary_file(self, file_path):
+        #self.print_method_name()
         """
         Check if a file is binary with interruption support
         """
@@ -9347,6 +9807,7 @@ class WineCharmApp(Gtk.Application):
 
 ##################################################################################### 
     def get_template_arch(self, template_path):
+        self.print_method_name()
         """Extract architecture from template's system.reg file"""
         system_reg = Path(template_path) / "system.reg"
         if not system_reg.exists():
@@ -9363,6 +9824,7 @@ class WineCharmApp(Gtk.Application):
         return "win64"  # Fallback if not found
 
     def set_default_template(self, action=None):
+        self.print_method_name()
         """Set default template with architecture auto-detection and update"""
         # Collect templates with architecture info
         templates = []
@@ -9416,6 +9878,7 @@ class WineCharmApp(Gtk.Application):
         dialog.set_default_response("ok")
 
         def on_response(dialog, response_id):
+            self.print_method_name()
             if response_id == "ok":
                 selected_idx = dropdown.get_selected()
                 if selected_idx != Gtk.INVALID_LIST_POSITION:
@@ -9442,6 +9905,7 @@ class WineCharmApp(Gtk.Application):
 
 ############# Delete template
     def delete_template(self, action=None):
+        self.print_method_name()
         """Delete a template directory with safety checks and settings updates"""
         self.load_settings()  # Ensure fresh settings
         current_arch = self.settings.get('arch', 'win64')
@@ -9499,6 +9963,7 @@ class WineCharmApp(Gtk.Application):
         dialog.set_default_response("delete")
 
         def on_response(dialog, response_id, dropdown, templates):
+            self.print_method_name()
             if response_id == "delete":
                 selected_idx = dropdown.get_selected()
                 if 0 <= selected_idx < len(templates):
@@ -9544,12 +10009,14 @@ class WineCharmApp(Gtk.Application):
 
 ################## import template
     def import_template(self, action=None, param=None):
+        self.print_method_name()
         """Import a Wine directory as a template into the templates directory."""
         file_dialog = Gtk.FileDialog.new()
         file_dialog.set_modal(True)
         file_dialog.select_folder(self.window, None, self.on_import_template_response)
 
     def on_import_template_response(self, dialog, result):
+        self.print_method_name()
         try:
             folder = dialog.select_folder_finish(result)
             if folder:
@@ -9580,6 +10047,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Template import error: {e}")
 
     def process_template_import(self, steps, dst, backup_dir):
+        self.print_method_name()
         """Handle template import with error handling and rollback"""
         self.stop_processing = False
         self.total_steps = len(steps)
@@ -9605,6 +10073,7 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(self.on_import_template_directory_completed)
 
     def verify_template_source(self, src):
+        self.print_method_name()
         """Validate the source directory contains a valid Wine prefix"""
         required_files = ["system.reg", "userdef.reg", "dosdevices"]
         missing = [f for f in required_files if not (src / f).exists()]
@@ -9612,6 +10081,7 @@ class WineCharmApp(Gtk.Application):
             raise Exception(f"Missing required Wine files: {', '.join(missing)}")
 
     def clean_template_files(self, template_path):
+        self.print_method_name()
         """Remove unnecessary files from the template"""
         # Remove any existing charm files
         for charm_file in template_path.glob("*.charm"):
@@ -9624,6 +10094,7 @@ class WineCharmApp(Gtk.Application):
                 desktop_file.unlink()
 
     def handle_template_import_error(self, dst, backup_dir, error_msg):
+        self.print_method_name()
         """Handle template import errors and cleanup"""
         try:
             if dst.exists():
@@ -9636,6 +10107,7 @@ class WineCharmApp(Gtk.Application):
         self.show_info_dialog("Template Import Failed", error_msg)
     
     def on_import_template_directory_completed(self):
+        self.print_method_name()
         """
         Called when the template import process is complete. Updates UI, restores scripts, and resets the open button.
         """
@@ -9655,12 +10127,14 @@ class WineCharmApp(Gtk.Application):
         
 ##################### Import runner
     def import_runner(self, action=None, param=None):
+        self.print_method_name()
         """Import a Wine runner into the runners directory."""
         file_dialog = Gtk.FileDialog.new()
         file_dialog.set_modal(True)
         file_dialog.select_folder(self.window, None, self.on_import_runner_response)
 
     def on_import_runner_response(self, dialog, result):
+        self.print_method_name()
         try:
             folder = dialog.select_folder_finish(result)
             if folder:
@@ -9690,6 +10164,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Runner import error: {e}")
 
     def process_runner_import(self, steps, dst, backup_dir):
+        self.print_method_name()
         """Handle runner import with error handling and rollback"""
         self.stop_processing = False
         self.total_steps = len(steps)
@@ -9716,11 +10191,13 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(self.on_import_runner_directory_completed)
 
     def verify_runner_source(self, src):
+        self.print_method_name()
         """Validate the source directory contains a valid Wine runner"""
         wine_binary = src / "bin/wine"
         return wine_binary.exists() and self.validate_runner(wine_binary)
 
     def verify_runner_binary(self, src):
+        self.print_method_name()
         """Explicit validation check for the runner binary"""
         wine_binary = src / "bin/wine"
         if not wine_binary.exists():
@@ -9729,6 +10206,7 @@ class WineCharmApp(Gtk.Application):
             raise Exception("Wine binary validation failed")
 
     def set_runner_permissions(self, runner_path):
+        self.print_method_name()
         """Set executable permissions for critical runner files"""
         wine_binary = runner_path / "bin/wine"
         wineserver = runner_path / "bin/wineserver"
@@ -9743,6 +10221,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Warning: Could not set permissions - {e}")
 
     def handle_runner_import_error(self, dst, backup_dir, error_msg):
+        self.print_method_name()
         """Handle runner import errors and cleanup"""
         try:
             if dst.exists():
@@ -9755,6 +10234,7 @@ class WineCharmApp(Gtk.Application):
         self.show_info_dialog("Runner Import Failed", error_msg)
 
     def on_import_runner_directory_completed(self):
+        self.print_method_name()
         """Finalize runner import UI updates"""
         self.set_open_button_label("Open")
         self.set_open_button_icon_visible(True)
@@ -9764,6 +10244,7 @@ class WineCharmApp(Gtk.Application):
         print("Runner import process completed.")
 
     def refresh_runner_list(self):
+        self.print_method_name()
         """Refresh the runner list in settings UI"""
         if hasattr(self, 'runner_dropdown'):
             all_runners = self.get_all_runners()
@@ -9772,6 +10253,7 @@ class WineCharmApp(Gtk.Application):
 
 ########################## fix default runner to handle arch difference
     def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, all_runners):
+        self.print_method_name()
         if response_id == "ok":
             selected_index = runner_dropdown.get_selected()
             if selected_index == Gtk.INVALID_LIST_POSITION:
@@ -9826,6 +10308,7 @@ class WineCharmApp(Gtk.Application):
 
 ##### Template Backup
     def backup_template(self, action=None):
+        self.print_method_name()
         """
         Allow the user to backup a template with interruptible process.
         """
@@ -9854,6 +10337,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def on_backup_template_response(self, dialog, response_id, dropdown, templates):
+        self.print_method_name()
         if response_id == "ok":
             selected_index = dropdown.get_selected()
             if 0 <= selected_index < len(templates):
@@ -9888,6 +10372,7 @@ class WineCharmApp(Gtk.Application):
         dialog.close()
 
     def create_template_backup(self, template_path, dest_path):
+        self.print_method_name()
         """
         Create compressed template archive using zstd compression with interruptible progress.
         """
@@ -9902,6 +10387,7 @@ class WineCharmApp(Gtk.Application):
         restore_media_username = {'/media/%USERNAME%/': f'/media/{current_username}/'}
 
         def perform_backup_steps():
+            self.print_method_name()
             try:
                 steps = [
                     (f"Replace \"{usershome}\" with '~' in files", lambda: self.replace_strings_in_files(template_path, find_replace_pairs)),
@@ -9941,6 +10427,7 @@ class WineCharmApp(Gtk.Application):
                 GLib.idle_add(self.revert_open_button)
 
         def run_backup():
+            self.print_method_name()
             if self.stop_processing:
                 raise Exception("Operation cancelled by user")
 
@@ -9963,6 +10450,7 @@ class WineCharmApp(Gtk.Application):
 
             # Start output reader thread
             def read_output():
+                self.print_method_name()
                 while True:
                     output = process.stdout.readline()
                     if output == '' and process.poll() is not None:
@@ -9996,6 +10484,7 @@ class WineCharmApp(Gtk.Application):
         threading.Thread(target=perform_backup_steps, daemon=True).start()
 
     def connect_cancel_button_for_template_backup(self):
+        self.print_method_name()
         if hasattr(self, 'open_button_handler_id') and self.open_button_handler_id is not None:
             self.open_button.disconnect(self.open_button_handler_id)
         self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_template_backup_clicked)
@@ -10003,6 +10492,7 @@ class WineCharmApp(Gtk.Application):
         self.set_open_button_icon_visible(False)
 
     def on_cancel_template_backup_clicked(self, button):
+        self.print_method_name()
         dialog = Adw.AlertDialog(
             heading="Cancel Backup",
             body="Do you want to cancel the template backup process?"
@@ -10014,11 +10504,13 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def on_cancel_template_backup_dialog_response(self, dialog, response):
+        self.print_method_name()
         if response == "cancel":
             self.stop_processing = True
         dialog.close()
 
     def cleanup_cancelled_template_backup(self):
+        self.print_method_name()
         try:
             if hasattr(self, 'current_backup_path') and self.current_backup_path and Path(self.current_backup_path).exists():
                 Path(self.current_backup_path).unlink()
@@ -10030,6 +10522,7 @@ class WineCharmApp(Gtk.Application):
             self.revert_open_button()
 
     def revert_open_button(self):
+        self.print_method_name()
         """
         Cleanup after template restore completion.
         """
@@ -10041,6 +10534,7 @@ class WineCharmApp(Gtk.Application):
 
 #################### NEW RESTORE template like restore wzt
     def restore_template_from_backup(self, action=None, param=None):
+        self.print_method_name()
         # Step 1: Create required directories if needed
         self.create_required_directories()
 
@@ -10061,6 +10555,7 @@ class WineCharmApp(Gtk.Application):
         file_dialog.open(self.window, None, self.on_restore_template_file_dialog_response)
 
     def on_restore_template_file_dialog_response(self, dialog, result):
+        self.print_method_name()
         try:
             file = dialog.open_finish(result)
             if file:
@@ -10072,6 +10567,7 @@ class WineCharmApp(Gtk.Application):
                 print(f"An error occurred: {e}")
 
     def restore_template_tar_zst(self, file_path):
+        self.print_method_name()
         """
         Restore a template from a .wzt backup file to the templates directory.
         """
@@ -10097,6 +10593,7 @@ class WineCharmApp(Gtk.Application):
             self.connect_open_button_with_restore_backup_cancel()
 
             def restore_process():
+                self.print_method_name()
                 try:
                     # Get WZT restore steps modified for templates
                     restore_steps = self.get_template_restore_steps(file_path)
@@ -10149,6 +10646,7 @@ class WineCharmApp(Gtk.Application):
             GLib.idle_add(self.show_info_dialog, "Error", f"Failed to start template restore: {str(e)}")
 
     def extract_template_backup(self, file_path):
+        self.print_method_name()
         """
         Extract template backup to templates directory with process management.
         """
@@ -10217,6 +10715,7 @@ class WineCharmApp(Gtk.Application):
                 self.current_process = None
 
     def extract_template_dir(self, file_path):
+        self.print_method_name()
         """
         Determine template directory name from backup file.
         """
@@ -10238,6 +10737,7 @@ class WineCharmApp(Gtk.Application):
             return None
 
     def get_template_restore_steps(self, file_path):
+        self.print_method_name()
         """
         Return steps for template restore using WZT format.
         """
@@ -10250,6 +10750,7 @@ class WineCharmApp(Gtk.Application):
         ]
 
     def check_template_disk_space(self, file_path):
+        self.print_method_name()
         """
         Check disk space in templates directory against backup size.
         """
@@ -10284,6 +10785,7 @@ class WineCharmApp(Gtk.Application):
             return False
 
     def on_template_restore_completed(self):
+        self.print_method_name()
         """
         Cleanup after template restore completion.
         """
@@ -10295,6 +10797,7 @@ class WineCharmApp(Gtk.Application):
 
 ################ clone template
     def clone_template(self, action=None):
+        self.print_method_name()
         """
         Allow the user to clone a template with an editable name suggestion.
         """
@@ -10337,6 +10840,7 @@ class WineCharmApp(Gtk.Application):
         dialog.present(self.window)
 
     def on_template_selected_for_clone(self, dropdown, _pspec, entry, templates):
+        self.print_method_name()
         """Update entry text when template selection changes"""
         selected_index = dropdown.get_selected()
         if 0 <= selected_index < len(templates):
@@ -10346,6 +10850,7 @@ class WineCharmApp(Gtk.Application):
             entry.set_position(len(new_name))  # Move cursor to end
 
     def on_clone_name_changed(self, entry, dropdown, templates):
+        self.print_method_name()
         """Real-time validation of clone name"""
         new_name = entry.get_text().strip()
         dest_path = self.templates_dir / new_name
@@ -10360,6 +10865,7 @@ class WineCharmApp(Gtk.Application):
             entry.add_css_class("error")
 
     def on_clone_template_response(self, dialog, response_id, dropdown, entry, templates):
+        self.print_method_name()
         if response_id == "ok":
             selected_index = dropdown.get_selected()
             new_name = entry.get_text().strip()
@@ -10388,6 +10894,7 @@ class WineCharmApp(Gtk.Application):
         dialog.close()
 
     def perform_template_clone(self, source_path, dest_path):
+        self.print_method_name()
         """Perform the actual directory copy with error handling"""
         try:
             self.custom_copytree(source_path, dest_path)
@@ -10405,6 +10912,7 @@ class WineCharmApp(Gtk.Application):
 
 ########### Create Template
     def create_template(self, action=None):
+        self.print_method_name()
         dialog = Adw.AlertDialog(
             heading="Create Template",
             body="Enter a name and select architecture:"
@@ -10430,6 +10938,7 @@ class WineCharmApp(Gtk.Application):
         dialog.set_default_response("ok")
         
         def on_response(dialog, response):
+            self.print_method_name()
             if response == "ok":
                 name = entry.get_text().strip()
                 if not name:
@@ -10444,6 +10953,22 @@ class WineCharmApp(Gtk.Application):
         
         dialog.connect("response", on_response)
         dialog.present(self.window)
+
+
+    def configure_template(self, action=None):
+        pass
+
+
+###################### 0.95
+
+
+    def initialize_app(self):
+        
+        if not hasattr(self, 'window') or not self.window:
+            # Call the startup code
+            self.create_main_window()
+            self.create_script_list()
+            
 
 
     def process_cli_file(self, file_path):
@@ -10468,23 +10993,427 @@ class WineCharmApp(Gtk.Application):
             GLib.timeout_add_seconds(0.5, self.create_script_list)
 
 
+    def on_open(self, app, files, *args):
+        # Ensure the application is fully initialized
+        #print("1. on_open method called")
+        
+        # Initialize the application if it hasn't been already
+        self.initialize_app()
+        #print("2. self.initialize_app initiated")
+        
+        # Present the window as soon as possible
+        GLib.idle_add(self.window.present)
+        #print("3. self.window.present() Complete")
+
+        #self.check_running_processes_and_update_buttons()
+        if not self.template:
+            self.template = getattr(self, f'default_template_{self.arch}')
+            #print("77777777777777777777777777777777777777777777777777777777777777777")
+            #print(self.template)
+            self.template = self.expand_and_resolve_path(self.template)
+            #print(self.template)
+
+        missing_programs = self.check_required_programs()
+        if missing_programs:
+            self.show_missing_programs_dialog(missing_programs)
+
+        self.set_dynamic_variables()
+
+        self.check_running_processes_on_startup()
+
+
+    def process_cli_file_in_thread(self, file_path):
+        try:
+            print(f"Processing CLI file in thread: {file_path}")
+            abs_file_path = str(Path(file_path).resolve())
+            print(f"Resolved absolute CLI file path: {abs_file_path}")
+
+            if not Path(abs_file_path).exists():
+                print(f"File does not exist: {abs_file_path}")
+                return
+
+            # Perform the heavy processing here
+            self.create_yaml_file(abs_file_path, None)
+
+            # Schedule GUI updates in the main thread
+            #GLib.idle_add(self.update_gui_after_file_processing, abs_file_path)
+
+        except Exception as e:
+            print(f"Error processing file in background: {e}")
+        finally:
+            if self.initializing_template:
+                pass  # Keep showing spinner
+            else:
+                GLib.idle_add(self.hide_processing_spinner)
+            
+            GLib.timeout_add_seconds(0.5, self.create_script_list)
+
+
+    def process_cli_file_later(self, file_path):
+        # Use GLib.idle_add to ensure this runs after the main loop starts
+        GLib.idle_add(self.show_processing_spinner, "Processing2...")
+        GLib.idle_add(self.process_cli_file, file_path)
+
+        #self.default_template_win64 = self.templates_dir / "WineCharm-win64"
+        #self.default_template_win32 = self.templates_dir / "WineCharm-win32"
+
+    def on_startup(self, app):
+        self.create_main_window()
+        # Clear or initialize the script list
+        self.set_dynamic_variables()
+        self.script_list = {}
+        self.load_script_list()
+        self.create_script_list()
+
+        if not self.template:
+            self.template = getattr(self, f'default_template_{self.arch}')
+            self.template = self.expand_and_resolve_path(self.template)
+
+
+        missing_programs = self.check_required_programs()
+        if missing_programs:
+            self.show_missing_programs_dialog(missing_programs)
+        else:
+            if not self.template.exists():
+                self.initialize_template(self.template, self.on_template_initialized)
+            else:
+                self.set_dynamic_variables()
+                # Process the command-line file if the template already exists
+                if self.command_line_file:
+                    print("Template exists. Processing command-line file after UI initialization.")
+                    self.process_cli_file_later(self.command_line_file)
+        # After loading scripts and building the UI, check for running processes
+        self.check_running_processes_on_startup()
+
+        # Start fetching runner URLs asynchronously
+        threading.Thread(target=self.maybe_fetch_runner_urls).start()
+
+
+    def remove_symlinks_and_create_directories(self, wineprefix):
+        """
+        Remove all symbolic link files in the specified directory (drive_c/users/{user}) and 
+        create normal directories in their place.
+        
+        Args:
+            wineprefix: The path to the Wine prefix where symbolic links will be removed.
+        """
+        userhome = os.getenv("USER") or os.getenv("USERNAME")
+        if not userhome:
+            print("Error: Unable to determine the current user from environment.")
+            return
+        
+        user_dir = Path(wineprefix) / "drive_c" / "users"
+        print(f"Removing symlinks from: {user_dir}")
+
+        # Iterate through all symbolic links in the user's directory
+        for item in user_dir.rglob("*"):
+            if item.is_symlink():
+                try:
+                    # Remove the symlink and create a directory in its place
+                    item.unlink()
+                    item.mkdir(parents=True, exist_ok=True)
+                    print(f"Replaced symlink with directory: {item}")
+                except Exception as e:
+                    print(f"Error processing {item}: {e}")
+
+    def initialize_template(self, template_dir, callback):
+        self.create_required_directories()
+        self.initializing_template = True
+        if self.open_button_handler_id is not None:
+            self.open_button.disconnect(self.open_button_handler_id)
+
+        #self.spinner = Gtk.Spinner()
+        #self.spinner.start()
+        #self.open_button_box.append(self.spinner)
+
+        self.set_open_button_label("Initializing...")
+        self.set_open_button_icon_visible(False)  # Hide the open-folder icon
+        self.search_button.set_sensitive(False)  # Disable the search button
+        self.view_toggle_button.set_sensitive(False)
+        self.ensure_directory_exists(template_dir)
+
+        steps = [
+            ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
+            ("Replace symbolic links with directories", lambda: self.remove_symlinks_and_create_directories(template_dir)),
+            #("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
+            ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+            #("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+            #("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+            #("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
+            #("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
+        ]
+
+        def initialize():
+            for step_text, command in steps:
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    if callable(command):
+                        # If the command is a callable, invoke it directly
+                        command()
+                    else:
+                        # Run the command in the shell
+                        subprocess.run(command, shell=True, check=True)
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                except subprocess.CalledProcessError as e:
+                    print(f"Error initializing template: {e}")
+                    break
+            GLib.idle_add(callback)
+
+        threading.Thread(target=initialize).start()
+
+    def on_template_initialized(self):
+        print("Template initialization complete.")
+        self.initializing_template = False
+        
+        # Ensure the spinner is stopped after initialization
+        self.hide_processing_spinner()
+        
+        self.set_open_button_label("Open")
+        self.set_open_button_icon_visible(True)
+        self.search_button.set_sensitive(True)
+        self.view_toggle_button.set_sensitive(True)
+        
+        if self.open_button_handler_id is not None:
+            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
+
+        print("Template initialization completed and UI updated.")
+        self.show_initializing_step("Initialization Complete!")
+        self.mark_step_as_done("Initialization Complete!")
+        self.hide_processing_spinner()
+        GLib.timeout_add_seconds(0.5, self.create_script_list)
+        
+        # Check if there's a command-line file to process after initialization
+        if self.command_line_file:
+            print("Processing command-line file after template initialization")
+            self.process_cli_file_later(self.command_line_file)
+            self.command_line_file = None  # Reset after processing
+
+        #
+        self.set_dynamic_variables()
 
 
 
-
-
-
+###############
+    def initialize_template(self, template_dir, callback, arch='win64'):
+        """
+        Modified template initialization with architecture support
+        """
+        template_dir = Path(template_dir) if not isinstance(template_dir, Path) else template_dir
+        
+        self.create_required_directories()
+        self.initializing_template = True
+        self.stop_processing = False
+        self.current_arch = arch  # Store current architecture
+        
+        # Disabled Cancel/Interruption
+        ## Disconnect open button handler
+        #if self.open_button_handler_id is not None:
+        #    self.open_button.disconnect(self.open_button_handler_id)
+        #    self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_template_init_clicked)
+        self.disconnect_open_button()
         
 
+        # Architecture-specific steps
+        steps = [
+            ("Initializing wineprefix", 
+            f"WINEARCH={arch} WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
+            ("Replace symbolic links with directories", 
+            lambda: self.remove_symlinks_and_create_directories(template_dir)),
+            # ("Installing arial", 
+            # f"WINEPREFIX='{template_dir}' winetricks -q arial"),
+            # ("Installing tahoma", 
+            # f"WINEPREFIX='{template_dir}' winetricks -q tahoma"),
+            # ("Installing times", 
+            # f"WINEPREFIX='{template_dir}' winetricks -q times"),
+            # ("Installing courier", 
+            # f"WINEPREFIX='{template_dir}' winetricks -q courier"),
+            # ("Installing webdings", 
+            # f"WINEPREFIX='{template_dir}' winetricks -q webdings"),
+            # ("Installing openal", 
+            # f"WINEPREFIX='{template_dir}' winetricks -q openal"),
+            #("Installing vkd3d", 
+            #f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
+            #("Installing dxvk", 
+            #f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
+        ]
+        
+        # Set total steps and initialize progress UI
+        self.total_steps = len(steps)
+        self.show_processing_spinner(f"Initializing {template_dir.name} Template...")
+
+        def initialize():
+            for index, (step_text, command) in enumerate(steps, 1):
+                if self.stop_processing:
+                    GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
+                    return
+                    
+                GLib.idle_add(self.show_initializing_step, step_text)
+                try:
+                    if callable(command):
+                        command()
+                    else:
+                        process = subprocess.Popen(command, shell=True, 
+                                                stdout=subprocess.PIPE, 
+                                                stderr=subprocess.PIPE)
+                        while process.poll() is None:
+                            if self.stop_processing:
+                                process.terminate()
+                                try:
+                                    process.wait(timeout=2)
+                                except subprocess.TimeoutExpired:
+                                    process.kill()
+                                GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
+                                return
+                            time.sleep(0.1)
+                        
+                        if process.returncode != 0:
+                            raise subprocess.CalledProcessError(process.returncode, command)
+                    
+                    GLib.idle_add(self.mark_step_as_done, step_text)
+                    if hasattr(self, 'progress_bar'):
+                        GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
+                    
+                except subprocess.CalledProcessError as e:
+                    print(f"Error initializing template: {e}")
+                    GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
+                    return
+                    
+            if not self.stop_processing:
+                GLib.idle_add(lambda: self.on_template_initialized(arch))
+                GLib.idle_add(self.hide_processing_spinner)
+                self.disconnect_open_button()
+                #GLib.idle_add(self.reset_ui_after_template_init)
+        threading.Thread(target=initialize).start()
+
+
+    def on_template_initialized(self, arch=None):
+        print(f"Template initialization complete for {arch if arch else 'default'} architecture.")
+        self.initializing_template = False
+        # Update architecture setting if we were initializing a specific arch
+        if arch:
+            self.arch = arch
+            # Set template path based on architecture
+            self.template = self.default_template_win32 if arch == 'win32' \
+                else self.default_template_win64
+            self.save_settings()
+        
+        # Ensure the spinner is stopped after initialization
+        self.hide_processing_spinner()
+        
+        #self.set_open_button_label("Open")
+        #self.set_open_button_icon_visible(True)
+        #self.search_button.set_sensitive(True)
+        #self.view_toggle_button.set_sensitive(True)
+        
+        # Disabled Cancel/Interruption
+        #if self.open_button_handler_id is not None:
+        #    self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
+
+        print("Template initialization completed and UI updated.")
+        self.show_initializing_step("Initialization Complete!")
+        self.mark_step_as_done("Initialization Complete!")
+        
+
+            
+        ## Check if there's a command-line file to process after initialization
+        #if self.command_line_file:
+        #    print("Processing command-line file after template initialization")
+        #    self.process_cli_file_later(self.command_line_file)
+        #    self.command_line_file = None  # Reset after processing
+
+        # Check if the command_line_file exists and is either .exe or .msi
+        if self.command_line_file:
+            print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+            print(self.command_line_file)
+
+            file_extension = Path(self.command_line_file).suffix.lower()
+            if file_extension in ['.exe', '.msi']:
+                print("A"*100)
+                print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
+                print("Trying to process file inside on template initialized")
+
+                GLib.idle_add(self.show_processing_spinner, "Processing...")
+                self.process_cli_file(self.command_line_file)
+            elif file_extension in ['.wzt', '.bottle', '.prefix']:
+                print("B"*100)
+                self.restore_prefix_bottle_wzt_tar_zst(self.command_line_file)
+
+            else:
+                print("C"*100)
+                print(f"Invalid file type: def on_open: {file_extension}. Only .exe or .msi files are allowed.")
+                GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
+                self.command_line_file = None
+                return False
+
+
+        print("xjxjxjxjxjxjxjxjxjxjxjxjxjxjxjxjxjxjx")
+        # If not called from settings create script list else go to settings
+        if not self.called_from_settings:
+            self.reconnect_open_button()
+            GLib.timeout_add_seconds(0.5, self.create_script_list)
+        
+        if self.called_from_settings:
+            print("jx"*20)
+            GLib.idle_add(lambda: self.replace_open_button_with_settings())
+            self.show_options_for_settings()
+        #self.set_dynamic_variables()
+        #self.disconnect_open_button()
+        #self.reconnect_open_button()
+        #self.show_options_for_settings()
+        #self.revert_open_button()
+        #self.called_from_settings = False
+
+    def process_cli_file_later(self, file_path):
+        #self.create_main_window()
+        print("D"*100)
+        # Use GLib.idle_add to ensure this runs after the main loop starts
+        #GLib.idle_add(self.show_processing_spinner, "hello world")
+                # Check if the command_line_file exists and is either .exe or .msi
+        if file_path:
+            print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+            print(file_path)
+
+            file_extension = Path(file_path).suffix.lower()
+            if file_extension in ['.exe', '.msi']:
+                print("A"*100)
+                print(f"Processing file: {file_path} (Valid extension: {file_extension})")
+                print("Trying to process file inside on template initialized")
+
+                GLib.idle_add(self.show_processing_spinner, "Processing")
+                self.process_cli_file_in_thread(file_path)
+            elif file_extension in ['.wzt', '.bottle', '.prefix']:
+                print("B"*100)
+                GLib.idle_add(self.show_processing_spinner, "Restoring")
+                self.restore_prefix_bottle_wzt_tar_zst(file_path)
+
+            else:
+                print("C"*100)
+                print(f"Invalid file type: def on_open: {file_extension}. Only .exe or .msi files are allowed.")
+                GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
+                self.command_line_file = None
+                return False
+
+
+
+
+
+
+
+
+
+
 def parse_args():
+    WineCharmApp().print_method_name()
     """
     Parse command-line arguments.
     """
     parser = argparse.ArgumentParser(description="WineCharm GUI application or headless mode for .charm files")
-    parser.add_argument('file', nargs='?', help="Path to the .exe, .msi, or .charm file")
+    parser.add_argument('file', nargs='?', help="Path to the .exe, .msi, .charm, .bottle, .prefix, or .wzt file")
     return parser.parse_args()
-    
+
 def main():
+
+    WineCharmApp().print_method_name()
     args = parse_args()
 
     # Create an instance of WineCharmApp
@@ -10514,7 +11443,7 @@ def main():
                     sys.exit(1)
 
                 # Extract additional environment and arguments
-                
+
                 # if .charm file has script_path use it
                 wineprefix_path_candidate = script_data.get('script_path')
 
@@ -10526,7 +11455,7 @@ def main():
 
                 # Resolve the final wineprefix path
                 wineprefix = Path(wineprefix_path_candidate).parent.expanduser().resolve()
-                
+
                 env_vars = script_data.get("env_vars", "").strip()
                 script_args = script_data.get("args", "").strip()
                 runner = script_data.get("runner", "wine")
@@ -10580,8 +11509,8 @@ def main():
                 print(f"Error: Unable to launch the .charm script: {e}")
                 sys.exit(1)
 
-        # For .exe or .msi files, validate the file type and continue with GUI mode
-        elif file_extension in ['.exe', '.msi']:
+        # For .exe, .msi, .bottle, .prefix, or .wzt files, handle via GUI mode
+        elif file_extension in ['.exe', '.msi', '.bottle', '.prefix', '.wzt']:
             if app.SOCKET_FILE.exists():
                 try:
                     # Send the file to an existing running instance
@@ -10598,40 +11527,42 @@ def main():
             app.command_line_file = args.file
 
         else:
-            # Invalid file type, print error and handle accordingly
-            print(f"Invalid file type: {file_extension}. Only .exe, .msi, or .charm files are allowed.")
-            
-            # If no instance is running, start WineCharmApp and show the error dialog directly
-            if not app.SOCKET_FILE.exists():
-                app.start_socket_server()
-                GLib.timeout_add_seconds(1.5, app.show_info_dialog, "Invalid File Type", f"Only .exe, .msi, or .charm files are allowed. You provided: {file_extension}")
-                app.run(sys.argv)
-
-                # Clean up the socket file
-                if app.SOCKET_FILE.exists():
-                    app.SOCKET_FILE.unlink()
+            # Check if it's a supported backup file type
+            if file_extension in ['.bottle', '.prefix', '.wzt']:
+                app.command_line_file = args.file
             else:
-                # If an instance is running, send the error message to the running instance
-                try:
-                    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
-                        client.connect(str(app.SOCKET_FILE))
-                        message = f"show_dialog||Invalid file type: {file_extension}||Only .exe, .msi, or .charm files are allowed."
-                        client.sendall(message.encode())
-                    return
-                except ConnectionRefusedError:
-                    print("No existing instance found, starting a new one.")
-            
-            # Return early to skip further processing
-            return
+                # Invalid file type, print error and handle accordingly
+                print(f"Invalid file type: {file_extension}. Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed.")
+
+                # If no instance is running, start WineCharmApp and show the error dialog directly
+                if not app.SOCKET_FILE.exists():
+                    app.start_socket_server()
+                    GLib.timeout_add_seconds(1.5, app.show_info_dialog, "Invalid File Type", f"Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You provided: {file_extension}")
+                    app.run(sys.argv)
+
+                    # Clean up the socket file
+                    if app.SOCKET_FILE.exists():
+                        app.SOCKET_FILE.unlink()
+                else:
+                    # If an instance is running, send the error message to the running instance
+                    try:
+                        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+                            client.connect(str(app.SOCKET_FILE))
+                            message = f"show_dialog||Invalid file type: {file_extension}||Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed."
+                            client.sendall(message.encode())
+                        return
+                    except ConnectionRefusedError:
+                        print("No existing instance found, starting a new one.")
+
+                # Return early to skip further processing
+                return
 
     # Start the socket server and run the application (GUI mode)
+    if args.file and file_extension in ['.bottle', '.prefix', '.wzt']:
+        app.command_line_file = args.file
     app.start_socket_server()
     app.run(sys.argv)
 
-    # Clean up the socket file
-    if app.SOCKET_FILE.exists():
-        app.SOCKET_FILE.unlink()
 
 if __name__ == "__main__":
     main()
-
