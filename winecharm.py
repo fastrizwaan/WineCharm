@@ -49,7 +49,7 @@ class WineCharmApp(Gtk.Application):
         
         # Move the global variables to instance attributes
         self.debug = False
-        self.version = "0.96"
+        self.version = "0.97"
         # Paths and directories
         self.winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
         self.prefixes_dir = self.winecharmdir / "Prefixes"
@@ -335,94 +335,37 @@ class WineCharmApp(Gtk.Application):
         return Path("/app/share/icons/hicolor/128x128/apps/org.winehq.Wine.png")
 
     def on_startup(self, app):
-        self.print_method_name()
         self.create_main_window()
+        # Clear or initialize the script list
+        self.set_dynamic_variables()
         self.script_list = {}
         self.load_script_list()
-
-        self.single_prefix = False
-        self.load_settings()
-        print(f"Single Prefix: {self.single_prefix}")
-
-        def initialize_template_if_needed(template_path, arch, single_prefix_dir=None):
-            self.print_method_name()
-            if not template_path.exists():
-                self.set_open_button_label("Initializing")
-                print(f"Initializing {arch} template...")
-                self.initialize_template(template_path, self.on_template_initialized, arch=arch)
-                return True
-            elif self.single_prefix and single_prefix_dir and not single_prefix_dir.exists():
-                print(f"Copying {arch} template to single prefix...")
-                self.copy_template(single_prefix_dir)
-            return False
-
-        # Corrected conditions: Only check current arch when single_prefix is False
-        arch_templates = []
-        if self.single_prefix:
-            # Check both templates if single_prefix is enabled
-            arch_templates = [
-                (True, self.default_template_win32, 'win32', self.single_prefix_dir_win32),
-                (True, self.default_template_win64, 'win64', self.single_prefix_dir_win64)
-            ]
-        else:
-            # Check only the current arch's template
-            if self.arch == 'win32':
-                arch_templates = [
-                    (True, self.default_template_win32, 'win32', self.single_prefix_dir_win32)
-                ]
-            else:
-                arch_templates = [
-                    (True, self.default_template_win64, 'win64', self.single_prefix_dir_win64)
-                ]
-
-        needs_initialization = False
-        for check, template, arch, single_dir in arch_templates:
-            if check:
-                needs_initialization |= initialize_template_if_needed(template, arch, single_dir)
-
-        if not needs_initialization:
-            self.create_script_list()
-            self.set_dynamic_variables()
-            #if self.command_line_file:
-            #    print("Processing command-line file after UI initialization")
-            #    self.process_cli_file_later(self.command_line_file)
-
-            # Check if the command_line_file exists and is either .exe or .msi
-            if self.command_line_file:
-                print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-                print(self.command_line_file)
-
-                file_extension = Path(self.command_line_file).suffix.lower()
-                if file_extension in ['.exe', '.msi']:
-                    print("A"*100)
-                    print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
-                    print("Trying to process file inside on template initialized")
-
-                    GLib.idle_add(self.show_processing_spinner)
-                    self.process_cli_file_later(self.command_line_file)
-                elif file_extension in ['.wzt', '.bottle', '.prefix']:
-                    print("B"*100)
-                    self.restore_prefix_bottle_wzt_tar_zst(self.command_line_file)
-
-                else:
-                    print("C"*100)
-                    print(f"Invalid file type: def on_open: {file_extension}. Only .exe or .msi files are allowed.")
-                    GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
-                    self.command_line_file = None
-                    return False
-        print(" | "*50)
         self.create_script_list()
+
+        if not self.template:
+            self.template = getattr(self, f'default_template_{self.arch}')
+            self.template = self.expand_and_resolve_path(self.template)
 
 
         missing_programs = self.check_required_programs()
         if missing_programs:
             self.show_missing_programs_dialog(missing_programs)
-        
+        else:
+            if not self.template.exists():
+                self.initialize_template(self.template, self.on_template_initialized)
+            else:
+                self.set_dynamic_variables()
+                # Process the command-line file if the template already exists
+                if self.command_line_file:
+                    print("Template exists. Processing command-line file after UI initialization.")
+                    self.process_cli_file_later(self.command_line_file)
+        # After loading scripts and building the UI, check for running processes
         self.check_running_processes_on_startup()
+
+        # Start fetching runner URLs asynchronously
         threading.Thread(target=self.maybe_fetch_runner_urls).start()
 
     def remove_symlinks_and_create_directories(self, wineprefix):
-        self.print_method_name()
         """
         Remove all symbolic link files in the specified directory (drive_c/users/{user}) and 
         create normal directories in their place.
@@ -449,8 +392,8 @@ class WineCharmApp(Gtk.Application):
                 except Exception as e:
                     print(f"Error processing {item}: {e}")
 
+
     def initialize_template(self, template_dir, callback, arch='win64'):
-        self.print_method_name()
         """
         Modified template initialization with architecture support
         """
@@ -477,6 +420,14 @@ class WineCharmApp(Gtk.Application):
             lambda: self.remove_symlinks_and_create_directories(template_dir)),
             ("Installing arial", 
             f"WINEPREFIX='{template_dir}' winetricks -q arial"),
+            # ("Installing tahoma", 
+            # f"WINEPREFIX='{template_dir}' winetricks -q tahoma"),
+            # ("Installing times", 
+            # f"WINEPREFIX='{template_dir}' winetricks -q times"),
+            # ("Installing courier", 
+            # f"WINEPREFIX='{template_dir}' winetricks -q courier"),
+            # ("Installing webdings", 
+            # f"WINEPREFIX='{template_dir}' winetricks -q webdings"),
             ("Installing openal", 
             f"WINEPREFIX='{template_dir}' winetricks -q openal"),
             #("Installing vkd3d", 
@@ -490,7 +441,6 @@ class WineCharmApp(Gtk.Application):
         self.show_processing_spinner(f"Initializing {template_dir.name} Template...")
 
         def initialize():
-            self.print_method_name()
             for index, (step_text, command) in enumerate(steps, 1):
                 if self.stop_processing:
                     GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
@@ -531,14 +481,12 @@ class WineCharmApp(Gtk.Application):
                 GLib.idle_add(lambda: self.on_template_initialized(arch))
                 GLib.idle_add(self.hide_processing_spinner)
                 self.disconnect_open_button()
-                GLib.idle_add(self.reset_ui_after_template_init)
+                #GLib.idle_add(self.reset_ui_after_template_init)
         threading.Thread(target=initialize).start()
 
     def on_template_initialized(self, arch=None):
-        self.print_method_name()
         print(f"Template initialization complete for {arch if arch else 'default'} architecture.")
         self.initializing_template = False
-        
         # Update architecture setting if we were initializing a specific arch
         if arch:
             self.arch = arch
@@ -552,8 +500,8 @@ class WineCharmApp(Gtk.Application):
         
         #self.set_open_button_label("Open")
         #self.set_open_button_icon_visible(True)
-        self.search_button.set_sensitive(True)
-        self.view_toggle_button.set_sensitive(True)
+        #self.search_button.set_sensitive(True)
+        #self.view_toggle_button.set_sensitive(True)
         
         # Disabled Cancel/Interruption
         #if self.open_button_handler_id is not None:
@@ -563,20 +511,6 @@ class WineCharmApp(Gtk.Application):
         self.show_initializing_step("Initialization Complete!")
         self.mark_step_as_done("Initialization Complete!")
         
-        # If not called from settings create script list else go to settings
-        if not self.called_from_settings:
-            GLib.timeout_add_seconds(0.5, self.create_script_list)
-        
-        if self.called_from_settings:
-            self.on_template_restore_completed()
-            
-        ## Check if there's a command-line file to process after initialization
-        #if self.command_line_file:
-        #    print("Processing command-line file after template initialization")
-        #    self.process_cli_file_later(self.command_line_file)
-        #    self.command_line_file = None  # Reset after processing
-
-        # Check if the command_line_file exists and is either .exe or .msi
         if self.command_line_file:
             print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
             print(self.command_line_file)
@@ -587,8 +521,8 @@ class WineCharmApp(Gtk.Application):
                 print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
                 print("Trying to process file inside on template initialized")
 
-                GLib.idle_add(self.show_processing_spinner, "on_template_initialized")
-                self.process_cli_file_in_thread(self.command_line_file)
+                GLib.idle_add(self.show_processing_spinner, "Processing...")
+                self.process_cli_file(self.command_line_file)
             elif file_extension in ['.wzt', '.bottle', '.prefix']:
                 print("B"*100)
                 self.restore_prefix_bottle_wzt_tar_zst(self.command_line_file)
@@ -600,30 +534,27 @@ class WineCharmApp(Gtk.Application):
                 self.command_line_file = None
                 return False
 
-
+        # If not called from settings create script list else go to settings
         if not self.called_from_settings:
+            self.reconnect_open_button()
             GLib.timeout_add_seconds(0.5, self.create_script_list)
         
         if self.called_from_settings:
+            GLib.idle_add(lambda: self.replace_open_button_with_settings())
             self.show_options_for_settings()
-            self.called_from_settings = False
-
-        self.set_dynamic_variables()
+        #self.set_dynamic_variables()
+        #self.disconnect_open_button()
         #self.reconnect_open_button()
+        #self.show_options_for_settings()
+        #self.revert_open_button()
+        #self.called_from_settings = False
         
 
     def process_cli_file_later(self, file_path):
-        self.count = 0
-        self.print_method_name()
-        #__init__()
         #self.create_main_window()
         print("D"*100)
-        # Use GLib.idle_add to ensure this runs after the main loop starts
-        #GLib.idle_add(self.show_processing_spinner, "hello world")
-                # Check if the command_line_file exists and is either .exe or .msi
+
         if file_path:
-            print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-            print(file_path)
 
             file_extension = Path(file_path).suffix.lower()
             if file_extension in ['.exe', '.msi']:
@@ -644,7 +575,7 @@ class WineCharmApp(Gtk.Application):
                 GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
                 self.command_line_file = None
                 return False
-        #GLib.idle_add(self.process_cli_file_in_thread, file_path)
+
         self.create_script_list()
 
     def set_open_button_label(self, label_text):
@@ -1356,25 +1287,20 @@ class WineCharmApp(Gtk.Application):
             self.monitoring_active = True
 
     def process_cli_file_in_thread(self, file_path):
-        self.print_method_name()
-        """
-        Process CLI file in a background thread with proper Path handling
-        """
         try:
             print(f"Processing CLI file in thread: {file_path}")
-            file_path = Path(file_path) if not isinstance(file_path, Path) else file_path
-            abs_file_path = file_path.resolve()
+            abs_file_path = str(Path(file_path).resolve())
             print(f"Resolved absolute CLI file path: {abs_file_path}")
 
-            if not abs_file_path.exists():
-                ext = abs_file_path.suffix.lower()
-                if ext in ['.bottle', '.prefix', '.wzt']:
-                    GLib.idle_add(self.restore_prefix_bottle_wzt_tar_zst, str(abs_file_path))
-                else:
-                    self.create_yaml_file(str(abs_file_path), None)
-            else:
+            if not Path(abs_file_path).exists():
                 print(f"File does not exist: {abs_file_path}")
                 return
+
+            # Perform the heavy processing here
+            self.create_yaml_file(abs_file_path, None)
+
+            # Schedule GUI updates in the main thread
+            #GLib.idle_add(self.update_gui_after_file_processing, abs_file_path)
 
         except Exception as e:
             print(f"Error processing file in background: {e}")
@@ -1383,7 +1309,7 @@ class WineCharmApp(Gtk.Application):
                 pass  # Keep showing spinner
             else:
                 GLib.idle_add(self.hide_processing_spinner)
-
+            
             GLib.timeout_add_seconds(0.5, self.create_script_list)
 
     def on_back_button_clicked(self, button):
@@ -2856,7 +2782,7 @@ class WineCharmApp(Gtk.Application):
         """
         # Logic to determine the program name based on exe name and product name
         if "setup" in exe_name.lower() or "install" in exe_name.lower():
-            return productname + ' Setup'
+            return productname + '*'
         elif "setup" in productname.lower() or "install" in productname.lower():
             return productname
         else:
@@ -5334,78 +5260,35 @@ class WineCharmApp(Gtk.Application):
         # Run the server in a separate thread
         threading.Thread(target=server_thread, daemon=True).start()
 
+    def process_cli_file(self, file_path):
+        print(f"Processing CLI file: {file_path}")
+        abs_file_path = str(Path(file_path).resolve())
+        print(f"Resolved absolute CLI file path: {abs_file_path}")
+
+        try:
+            if not Path(abs_file_path).exists():
+                print(f"File does not exist: {abs_file_path}")
+                return
+            self.create_yaml_file(abs_file_path, None)
+
+        except Exception as e:
+            print(f"Error processing file: {e}")
+        finally:
+            if self.initializing_template:
+                pass  # Keep showing spinner
+            else:
+                GLib.timeout_add_seconds(1, self.hide_processing_spinner)
+                
+            GLib.timeout_add_seconds(0.5, self.create_script_list)
 
     def initialize_app(self):
-        self.count = 0
-        print("--------------- INITIALIZE_APP ------------------")
-        self.print_method_name()
+        
         if not hasattr(self, 'window') or not self.window:
             # Call the startup code
             self.create_main_window()
-            #self.create_script_list()
-            #self.check_running_processes_and_update_buttons()
-            
-            missing_programs = self.check_required_programs()
-            if missing_programs:
-                self.show_missing_programs_dialog(missing_programs)
-            else:
-                # if not self.default_template.exists() and not self.single_prefix:
-                #     self.initialize_template(self.default_template, self.on_template_initialized)
-                # if not self.default_template.exists() and self.single_prefix:
-                #     self.initialize_template(self.default_template, self.on_template_initialized)
-                #     self.copy_template(self.single_prefixes_dir)
-                # elif self.default_template.exists() and not self.single_prefixes_dir.exists() and self.single_prefix:
-                #     self.copy_template(self.single_prefixes_dir)
-                # else:
-                #     self.set_dynamic_variables()
+            self.create_script_list()
 
-                self.set_dynamic_variables()
-
-    def process_cli_file_in_thread(self, file_path):
-        self.print_method_name()
-        """Process CLI file in a background thread with step-based progress"""
-        self.stop_processing = False
-        
-        GLib.idle_add(lambda: self.show_processing_spinner("Processing..."))
-        steps = [
-            ("Creating configuration", lambda: self.create_yaml_file(str(file_path), None)),
-        ]
-        try:
-            # Show progress bar and initialize UI
-            self.total_steps = len(steps)
-            
-            # Process each step
-            for index, (step_text, step_func) in enumerate(steps, 1):
-                if self.stop_processing:
-                    return
-                    
-                # Update progress bar
-                GLib.idle_add(lambda i=index: self.progress_bar.set_fraction((i-1)/self.total_steps))
-                #GLib.idle_add(lambda t=step_text: self.set_open_button_label(t))
-                
-                try:
-                    # Execute the step
-                    step_func()
-                    # Update progress after step completion
-                    GLib.idle_add(lambda i=index: self.progress_bar.set_fraction(i/self.total_steps))
-                except Exception as e:
-                    print(f"Error during step '{step_text}': {e}")
-                    GLib.idle_add(lambda: self.show_info_dialog("Error", f"An error occurred during '{step_text}': {e}"))
-                    return
-
-        except Exception as e:
-            print(f"Error during file processing: {e}")
-            GLib.idle_add(lambda: self.show_info_dialog("Error", f"Processing failed: {e}"))
-        finally:
-            # Clean up and update UI
-            def cleanup():
-                self.print_method_name()
-                if not self.initializing_template:
-                    self.hide_processing_spinner()
-                self.create_script_list()
-                return False
-            
-            GLib.timeout_add(500, cleanup)
+        self.set_dynamic_variables()
 
 
     def show_processing_spinner(self, label_text):
@@ -5467,96 +5350,29 @@ class WineCharmApp(Gtk.Application):
             print(f"Error in hide_processing_spinner: {e}")
 
     def on_open(self, app, files, *args):
-        print("---------------------- ON_OPEN ------------------")
-        self.count = 0
-        self.print_method_name()
         # Ensure the application is fully initialized
         #print("1. on_open method called")
-
+        
         # Initialize the application if it hasn't been already
         self.initialize_app()
         #print("2. self.initialize_app initiated")
-
+        
         # Present the window as soon as possible
         GLib.idle_add(self.window.present)
         #print("3. self.window.present() Complete")
 
-        self.script_list = {}
-        self.load_script_list()
+        #self.check_running_processes_and_update_buttons()
+        if not self.template:
+            self.template = getattr(self, f'default_template_{self.arch}')
+            #print("77777777777777777777777777777777777777777777777777777777777777777")
+            #print(self.template)
+            self.template = self.expand_and_resolve_path(self.template)
+            #print(self.template)
 
-        self.single_prefix = False
-        self.load_settings()
-        print(f"Single Prefix: {self.single_prefix}")
+        missing_programs = self.check_required_programs()
+        if missing_programs:
+            self.show_missing_programs_dialog(missing_programs)
 
-        def initialize_template_if_needed(template_path, arch, single_prefix_dir=None):
-            self.print_method_name()
-            if not template_path.exists():
-                self.initializing_template = True
-                self.set_open_button_label("Initializing")
-                print(f"Initializing {arch} template...")
-                self.initialize_template(template_path, self.on_template_initialized, arch=arch)
-                return True
-            elif self.single_prefix and single_prefix_dir and not single_prefix_dir.exists():
-                print(f"Copying {arch} template to single prefix...")
-                self.copy_template(single_prefix_dir)
-            return False
-
-        # Corrected conditions: Only check current arch when single_prefix is False
-        arch_templates = []
-        if self.single_prefix:
-            # Check both templates if single_prefix is enabled
-            arch_templates = [
-                (True, self.default_template_win32, 'win32', self.single_prefix_dir_win32),
-                (True, self.default_template_win64, 'win64', self.single_prefix_dir_win64)
-            ]
-        else:
-            # Check only the current arch's template
-            if self.arch == 'win32':
-                arch_templates = [
-                    (True, self.default_template_win32, 'win32', self.single_prefix_dir_win32)
-                ]
-            else:
-                arch_templates = [
-                    (True, self.default_template_win64, 'win64', self.single_prefix_dir_win64)
-                ]
-
-        needs_initialization = False
-        for check, template, arch, single_dir in arch_templates:
-            if check:
-                needs_initialization |= initialize_template_if_needed(template, arch, single_dir)
-
-        if not needs_initialization:
-            self.create_script_list()
-            self.set_dynamic_variables()
-            #if self.command_line_file:
-            #    print("Processing command-line file after UI initialization")
-            #    self.process_cli_file_later(self.command_line_file)
-
-            # Check if the command_line_file exists and is either .exe or .msi
-            if self.command_line_file:
-                print("+++++++++++++++++++  On Open  ++++++++++++++++++++++++++++++")
-                print(self.command_line_file)
-
-                file_extension = Path(self.command_line_file).suffix.lower()
-                if file_extension in ['.exe', '.msi']:
-                    print("A"*100)
-                    print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
-                    print("Trying to process file inside on template initialized")
-
-                    GLib.idle_add(self.show_processing_spinner, "if not needs_initialization:")
-                    self.process_cli_file_later(self.command_line_file)
-                elif file_extension in ['.wzt', '.bottle', '.prefix']:
-                    print("B"*100)
-                    self.restore_prefix_bottle_wzt_tar_zst(self.command_line_file)
-
-                else:
-                    print("C"*100)
-                    print(f"Invalid file type: def on_open: {file_extension}. Only .exe or .msi files are allowed.")
-                    GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
-                    self.command_line_file = None
-                    return False
-
-        print(" = "*50)
         self.check_running_processes_on_startup()
 
         
@@ -10962,436 +10778,17 @@ class WineCharmApp(Gtk.Application):
 ###################### 0.95
 
 
-    def initialize_app(self):
-        
-        if not hasattr(self, 'window') or not self.window:
-            # Call the startup code
-            self.create_main_window()
-            self.create_script_list()
-            
-
-
-    def process_cli_file(self, file_path):
-        print(f"Processing CLI file: {file_path}")
-        abs_file_path = str(Path(file_path).resolve())
-        print(f"Resolved absolute CLI file path: {abs_file_path}")
-
-        try:
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-            self.create_yaml_file(abs_file_path, None)
-
-        except Exception as e:
-            print(f"Error processing file: {e}")
-        finally:
-            if self.initializing_template:
-                pass  # Keep showing spinner
-            else:
-                GLib.timeout_add_seconds(1, self.hide_processing_spinner)
-                
-            GLib.timeout_add_seconds(0.5, self.create_script_list)
-
-
-    def on_open(self, app, files, *args):
-        # Ensure the application is fully initialized
-        #print("1. on_open method called")
-        
-        # Initialize the application if it hasn't been already
-        self.initialize_app()
-        #print("2. self.initialize_app initiated")
-        
-        # Present the window as soon as possible
-        GLib.idle_add(self.window.present)
-        #print("3. self.window.present() Complete")
-
-        #self.check_running_processes_and_update_buttons()
-        if not self.template:
-            self.template = getattr(self, f'default_template_{self.arch}')
-            #print("77777777777777777777777777777777777777777777777777777777777777777")
-            #print(self.template)
-            self.template = self.expand_and_resolve_path(self.template)
-            #print(self.template)
-
-        missing_programs = self.check_required_programs()
-        if missing_programs:
-            self.show_missing_programs_dialog(missing_programs)
-
-        self.set_dynamic_variables()
-
-        self.check_running_processes_on_startup()
-
-
-    def process_cli_file_in_thread(self, file_path):
-        try:
-            print(f"Processing CLI file in thread: {file_path}")
-            abs_file_path = str(Path(file_path).resolve())
-            print(f"Resolved absolute CLI file path: {abs_file_path}")
-
-            if not Path(abs_file_path).exists():
-                print(f"File does not exist: {abs_file_path}")
-                return
-
-            # Perform the heavy processing here
-            self.create_yaml_file(abs_file_path, None)
-
-            # Schedule GUI updates in the main thread
-            #GLib.idle_add(self.update_gui_after_file_processing, abs_file_path)
-
-        except Exception as e:
-            print(f"Error processing file in background: {e}")
-        finally:
-            if self.initializing_template:
-                pass  # Keep showing spinner
-            else:
-                GLib.idle_add(self.hide_processing_spinner)
-            
-            GLib.timeout_add_seconds(0.5, self.create_script_list)
-
-
-    def process_cli_file_later(self, file_path):
-        # Use GLib.idle_add to ensure this runs after the main loop starts
-        GLib.idle_add(self.show_processing_spinner, "Processing2...")
-        GLib.idle_add(self.process_cli_file, file_path)
-
-        #self.default_template_win64 = self.templates_dir / "WineCharm-win64"
-        #self.default_template_win32 = self.templates_dir / "WineCharm-win32"
-
-    def on_startup(self, app):
-        self.create_main_window()
-        # Clear or initialize the script list
-        self.set_dynamic_variables()
-        self.script_list = {}
-        self.load_script_list()
-        self.create_script_list()
-
-        if not self.template:
-            self.template = getattr(self, f'default_template_{self.arch}')
-            self.template = self.expand_and_resolve_path(self.template)
-
-
-        missing_programs = self.check_required_programs()
-        if missing_programs:
-            self.show_missing_programs_dialog(missing_programs)
-        else:
-            if not self.template.exists():
-                self.initialize_template(self.template, self.on_template_initialized)
-            else:
-                self.set_dynamic_variables()
-                # Process the command-line file if the template already exists
-                if self.command_line_file:
-                    print("Template exists. Processing command-line file after UI initialization.")
-                    self.process_cli_file_later(self.command_line_file)
-        # After loading scripts and building the UI, check for running processes
-        self.check_running_processes_on_startup()
-
-        # Start fetching runner URLs asynchronously
-        threading.Thread(target=self.maybe_fetch_runner_urls).start()
-
-
-    def remove_symlinks_and_create_directories(self, wineprefix):
-        """
-        Remove all symbolic link files in the specified directory (drive_c/users/{user}) and 
-        create normal directories in their place.
-        
-        Args:
-            wineprefix: The path to the Wine prefix where symbolic links will be removed.
-        """
-        userhome = os.getenv("USER") or os.getenv("USERNAME")
-        if not userhome:
-            print("Error: Unable to determine the current user from environment.")
-            return
-        
-        user_dir = Path(wineprefix) / "drive_c" / "users"
-        print(f"Removing symlinks from: {user_dir}")
-
-        # Iterate through all symbolic links in the user's directory
-        for item in user_dir.rglob("*"):
-            if item.is_symlink():
-                try:
-                    # Remove the symlink and create a directory in its place
-                    item.unlink()
-                    item.mkdir(parents=True, exist_ok=True)
-                    print(f"Replaced symlink with directory: {item}")
-                except Exception as e:
-                    print(f"Error processing {item}: {e}")
-
-    def initialize_template(self, template_dir, callback):
-        self.create_required_directories()
-        self.initializing_template = True
-        if self.open_button_handler_id is not None:
-            self.open_button.disconnect(self.open_button_handler_id)
-
-        #self.spinner = Gtk.Spinner()
-        #self.spinner.start()
-        #self.open_button_box.append(self.spinner)
-
-        self.set_open_button_label("Initializing...")
-        self.set_open_button_icon_visible(False)  # Hide the open-folder icon
-        self.search_button.set_sensitive(False)  # Disable the search button
-        self.view_toggle_button.set_sensitive(False)
-        self.ensure_directory_exists(template_dir)
-
-        steps = [
-            ("Initializing wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-            ("Replace symbolic links with directories", lambda: self.remove_symlinks_and_create_directories(template_dir)),
-            #("Installing corefonts",    f"WINEPREFIX='{template_dir}' winetricks -q corefonts"),
-            ("Installing openal",       f"WINEPREFIX='{template_dir}' winetricks -q openal"),
-            #("Installing vkd3d",        f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-            #("Installing dxvk",         f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
-            #("Installing vcrun2005",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2005"),
-            #("Installing vcrun2019",    f"WINEPREFIX='{template_dir}' winetricks -q vcrun2019"),
-        ]
-
-        def initialize():
-            for step_text, command in steps:
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    if callable(command):
-                        # If the command is a callable, invoke it directly
-                        command()
-                    else:
-                        # Run the command in the shell
-                        subprocess.run(command, shell=True, check=True)
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                except subprocess.CalledProcessError as e:
-                    print(f"Error initializing template: {e}")
-                    break
-            GLib.idle_add(callback)
-
-        threading.Thread(target=initialize).start()
-
-    def on_template_initialized(self):
-        print("Template initialization complete.")
-        self.initializing_template = False
-        
-        # Ensure the spinner is stopped after initialization
-        self.hide_processing_spinner()
-        
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)
-        self.search_button.set_sensitive(True)
-        self.view_toggle_button.set_sensitive(True)
-        
-        if self.open_button_handler_id is not None:
-            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
-
-        print("Template initialization completed and UI updated.")
-        self.show_initializing_step("Initialization Complete!")
-        self.mark_step_as_done("Initialization Complete!")
-        self.hide_processing_spinner()
-        GLib.timeout_add_seconds(0.5, self.create_script_list)
-        
-        # Check if there's a command-line file to process after initialization
-        if self.command_line_file:
-            print("Processing command-line file after template initialization")
-            self.process_cli_file_later(self.command_line_file)
-            self.command_line_file = None  # Reset after processing
-
-        #
-        self.set_dynamic_variables()
-
-
-
-###############
-    def initialize_template(self, template_dir, callback, arch='win64'):
-        """
-        Modified template initialization with architecture support
-        """
-        template_dir = Path(template_dir) if not isinstance(template_dir, Path) else template_dir
-        
-        self.create_required_directories()
-        self.initializing_template = True
-        self.stop_processing = False
-        self.current_arch = arch  # Store current architecture
-        
-        # Disabled Cancel/Interruption
-        ## Disconnect open button handler
-        #if self.open_button_handler_id is not None:
-        #    self.open_button.disconnect(self.open_button_handler_id)
-        #    self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_template_init_clicked)
-        self.disconnect_open_button()
-        
-
-        # Architecture-specific steps
-        steps = [
-            ("Initializing wineprefix", 
-            f"WINEARCH={arch} WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-            ("Replace symbolic links with directories", 
-            lambda: self.remove_symlinks_and_create_directories(template_dir)),
-            # ("Installing arial", 
-            # f"WINEPREFIX='{template_dir}' winetricks -q arial"),
-            # ("Installing tahoma", 
-            # f"WINEPREFIX='{template_dir}' winetricks -q tahoma"),
-            # ("Installing times", 
-            # f"WINEPREFIX='{template_dir}' winetricks -q times"),
-            # ("Installing courier", 
-            # f"WINEPREFIX='{template_dir}' winetricks -q courier"),
-            # ("Installing webdings", 
-            # f"WINEPREFIX='{template_dir}' winetricks -q webdings"),
-            # ("Installing openal", 
-            # f"WINEPREFIX='{template_dir}' winetricks -q openal"),
-            #("Installing vkd3d", 
-            #f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-            #("Installing dxvk", 
-            #f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
-        ]
-        
-        # Set total steps and initialize progress UI
-        self.total_steps = len(steps)
-        self.show_processing_spinner(f"Initializing {template_dir.name} Template...")
-
-        def initialize():
-            for index, (step_text, command) in enumerate(steps, 1):
-                if self.stop_processing:
-                    GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
-                    return
-                    
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    if callable(command):
-                        command()
-                    else:
-                        process = subprocess.Popen(command, shell=True, 
-                                                stdout=subprocess.PIPE, 
-                                                stderr=subprocess.PIPE)
-                        while process.poll() is None:
-                            if self.stop_processing:
-                                process.terminate()
-                                try:
-                                    process.wait(timeout=2)
-                                except subprocess.TimeoutExpired:
-                                    process.kill()
-                                GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
-                                return
-                            time.sleep(0.1)
-                        
-                        if process.returncode != 0:
-                            raise subprocess.CalledProcessError(process.returncode, command)
-                    
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                    if hasattr(self, 'progress_bar'):
-                        GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
-                    
-                except subprocess.CalledProcessError as e:
-                    print(f"Error initializing template: {e}")
-                    GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
-                    return
-                    
-            if not self.stop_processing:
-                GLib.idle_add(lambda: self.on_template_initialized(arch))
-                GLib.idle_add(self.hide_processing_spinner)
-                self.disconnect_open_button()
-                #GLib.idle_add(self.reset_ui_after_template_init)
-        threading.Thread(target=initialize).start()
-
-
-    def on_template_initialized(self, arch=None):
-        print(f"Template initialization complete for {arch if arch else 'default'} architecture.")
-        self.initializing_template = False
-        # Update architecture setting if we were initializing a specific arch
-        if arch:
-            self.arch = arch
-            # Set template path based on architecture
-            self.template = self.default_template_win32 if arch == 'win32' \
-                else self.default_template_win64
-            self.save_settings()
-        
-        # Ensure the spinner is stopped after initialization
-        self.hide_processing_spinner()
-        
-        #self.set_open_button_label("Open")
-        #self.set_open_button_icon_visible(True)
-        #self.search_button.set_sensitive(True)
-        #self.view_toggle_button.set_sensitive(True)
-        
-        # Disabled Cancel/Interruption
-        #if self.open_button_handler_id is not None:
-        #    self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
-
-        print("Template initialization completed and UI updated.")
-        self.show_initializing_step("Initialization Complete!")
-        self.mark_step_as_done("Initialization Complete!")
-        
 
             
-        ## Check if there's a command-line file to process after initialization
-        #if self.command_line_file:
-        #    print("Processing command-line file after template initialization")
-        #    self.process_cli_file_later(self.command_line_file)
-        #    self.command_line_file = None  # Reset after processing
-
-        # Check if the command_line_file exists and is either .exe or .msi
-        if self.command_line_file:
-            print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-            print(self.command_line_file)
-
-            file_extension = Path(self.command_line_file).suffix.lower()
-            if file_extension in ['.exe', '.msi']:
-                print("A"*100)
-                print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
-                print("Trying to process file inside on template initialized")
-
-                GLib.idle_add(self.show_processing_spinner, "Processing...")
-                self.process_cli_file(self.command_line_file)
-            elif file_extension in ['.wzt', '.bottle', '.prefix']:
-                print("B"*100)
-                self.restore_prefix_bottle_wzt_tar_zst(self.command_line_file)
-
-            else:
-                print("C"*100)
-                print(f"Invalid file type: def on_open: {file_extension}. Only .exe or .msi files are allowed.")
-                GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
-                self.command_line_file = None
-                return False
 
 
-        print("xjxjxjxjxjxjxjxjxjxjxjxjxjxjxjxjxjxjx")
-        # If not called from settings create script list else go to settings
-        if not self.called_from_settings:
-            self.reconnect_open_button()
-            GLib.timeout_add_seconds(0.5, self.create_script_list)
-        
-        if self.called_from_settings:
-            print("jx"*20)
-            GLib.idle_add(lambda: self.replace_open_button_with_settings())
-            self.show_options_for_settings()
-        #self.set_dynamic_variables()
-        #self.disconnect_open_button()
-        #self.reconnect_open_button()
-        #self.show_options_for_settings()
-        #self.revert_open_button()
-        #self.called_from_settings = False
 
-    def process_cli_file_later(self, file_path):
-        #self.create_main_window()
-        print("D"*100)
-        # Use GLib.idle_add to ensure this runs after the main loop starts
-        #GLib.idle_add(self.show_processing_spinner, "hello world")
-                # Check if the command_line_file exists and is either .exe or .msi
-        if file_path:
-            print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-            print(file_path)
 
-            file_extension = Path(file_path).suffix.lower()
-            if file_extension in ['.exe', '.msi']:
-                print("A"*100)
-                print(f"Processing file: {file_path} (Valid extension: {file_extension})")
-                print("Trying to process file inside on template initialized")
 
-                GLib.idle_add(self.show_processing_spinner, "Processing")
-                self.process_cli_file_in_thread(file_path)
-            elif file_extension in ['.wzt', '.bottle', '.prefix']:
-                print("B"*100)
-                GLib.idle_add(self.show_processing_spinner, "Restoring")
-                self.restore_prefix_bottle_wzt_tar_zst(file_path)
 
-            else:
-                print("C"*100)
-                print(f"Invalid file type: def on_open: {file_extension}. Only .exe or .msi files are allowed.")
-                GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
-                self.command_line_file = None
-                return False
+
+
+
 
 
 
