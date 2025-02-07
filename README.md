@@ -5,6 +5,7 @@
 ### Requirement for system installation:
 GTK4-4.16+ and libadwaita-1.6.3+
 
+##### Example on Debian Trixie:
 ```
 $ dpkg -l libadwaita-1-0
 ||/ Name                 Version      Architecture Description
