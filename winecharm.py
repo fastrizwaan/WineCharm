@@ -148,6 +148,23 @@ class WineCharmApp(Gtk.Application):
             .normal-font {  /* Add the CSS rule for the normal-font class */
             font-weight: normal;
             }
+            progressbar.header-progress {
+                min-height: 4px;
+                background: none;
+                border: none;
+                padding: 0;
+                #margin: 0 0px 3px 0px;
+            }
+            progressbar.header-progress trough {
+                min-height: 4px;
+                background-color: alpha(0, 0);
+                border: none;
+            }
+            progressbar.header-progress progress {
+                min-height: 4px;
+                #background-color: @success_color;
+                #border-radius: 10px;
+            }
         """)
 
         Gtk.StyleContext.add_provider_for_display(
@@ -908,7 +925,7 @@ class WineCharmApp(Gtk.Application):
         self.vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         self.vbox.set_margin_start(10)
         self.vbox.set_margin_end(10)
-        self.vbox.set_margin_top(3)
+        #self.vbox.set_margin_top(3)
         self.vbox.set_margin_bottom(10)
         self.window.set_child(self.vbox)
 
@@ -1206,7 +1223,7 @@ class WineCharmApp(Gtk.Application):
         found_match = False
         
         # Iterate over all scripts in self.script_list using script_key and script_data
-        for script_key, script_data in self.script_list.items():
+        for script_key, script_data in list(self.script_list.items()):
             # Resolve the script path, executable name, and get the progname
             script_path = Path(script_data['script_path']).expanduser().resolve()
             exe_name = Path(script_data['exe_file']).expanduser().resolve().name
@@ -1226,7 +1243,9 @@ class WineCharmApp(Gtk.Application):
                 
                 # If the script is currently running, update the UI to reflect its running state
                 if script_key in self.running_processes:
-                    self.update_ui_for_running_process(script_key, row, self.running_processes)
+                    #self.update_ui_for_running_process(script_key, row, self.running_processes)
+                    self.update_ui_for_running_process(self.running_processes)
+
 
         if not found_match:
             print(f"No matches found for search term: {search_term}")
@@ -1343,14 +1362,17 @@ class WineCharmApp(Gtk.Application):
         if self.main_frame.get_child() != self.scrolled:
             self.main_frame.set_child(self.scrolled)
 
+        self.remove_accelerator_context()
+            
+        # Restore the script list
+        self.create_script_list()
+        
+    def remove_accelerator_context(self):
         # Cleanup accelerator group when leaving options view
         if hasattr(self, 'accel_group'):
             self.window.remove_accel_group(self.accel_group)
             del self.accel_group
             
-        # Restore the script list
-        self.create_script_list()
-
     def setup_accelerator_context(self):
         self.print_method_name()
         controller = Gtk.ShortcutController()
@@ -1545,7 +1567,7 @@ class WineCharmApp(Gtk.Application):
         self.script_ui_data = {}  # Use script_data to hold all script-related data
 
         # Iterate over self.script_list
-        for script_key, script_data in self.script_list.items():
+        for script_key, script_data in list(self.script_list.items()):
             row = self.create_script_row(script_key, script_data)
             if row:
                 self.flowbox.append(row)
@@ -2570,7 +2592,7 @@ class WineCharmApp(Gtk.Application):
         self.print_method_name()
         if not hasattr(self, 'script_ui_data') or not self.script_ui_data:
             return
-        for script_key, script_data in self.script_list.items():
+        for script_key, script_data in list(self.script_list.items()):
             wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
             target_exe_path = Path(script_data['exe_file']).expanduser().resolve()
             target_exe_name = target_exe_path.name
@@ -4292,8 +4314,57 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error opening file manager: {e}")
 
+########################################  delete wineprefix
+    def load_icon(self, script, x, y):
+        icon_name = script.stem + ".png"
+        icon_dir = script.parent
+        icon_path = icon_dir / icon_name
+        default_icon_path = self.get_default_icon_path()
+
+        try:
+            # Load the icon at a higher resolution
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(icon_path), 128, 128)
+            # Scale down to the desired size
+            scaled_pixbuf = pixbuf.scale_simple(x, y, GdkPixbuf.InterpType.BILINEAR)
+            return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
+        except Exception:
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(default_icon_path), 128, 128)
+                scaled_pixbuf = pixbuf.scale_simple(x, y, GdkPixbuf.InterpType.BILINEAR)
+                return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
+            except Exception:
+                return None
+
+    def create_icon_title_widget(self, script):
+        self.print_method_name()
+        # Find the matching script data from self.script_list
+        script_data = next((data for key, data in self.script_list.items() if Path(data['script_path']) == script), None)
+
+        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        
+        # Load the icon associated with the script
+        icon = self.load_icon(script, 24, 24)
+        if icon:
+            icon_image = Gtk.Image.new_from_paintable(icon)
+            icon_image.set_pixel_size(24)
+            hbox.append(icon_image)
+
+        # Use the progname from script_data if available, otherwise fallback to script stem
+        if script_data and 'progname' in script_data:
+            label_text = f"<b>{script_data['progname'].replace('_', ' ')}</b>"
+        else:
+            label_text = f"<b>{script.stem.replace('_', ' ')}</b>"
+
+        # Create and append the label
+        label = Gtk.Label(label=label_text)
+        label.set_use_markup(True)
+        label.set_ellipsize(Pango.EllipsizeMode.END)
+        hbox.append(label)
+
+        return hbox
             
     def show_delete_wineprefix_confirmation(self, script, button):
+        self.remove_accelerator_context()
         self.count = 0
         self.print_method_name()
         """
@@ -4388,7 +4459,7 @@ class WineCharmApp(Gtk.Application):
         # Close the dialog
         dialog.close()
 
-
+######################################## / delete wineprefix
 
     def get_script_keys_from_wineprefix(self, wineprefix):
         self.print_method_name()
@@ -4402,7 +4473,7 @@ class WineCharmApp(Gtk.Application):
             A list of script_keys corresponding to the given wineprefix.
         """
         script_keys = []
-        for script_key, script_data in self.script_list.items():
+        for script_key, script_data in list(self.script_list.items()):
             script_path = Path(script_data['script_path']).expanduser().resolve()
             if script_path.parent == wineprefix:
                 script_keys.append(script_key)
@@ -4543,7 +4614,7 @@ class WineCharmApp(Gtk.Application):
         Returns:
             The corresponding script_key from script_list, if found.
         """
-        for script_key, script_data in self.script_list.items():
+        for script_key, script_data in list(self.script_list.items()):
             script_path = Path(script_data['script_path']).expanduser().resolve()
             if script_path == shortcut_file:
                 return script_key
@@ -5306,9 +5377,12 @@ class WineCharmApp(Gtk.Application):
         
         # Add progress bar
         self.progress_bar = Gtk.ProgressBar()
+        self.progress_bar.add_css_class("header-progress")
         self.progress_bar.set_show_text(False)
+        self.progress_bar.set_margin_top(0)
+        self.progress_bar.set_margin_bottom(0)
         self.progress_bar.set_fraction(0.0)
-        self.progress_bar.set_size_request(420, -1)
+        #self.progress_bar.set_size_request(420, -1)
         self.vbox.prepend(self.progress_bar)
         self.flowbox.remove_all()
         
@@ -5374,65 +5448,6 @@ class WineCharmApp(Gtk.Application):
             self.show_missing_programs_dialog(missing_programs)
 
         self.check_running_processes_on_startup()
-
-        
-    def load_icon(self, script, x, y):
-        #self.print_method_name()
-        
-        icon_name = script.stem + ".png"
-        icon_dir = script.parent
-        icon_path = icon_dir / icon_name
-        default_icon_path = self.get_default_icon_path()
-
-#        print(f"""
-#        script = {script}
-#        script.stem = {script.stem}
-#        script.stem + '.png' = 
-#        icon_name = {icon_name}
-#        """)
-        try:
-            # Load the icon at a higher resolution
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(icon_path), 128, 128)
-            # Scale down to the desired size
-            scaled_pixbuf = pixbuf.scale_simple(x, y, GdkPixbuf.InterpType.BILINEAR)
-            return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
-        except Exception:
-            try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(default_icon_path), 128, 128)
-                scaled_pixbuf = pixbuf.scale_simple(x, y, GdkPixbuf.InterpType.BILINEAR)
-                return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
-            except Exception:
-                return None
-
-
-                
-    def create_icon_title_widget(self, script):
-        self.print_method_name()
-        # Find the matching script data from self.script_list
-        script_data = next((data for key, data in self.script_list.items() if Path(data['script_path']) == script), None)
-
-        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-        
-        # Load the icon associated with the script
-        icon = self.load_icon(script, 24, 24)
-        if icon:
-            icon_image = Gtk.Image.new_from_paintable(icon)
-            icon_image.set_pixel_size(24)
-            hbox.append(icon_image)
-
-        # Use the progname from script_data if available, otherwise fallback to script stem
-        if script_data and 'progname' in script_data:
-            label_text = f"<b>{script_data['progname'].replace('_', ' ')}</b>"
-        else:
-            label_text = f"<b>{script.stem.replace('_', ' ')}</b>"
-
-        # Create and append the label
-        label = Gtk.Label(label=label_text)
-        label.set_use_markup(True)
-        label.set_ellipsize(Pango.EllipsizeMode.END)
-        hbox.append(label)
-
-        return hbox
 
 
     def on_view_toggle_button_clicked(self, button):
@@ -6016,23 +6031,22 @@ class WineCharmApp(Gtk.Application):
     def custom_copytree(self, src, dst):
         self.print_method_name()
         """
-        Custom copy implementation that preserves symlinks with smooth progress tracking
+        Custom copy implementation that preserves symlinks while skipping broken ones,
+        with smooth progress tracking.
         """
         try:
             # Count total files for progress tracking
-            total_files = sum(1 for _, _, files in os.walk(src) 
-                            for _ in files)
+            total_files = sum(1 for _, _, files in os.walk(src) for _ in files)
             if total_files == 0:
-                raise Exception("No files found to copy")
+                print("No files found to copy, continuing...")
+                return
 
             processed_files = 0
 
             def update_progress():
                 if hasattr(self, 'progress_bar'):
-                    GLib.idle_add(
-                        lambda: self.progress_bar.set_fraction(processed_files / total_files)
-                        if hasattr(self, 'progress_bar') else None
-                    )
+                    GLib.idle_add(lambda: self.progress_bar.set_fraction(processed_files / total_files)
+                                  if hasattr(self, 'progress_bar') else None)
                 return True
 
             # Create destination if it doesn't exist
@@ -6041,57 +6055,71 @@ class WineCharmApp(Gtk.Application):
             def preexec_function():
                 os.setpgrp()
 
-            # Use cp -a to preserve all attributes including symlinks
-            copy_process = subprocess.Popen(
-                ['cp', '-a', str(src) + '/.', str(dst)],
-                preexec_fn=preexec_function,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            
+            # Collect valid files and symlinks
+            valid_files = []
+            for root, dirs, files in os.walk(src):
+                for name in dirs + files:
+                    path = os.path.join(root, name)
+                    if os.path.islink(path):
+                        target = os.readlink(path)
+                        target_path = os.path.join(os.path.dirname(path), target)
+                        if not os.path.exists(target_path):
+                            print(f"Skipping broken symlink: {path}")
+                            continue
+                    valid_files.append(path)
+
+            if not valid_files:
+                print("No valid files to copy after filtering broken symlinks, continuing...")
+                return
+
+            # Use cp -a to preserve attributes, but only copy valid files
+            try:
+                copy_process = subprocess.Popen(
+                    ['cp', '-a'] + valid_files + [str(dst)],
+                    preexec_fn=preexec_function,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
+            except FileNotFoundError as e:
+                print(f"Skipping file due to error: {e}")
+                return
+
             with self.process_lock:
                 self.current_process = copy_process
 
-            # Monitor the source files being processed
+            # Monitor the copy process
             last_processed_size = 0
             while copy_process.poll() is None:
                 if self.stop_processing:
                     print("Cancellation requested, terminating copy process...")
                     self._kill_current_process()
-                    
-                    # Clean up partially copied files
                     if Path(dst).exists():
                         print(f"Cleaning up partially copied files at {dst}")
                         shutil.rmtree(dst, ignore_errors=True)
-                    
-                    raise Exception("Operation cancelled by user")
+                    print("Operation cancelled by user, continuing...")
+                    return
 
-                # Get current total size of destination
                 current_size = sum(os.path.getsize(os.path.join(root, file))
-                                for root, _, files in os.walk(dst)
-                                for file in files)
-                
-                # If size has increased, update progress
+                                   for root, _, files in os.walk(dst)
+                                   for file in files)
+
                 if current_size > last_processed_size:
                     processed_files += 1
-                    if processed_files > total_files:  # Ensure we don't exceed 100%
-                        processed_files = total_files
+                    processed_files = min(processed_files, total_files)  # Ensure we don't exceed 100%
                     update_progress()
                     last_processed_size = current_size
-                
+
                 time.sleep(0.1)  # Prevent too frequent checks
 
             if copy_process.returncode != 0:
                 stderr = copy_process.stderr.read().decode() if copy_process.stderr else ""
-                raise Exception(f"Copy failed with return code {copy_process.returncode}: {stderr}")
+                print(f"Copy failed with return code {copy_process.returncode}: {stderr}, continuing...")
 
-            # Ensure we show 100% at the end
             processed_files = total_files
             update_progress()
 
         except Exception as e:
-            print(f"Error during copy: {e}")
-            raise
+            print(f"Error during copy: {e}, continuing...")
         finally:
             with self.process_lock:
                 self.current_process = None
