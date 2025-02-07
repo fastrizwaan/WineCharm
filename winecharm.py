@@ -3001,6 +3001,18 @@ class WineCharmApp(Gtk.Application):
 
         return icon_path if icon_path.exists() else None
 
+
+    def track_all_lnk_files(self, wineprefix):
+        self.print_method_name()
+        lnk_files = self.find_lnk_files(wineprefix)
+        
+        for lnk_file in lnk_files:
+            # Skip if already processed
+            if self.is_lnk_file_processed(wineprefix, lnk_file):
+                continue  
+            # Add the .lnk file to the processed list
+            self.add_lnk_file_to_processed(wineprefix, lnk_file)
+
     def find_lnk_files(self, wineprefix):
         self.print_method_name()
         drive_c = wineprefix / "drive_c" 
@@ -3065,7 +3077,8 @@ class WineCharmApp(Gtk.Application):
             else:
                 self.create_yaml_file(exe_files[0], wineprefix, use_exe_name=False, runner_override=parent_runner)
 
-
+        self.find_and_remove_wine_created_shortcuts()
+         
     def extract_exe_files_from_lnk(self, lnk_files, wineprefix):
         self.print_method_name()
         exe_files = []
@@ -5933,7 +5946,7 @@ class WineCharmApp(Gtk.Application):
         for exe_file in exe_files:
             self.create_yaml_file(exe_file, wineprefix, use_exe_name=True)
             
-        GLib.timeout_add_seconds(0.5, self.create_script_list)
+        #GLib.timeout_add_seconds(0.5, self.create_script_list)
 
     def find_exe_files(self, wineprefix):
         self.print_method_name()
@@ -8925,9 +8938,9 @@ class WineCharmApp(Gtk.Application):
             ("Extracting WZT Backup File", lambda: self.extract_backup(file_path)),
             ("Performing User Related Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(file_path))),
             ("Processing WineZGUI Script Files", lambda: self.process_sh_files(self.extract_prefix_dir(file_path))),
-            ("Search LNK Files and Append to Found List", lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(file_path))),
             ("Replacing Symbolic Links with Directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
             ("Renaming and Merging User Directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
+            ("Search LNK Files and Append to Found List", lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(file_path))),
         ]
 
     def perform_replacements(self, directory):
@@ -9012,24 +9025,32 @@ class WineCharmApp(Gtk.Application):
         """
         sh_files = self.find_sh_files(directory)
         created_charm_files = False  # Track whether any .charm file is created
-
+        
+        print(f"sh_files = \n {sh_files}")
+        
         for sh_file in sh_files:
             variables = self.extract_infofile_path_from_sh(sh_file)
             exe_file = variables.get('EXE_FILE', '')
             progname = variables.get('PROGNAME', '')
             sha256sum = variables.get('CHECKSUM', '')
 
-        # Regenerate sha256sum if missing
-        if exe_file and not sha256sum:
-            sha256_hash = hashlib.sha256()
-            try:
-                with open(exe_file, "rb") as f:
-                    for byte_block in iter(lambda: f.read(4096), b""):
-                        sha256_hash.update(byte_block)
-                sha256sum = sha256_hash.hexdigest()
-                print(f"Warning: sha256sum missing in {exe_file}. Regenerated hash.")
-            except FileNotFoundError:
-                print(f"Error: {exe_file} not found. Cannot compute sha256sum.")
+            print(" = "*20)
+            print(f"""
+            exe_file = {exe_file}
+            progname = {progname}
+            sha256sum = {sha256sum}
+            """)
+            # Regenerate sha256sum if missing
+            if exe_file and not sha256sum:
+                sha256_hash = hashlib.sha256()
+                try:
+                    with open(exe_file, "rb") as f:
+                        for byte_block in iter(lambda: f.read(4096), b""):
+                            sha256_hash.update(byte_block)
+                    sha256sum = sha256_hash.hexdigest()
+                    print(f"Warning: sha256sum missing in {exe_file}. Regenerated hash.")
+                except FileNotFoundError:
+                    print(f"Error: {exe_file} not found. Cannot compute sha256sum.")
 
             info_file_path = variables.get('INFOFILE')
             if info_file_path:
@@ -9064,6 +9085,7 @@ class WineCharmApp(Gtk.Application):
                         self.new_scripts.add(Path(yml_path).stem)
                         print(f"Created {yml_path}")
                         created_charm_files = True  # Mark that at least one .charm file was created
+                        
 
                     except Exception as e:
                         print(f"Error parsing INFOFILE {info_file_path}: {e}")
@@ -9080,6 +9102,8 @@ class WineCharmApp(Gtk.Application):
 
             self.create_scripts_for_exe_files(directory)
             print(f"Scripts created for .exe files in {directory}")
+        else:
+            self.track_all_lnk_files(directory)
 
     def load_and_fix_yaml(self, yaml_file_path, filename):
         self.print_method_name()
@@ -9171,6 +9195,7 @@ class WineCharmApp(Gtk.Application):
                         key = parts[0].replace('export ', '').strip()
                         value = parts[1].strip().strip('"')
                         variables[key] = value
+        #print(f"Variables: {variables}")
         return variables
                 
     def find_sh_files(self, directory):
