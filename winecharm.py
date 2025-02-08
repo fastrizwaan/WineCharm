@@ -6044,18 +6044,31 @@ class WineCharmApp(Gtk.Application):
     def custom_copytree(self, src, dst):
         self.print_method_name()
         """
-        Simple directory copy implementation using cp command.
-        Preserves all attributes and handles symlinks correctly.
+        Robust directory copy using cp -a that:
+        - Preserves symlinks and attributes
+        - Copies contents of src directory into dst
+        - Handles spaces in paths
+        - Provides cancellation and progress pulse
         """
         try:
-            os.makedirs(dst, exist_ok=True)
+            src_path = Path(src).resolve()
+            dst_path = Path(dst).resolve()
+
+            # Ensure source exists
+            if not src_path.exists():
+                raise FileNotFoundError(f"Source directory {src_path} does not exist")
+
+            # Create parent directory for destination
+            dst_path.mkdir(parents=True, exist_ok=True)
 
             def preexec_function():
+                """Ensure child processes don't receive signals"""
                 os.setpgrp()
 
-            # Use cp -a to preserve all attributes and symlinks
+            # Use cp -a to copy contents of src to dst (not the directory itself)
+            # The '/.' ensures we copy directory contents rather than the directory
             copy_process = subprocess.Popen(
-                ['cp', '-a', src, os.path.dirname(dst)],
+                ['cp', '-a', f'{src_path}/.', str(dst_path)],
                 preexec_fn=preexec_function,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
@@ -6064,35 +6077,37 @@ class WineCharmApp(Gtk.Application):
             with self.process_lock:
                 self.current_process = copy_process
 
+            # Monitor process and handle cancellation
             while copy_process.poll() is None:
                 if self.stop_processing:
                     print("Cancellation requested, terminating copy process...")
                     self._kill_current_process()
-                    if Path(dst).exists():
-                        print(f"Cleaning up partially copied files at {dst}")
-                        shutil.rmtree(dst, ignore_errors=True)
+                    if dst_path.exists():
+                        print(f"Cleaning up partially copied files at {dst_path}")
+                        shutil.rmtree(dst_path, ignore_errors=True)
                     print("Operation cancelled by user")
                     return
 
-                # Update progress bar if it exists
+                # Pulse progress bar if available
                 if hasattr(self, 'progress_bar'):
-                    GLib.idle_add(lambda: self.progress_bar.pulse() 
-                                if hasattr(self, 'progress_bar') else None)
-                
-                time.sleep(0.1)
+                    GLib.idle_add(lambda: self.progress_bar.pulse())
 
+                time.sleep(0.1)  # Reduce CPU usage
+
+            # Handle completion
             if copy_process.returncode != 0:
-                stderr = copy_process.stderr.read().decode() if copy_process.stderr else ""
-                print(f"Copy failed with return code {copy_process.returncode}: {stderr}")
-                return
+                error_msg = copy_process.stderr.read().decode() if copy_process.stderr else "Unknown error"
+                raise RuntimeError(f"Copy failed with code {copy_process.returncode}: {error_msg}")
 
-            # Set progress bar to 100% when done
+            # Final progress update
             if hasattr(self, 'progress_bar'):
-                GLib.idle_add(lambda: self.progress_bar.set_fraction(1.0) 
-                            if hasattr(self, 'progress_bar') else None)
+                GLib.idle_add(lambda: self.progress_bar.set_fraction(1.0))
 
         except Exception as e:
-            print(f"Error during copy: {e}")
+            print(f"Copy error: {str(e)}")
+            if dst_path.exists():
+                shutil.rmtree(dst_path, ignore_errors=True)
+            raise
         finally:
             with self.process_lock:
                 self.current_process = None
