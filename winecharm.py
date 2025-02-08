@@ -153,17 +153,13 @@ class WineCharmApp(Gtk.Application):
                 background: none;
                 border: none;
                 padding: 0;
-                #margin: 0 0px 3px 0px;
             }
             progressbar.header-progress trough {
                 min-height: 4px;
-                background-color: alpha(0, 0);
                 border: none;
             }
             progressbar.header-progress progress {
                 min-height: 4px;
-                #background-color: @success_color;
-                #border-radius: 10px;
             }
         """)
 
