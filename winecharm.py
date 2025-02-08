@@ -9310,31 +9310,16 @@ class WineCharmApp(Gtk.Application):
             raise Exception("Unable to determine the current username from the environment.")
 
         try:
+            # Get the prefix directory using the dedicated method
+            extracted_prefix_dir = self.extract_prefix_dir(file_path)
+            if not extracted_prefix_dir:
+                raise Exception("Failed to determine the prefix directory from the backup.")
+
+            print(f"Extracted prefix directory: {extracted_prefix_dir}")
+
             # Create a new process group
             def preexec_function():
                 os.setpgrp()
-
-            # Extract the prefix name from the .tar.zst file
-            list_process = subprocess.Popen(
-                ['tar', '-tf', file_path],
-                stdout=subprocess.PIPE,
-                preexec_fn=preexec_function,
-                universal_newlines=True
-            )
-            
-            with self.process_lock:
-                self.current_process = list_process
-            
-            if self.stop_processing:
-                self._kill_current_process()
-                raise Exception("Operation cancelled by user")
-                
-            output, _ = list_process.communicate()
-            extracted_prefix_name = output.splitlines()[0].split('/')[0]
-            extracted_prefix_dir = Path(self.prefixes_dir) / extracted_prefix_name
-
-            print(f"Extracted prefix name: {extracted_prefix_name}")
-            print(f"Extracting to: {extracted_prefix_dir}")
 
             # Extract the archive with process tracking
             extract_process = subprocess.Popen(
@@ -9773,15 +9758,6 @@ class WineCharmApp(Gtk.Application):
                 is_current_default = (tpl_path == current_default)
                 templates.append((display_name, tpl_path, arch, is_current_default))
 
-        print(f"""
-        current_arch = {current_arch}
-        self.template = {self.template}
-        current_default = {current_default}
-        tpl_path = {tpl_path}
-        arch = {arch}
-        is_current_default = {is_current_default}
-        Path(self.template).expanduser().resolve()={Path(self.template).expanduser().resolve()}
-        """)
         if not templates:
             self.show_info_dialog("No Templates", "No templates found to delete.")
             return
@@ -9815,7 +9791,7 @@ class WineCharmApp(Gtk.Application):
                     display_name, template_path, template_arch, is_current_default = templates[selected_idx]
                     
                     # Immediate prevention checks
-                    if is_current_default or self.template:
+                    if is_current_default:
                         self.show_info_dialog(
                             "Protected Template",
                             f"Cannot delete the active / default {current_arch} template!\n"
