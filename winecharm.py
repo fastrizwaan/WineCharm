@@ -558,8 +558,8 @@ class WineCharmApp(Gtk.Application):
             self.show_options_for_settings()
         
         self.set_dynamic_variables()
-        self.disconnect_open_button()
-        self.reconnect_open_button()
+        #self.disconnect_open_button()
+        ##self.reconnect_open_button()
         #self.show_options_for_settings()
         #self.revert_open_button()
         #self.called_from_settings = False
