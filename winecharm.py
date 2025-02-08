@@ -110,6 +110,7 @@ class WineCharmApp(Gtk.Application):
         self.process_lock = threading.Lock()
         self.called_from_settings = False
         self.open_button_handler_id = None
+        self.lnk_processed_success_status = False
 
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
@@ -3059,6 +3060,7 @@ class WineCharmApp(Gtk.Application):
 
     def create_scripts_for_lnk_files(self, wineprefix, parent_runner=None):
         self.print_method_name()
+        self.lnk_processed_success_status = False
         lnk_files = self.find_lnk_files(wineprefix)
         exe_files = self.extract_exe_files_from_lnk(lnk_files, wineprefix)
         product_name_map = {}
@@ -9056,8 +9058,11 @@ class WineCharmApp(Gtk.Application):
             self.create_scripts_for_lnk_files(directory)
             print(f"Scripts created for .lnk files in {directory}")
 
-            self.create_scripts_for_exe_files(directory)
-            print(f"Scripts created for .exe files in {directory}")
+            if self.lnk_processed_success_status:
+                print("Skipping create_scripts_for_exe_files creation: .lnk files processed successfully.")
+            else:
+                self.create_scripts_for_exe_files(directory)
+                print(f"Scripts created for .exe files in {directory}")
         else:
             self.track_all_lnk_files(directory)
 
