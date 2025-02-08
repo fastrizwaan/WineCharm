@@ -373,6 +373,7 @@ class WineCharmApp(Gtk.Application):
                     print("Template exists. Processing command-line file after UI initialization.")
                     self.process_cli_file_later(self.command_line_file)
         # After loading scripts and building the UI, check for running processes
+        self.set_dynamic_variables()
         self.check_running_processes_on_startup()
 
         # Start fetching runner URLs asynchronously
@@ -494,7 +495,7 @@ class WineCharmApp(Gtk.Application):
                 GLib.idle_add(lambda: self.on_template_initialized(arch))
                 GLib.idle_add(self.hide_processing_spinner)
                 self.disconnect_open_button()
-                #GLib.idle_add(self.reset_ui_after_template_init)
+                GLib.idle_add(self.reset_ui_after_template_init)
         threading.Thread(target=initialize).start()
 
     def on_template_initialized(self, arch=None):
@@ -555,9 +556,10 @@ class WineCharmApp(Gtk.Application):
         if self.called_from_settings:
             GLib.idle_add(lambda: self.replace_open_button_with_settings())
             self.show_options_for_settings()
-        #self.set_dynamic_variables()
-        #self.disconnect_open_button()
-        #self.reconnect_open_button()
+        
+        self.set_dynamic_variables()
+        self.disconnect_open_button()
+        self.reconnect_open_button()
         #self.show_options_for_settings()
         #self.revert_open_button()
         #self.called_from_settings = False
@@ -6040,64 +6042,26 @@ class WineCharmApp(Gtk.Application):
     def custom_copytree(self, src, dst):
         self.print_method_name()
         """
-        Custom copy implementation that preserves symlinks while skipping broken ones,
-        with smooth progress tracking.
+        Simple directory copy implementation using cp command.
+        Preserves all attributes and handles symlinks correctly.
         """
         try:
-            # Count total files for progress tracking
-            total_files = sum(1 for _, _, files in os.walk(src) for _ in files)
-            if total_files == 0:
-                print("No files found to copy, continuing...")
-                return
-
-            processed_files = 0
-
-            def update_progress():
-                if hasattr(self, 'progress_bar'):
-                    GLib.idle_add(lambda: self.progress_bar.set_fraction(processed_files / total_files)
-                                  if hasattr(self, 'progress_bar') else None)
-                return True
-
-            # Create destination if it doesn't exist
             os.makedirs(dst, exist_ok=True)
 
             def preexec_function():
                 os.setpgrp()
 
-            # Collect valid files and symlinks
-            valid_files = []
-            for root, dirs, files in os.walk(src):
-                for name in dirs + files:
-                    path = os.path.join(root, name)
-                    if os.path.islink(path):
-                        target = os.readlink(path)
-                        target_path = os.path.join(os.path.dirname(path), target)
-                        if not os.path.exists(target_path):
-                            print(f"Skipping broken symlink: {path}")
-                            continue
-                    valid_files.append(path)
-
-            if not valid_files:
-                print("No valid files to copy after filtering broken symlinks, continuing...")
-                return
-
-            # Use cp -a to preserve attributes, but only copy valid files
-            try:
-                copy_process = subprocess.Popen(
-                    ['cp', '-a'] + valid_files + [str(dst)],
-                    preexec_fn=preexec_function,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-            except FileNotFoundError as e:
-                print(f"Skipping file due to error: {e}")
-                return
+            # Use cp -a to preserve all attributes and symlinks
+            copy_process = subprocess.Popen(
+                ['cp', '-a', src, os.path.dirname(dst)],
+                preexec_fn=preexec_function,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
 
             with self.process_lock:
                 self.current_process = copy_process
 
-            # Monitor the copy process
-            last_processed_size = 0
             while copy_process.poll() is None:
                 if self.stop_processing:
                     print("Cancellation requested, terminating copy process...")
@@ -6105,36 +6069,32 @@ class WineCharmApp(Gtk.Application):
                     if Path(dst).exists():
                         print(f"Cleaning up partially copied files at {dst}")
                         shutil.rmtree(dst, ignore_errors=True)
-                    print("Operation cancelled by user, continuing...")
+                    print("Operation cancelled by user")
                     return
 
-                current_size = sum(os.path.getsize(os.path.join(root, file))
-                                   for root, _, files in os.walk(dst)
-                                   for file in files)
-
-                if current_size > last_processed_size:
-                    processed_files += 1
-                    processed_files = min(processed_files, total_files)  # Ensure we don't exceed 100%
-                    update_progress()
-                    last_processed_size = current_size
-
-                time.sleep(0.1)  # Prevent too frequent checks
+                # Update progress bar if it exists
+                if hasattr(self, 'progress_bar'):
+                    GLib.idle_add(lambda: self.progress_bar.pulse() 
+                                if hasattr(self, 'progress_bar') else None)
+                
+                time.sleep(0.1)
 
             if copy_process.returncode != 0:
                 stderr = copy_process.stderr.read().decode() if copy_process.stderr else ""
-                print(f"Copy failed with return code {copy_process.returncode}: {stderr}, continuing...")
+                print(f"Copy failed with return code {copy_process.returncode}: {stderr}")
+                return
 
-            processed_files = total_files
-            update_progress()
+            # Set progress bar to 100% when done
+            if hasattr(self, 'progress_bar'):
+                GLib.idle_add(lambda: self.progress_bar.set_fraction(1.0) 
+                            if hasattr(self, 'progress_bar') else None)
 
         except Exception as e:
-            print(f"Error during copy: {e}, continuing...")
+            print(f"Error during copy: {e}")
         finally:
             with self.process_lock:
                 self.current_process = None
 
-
-                
     def disable_open_button(self):
         self.print_method_name()
         if self.open_button:
