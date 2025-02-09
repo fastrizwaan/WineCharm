@@ -7180,7 +7180,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error: Wine prefix '{wineprefix}' doesn't exist")
             return
 
-        if self.single_prefix:  # Added confirmation check
+        if self.single_prefix and (wineprefix in [self.single_prefix_dir_win64, self.single_prefix_dir_win32]):  # Added confirmation check
             confirm_dialog = Adw.AlertDialog(
                 heading="Single Prefix Mode Warning",
                 body="You're in Single Prefix mode! Renaming will affect ALL scripts using this prefix.",
