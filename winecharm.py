@@ -1037,7 +1037,18 @@ class WineCharmApp(Gtk.Application):
         reverse = reverse_str == "True"
 
         print(f"Sorting by {key} {'descending' if reverse else 'ascending'}")
-        sorted_scripts = sorted(self.script_list.items(), key=lambda x: x[1].get(key, '').lower() if isinstance(x[1].get(key, ''), str) else x[1].get(key, ''), reverse=reverse)
+        
+        def sort_key(item):
+            _, value = item
+            if key == 'mtime':
+                # Convert to float for proper numerical comparison
+                return float(value.get(key, 0))
+            else:
+                # For string values, convert to lowercase for case-insensitive sorting
+                val = value.get(key, '')
+                return val.lower() if isinstance(val, str) else val
+
+        sorted_scripts = sorted(self.script_list.items(), key=sort_key, reverse=reverse)
         self.script_list = {key: value for key, value in sorted_scripts}
         GLib.idle_add(self.create_script_list)
 
@@ -6150,6 +6161,10 @@ class WineCharmApp(Gtk.Application):
         if prefixdir is None:
             prefixdir = self.prefixes_dir
 
+        # Clear existing script list when loading from default directory
+        if prefixdir == self.prefixes_dir:
+            self.script_list = {}
+
         # Find all .charm files in the directory
         scripts = self.find_charm_files(prefixdir)
 
@@ -6189,11 +6204,11 @@ class WineCharmApp(Gtk.Application):
 
                 # Regenerate sha256sum if missing
                 should_generate_hash = False
-                if 'sha256sum' not in script_data or script_data['sha256sum'] == None :
+                if 'sha256sum' not in script_data or script_data['sha256sum'] == None:
                     should_generate_hash = True
 
                 if should_generate_hash:
-                    if 'exe_file' in script_data or script_data['exe_file']:
+                    if 'exe_file' in script_data and script_data['exe_file']:
                         # Generate hash from exe_file if it exists
                         exe_path = Path(script_data['exe_file']).expanduser().resolve()
                         if os.path.exists(exe_path):
@@ -6207,15 +6222,14 @@ class WineCharmApp(Gtk.Application):
                         else:
                             print(f"Warning: exe_file not found, not updating sha256sum from script file: {script_file}")
 
-
                 # If updates are needed, rewrite the file
                 if updated:
                     with open(script_file, 'w') as f:
                         yaml.safe_dump(script_data, f)
                     print(f"Updated script file: {script_file}")
 
-                # Add modification time (mtime) to script_data
-                script_data['mtime'] = script_file.stat().st_mtime
+                # Store the actual file modification time
+                script_data['mtime'] = os.path.getmtime(script_file)
 
                 # Use 'sha256sum' as the key in script_list
                 script_key = script_data['sha256sum']
@@ -10781,6 +10795,10 @@ class WineCharmApp(Gtk.Application):
 
 
 ###################### 0.95
+
+
+
+
 
 
 
