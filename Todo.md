@@ -23,24 +23,23 @@ Refactoring winecharm
 - [x] Add all info from .charm and buttons, row, label in self.all_scripts, use script_key (sha256sum)
 - [x] play/stop button, row highlight should be manageed.
 
-
 # Todo 0.98
+- [ ] show recommended dxvk, vkd3d, openal, corefonts (get them separate, arial, times, etc. for progress) and show show all winetricks dlls with a window with checkbox
+- [ ] show winetricks dlls 
+
+ # Todo WineCharm 0.97
 - [x] keep margin/padding for button, so that they don't overlap the text
 - [x] Arch, Template feature working required
 - [x] single wine prefix set template winecharm-single
-- [ ] disable change prefix name when using single prefix
+- [x] Warn prefix name when using single prefix
 - [x] do not remove search "Removed existing charm file" from single_prefix 
 - [x] Create template
-- [ ] Runner getting wrong "~/WineCharm" or pwd is used for runner while creating bottle.
-- [ ] template configure
-- [ ] open terminal at template
-- [ ] open filemanager at template
-- [ ] show recommended dxvk, vkd3d, openal, corefonts (get them separate, arial, times, etc. for progress) and show show all winetricks dlls with a window with checkbox
-- [ ] show winetricks dlls 
+- [x] Runner getting wrong "~/WineCharm" or pwd is used for runner while creating bottle.
+- [x] template configure
+- [x] open terminal at template
 - [x] fix the following error which is there for initializing template, startup with scripts installed.
     /usr/lib/python3.12/site-packages/gi/overrides/GObject.py:491: Warning: ../gobject/gsignal.c:2684: instance '0x55d9ea6653c0' has no handler with id '634'
  
- # Todo WineCharm 0.97
  - BUGS and Features
     - [x] Cancellable
         - [x] Initialize Template
@@ -103,14 +102,14 @@ Refactoring winecharm
          - [x] List all Runners even from prefixes_dir/*/Runner/runner_dir/bin/wine
 
  - 2. [x] Settings support (like show_options_for_script)
-     - [ ] Arch 
+     - [x] Arch 
      - [x] Runner
-         - [ ] same as Settings level above
-     - [ ] Template
-        - [ ] Configure
-        - [ ] New
-        - [ ] Copy
-        - [ ] Delete
+         - [x] same as Settings level above
+     - [x] Template
+        - [x] Configure
+        - [x] New
+        - [x] Copy
+        - [x] Delete
 
 
  - 3. [] update all scripts
