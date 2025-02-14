@@ -937,12 +937,12 @@ class WineCharmApp(Gtk.Application):
 
         self.open_button = Gtk.Button()
         self.open_button.set_child(self.open_button_box)
-        self.open_button.set_size_request(-1, 36)  # Set height to 36 pixels
+        self.open_button.set_size_request(-1, 40    )  # Set height to 36 pixels
         self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
         self.vbox.append(self.open_button)
 
         self.search_entry = Gtk.Entry()
-        self.search_entry.set_size_request(-1, 36)
+        self.search_entry.set_size_request(-1, 40)
         self.search_entry.set_placeholder_text("Search")
         self.search_entry.connect("activate", self.on_search_entry_activated)
         self.search_entry.connect("changed", self.on_search_entry_changed)
@@ -1393,63 +1393,41 @@ class WineCharmApp(Gtk.Application):
         controller.add_shortcut(shortcut)
         self.window.add_controller(controller)
         
-    def wrap_text_at_20_chars(self):
+    def wrap_text_at_24_chars(self, text):
         #self.print_method_name()
-        text="Speedpro Installer Setup"
-        if len(text) < 20:
-            return text
-
-        # Find the position of the first space or hyphen after 21 characters
-        wrap_pos = -1
-        for i in range(12, len(text)):
-            if text[i] in [' ', '-']:
-                wrap_pos = i + 1
-                break
-
-        # If no space or hyphen is found, wrap at 21 chars
-        if wrap_pos == -1:
-            wrap_pos = 21
-
-        # Insert newline at the found position
-        # text[start with 21 chars] + "\n" + text[middle 21 chars] + "\n" + text[end 21 chars] 
-        return text[:wrap_pos] + "\n" + text[wrap_pos:] + "\n" + text[wrap_pos]
-
-
-    def wrap_text_at_20_chars(self, text):
-        #self.print_method_name()
-        if len(text) <= 20:
-            # If text is already short enough, assign it all to label1
+        if len(text) <= 24:
+            # If text is short enough, assign to label1
             label1 = text
             label2 = ""
             label3 = ""
             return label1, label2, label3
 
-        # Find the position of the first space or hyphen for the first split
+        # Find first split point near 24 chars
         wrap_pos1 = -1
-        for i in range(12, min(21, len(text))):  # Wrap at or before 20 characters
+        for i in range(16, min(25, len(text))):  # Check from 16 to 24
             if text[i] in [' ', '-']:
                 wrap_pos1 = i + 1
                 break
         if wrap_pos1 == -1:
-            wrap_pos1 = 21  # Default wrap at 21 if no space or hyphen found
+            wrap_pos1 = 25  # Split at 25 if no space/hyphen
 
-        # Find the position of the second split for the next 20 chars
+        # Find second split point
         wrap_pos2 = -1
-        for i in range(wrap_pos1 + 12, min(wrap_pos1 + 21, len(text))):
+        for i in range(wrap_pos1 + 16, min(wrap_pos1 + 25, len(text))):
             if text[i] in [' ', '-']:
                 wrap_pos2 = i + 1
                 break
         if wrap_pos2 == -1:
-            wrap_pos2 = min(wrap_pos1 + 21, len(text))
+            wrap_pos2 = min(wrap_pos1 + 25, len(text))
 
-        # Split the text into three parts
+        # Split the text
         label1 = text[:wrap_pos1].strip()
         label2 = text[wrap_pos1:wrap_pos2].strip()
         label3 = text[wrap_pos2:].strip()
 
-        # If label3 is longer than 18 characters, truncate and add '...'
-        if len(label3) > 18:
-            label3 = label3[:18] + "..."
+        # Truncate label3 if too long
+        if len(label3) > 22:
+            label3 = label3[:22] + "..."
             
         return label1, label2, label3
         
@@ -1504,7 +1482,7 @@ class WineCharmApp(Gtk.Application):
             self.vbox.remove(self.open_button)
 
         self.launch_button = Gtk.Button()
-        self.launch_button.set_size_request(450, 36)
+        self.launch_button.set_size_request(-1, 40)
 
         #yaml_info = self.extract_yaml_info(script)
         script_key = script_data['sha256sum']  # Use sha256sum as the key
@@ -1539,7 +1517,7 @@ class WineCharmApp(Gtk.Application):
 
             # Create new launch button
             self.launch_button = Gtk.Button()
-            self.launch_button.set_size_request(450, 36)
+            self.launch_button.set_size_request(-1, 40)
             
             # Set initial icon state
             is_running = script_key in self.running_processes
@@ -1594,134 +1572,176 @@ class WineCharmApp(Gtk.Application):
 
 
     def create_script_row(self, script_key, script_data):
-        #self.print_method_name()
-        """
-        Creates a row for a given script in the UI, including the play and options buttons.
-
-        Args:
-            script_key (str): The unique key for the script (e.g., sha256sum).
-            script_data (dict): Data associated with the script.
-
-        Returns:
-            Gtk.Overlay: The overlay containing the row UI.
-        """
         script = Path(script_data['script_path']).expanduser()
-
-        # Create the main button for the row
-        button = Gtk.Button()
-        button.set_hexpand(True)
-        button.set_halign(Gtk.Align.FILL)
-        button.add_css_class("flat")
-        button.add_css_class("normal-font")
-
-        # Extract the program name or fallback to the script stem
-        label_text, label2_text, label3_text = "", "", ""
-        label_text = script_data.get('progname', '').replace('_', ' ') or script.stem.replace('_', ' ')
-
-        # Create an overlay to add play and options buttons
-        overlay = Gtk.Overlay()
-        overlay.set_child(button)
-
-        if self.icon_view:
-            # Icon view mode: Larger icon size and vertically oriented layout
-            icon = self.load_icon(script, 64, 64)
-            icon_image = Gtk.Image.new_from_paintable(icon)
-            button.set_size_request(160, 100)
-            icon_image.set_pixel_size(64)
-            hbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-
-            # Create a box to hold both buttons in vertical orientation
-            buttons_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-
-            # Apply text wrapping logic for the label
-            label1, label2, label3 = self.wrap_text_at_20_chars(label_text)
-            label = Gtk.Label(label=label1)
-            if label2:
-                label2 = Gtk.Label(label=label2)
-            if label3:
-                label3 = Gtk.Label(label=label3)
-        else:
-            # Non-icon view mode: Smaller icon size and horizontally oriented layout
-            icon = self.load_icon(script, 32, 32)
-            icon_image = Gtk.Image.new_from_paintable(icon)
-            button.set_size_request(450, 36)
-            icon_image.set_pixel_size(32)
-            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-
-            # Create a box to hold both buttons in horizontal orientation
-            buttons_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-
-            # Use a single line label for non-icon view
-            label = Gtk.Label(label=label_text)
-            label.set_xalign(0)
-            label.set_ellipsize(Pango.EllipsizeMode.END)
-            label2 = Gtk.Label(label="")
-            label3 = Gtk.Label(label="")
-
-        # Set up the label and icon in the button
-        hbox.append(icon_image)
-        hbox.append(label)
-        if self.icon_view and label2:
-            hbox.append(label2)
-        if self.icon_view and label3:
-            hbox.append(label3)
-
-        button.set_child(hbox)
-
-        # Apply bold styling to the label if the script is new
-        if script.stem in self.new_scripts:
-            label.set_markup(f"<b>{label.get_text()}</b>")
-            if label2:
-                label2.set_markup(f"<b>{label2.get_text()}</b>")
-
-            if label3:
-                label3.set_markup(f"<b>{label3.get_text()}</b>")
-            
-        buttons_box.set_margin_end(6)  # Adjust this value to prevent overlapping
-
-        # Play button
-        play_button = Gtk.Button.new_from_icon_name("media-playback-start-symbolic")
-        play_button.set_tooltip_text("Play")
-        if self.icon_view:
-            play_button.set_size_request(50, 40)
-        else:
-            play_button.set_size_request(50, -1)
         
-        play_button.set_visible(False)  # Initially hidden
-        buttons_box.append(play_button)
+        if self.icon_view:
+            # ICON VIEW: Build a layout using the full FlowBoxChild area.
+            container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+            container.set_hexpand(True)
+            container.set_vexpand(True)
+            container.set_valign(Gtk.Align.FILL)
+            container.set_halign(Gtk.Align.FILL)
+            
+            # Top horizontal box: options button | icon | play button.
+            top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
+            top_box.set_hexpand(True)
+            top_box.set_vexpand(False)
+            top_box.set_valign(Gtk.Align.CENTER)
+            top_box.set_halign(Gtk.Align.CENTER)
+            
+            options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text="Options")
+            options_button.add_css_class("flat")
+            options_button.set_size_request(60, 50)
+            
+            icon = self.load_icon(script, 96, 96)
+            if icon:
+                icon_image = Gtk.Image.new_from_paintable(icon)
+                icon_image.set_pixel_size(96)
+                icon_image.set_halign(Gtk.Align.CENTER)
+            else:
+                icon_image = Gtk.Image()
+            
+            play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play")
+            play_button.add_css_class("flat")
+            play_button.set_size_request(60, 50)
+            
+            top_box.append(options_button)
+            top_box.append(icon_image)
+            top_box.append(play_button)
+            container.append(top_box)
+            
+            # Bottom: Label area.
+            label_text = str(script_data.get('progname', script.stem)).replace('_', ' ')
+            line1, line2, line3 = self.wrap_text_at_24_chars(label_text)
+            if script.stem in self.new_scripts:
+                line1 = f"<b>{line1}</b>"
+                if line2:
+                    line2 = f"<b>{line2}</b>"
+                if line3:
+                    line3 = f"<b>{line3}</b>"
+            label_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+            label_box.set_halign(Gtk.Align.CENTER)
+            label_box.set_valign(Gtk.Align.CENTER)
+            main_label = Gtk.Label()
+            main_label.set_wrap(True)
+            main_label.set_halign(Gtk.Align.CENTER)
+            main_label.set_markup(line1)
+            label_box.append(main_label)
+            if line2:
+                second_label = Gtk.Label()
+                second_label.set_wrap(True)
+                second_label.set_halign(Gtk.Align.CENTER)
+                second_label.set_markup(line2)
+                label_box.append(second_label)
+            if line3:
+                third_label = Gtk.Label()
+                third_label.set_wrap(True)
+                third_label.set_halign(Gtk.Align.CENTER)
+                third_label.set_markup(line3)
+                label_box.append(third_label)
+            container.append(label_box)
+            
+            play_button.set_opacity(0)
+            options_button.set_opacity(0)
+            play_button.set_sensitive(False)
+            options_button.set_sensitive(False)
+            
+            self.script_ui_data[script_key] = {
+                'row': container,
+                'play_button': play_button,
+                'options_button': options_button,
+                'is_running': False,
+                'script_path': script
+            }
+            
+            click = Gtk.GestureClick()
+            click.connect("released", lambda gesture, n, x, y: self.toggle_overlay_buttons(script_key))
+            container.add_controller(click)
+            
+            play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, btn, container))
+            options_button.connect("clicked", lambda btn: self.show_options_for_script(
+                self.script_ui_data[script_key], container, script_key))
+            
+            return container
+        else:
+            # LIST VIEW: Use an Adw.ActionRow.
+            title_text = str(script_data.get('progname', script.stem)).replace('_', ' ')
+            if script.stem in self.new_scripts:
+                title_text = f"<b>{title_text}</b>"
+            row = Adw.ActionRow(
+                title=title_text,
+                activatable=True
+            )
+            row.set_hexpand(True)
+            row.set_vexpand(True)
+            row.add_css_class('activatable')
+            row.set_use_markup(True)
+            icon = self.load_icon(script, 40, 40)
+            if icon:
+                icon_image = Gtk.Image.new_from_paintable(icon)
+                icon_image.set_pixel_size(40)
+                row.add_prefix(icon_image)
+            button_box = Gtk.Box(spacing=6, valign=Gtk.Align.CENTER)
+            play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play")
+            play_button.add_css_class("flat")
+            options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text="Options")
+            options_button.add_css_class("flat")
+            button_box.append(play_button)
+            button_box.append(options_button)
+            row.add_suffix(button_box)
+            play_button.set_opacity(0)
+            options_button.set_opacity(0)
+            play_button.set_sensitive(False)
+            options_button.set_sensitive(False)
+            
+            self.script_ui_data[script_key] = {
+                'row': row,
+                'play_button': play_button,
+                'options_button': options_button,
+                'is_running': False,
+                'script_path': script
+            }
+            click = Gtk.GestureClick()
+            click.connect("released", lambda gesture, n, x, y: self.toggle_overlay_buttons(script_key))
+            row.add_controller(click)
+            play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, btn, row))
+            options_button.connect("clicked", lambda btn: self.show_options_for_script(
+                self.script_ui_data[script_key], row, script_key))
+            return row
 
-        # Options button
-        options_button = Gtk.Button.new_from_icon_name("emblem-system-symbolic")
-        options_button.set_tooltip_text("Options")
-        options_button.set_visible(False)  # Initially hidden
-        buttons_box.append(options_button)
-
-        # Add the buttons box to the overlay
-        overlay.add_overlay(buttons_box)
-        buttons_box.set_halign(Gtk.Align.END)
-        buttons_box.set_valign(Gtk.Align.CENTER)
-
-        # **Store references in self.script_ui_data**
-        self.script_ui_data[script_key] = {
-            'row': overlay,  # The overlay that contains the row UI
-            'play_button': play_button,  # The play button for the row
-            'options_button': options_button,  # The options button
-            'highlighted': False,  # Initially not highlighted
-            'is_running': False,  # Not running initially
-            'is_clicked_row': False,
-            'script_path': script
-        }
-
-        # Connect the play button to toggle the script's running state
-        play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, play_button, overlay))
-
-        # Connect the options button to show the script's options
-        options_button.connect("clicked", lambda btn: self.show_options_for_script(self.script_ui_data[script_key], overlay, script_key))
-
-        # Event handler for button click (handles row highlighting)
-        button.connect("clicked", lambda *args: self.on_script_row_clicked(script_key))
-
-        return overlay
+    def toggle_overlay_buttons(self, script_key):
+        # Hide overlay buttons and remove "blue" CSS from all other rows.
+        for key, ui in self.script_ui_data.items():
+            if key != script_key:
+                ui['play_button'].set_opacity(0)
+                ui['options_button'].set_opacity(0)
+                ui['play_button'].set_sensitive(False)
+                ui['options_button'].set_sensitive(False)
+                ui['row'].remove_css_class("blue")
+        ui = self.script_ui_data.get(script_key)
+        if not ui:
+            return
+        pb = ui['play_button']
+        ob = ui['options_button']
+        row = ui['row']
+        # Toggle overlay buttons without changing layout.
+        if pb.get_opacity() > 0:
+            pb.set_opacity(0)
+            ob.set_opacity(0)
+            pb.set_sensitive(False)
+            ob.set_sensitive(False)
+            row.remove_css_class("blue")
+        else:
+            pb.set_opacity(1)
+            ob.set_opacity(1)
+            pb.set_sensitive(True)
+            ob.set_sensitive(True)
+            row.add_css_class("blue")
+        # Update play button icon based on running state.
+        if ui.get("is_running"):
+            pb.set_icon_name("media-playback-stop-symbolic")
+        else:
+            pb.set_icon_name("media-playback-start-symbolic")
        
     def show_buttons(self, play_button, options_button):
         self.print_method_name()
@@ -1864,7 +1884,6 @@ class WineCharmApp(Gtk.Application):
 
     def process_ended(self, script_key):
         self.print_method_name()
-        # Get UI elements for the script
         print(f"--> I'm called by {script_key}")
         ui_state = self.script_ui_data.get(script_key)
         if not ui_state:
@@ -1876,10 +1895,8 @@ class WineCharmApp(Gtk.Application):
         options_button = ui_state.get('options_button')
         is_clicked = ui_state.get('is_clicked_row', False)
 
-        # Handle wineprefix and process linked files if necessary
+        # Handle wineprefix and process linked files if necessary.
         process_info = self.running_processes.pop(script_key, None)
-        
-        # Initialize variables
         exe_name = None
         exe_parent_name = None
         unique_id = None
@@ -1892,33 +1909,24 @@ class WineCharmApp(Gtk.Application):
                 wineprefix = script.parent
                 print(f"Processing wineprefix: {wineprefix}")
                 if wineprefix:
-                    # Get parent script's runner
                     script_data = self.script_list.get(script_key, {})
                     parent_runner = script_data.get('runner', '')
                     self.create_scripts_for_lnk_files(wineprefix, parent_runner)
                     self.find_and_remove_wine_created_shortcuts()
 
-        # Only proceed if exe_name and exe_parent_name are defined
         if exe_name and exe_parent_name:
-            # Check if any processes with the same exe_name and exe_parent_name are still running
             is_still_running = False
             new_pid = None
             for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
                 try:
                     proc_name = proc.info['name']
                     proc_cmdline = proc.info['cmdline'] or []
-
-                    # Check if process name matches the target executable name
                     if proc_name.lower() == exe_name.lower() or any(exe_name.lower() in arg.lower() for arg in proc_cmdline):
-                        # Extract parent directory names from command-line arguments
                         for arg in proc_cmdline:
                             if exe_name.lower() in arg.lower():
                                 proc_exe_path = Path(arg)
                                 proc_exe_parent_name = proc_exe_path.parent.name
-
-                                # Compare parent directory names
                                 if proc_exe_parent_name == exe_parent_name:
-                                    # Process matches
                                     is_still_running = True
                                     new_pid = proc.pid
                                     break
@@ -1928,8 +1936,6 @@ class WineCharmApp(Gtk.Application):
                     continue
 
             if is_still_running:
-                # The process has respawned or is still running
-                # Re-add to running_processes with the new PID under the same script_key
                 self.running_processes[script_key] = {
                     "process": None,
                     "wineprefix": process_info.get("wineprefix") if process_info else None,
@@ -1938,65 +1944,46 @@ class WineCharmApp(Gtk.Application):
                     "script": script if process_info else None,
                     "exe_name": exe_name,
                     "exe_parent_name": exe_parent_name,
-                    "pid": new_pid,  # Update with the new PID
+                    "pid": new_pid,
                     "unique_id": unique_id
                 }
-                print(f"Process with exe_name {exe_name} and parent directory '{exe_parent_name}' is still running (respawned).")
-
-                # Start monitoring the new process
+                print(f"Process with exe_name {exe_name} and parent '{exe_parent_name}' is still running (respawned).")
                 threading.Thread(target=self.monitor_external_process, args=(script_key, new_pid), daemon=True).start()
-
-                # Update UI elements
                 ui_state['is_running'] = True
-
                 if row:
                     self.update_row_highlight(row, True)
                     row.add_css_class("highlighted")
-
                 if play_button:
                     self.set_play_stop_button_state(play_button, True)
                     play_button.set_tooltip_text("Stop")
-
-                # Maintain the clicked state if it was clicked
                 if is_clicked:
                     row.add_css_class("blue")
                     self.show_buttons(play_button, options_button)
                     print(f"Maintaining 'blue' highlight and buttons for script_key: {script_key}")
+                return
 
-                return  # Exit early since we have re-added the process under the same script_key
-
-        # No matching process found; reset UI elements
-        # Update UI elements
+        # Reset UI elements when process has ended.
         if row:
-            # Remove both 'highlighted' and 'blue' classes
             row.remove_css_class("highlighted")
             row.remove_css_class("blue")
-
         if play_button:
             self.set_play_stop_button_state(play_button, False)
             play_button.set_tooltip_text("Play")
-
-        # Reset the launch button if it exists
         if self.launch_button:
             self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
             self.launch_button.set_tooltip_text("Play")
-
-        # Hide play and options buttons
-        if options_button:
-            self.hide_buttons(play_button, options_button)
-
-        # Reset the 'is_clicked_row' state
+        # Instead of fully hiding the overlay buttons, reset their opacity and sensitivity.
+        if play_button and options_button:
+            play_button.set_opacity(0)
+            options_button.set_opacity(0)
+            play_button.set_sensitive(False)
+            options_button.set_sensitive(False)
         ui_state['is_clicked_row'] = False
         ui_state['is_running'] = False
 
-        # Check if there are any remaining running processes
         if not self.running_processes:
             print("All processes ended.")
-
-        # Revert the runner to default
         self.runner_to_use = None
-
-        # Call check_running_processes_on_startup to update UI
         self.check_running_processes_on_startup()
 
     def launch_script(self, script_key, play_stop_button, row):
@@ -3605,7 +3592,7 @@ class WineCharmApp(Gtk.Application):
         for label, icon_name, callback in self.script_options:
             if filter_text in label.lower():
                 option_button = Gtk.Button()
-                option_button.set_size_request(150, 36)
+                option_button.set_size_request(-1, 40)
                 option_button.add_css_class("flat")
                 option_button.add_css_class("normal-font")
 
@@ -7561,7 +7548,7 @@ class WineCharmApp(Gtk.Application):
         for label, icon_name, callback in self.settings_options:
             if filter_text in label.lower():
                 option_button = Gtk.Button()
-                option_button.set_size_request(190, 36)
+                option_button.set_size_request(-1, 40)
                 option_button.add_css_class("flat")
                 option_button.add_css_class("normal-font")
 
