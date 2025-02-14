@@ -185,11 +185,11 @@ class WineCharmApp(Gtk.Application):
         self.set_accels_for_action("win.on_kill_all_clicked", ["<Ctrl>k"])
         self.set_accels_for_action("win.toggle_view", ["<Ctrl>v"])
         self.set_accels_for_action("win.back", ["<Ctrl>BackSpace"])
-        print("__init__ end" + " - "*50)
 
         self.count = 0
 
     def print_method_name(self):
+        return
         self.count = self.count + 1 
         current_frame = sys._getframe(1)  # Get the caller's frame
         method_name = current_frame.f_code.co_name
@@ -769,7 +769,7 @@ class WineCharmApp(Gtk.Application):
         try:
             with open(self.settings_file, 'w') as settings_file:
                 yaml.dump(settings, settings_file, default_flow_style=False, indent=4)
-            print(f"Settings saved to {self.settings_file} with content:\n{settings}")
+            #print(f"Settings saved to {self.settings_file} with content:\n{settings}")
         except Exception as e:
             print(f"Error saving settings: {e}")
 
@@ -820,7 +820,7 @@ class WineCharmApp(Gtk.Application):
 
         self.window = Gtk.ApplicationWindow(application=self)
         self.window.set_title("Wine Charm")
-        self.window.set_default_size(480, 640)
+        self.window.set_default_size(520, 680)
         self.window.add_css_class("common-background")
 
         self.headerbar = Gtk.HeaderBar()
