@@ -1235,9 +1235,9 @@ class WineCharmApp(Gtk.Application):
         # Iterate over all scripts in self.script_list using script_key and script_data
         for script_key, script_data in list(self.script_list.items()):
             # Resolve the script path, executable name, and get the progname
-            script_path = Path(script_data['script_path']).expanduser().resolve()
-            exe_name = Path(script_data['exe_file']).expanduser().resolve().name
-            progname = script_data.get('progname', '').lower()  # Fallback to empty string if 'progname' is missing
+            script_path = Path(str(script_data['script_path'])).expanduser().resolve()
+            exe_name = Path(str(script_data['exe_file'])).expanduser().resolve().name
+            progname = str(script_data.get('progname', '')).lower()  # Fallback to empty string if 'progname' is missing
             
             # Check if the search term is present in the exe_name, script_name (stem), or progname
             if (search_term in exe_name.lower() or 
@@ -1572,7 +1572,7 @@ class WineCharmApp(Gtk.Application):
 
 
     def create_script_row(self, script_key, script_data):
-        script = Path(script_data['script_path']).expanduser()
+        script = Path(str(script_data['script_path'])).expanduser()
         
         if self.icon_view:
             # ICON VIEW: Build a layout using the full FlowBoxChild area.
@@ -2005,9 +2005,9 @@ class WineCharmApp(Gtk.Application):
         env = os.environ.copy()
         env['WINECHARM_UNIQUE_ID'] = unique_id
 
-        exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
-        wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
-        env_vars = script_data.get('env_vars', '')
+        exe_file = Path(str(script_data.get('exe_file', ''))).expanduser().resolve()
+        wineprefix = Path(str(script_data.get('script_path', ''))).parent.expanduser().resolve()
+        env_vars = str(script_data.get('env_vars', ''))
 
         try:
             # Get the runner from the script data
@@ -2062,7 +2062,7 @@ class WineCharmApp(Gtk.Application):
                     "unique_id": unique_id,
                     "pgid": os.getpgid(process.pid),
                     "row": row,
-                    "script": Path(script_data['script_path']),
+                    "script": Path(str(script_data['script_path'])),
                     "exe_file": exe_file,
                     "exe_name": exe_file.name,
                     "runner": str(runner_path),
@@ -2226,7 +2226,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error: Script with key {script_key} not found in script_list.")
             return None
 
-        script_path = Path(script_data.get('script_path', '')).expanduser().resolve()
+        script_path = Path(str(script_data.get('script_path', ''))).expanduser().resolve()
 
         if not script_path.exists():
             print(f"Error: Script path {script_path} does not exist.")
@@ -2590,8 +2590,8 @@ class WineCharmApp(Gtk.Application):
         if not hasattr(self, 'script_ui_data') or not self.script_ui_data:
             return
         for script_key, script_data in list(self.script_list.items()):
-            wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
-            target_exe_path = Path(script_data['exe_file']).expanduser().resolve()
+            wineprefix = Path(str(script_data['script_path'])).parent.expanduser().resolve()
+            target_exe_path = Path(str(script_data['exe_file'])).expanduser().resolve()
             target_exe_name = target_exe_path.name
             runner = script_data.get('runner', 'wine')
 
@@ -2639,7 +2639,7 @@ class WineCharmApp(Gtk.Application):
                             "wineprefix": str(wineprefix),
                             "runner": runner,
                             "row": row,
-                            "script": Path(script_data['script_path']),
+                            "script": Path(str(script_data['script_path'])),
                             "exe_name": target_exe_name,
                             "pids": running_pids  # Store the list of PIDs
                         }
@@ -3203,7 +3203,7 @@ class WineCharmApp(Gtk.Application):
         if not script_data:
             raise Exception("Script data not found.")
 
-        exe_file = self.expand_and_resolve_path(script_data['exe_file'])
+        exe_file = self.expand_and_resolve_path(str(script_data['exe_file']))
         #exe_file = Path(str(exe_file).replace("%USERNAME%", user))
         exe_path = exe_file.parent
         exe_name = exe_file.name
@@ -3671,12 +3671,12 @@ class WineCharmApp(Gtk.Application):
         if not script_data:
             raise Exception("Script data not found.")
 
-        exe_file = self.expand_and_resolve_path(script_data['exe_file'])
+        exe_file = self.expand_and_resolve_path(str(script_data['exe_file']))
         exe_file = Path(str(exe_file).replace("%USERNAME%", user))
         exe_path = exe_file.parent
         exe_name = exe_file.name
 
-        runner = self.expand_and_resolve_path(script_data['runner'])
+        runner = self.expand_and_resolve_path(str(script_data['runner']))
 
         # If runner is inside the script
         if runner:
@@ -3955,7 +3955,7 @@ class WineCharmApp(Gtk.Application):
         if not script_data:
             raise Exception("Script data not found.")
 
-        exe_file = Path(script_data['exe_file']).expanduser().resolve()
+        exe_file = Path(str(script_data['exe_file'])).expanduser().resolve()
         exe_file = Path(str(exe_file).replace("%USERNAME%", current_username))
         exe_path = exe_file.parent
         tar_game_dir_name = exe_path.name
@@ -4026,7 +4026,7 @@ class WineCharmApp(Gtk.Application):
         if not script_data:
             raise Exception("Script data not found.")
 
-        exe_file = Path(script_data['exe_file']).expanduser().resolve()
+        exe_file = Path(str(script_data['exe_file'])).expanduser().resolve()
         exe_file = Path(str(exe_file).replace("%USERNAME%", current_username))
         exe_path = exe_file.parent
 
@@ -4203,7 +4203,7 @@ class WineCharmApp(Gtk.Application):
         if not script_data:
             return None
 
-        exe_file = Path(script_data['exe_file']).expanduser().resolve()
+        exe_file = Path(str(script_data['exe_file'])).expanduser().resolve()
         progname = script_data['progname']
         script_args = script_data['args']
         script_key = script_data['sha256sum']  # Use sha256sum as the key
@@ -4219,8 +4219,8 @@ class WineCharmApp(Gtk.Application):
         exe_name = Path(exe_file).name
 
         # Ensure the wineprefix, runner path is valid and resolve it
-        script = Path(script_data['script_path']).expanduser().resolve()
-        wineprefix = Path(script_data['script_path']).parent.expanduser().resolve()
+        script = Path(str(script_data['script_path'])).expanduser().resolve()
+        wineprefix = Path(str(script_data['script_path'])).parent.expanduser().resolve()
 
         try:
             # Get the runner from the script data
@@ -4314,7 +4314,7 @@ class WineCharmApp(Gtk.Application):
         # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
         if script_data:
-            script_path = Path(script_data['script_path']).expanduser().resolve()
+            script_path = Path(str(script_data['script_path'])).expanduser().resolve()
         else:
             print(f"Error: Script key {script_key} not found in script_list.")
             return
@@ -4345,6 +4345,34 @@ class WineCharmApp(Gtk.Application):
                 return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
             except Exception:
                 return None
+
+    def load_icon(self, script, x, y):
+        if not hasattr(self, 'icon_cache'):
+            self.icon_cache = {}
+        cache_key = (str(script), x, y)
+        if cache_key in self.icon_cache:
+            return self.icon_cache[cache_key]
+
+        icon_name = script.stem + ".png"
+        icon_path = script.parent / icon_name
+        default_icon_path = self.get_default_icon_path()
+
+        try:
+            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(icon_path), 128, 128)
+        except Exception:
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(default_icon_path), 128, 128)
+            except Exception:
+                pixbuf = None
+
+        if pixbuf:
+            scaled_pixbuf = pixbuf.scale_simple(x, y, GdkPixbuf.InterpType.BILINEAR)
+            texture = Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
+        else:
+            texture = None
+
+        self.icon_cache[cache_key] = texture
+        return texture
 
     def create_icon_title_widget(self, script):
         self.print_method_name()
@@ -4485,7 +4513,7 @@ class WineCharmApp(Gtk.Application):
         """
         script_keys = []
         for script_key, script_data in list(self.script_list.items()):
-            script_path = Path(script_data['script_path']).expanduser().resolve()
+            script_path = Path(str(script_data['script_path'])).expanduser().resolve()
             if script_path.parent == wineprefix:
                 script_keys.append(script_key)
         return script_keys
@@ -4508,8 +4536,8 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Extract the Wine prefix directory associated with this script
-        wine_prefix_dir = Path(script_data['script_path']).parent.expanduser().resolve()
-        script_path = Path(script_data['script_path']).expanduser().resolve()
+        wine_prefix_dir = Path(str(script_data['script_path'])).parent.expanduser().resolve()
+        script_path = Path(str(script_data['script_path'])).expanduser().resolve()
 
 
         # Fetch the list of charm files only in the specific Wine prefix directory
@@ -4626,7 +4654,7 @@ class WineCharmApp(Gtk.Application):
             The corresponding script_key from script_list, if found.
         """
         for script_key, script_data in list(self.script_list.items()):
-            script_path = Path(script_data['script_path']).expanduser().resolve()
+            script_path = Path(str(script_data['script_path'])).expanduser().resolve()
             if script_path == shortcut_file:
                 return script_key
         return None
@@ -4647,12 +4675,11 @@ class WineCharmApp(Gtk.Application):
         # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
         if script_data:
-            script_path = Path(script_data['script_path']).expanduser().resolve()
+            script_path = Path(str(script_data['script_path'])).expanduser().resolve()
         else:
             print(f"Error: Script key {script_key} not found in script_list.")
             return
         
-        #script = Path(script_data['script_path'])
         print("--=---------------------------========-------------")
         
         print(script_data)
@@ -4717,7 +4744,7 @@ class WineCharmApp(Gtk.Application):
                 self.script_list[script_key]['args'] = new_args
 
                 # Get the script path from the script info
-                script_path = Path(script_data['script_path']).expanduser().resolve()
+                script_path = Path(str(script_data['script_path'])).expanduser().resolve()
 
                 # Write the updated info back to the YAML file
                 with open(script_path, 'w') as file:
@@ -4754,7 +4781,7 @@ class WineCharmApp(Gtk.Application):
         # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
         if script_data:
-            script_path = Path(script_data['script_path']).expanduser().resolve()
+            script_path = Path(str(script_data['script_path'])).expanduser().resolve()
         else:
             print(f"Error: Script key {script_key} not found in script_list.")
             return
@@ -4814,7 +4841,7 @@ class WineCharmApp(Gtk.Application):
                 script_data['progname'] = new_name
 
                 # Get the script path from the script info
-                script_path = Path(script_data['script_path']).expanduser().resolve()
+                script_path = Path(str(script_data['script_path'])).expanduser().resolve()
 
                 print("*"*100)
                 print("writing script_path = {script_path}")
@@ -4831,7 +4858,7 @@ class WineCharmApp(Gtk.Application):
                 existing_sha256sum = script_data.get('sha256sum')
 
                 # Extract icon and create desktop entry
-                exe_file = Path(script_data['exe_file'])  # Assuming exe_file exists in script_data
+                exe_file = Path(str(script_data['exe_file']))  # Assuming exe_file exists in script_data
                 icon_path = new_script_path.with_suffix(".png")  # Correct the icon path generation
                 print("#" * 100)
                 print(icon_path)
@@ -4942,7 +4969,7 @@ class WineCharmApp(Gtk.Application):
         # Ensure we're using the updated script path
         script_data = self.script_list.get(script_key)
         if script_data:
-            script_path = Path(script_data['script_path']).expanduser().resolve()
+            script_path = Path(str(script_data['script_path'])).expanduser().resolve()
         else:
             print(f"Error: Script key {script_key} not found in script_list.")
             return
@@ -5014,7 +5041,7 @@ class WineCharmApp(Gtk.Application):
         self.print_method_name()
         script_data = self.script_list.get(script_key)
         if script_data:
-            exe_file = Path(script_data.get('exe_file'))
+            exe_file = Path(str(script_data.get('exe_file')))
 
         # Create a confirmation dialog
         dialog = Adw.AlertDialog(
@@ -5067,17 +5094,15 @@ class WineCharmApp(Gtk.Application):
             return
         
         # Extract exe_file and wineprefix from script_data
-        exe_file = Path(script_data['exe_file']).expanduser().resolve()
-        wineprefix = script_data.get('wineprefix')
-        script =  Path(script_data['script_path']).expanduser().resolve()
+        exe_file = Path(str(script_data['exe_file'])).expanduser().resolve()
+        wineprefix = str(script_data.get('wineprefix'))
+        script =  Path(str(script_data['script_path'])).expanduser().resolve()
         if wineprefix is None:
             wineprefix = script.parent  # Use script's parent directory if wineprefix is not provided
         else:
-            wineprefix = Path(wineprefix).expanduser().resolve()
+            wineprefix = Path(str(wineprefix)).expanduser().resolve()
 
-        script_path = Path(script_data.get('script_path')).expanduser().resolve()
-
-        script_path = Path(script_data.get('script_path')).expanduser().resolve()
+        script_path = Path(str(script_data.get('script_path'))).expanduser().resolve()
 
         
         # Ensure the exe_file and wineprefix exist
@@ -5103,7 +5128,7 @@ class WineCharmApp(Gtk.Application):
             if not script_data:
                 print(f"Error: Script key {script_key} not found in script_list.")
                 return
-            script_path = Path(script_data.get('script_path')).expanduser().resolve()
+            script_path = Path(str(script_data.get('script_path'))).expanduser().resolve()
             self.headerbar.set_title_widget(self.create_icon_title_widget(script_path))
 
 
@@ -6197,7 +6222,7 @@ class WineCharmApp(Gtk.Application):
                 if should_generate_hash:
                     if 'exe_file' in script_data and script_data['exe_file']:
                         # Generate hash from exe_file if it exists
-                        exe_path = Path(script_data['exe_file']).expanduser().resolve()
+                        exe_path = Path(str(script_data['exe_file'])).expanduser().resolve()
                         if os.path.exists(exe_path):
                             sha256_hash = hashlib.sha256()
                             with open(exe_path, "rb") as f:
@@ -6247,8 +6272,8 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Resolve paths
-        wine_prefix_dir = Path(script_data['script_path']).parent.expanduser().resolve()
-        script_path = Path(script_data['script_path']).expanduser().resolve()
+        wine_prefix_dir = Path(str(script_data['script_path'])).parent.expanduser().resolve()
+        script_path = Path(str(script_data['script_path'])).expanduser().resolve()
 
         # Find charm files in the prefix directory
         charm_files = list(wine_prefix_dir.rglob("*.charm"))
@@ -6351,7 +6376,7 @@ class WineCharmApp(Gtk.Application):
 
                         # Extract needed values
                         progname = script_data.get('progname', '')
-                        script_path = Path(script_data['script_path']).expanduser().resolve()
+                        script_path = Path(str(script_data['script_path'])).expanduser().resolve()
                         wineprefix = script_path.parent.expanduser().resolve()
                         
                         # Get icon path
@@ -6406,7 +6431,7 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Resolve paths
-        wine_prefix_dir = Path(script_data['script_path']).parent.expanduser().resolve()
+        wine_prefix_dir = Path(str(script_data['script_path'])).parent.expanduser().resolve()
         desktop_files = list(wine_prefix_dir.glob("*.desktop"))
 
         if not desktop_files:
@@ -6636,8 +6661,8 @@ class WineCharmApp(Gtk.Application):
             return
 
         # Extract exe_file and wineprefix from script_data
-        exe_file = Path(script_data['exe_file']).expanduser().resolve()
-        script_path = Path(script_data['script_path']).expanduser().resolve()
+        exe_file = Path(str(script_data['exe_file'])).expanduser().resolve()
+        script_path = Path(str(script_data['script_path'])).expanduser().resolve()
         wineprefix = script_path.parent
 
         exe_path = exe_file.parent
@@ -6836,15 +6861,15 @@ class WineCharmApp(Gtk.Application):
         env = os.environ.copy()
         env['WINECHARM_UNIQUE_ID'] = unique_id
 
-        exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
-        script = Path(script_data.get('script_path', '')).expanduser().resolve()
-        progname = script_data.get('progname', '')
-        script_args = script_data.get('args', '')
-        script_key = script_data.get('sha256sum', script_key)
-        env_vars = script_data.get('env_vars', '')
-        wine_debug = script_data.get('wine_debug', '')
-        exe_name = Path(exe_file).name
-        wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
+        exe_file = Path(str(script_data.get('exe_file', ''))).expanduser().resolve()
+        script = Path(str(script_data.get('script_path', ''))).expanduser().resolve()
+        progname = str(script_data.get('progname', ''))
+        script_args = str(script_data.get('args', ''))
+        script_key = str(script_data.get('sha256sum', script_key))
+        env_vars = str(script_data.get('env_vars', ''))
+        wine_debug = str(script_data.get('wine_debug', ''))
+        exe_name = Path(str(exe_file)).name
+        wineprefix = Path(str(script_data.get('script_path', ''))).parent.expanduser().resolve()
 
         try:
             # Get the runner from the script data
@@ -6940,7 +6965,7 @@ class WineCharmApp(Gtk.Application):
                 script_data['env_vars'] = new_env_vars
 
                 # Write the updated data back to the YAML file
-                script_path = Path(script_data['script_path']).expanduser().resolve()
+                script_path = Path(str(script_data['script_path'])).expanduser().resolve()
                 with open(script_path, 'w') as file:
                     yaml.dump(script_data, file, default_flow_style=False, width=1000)
 
@@ -7063,7 +7088,7 @@ class WineCharmApp(Gtk.Application):
                 script_data['runner'] = self.replace_home_with_tilde_in_path(new_value)
                 
                 try:
-                    with open(Path(script_data['script_path']).expanduser(), 'w') as f:
+                    with open(Path(str(script_data['script_path'])).expanduser(), 'w') as f:
                         yaml.dump(script_data, f)
                     print(f"Updated runner to {new_display}")
                 except Exception as e:
@@ -7176,7 +7201,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error: Script key {script_key} not found")
             return
 
-        wineprefix = Path(script_data.get('wineprefix')).expanduser().resolve()
+        wineprefix = Path(str(script_data.get('wineprefix'))).expanduser().resolve()
         if not wineprefix.exists():
             print(f"Error: Wine prefix '{wineprefix}' doesn't exist")
             return
@@ -7303,7 +7328,7 @@ class WineCharmApp(Gtk.Application):
         # Get the script data from script_list
         script_data = self.script_list.get(script_key)
         if script_data:
-            old_wineprefix = Path(script_data['wineprefix']).expanduser().resolve()
+            old_wineprefix = Path(str(script_data['wineprefix'])).expanduser().resolve()
             new_wineprefix_resolved = Path(new_wineprefix).expanduser().resolve()
 
             # Update the wineprefix path in the script_data
@@ -7317,7 +7342,7 @@ class WineCharmApp(Gtk.Application):
             # Special handling for script_path to reflect the new prefix
             if 'script_path' in script_data:
                 # Extract the filename from the old script path
-                old_script_filename = Path(script_data['script_path']).name
+                old_script_filename = Path(str(script_data['script_path'])).name
                 # Create the new script path using the new prefix and the old script filename
                 new_script_path = Path(new_wineprefix_resolved) / old_script_filename
                 script_data['script_path'] = str(new_script_path)
@@ -7344,15 +7369,15 @@ class WineCharmApp(Gtk.Application):
         env = os.environ.copy()
         env['WINECHARM_UNIQUE_ID'] = unique_id
 
-        exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
-        script = Path(script_data.get('script_path', '')).expanduser().resolve()
-        progname = script_data.get('progname', '')
-        script_args = script_data.get('args', '')
-        script_key = script_data.get('sha256sum', script_key)
-        env_vars = script_data.get('env_vars', '')
-        wine_debug = script_data.get('wine_debug', '')
-        exe_name = Path(exe_file).name
-        wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
+        exe_file = Path(str(script_data.get('exe_file', ''))).expanduser().resolve()
+        script = Path(str(script_data.get('script_path', ''))).expanduser().resolve()
+        progname = str(script_data.get('progname', ''))
+        script_args = str(script_data.get('args', ''))
+        script_key = str(script_data.get('sha256sum', script_key))
+        env_vars = str(script_data.get('env_vars', ''))
+        wine_debug = str(script_data.get('wine_debug', ''))
+        exe_name = Path(str(exe_file)).name
+        wineprefix = Path(str(script_data.get('script_path', ''))).parent.expanduser().resolve()
 
         try:
             # Get the runner from the script data
@@ -7396,19 +7421,19 @@ class WineCharmApp(Gtk.Application):
         env = os.environ.copy()
         env['WINECHARM_UNIQUE_ID'] = unique_id
 
-        exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
-        script = Path(script_data.get('script_path', '')).expanduser().resolve()
-        progname = script_data.get('progname', '')
-        script_args = script_data.get('args', '')
-        script_key = script_data.get('sha256sum', script_key)
-        env_vars = script_data.get('env_vars', '')
-        wine_debug = script_data.get('wine_debug', '')
-        exe_name = Path(exe_file).name
-        wineprefix = Path(script_data.get('script_path', '')).parent.expanduser().resolve()
+        exe_file = Path(str(script_data.get('exe_file', ''))).expanduser().resolve()
+        script = Path(str(script_data.get('script_path', ''))).expanduser().resolve()
+        progname = str(script_data.get('progname', ''))
+        script_args = str(script_data.get('args', ''))
+        script_key = str(script_data.get('sha256sum', script_key))
+        env_vars = str(script_data.get('env_vars', ''))
+        wine_debug = str(script_data.get('wine_debug', ''))
+        exe_name = Path(str(exe_file)).name
+        wineprefix = Path(str(script_data.get('script_path', ''))).parent.expanduser().resolve()
 
         try:
             # Get the runner from the script data
-            runner_path = self.get_runner(script_data)
+            runner_path = str(self.get_runner(script_data))
 
             # Formulate the command to run the selected executable
             if isinstance(runner_path, Path):
