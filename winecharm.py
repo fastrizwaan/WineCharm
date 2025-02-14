@@ -1046,7 +1046,7 @@ class WineCharmApp(Gtk.Application):
             else:
                 # For string values, convert to lowercase for case-insensitive sorting
                 val = value.get(key, '')
-                return val.lower() if isinstance(val, str) else val
+                return val.lower() if isinstance(val, str) else str(val)
 
         sorted_scripts = sorted(self.script_list.items(), key=sort_key, reverse=reverse)
         self.script_list = {key: value for key, value in sorted_scripts}
