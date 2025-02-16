@@ -672,15 +672,16 @@ class WineCharmApp(Gtk.Application):
 
     def check_required_programs(self):
         self.print_method_name()
-        if shutil.which("flatpak-spawn"):
-            return []
+        #if shutil.which("flatpak-spawn"):
+        #    return []
             
         # List of supported terminals
         terminal_options = [
             'ptyxis',
             'gnome-terminal',
             'konsole',
-            'xfce4-terminal'
+            'xfce4-terminal',
+            'wcterm'
         ]
         
         # Base required programs
