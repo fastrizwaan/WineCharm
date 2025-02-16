@@ -769,7 +769,7 @@ class WineCharmApp(Gtk.Application):
 
         try:
             with open(self.settings_file, 'w') as settings_file:
-                yaml.dump(settings, settings_file, default_flow_style=False, indent=4)
+                yaml.dump(settings, settings_file, default_style="'", default_flow_style=False, width=10000)
             #print(f"Settings saved to {self.settings_file} with content:\n{settings}")
         except Exception as e:
             print(f"Error saving settings: {e}")
@@ -2010,6 +2010,7 @@ class WineCharmApp(Gtk.Application):
         exe_file = Path(str(script_data.get('exe_file', ''))).expanduser().resolve()
         wineprefix = Path(str(script_data.get('script_path', ''))).parent.expanduser().resolve()
         env_vars = str(script_data.get('env_vars', ''))
+        args = str(script_data.get('args', ''))
 
         try:
             # Get the runner from the script data
@@ -2037,11 +2038,13 @@ class WineCharmApp(Gtk.Application):
         command = [
             "sh", "-c", 
             (
+            f"export WINEPREFIX={shlex.quote(str(wineprefix))}; "
             f"cd {shlex.quote(str(exe_file.parent))} && "
             f"{env_vars} "
             f"WINEPREFIX={shlex.quote(str(wineprefix))} "
             f"{shlex.quote(str(runner_path))} "
-            f"{shlex.quote(exe_file.name)}"
+            f"{shlex.quote(exe_file.name)} "
+            f"{args}"
             )
         ]
 
@@ -2936,7 +2939,7 @@ class WineCharmApp(Gtk.Application):
 
         # Write the new YAML file
         with open(yaml_file_path, 'w') as yaml_file:
-            yaml.dump(yaml_data, yaml_file, default_flow_style=False, width=1000)
+            yaml.dump(yaml_data, open(yaml_file_path, 'w'), default_style="'", default_flow_style=False, width=10000)
 
         # Update yaml_data with resolved paths
         yaml_data['exe_file'] = str(exe_file.expanduser().resolve())
@@ -3047,7 +3050,7 @@ class WineCharmApp(Gtk.Application):
             found_lnk_files.append(filename)
 
         with open(found_lnk_files_path, 'w') as file:
-            yaml.dump(found_lnk_files, file, default_flow_style=False, width=1000)
+            yaml.dump(found_lnk_files, file, default_style="'", default_flow_style=False, width=10000)
 
     def is_lnk_file_processed(self, wineprefix, lnk_file):
         self.print_method_name()
@@ -4750,7 +4753,7 @@ class WineCharmApp(Gtk.Application):
 
                 # Write the updated info back to the YAML file
                 with open(script_path, 'w') as file:
-                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
+                    yaml.dump(script_data, file, default_style="'", default_flow_style=False, width=10000)
 
                 print(f"Updated Wine arguments for {script_path}: {new_args}")
 
@@ -4854,7 +4857,7 @@ class WineCharmApp(Gtk.Application):
                 # Write the updated info back to the YAML file
                 with open(new_script_path, 'w') as file:
                     script_data['script_path'] = str(new_script_path).replace(str(Path.home()), "~")
-                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
+                    yaml.dump(script_data, file, default_style="'", default_flow_style=False, width=10000)
                     
                 # Ensure that script_data still contains the same sha256sum
                 existing_sha256sum = script_data.get('sha256sum')
@@ -6972,7 +6975,7 @@ class WineCharmApp(Gtk.Application):
                 # Write the updated data back to the YAML file
                 script_path = Path(str(script_data['script_path'])).expanduser().resolve()
                 with open(script_path, 'w') as file:
-                    yaml.dump(script_data, file, default_flow_style=False, width=1000)
+                    yaml.dump(script_data, file, default_style="'", default_flow_style=False, width=10000)
 
                 print(f"Updated environment variables for {script_path}: {new_env_vars}")
             else:
@@ -7099,7 +7102,7 @@ class WineCharmApp(Gtk.Application):
                 
                 try:
                     with open(Path(str(script_data['script_path'])).expanduser(), 'w') as f:
-                        yaml.dump(script_data, f)
+                        yaml.dump(script_data, f, default_style="'", default_flow_style=False, width=10000)
                     print(f"Updated runner to {new_display}")
                 except Exception as e:
                     print(f"Update error: {e}")
@@ -7948,7 +7951,7 @@ class WineCharmApp(Gtk.Application):
         """
         try:
             with open(self.runner_cache_file, 'w') as f:
-                yaml.dump(runner_data, f)
+                yaml.dump(runner_data, f, default_style="'", default_flow_style=False, width=10000)
             print(f"Runner data cached to {self.runner_cache_file}")
         except Exception as e:
             print(f"Error saving runner data to cache: {e}")
@@ -9246,7 +9249,7 @@ class WineCharmApp(Gtk.Application):
 
         # Save the updated list back to found_lnk_files.yaml
         with open(found_lnk_files_path, 'w') as file:
-            yaml.dump(updated_lnk_files, file, default_flow_style=False)
+            yaml.dump(updated_lnk_files, file, default_style="'", default_flow_style=False, width=10000)
 
         print(f"Saved {len(lnk_files)} .lnk files to {found_lnk_files_path}")
         self.load_script_list(wineprefix)
