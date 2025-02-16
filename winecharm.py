@@ -3246,8 +3246,8 @@ class WineCharmApp(Gtk.Application):
                 threading.Thread(target=self.backup_prefix, args=(script, script_key,  backup_path)).start()
 
         except GLib.Error as e:
-            # Handle any errors, such as cancellation
-            print(f"An error occurred: {e}")
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"An error occurred: {e}")
 
     def on_backup_prefix_completed(self, script_key, backup_path):
         self.print_method_name()
@@ -3936,8 +3936,8 @@ class WineCharmApp(Gtk.Application):
                 threading.Thread(target=self.create_bottle, args=(script, script_key, backup_path)).start()
 
         except GLib.Error as e:
-            # Handle any errors, such as cancellation
-            print(f"An error occurred: {e}")
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"An error occurred: {e}")
 
     def create_bottle_archive(self, script_key, wineprefix, backup_path):
         self.print_method_name()
@@ -5620,8 +5620,8 @@ class WineCharmApp(Gtk.Application):
                     GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
 
         except GLib.Error as e:
-            # Handle any errors that occurred during folder selection
-            print(f"An error occurred: {e}")
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"An error occurred: {e}")
 
         print("FileDialog operation complete.")
 
@@ -6540,7 +6540,8 @@ class WineCharmApp(Gtk.Application):
                 threading.Thread(target=self.save_user_dirs, args=(script, script_key, backup_path)).start()
 
         except GLib.Error as e:
-            print(f"An error occurred while saving the backup: {e}")
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"An error occurred while saving the backup: {e}")
 
     def save_user_dirs(self, script, script_key, backup_path):
         self.print_method_name()
@@ -6615,7 +6616,8 @@ class WineCharmApp(Gtk.Application):
                 threading.Thread(target=self.load_user_dirs, args=(script, script_key, backup_path)).start()
 
         except GLib.Error as e:
-            print(f"An error occurred while loading the backup: {e}")
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"An error occurred while loading the backup: {e}")
 
     def load_user_dirs(self, script, script_key, backup_path):
         self.print_method_name()
@@ -6905,7 +6907,8 @@ class WineCharmApp(Gtk.Application):
                 print(f"Running {exe_path} from Wine prefix {wineprefix}")
 
         except Exception as e:
-            print(f"Error running EXE: {e}")
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"An error occurred: {e}")
 
     def set_environment_variables(self, script, script_key, *args):
         self.print_method_name()
@@ -8441,7 +8444,8 @@ class WineCharmApp(Gtk.Application):
                         threading.Thread(target=self.create_runner_backup, args=(runner_path, destination_path)).start()
                         self.show_info_dialog("Backup Complete", f"Runner backup saved to {destination_path}.")
                 except GLib.Error as e:
-                    print(f"An error occurred: {e}")
+                    if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                        print(f"An error occurred: {e}")
 
             # Show the save dialog
             file_dialog.save(self.window, None, on_save_file_dialog_response)
@@ -8530,7 +8534,8 @@ class WineCharmApp(Gtk.Application):
                         print("Selected archive does not contain a valid runner.")
                         self.show_info_dialog("Invalid Archive", "The selected archive does not contain a valid runner.")
             except GLib.Error as e:
-                print(f"An error occurred: {e}")
+                if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                    print(f"An error occurred: {e}")
 
         # Show the open dialog
         file_dialog.open(self.window, None, on_open_file_dialog_response)
@@ -8826,7 +8831,6 @@ class WineCharmApp(Gtk.Application):
                 self.restore_prefix_bottle_wzt_tar_zst(file_path)
 
         except GLib.Error as e:
-            # Handle errors, such as dialog cancellation
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                 print(f"An error occurred: {e}")
 
@@ -9897,7 +9901,8 @@ class WineCharmApp(Gtk.Application):
                 threading.Thread(target=self.process_template_import, args=(steps, dst, backup_dir)).start()
 
         except GLib.Error as e:
-            print(f"Template import error: {e}")
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"Template import error: {e}")
 
     def process_template_import(self, steps, dst, backup_dir):
         self.print_method_name()
@@ -10014,7 +10019,8 @@ class WineCharmApp(Gtk.Application):
                 threading.Thread(target=self.process_runner_import, args=(steps, dst, backup_dir)).start()
 
         except GLib.Error as e:
-            print(f"Runner import error: {e}")
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"Runner import error: {e}")
 
     def process_runner_import(self, steps, dst, backup_dir):
         self.print_method_name()

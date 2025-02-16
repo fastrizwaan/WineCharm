@@ -233,6 +233,8 @@ modules:
       - install -Dm755 wcterm.py    /app/bin/wcterm
       - install -Dm644 io.github.fastrizwaan.WineCharm.svg /app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg
       - install -Dm755 io.github.fastrizwaan.WineCharm.desktop /app/share/applications/io.github.fastrizwaan.WineCharm.desktop
+      - mkdir -p /app/share/icons/hicolor/scalable/actions
+      - install -Dm644 icons/* /app/share/icons/hicolor/scalable/actions
     sources:
       - type: file
         path: winecharm.py
