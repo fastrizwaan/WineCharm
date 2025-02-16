@@ -7041,14 +7041,19 @@ class WineCharmApp(Gtk.Application):
         model = Gtk.StringList.new(display_names)
         dropdown = Gtk.DropDown(model=model)
         
+        # Determine current runner
+        current_runner = self.script_list.get(script_key, {}).get('runner', '')
+        if current_runner:
+            current_runner = os.path.abspath(os.path.expanduser(current_runner))
+
         # Set initial selection
+        runner_paths = [path for _, path in all_runners]
         try:
-            runner_from_script = self.script_list.get(script_key, {}).get('runner', '')
-            runner_paths = [path for _, path in all_runners]
-            selected_index = runner_paths.index(runner_from_script)
-            dropdown.set_selected(selected_index)
-        except (ValueError, KeyError):
-            dropdown.set_selected(0)
+            selected_index = runner_paths.index(current_runner)
+        except ValueError:
+            selected_index = 0  # Fallback to first item if not found
+
+        dropdown.set_selected(selected_index)
 
         # Create download button
         download_button = Gtk.Button(
