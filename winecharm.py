@@ -8704,7 +8704,7 @@ class WineCharmApp(Gtk.Application):
 
 ############################################### 4444444444444444444444444 New initialize template
 
-####################### Restore Backup (prefix, bottle, .tar.zst)
+####################### Restore Backup (prefix, bottle, .tar.zst, .wzt)
 
     def restore_from_backup(self, action=None, param=None):
         self.print_method_name()
@@ -8849,6 +8849,8 @@ class WineCharmApp(Gtk.Application):
         try:
             # Extract prefix name before starting
             extracted_prefix = self.extract_prefix_dir(file_path)
+            print("= ="*50)
+            print(f"extracted_prefix ={extracted_prefix}")
             if not extracted_prefix:
                 raise Exception("Failed to determine prefix directory name")
             
@@ -9439,9 +9441,18 @@ class WineCharmApp(Gtk.Application):
             extracted_prefix_name = subprocess.check_output(
                 ["bash", "-c", f"tar -tf '{file_path}' | head -n2 | grep '/$' |head -n1 | cut -f1 -d '/'"]
             ).decode('utf-8').strip()
+            print(f"extracted_prefix_name={extracted_prefix_name}")
+
+            # Handle .tar.zst or .wzt with ./ or ../ in the directory name
+            if extracted_prefix_name == '.' or extracted_prefix_name == '..':
+                extracted_prefix_name = subprocess.check_output(
+                ["bash", "-c", f"tar -tf '{file_path}' | head -n2 | grep '/$' |head -n1 | cut -f2 -d '/'"]
+            ).decode('utf-8').strip()
+                print(f"extracted_prefix_name={extracted_prefix_name}")
 
             if not extracted_prefix_name:
                 raise Exception("No directory found in the tar archive.")
+            
 
             # Print the correct path for debugging
             extracted_prefix_path = Path(self.prefixes_dir) / extracted_prefix_name
@@ -9488,7 +9499,7 @@ class WineCharmApp(Gtk.Application):
         self.print_method_name()
         """
         Quick check of disk space by comparing compressed file size with available space.
-        Only if compressed size is > 1/4 of available space, we need the full uncompressed check.
+        Only if compressed size is > 10x of available space, we need the full uncompressed check.
         
         Args:
             prefixes_dir (Path): The directory where the wine prefixes are stored.
@@ -9508,12 +9519,12 @@ class WineCharmApp(Gtk.Application):
             # Get compressed file size
             compressed_size = Path(file_path).stat().st_size
 
-            # If compressed file is less than 1/4 of available space, we're safe to proceed
-            if compressed_size * 4 <= available_space:
+            # If compressed file is less than 10x of available space, we're safe to proceed
+            if compressed_size * 10 <= available_space:
                 print(f"Quick check passed - Compressed size: {compressed_size / (1024 * 1024):.2f} MB")
                 return True, available_space, compressed_size
 
-            # Otherwise, we need to check the actual uncompressed size
+            # Otherwise, check the actual uncompressed size
             uncompressed_size = self.get_total_uncompressed_size(file_path)
             return available_space >= uncompressed_size, available_space, uncompressed_size
 
