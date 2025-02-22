@@ -33,8 +33,9 @@ Refactoring winecharm
         user.reg:"GPUResX"="1920"
         user.reg:"GPUResY"="1080"
 - [ ] use args and env vars in headless .charm file launch
-- [ ] create need-wineboot.yml and check in launch, then do wineboot -u for restore/import so that game runs.
-- [ ] winetricks isolate after restore
+- [x] create need-wineboot.yml and check in launch, then do wineboot -u for restore/import so that game runs.
+- [x] isolate dirs after restore
+- [x] make icons unique
 
 
  # Todo WineCharm 0.97

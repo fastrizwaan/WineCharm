@@ -1644,6 +1644,8 @@ class WineCharmApp(Gtk.Application):
             
             # Bottom: Label area with Gtk.Label
             label_text = str(script_data.get('progname', script.stem)).replace('_', ' ')
+            if script.stem in self.new_scripts:
+                label_text = f"<b>{label_text}</b>"
             label_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             label_box.set_halign(Gtk.Align.CENTER)
             #label_box.set_valign(Gtk.Align.CENTER)
@@ -2039,19 +2041,13 @@ class WineCharmApp(Gtk.Application):
 
     def launch_script(self, script_key, play_stop_button, row):
         self.print_method_name()
-        # Reload the script data from the .charm file
         script_data = self.reload_script_data_from_charm(script_key)
         if not script_data:
             print("Error: Script data could not be reloaded.")
-            self.handle_ui_error(
-                play_stop_button, row,
-                "Script Error", "Failed to reload script data.", "Script Error"
-            )
-            return None
+            self.handle_ui_error(play_stop_button, row, "Script Error", "Failed to reload script data.", "Script Error")
+            return
 
-        self.debug = True  # Enable debugging
-
-        # Generate a unique ID for the process
+        self.debug = True
         unique_id = str(uuid.uuid4())
         env = os.environ.copy()
         env['WINECHARM_UNIQUE_ID'] = unique_id
@@ -2061,102 +2057,114 @@ class WineCharmApp(Gtk.Application):
         env_vars = str(script_data.get('env_vars', ''))
         args = str(script_data.get('args', ''))
         wine_debug = self.wine_debug
+        wineboot_file_path = Path(wineprefix) / "wineboot-required.yml"
 
         try:
-            # Get the runner from the script data
             runner_path = self.get_runner(script_data)
         except Exception as e:
             print(f"Error getting runner: {e}")
-            self.handle_ui_error(
-                play_stop_button, row,
-                "Runner Error", f"Failed to get runner. Error: {e}",
-                "Runner Error"
-            )
+            self.handle_ui_error(play_stop_button, row, "Runner Error", f"Failed to get runner. Error: {e}", "Runner Error")
             return
 
-        # Check if the executable file exists
         if not exe_file.exists():
-            self.handle_ui_error(
-                play_stop_button, row,
-                "Executable Not Found", str(exe_file),
-                "Exe Not Found"
-            )
+            self.handle_ui_error(play_stop_button, row, "Executable Not Found", str(exe_file), "Exe Not Found")
             return
 
-        # Prepare the log file and command to execute
+        # Prepare common launch components
         log_file_path = Path(wineprefix) / f"{exe_file.stem}.log"
         command = [
-            "sh", "-c", 
-            (
+            "sh", "-c",
             f"export WINEPREFIX={shlex.quote(str(wineprefix))}; "
             f"cd {shlex.quote(str(exe_file.parent))} && "
-            f"{wine_debug} "
-            f"{env_vars} "
+            f"{wine_debug} {env_vars} "
             f"WINEPREFIX={shlex.quote(str(wineprefix))} "
             f"{shlex.quote(str(runner_path))} "
-            f"{shlex.quote(exe_file.name)} "
-            f"{args}"
-            )
+            f"{shlex.quote(exe_file.name)} {args}"
         ]
 
-        if self.debug:
-            print(f"Launch command: {command}")
+        def execute_launch():
+            try:
+                with open(log_file_path, 'w') as log_file:
+                    process = subprocess.Popen(
+                        command,
+                        preexec_fn=os.setsid,
+                        stdout=subprocess.DEVNULL,
+                        stderr=log_file,
+                        env=env
+                    )
 
-        try:
-            # Launch the process
-            with open(log_file_path, 'w') as log_file:
-                process = subprocess.Popen(
-                    command,
-                    preexec_fn=os.setsid,
-                    stdout=subprocess.DEVNULL,
-                    stderr=log_file,
-                    env=env
-                )
+                    self.running_processes[script_key] = {
+                        "process": process,
+                        "unique_id": unique_id,
+                        "pgid": os.getpgid(process.pid),
+                        "row": row,
+                        "script": Path(str(script_data['script_path'])),
+                        "exe_file": exe_file,
+                        "exe_name": exe_file.name,
+                        "runner": str(runner_path),
+                        "wineprefix": str(wineprefix)
+                    }
 
-                self.running_processes[script_key] = {
-                    "process": process,
-                    "unique_id": unique_id,
-                    "pgid": os.getpgid(process.pid),
-                    "row": row,
-                    "script": Path(str(script_data['script_path'])),
-                    "exe_file": exe_file,
-                    "exe_name": exe_file.name,
-                    "runner": str(runner_path),
-                    "wineprefix": str(wineprefix)
-                }
-                
-                # Set the current runner for all the following scripts which will be created by this script's exe_file
-                self.runner_to_use = runner_path
+                    self.runner_to_use = runner_path
+                    self.set_play_stop_button_state(play_stop_button, True)
+                    self.update_row_highlight(row, True)
 
-                self.set_play_stop_button_state(play_stop_button, True)
-                self.update_row_highlight(row, True)
+                    if ui_state := self.script_ui_data.get(script_key):
+                        ui_state['is_running'] = True
 
-                ui_state = self.script_ui_data.get(script_key)
-                if ui_state:
-                    ui_state['is_running'] = True
+                    threading.Thread(target=self.monitor_process, args=(script_key,), daemon=True).start()
+                    GLib.timeout_add_seconds(5, self.get_child_pid_async, script_key)
 
-                threading.Thread(target=self.monitor_process, args=(script_key,), daemon=True).start()
-                GLib.timeout_add_seconds(5, self.get_child_pid_async, script_key)
+            except Exception as e:
+                error_message = f"Error launching script: {e}"
+                print(error_message)
+                traceback_str = traceback.format_exc()
+                with open(log_file_path, 'a') as log_file:
+                    log_file.write(f"\n{error_message}\n{traceback_str}\n")
 
-        except Exception as e:
-            error_message = f"Error launching script: {e}"
-            print(error_message)
-            traceback_str = traceback.format_exc()
-            with open(log_file_path, 'a') as log_file:
-                log_file.write(f"\n{error_message}\n{traceback_str}\n")
+                GLib.idle_add(self.handle_ui_error, play_stop_button, row,
+                            "Launch Error", f"Failed to launch: {e}", "Launch Failed")
+                GLib.idle_add(self.show_info_dialog, "Launch Error", f"Failed to launch: {e}")
 
-            # Show the error to the user via an info dialog
-            GLib.idle_add(
-                self.handle_ui_error,
-                play_stop_button, row,
-                "Launch Error", f"Failed to launch the script. Error: {e}",
-                "Launch Failed"
-            )
-            GLib.idle_add(
-                self.show_info_dialog,
-                "Launch Error",
-                f"Failed to launch the script. Error: {e}"
-            )
+        if wineboot_file_path.exists():
+            runner_dir = runner_path.parent.resolve()
+            
+            # Show loading state
+            GLib.idle_add(self.set_play_stop_button_state, play_stop_button, True)
+            GLib.idle_add(self.update_row_highlight, row, True)
+            GLib.idle_add(play_stop_button.set_sensitive, False)
+
+            def wineboot_operation():
+                try:
+                    prerun_command = [
+                        "sh", "-c",
+                        f"export PATH={shlex.quote(str(runner_dir))}:$PATH; "
+                        f"WINEPREFIX={shlex.quote(str(wineprefix))} wineboot -u"
+                    ]
+                    
+                    if self.debug:
+                        print(f"Running wineboot: {' '.join(prerun_command)}")
+
+                    subprocess.run(prerun_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    wineboot_file_path.unlink(missing_ok=True)
+                    
+                    # Schedule main launch after wineboot completes
+                    GLib.idle_add(execute_launch)
+
+                except subprocess.CalledProcessError as e:
+                    error_msg = f"Wineboot failed (code {e.returncode}): {e.stderr}"
+                    GLib.idle_add(self.handle_ui_error, play_stop_button, row,
+                                "Wineboot Error", error_msg, "Prefix Update Failed")
+                except Exception as e:
+                    error_msg = f"Wineboot error: {str(e)}"
+                    GLib.idle_add(self.handle_ui_error, play_stop_button, row,
+                                "Wineboot Error", error_msg, "Prefix Update Failed")
+                finally:
+                    GLib.idle_add(play_stop_button.set_sensitive, True)
+
+            threading.Thread(target=wineboot_operation, daemon=True).start()
+        else:
+            execute_launch()
 
     def get_runner(self, script_data):
         self.print_method_name()
@@ -3586,28 +3594,28 @@ class WineCharmApp(Gtk.Application):
 
         # Store options as instance variable for filtering
         self.script_options = [
-            ("Show log", "document-open-symbolic", self.show_log_file),
+            ("Show log", "mail-mark-junk-symbolic", self.show_log_file),
             ("Open Terminal", "utilities-terminal-symbolic", self.open_terminal),
             ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
             ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager),
             ("Edit Script File", "text-editor-symbolic", self.open_script_file),
             ("Delete Wineprefix", "user-trash-symbolic", self.show_delete_wineprefix_confirmation),
             ("Delete Shortcut", "edit-delete-symbolic", self.show_delete_shortcut_confirmation),
-            ("Wine Arguments", "preferences-system-symbolic", self.show_wine_arguments_entry),
+            ("Wine Arguments", "mail-attachment-symbolic", self.show_wine_arguments_entry),
             ("Rename Shortcut", "text-editor-symbolic", self.show_rename_shortcut_entry),
             ("Change Icon", "applications-graphics-symbolic", self.show_change_icon_dialog),
-            ("Backup Prefix", "document-save-symbolic", self.show_backup_prefix_dialog),
+            ("Backup Prefix", "media-floppy-symbolic", self.show_backup_prefix_dialog),
             ("Create Bottle", "package-x-generic-symbolic", self.create_bottle_selected),
-            ("Save Wine User Dirs", "document-save-symbolic", self.show_save_user_dirs_dialog),
-            ("Load Wine User Dirs", "document-revert-symbolic", self.show_load_user_dirs_dialog),
+            ("Save Wine User Dirs", "folder-symbolic", self.show_save_user_dirs_dialog),
+            ("Load Wine User Dirs", "document-open-symbolic", self.show_load_user_dirs_dialog),
             ("Reset Shortcut", "view-refresh-symbolic", self.reset_shortcut_confirmation),
             ("Add Desktop Shortcut", "user-bookmarks-symbolic", self.add_desktop_shortcut),
             ("Remove Desktop Shortcut", "action-unavailable-symbolic", self.remove_desktop_shortcut),
             ("Import Game Directory", "folder-download-symbolic", self.import_game_directory),
             ("Run Other Exe", "system-run-symbolic", self.run_other_exe),
-            ("Environment Variables", "preferences-system-symbolic", self.set_environment_variables),
+            ("Environment Variables", "document-properties-symbolic", self.set_environment_variables),
             ("Change Runner", "preferences-desktop-apps-symbolic", self.change_runner),
-            ("Rename Prefix Directory", "folder-visiting-symbolic", self.rename_prefix_directory),
+            ("Rename Prefix Directory", "rename-prefix-symbolic", self.rename_prefix_directory),
             ("Wine Config (winecfg)", "preferences-system-symbolic", self.wine_config),
             ("Registry Editor (regedit)", "dialog-password-symbolic", self.wine_registry_editor)
 
@@ -5711,6 +5719,8 @@ class WineCharmApp(Gtk.Application):
             ("Performing Replacements", lambda: self.perform_replacements(dst)),
             ("Renaming and Merging User Directories", lambda: self.rename_and_merge_user_directories(dst)),
             ("Creating scripts for .exe files", lambda: self.create_scripts_for_exe_files(dst)),
+            ("Replace symbolic links with directories", lambda: self.remove_symlinks_and_create_directories(dst)),
+            ("Create Wineboot Required file", lambda: self.create_wineboot_required_file(dst)),
         ]
         
         self.total_steps = len(steps)
@@ -9005,6 +9015,7 @@ class WineCharmApp(Gtk.Application):
             ("Replacing Symbolic Links with Directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
             ("Renaming and merging user directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
             ("Add Shortcuts to Script List", lambda: self.add_charm_files_to_script_list(self.extract_prefix_dir(file_path))),
+            ("Create Wineboot Required file", lambda: self.create_wineboot_required_file(self.extract_prefix_dir(file_path))),
         ]
 
     def get_wzt_restore_steps(self, file_path):
@@ -9020,7 +9031,22 @@ class WineCharmApp(Gtk.Application):
             ("Replacing Symbolic Links with Directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
             ("Renaming and Merging User Directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
             ("Search LNK Files and Append to Found List", lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(file_path))),
+            ("Create Wineboot Required file", lambda: self.create_wineboot_required_file(self.extract_prefix_dir(file_path))),
         ]
+
+    def create_wineboot_required_file(self, wineprefix):
+        wineboot_file_path = Path(wineprefix) / "wineboot-required.yml"
+
+        data = {
+            'wineboot': 'required'
+        }
+
+        try:
+            with open(wineboot_file_path, 'w') as file:
+                yaml.dump(data, file, default_flow_style=False, width=10000)
+            print(f"wineboot-required.yml file created successfully at {wineboot_file_path}")
+        except Exception as e:
+            print(f"Error creating wineboot-required.yml file: {e}")
 
     def perform_replacements(self, directory):
         self.print_method_name()
@@ -10684,7 +10710,9 @@ class WineCharmApp(Gtk.Application):
             ("Extracting Template File", lambda: self.extract_template_backup(file_path)),
             ("Processing Configuration Files", lambda: self.perform_replacements(self.extract_template_dir(file_path))),
             ("Updating Shortcut List", lambda: self.find_and_save_lnk_files(self.extract_template_dir(file_path))),
-            ("Finalizing Template Structure", lambda: self.remove_symlinks_and_create_directories(self.extract_template_dir(file_path)))
+            ("Finalizing Template Structure", lambda: self.remove_symlinks_and_create_directories(self.extract_template_dir(file_path))),
+            ("Replace symbolic links with directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
+            ("Create Wineboot Required file", lambda: self.create_wineboot_required_file(self.extract_prefix_dir(file_path)))
         ]
 
     def check_template_disk_space(self, file_path):
