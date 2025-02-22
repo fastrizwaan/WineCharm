@@ -2070,8 +2070,47 @@ class WineCharmApp(Gtk.Application):
             self.handle_ui_error(play_stop_button, row, "Executable Not Found", str(exe_file), "Exe Not Found")
             return
 
-        # Prepare common launch components
         log_file_path = Path(wineprefix) / f"{exe_file.stem}.log"
+        # Safely process arguments
+        try:
+            # Expand $WINEPREFIX first
+            expanded_args = args.replace('$WINEPREFIX', str(wineprefix))
+            
+            # Custom argument parsing for switches and spaced filenames
+            args_list = []
+            current_arg = []
+            for part in expanded_args.split():
+                if part.startswith('-'):
+                    if current_arg:
+                        args_list.append(' '.join(current_arg))
+                        current_arg = []
+                    args_list.append(part)
+                else:
+                    current_arg.append(part)
+            if current_arg:
+                args_list.append(' '.join(current_arg))
+
+            # Process each argument individually
+            processed_args = []
+            for arg in args_list:
+                # Convert to Windows path format if needed
+                drive_c_prefix = f"{wineprefix}/drive_c/"
+                if arg.startswith(drive_c_prefix):
+                    win_path = arg.replace(drive_c_prefix, "C:/").replace("/", "/")
+                    processed_args.append(shlex.quote(win_path))
+                else:
+                    processed_args.append(shlex.quote(arg))
+
+            safe_args = ' '.join(processed_args)
+
+        except Exception as e:
+            print(f"Error processing arguments: {e}")
+            self.handle_ui_error(play_stop_button, row, 
+                            "Argument Error", f"Invalid arguments: {e}", 
+                            "Launch Failed")
+            return
+
+        # Prepare command components
         command = [
             "sh", "-c",
             f"export WINEPREFIX={shlex.quote(str(wineprefix))}; "
@@ -2079,9 +2118,13 @@ class WineCharmApp(Gtk.Application):
             f"{wine_debug} {env_vars} "
             f"WINEPREFIX={shlex.quote(str(wineprefix))} "
             f"{shlex.quote(str(runner_path))} "
-            f"{shlex.quote(exe_file.name)} {args}"
+            f"{shlex.quote(exe_file.name)} {safe_args}"
         ]
-
+        
+        print("\n" + "="*40 + " FINAL COMMAND " + "="*40)
+        print("EXECUTING:", ' '.join(command))
+        print("="*94 + "\n")
+        
         def execute_launch():
             try:
                 with open(log_file_path, 'w') as log_file:
@@ -11039,15 +11082,41 @@ def main():
                 # Add wineprefix and runner
                 command_parts.append(f"WINEPREFIX={wineprefix} {runner} {shlex.quote(str(exe_path))}")
 
-                # Add script arguments if present
+                # Process .charm file arguments and paths
+                script_args = script_data.get("args", "").strip()
                 if script_args:
-                    command_parts.append(f"{script_args}")
+                    # Expand $WINEPREFIX if present
+                    script_args = script_args.replace('$WINEPREFIX', str(wineprefix))
+                    args_list, current_arg = [], []
+                    for part in script_args.split():
+                        if part.startswith('-'):
+                            if current_arg:
+                                args_list.append(' '.join(current_arg))
+                                current_arg = []
+                            args_list.append(part)
+                        else:
+                            current_arg.append(part)
+                    if current_arg:
+                        args_list.append(' '.join(current_arg))
+                    processed_script_args = ' '.join(shlex.quote(arg) for arg in args_list)
+                else:
+                    processed_script_args = ""
+
+                # Construct the command
+                command_parts = []
+                if path_env:
+                    command_parts.append(path_env)
+                command_parts.append(f"cd {exe_parent}")
+                if env_vars:
+                    command_parts.append(env_vars)
+                command_parts.append(f"WINEPREFIX={wineprefix} {runner} {shlex.quote(str(exe_path))} {processed_script_args}")
 
                 # Join all the command parts
                 command = " && ".join(command_parts)
 
                 print(f"Executing: {command}")
                 subprocess.run(command, shell=True)
+
 
                 # Exit after headless execution to ensure no GUI elements are opened
                 sys.exit(0)
