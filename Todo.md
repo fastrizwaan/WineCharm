@@ -32,7 +32,7 @@ Refactoring winecharm
 - [ ] determine max screensize and update the registry files for distribution of files. if GPURes values are found like these
         user.reg:"GPUResX"="1920"
         user.reg:"GPUResY"="1080"
-- [ ] use args and env vars in headless .charm file launch
+- [x] use args and env vars in headless .charm file launch
 - [x] create need-wineboot.yml and check in launch, then do wineboot -u for restore/import so that game runs.
 - [x] isolate dirs after restore
 - [x] make icons unique
