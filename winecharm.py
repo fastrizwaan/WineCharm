@@ -172,17 +172,6 @@ class WineCharmApp(Gtk.Application):
             .rounded-container {
                 border-radius: 5px;
             }
-
-            .rxounded-icon {
-                border-radius: 8px;
-                background-color: @card_bg_color;
-            }
-
-            .rxounded-button {
-                border-radius: 999px;
-                min-width: 24px;
-                min-height: 24px;
-            }
         """)
 
         Gtk.StyleContext.add_provider_for_display(
@@ -1646,7 +1635,7 @@ class WineCharmApp(Gtk.Application):
             play_button.add_css_class("flat")
             play_button.set_hexpand(True)
             play_button.set_halign(Gtk.Align.FILL)
-
+            play_button.set_valign(Gtk.Align.FILL)
 
             top_box.append(options_button)
             top_box.append(icon_container)
@@ -1857,14 +1846,12 @@ class WineCharmApp(Gtk.Application):
         if is_running:
             # If the script is running: set play button to 'Stop' and add 'highlighted' class
             self.set_play_stop_button_state(play_button, True)
-            play_button.set_tooltip_text("Stop")
             row.add_css_class("highlighted")
             print(f"Script {script_key} is running. Setting play button to 'Stop' and adding 'highlighted'.")
         else:
             # If the script is not running and not clicked, reset play button and highlight
             if not is_clicked:
                 self.set_play_stop_button_state(play_button, False)
-                play_button.set_tooltip_text("Play")
                 row.remove_css_class("highlighted")
                 print(f"Script {script_key} is not running. Setting play button to 'Play' and removing 'highlighted'.")
 
@@ -1874,14 +1861,31 @@ class WineCharmApp(Gtk.Application):
                 print(f"Preserving 'blue' highlight for clicked but not running script_key: {script_key}")
 
     def set_play_stop_button_state(self, button, is_playing):
-        #self.print_method_name()
+        # Check if the button already has a child (Gtk.Image)
+        current_child = button.get_child()
+        
+        if current_child and isinstance(current_child, Gtk.Image):
+            # Reuse the existing Gtk.Image child
+            image = current_child
+        else:
+            # Create a new Gtk.Image if none exists
+            image = Gtk.Image()
+            button.set_child(image)
+        
+        # Set the icon name and tooltip based on the state
         if is_playing:
-            button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
+            image.set_from_icon_name("media-playback-stop-symbolic")
             button.set_tooltip_text("Stop")
         else:
-            button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
+            image.set_from_icon_name("media-playback-start-symbolic")
             button.set_tooltip_text("Play")
-
+        
+        # Explicitly set pixel size to ensure crisp rendering
+        # image.set_pixel_size(24)
+        
+        # Ensure the icon is re-rendered cleanly
+        image.queue_draw()
+        
     def update_row_highlight(self, row, highlight):
         #self.print_method_name()
         if highlight:
@@ -2005,7 +2009,6 @@ class WineCharmApp(Gtk.Application):
                     row.add_css_class("highlighted")
                 if play_button:
                     self.set_play_stop_button_state(play_button, True)
-                    play_button.set_tooltip_text("Stop")
                 if is_clicked:
                     row.add_css_class("blue")
                     self.show_buttons(play_button, options_button)
@@ -2018,10 +2021,8 @@ class WineCharmApp(Gtk.Application):
             row.remove_css_class("blue")
         if play_button:
             self.set_play_stop_button_state(play_button, False)
-            play_button.set_tooltip_text("Play")
         if self.launch_button:
             self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-            self.launch_button.set_tooltip_text("Play")
         # Instead of fully hiding the overlay buttons, reset their opacity and sensitivity.
         if play_button and options_button:
             play_button.set_opacity(0)
@@ -2129,7 +2130,6 @@ class WineCharmApp(Gtk.Application):
 
                 self.set_play_stop_button_state(play_stop_button, True)
                 self.update_row_highlight(row, True)
-                play_stop_button.set_tooltip_text("Stop")
 
                 ui_state = self.script_ui_data.get(script_key)
                 if ui_state:
@@ -2717,7 +2717,6 @@ class WineCharmApp(Gtk.Application):
                             self.update_row_highlight(row, False)
                     if play_button:
                         self.set_play_stop_button_state(play_button, False)
-                        play_button.set_tooltip_text("Play")
 
     def monitor_multiple_processes(self, script_key, pids):
         self.print_method_name()
@@ -2748,7 +2747,6 @@ class WineCharmApp(Gtk.Application):
 
         if play_button:
             self.set_play_stop_button_state(play_button, True)
-            play_button.set_tooltip_text("Stop")
             ui_state['is_running'] = True  # Ensure is_running is set
 
             
