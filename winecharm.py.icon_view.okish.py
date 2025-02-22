@@ -996,10 +996,10 @@ class WineCharmApp(Gtk.Application):
         self.flowbox.set_valign(Gtk.Align.START)
         self.flowbox.set_halign(Gtk.Align.FILL)
 
-        # if self.icon_view:
-        #    self.flowbox.set_max_children_per_line(8)
-        # else:
-        #    self.flowbox.set_max_children_per_line(4)
+        if self.icon_view:
+           self.flowbox.set_max_children_per_line(8)
+        else:
+           self.flowbox.set_max_children_per_line(4)
 
         self.flowbox.set_homogeneous(True)
         self.flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -1608,21 +1608,22 @@ class WineCharmApp(Gtk.Application):
             container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             container.set_hexpand(True)
             container.set_vexpand(True)
-            container.set_valign(Gtk.Align.CENTER)  # Center vertically for better alignment
-            container.set_halign(Gtk.Align.CENTER)  # Center horizontally
+            container.set_valign(Gtk.Align.FILL)
+            container.set_halign(Gtk.Align.FILL)
             container.add_css_class("rounded-container")
             
             # Top horizontal box: options button | icon | play button
-            top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+            top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)  # No spacing between widgets
             top_box.set_hexpand(True)
             top_box.set_vexpand(True)
             top_box.set_valign(Gtk.Align.CENTER)
-            top_box.set_halign(Gtk.Align.FILL)
+            top_box.set_halign(Gtk.Align.FILL)  # Fill horizontally
             
             # Options button (expanded to fill available space)
             options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text="Options")
             options_button.add_css_class("flat")
-            options_button.set_hexpand(True)
+            options_button.add_css_class("rounded-button")
+            options_button.set_hexpand(True)  # Expand to fill available space
             options_button.set_halign(Gtk.Align.FILL)
             
             # Icon (fixed size, centered)
@@ -1634,7 +1635,7 @@ class WineCharmApp(Gtk.Application):
                 icon_image.set_pixel_size(96)
                 icon_image.set_halign(Gtk.Align.CENTER)
                 icon_container.append(icon_image)
-                icon_container.set_hexpand(False)
+                icon_container.set_hexpand(False)  # Do not expand
             else:
                 icon_container = Gtk.Box()
                 icon_image = Gtk.Image()
@@ -1644,31 +1645,36 @@ class WineCharmApp(Gtk.Application):
             # Play button (expanded to fill available space)
             play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play")
             play_button.add_css_class("flat")
-            play_button.set_hexpand(True)
+            play_button.add_css_class("rounded-button")
+            play_button.set_hexpand(True)  # Expand to fill available space
             play_button.set_halign(Gtk.Align.FILL)
+            play_button.set_valign(Gtk.Align.FILL)
 
-
+            # Append widgets to top_box
             top_box.append(options_button)
             top_box.append(icon_container)
             top_box.append(play_button)
             container.append(top_box)
             
-            # Bottom: Label area with Gtk.Label
+            # Bottom: Label area
             label_text = str(script_data.get('progname', script.stem)).replace('_', ' ')
             label_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             label_box.set_halign(Gtk.Align.CENTER)
-            #label_box.set_valign(Gtk.Align.CENTER)
+            label_box.set_valign(Gtk.Align.CENTER)
 
             main_label = Gtk.Label()
             main_label.set_wrap(True)
-            main_label.set_max_width_chars(20)  # Wrap after ~20 chars
-            main_label.set_lines(2)  # Limit to 2 lines
-            main_label.set_ellipsize(Pango.EllipsizeMode.END)  # Ellipsis if too long
+            main_label.set_max_width_chars(20)
+            main_label.set_lines(2)
+            main_label.set_ellipsize(Pango.EllipsizeMode.END)
             main_label.set_halign(Gtk.Align.CENTER)
             main_label.set_markup(label_text)
             label_box.append(main_label)
 
+            # Append label_box once
+            label_box.set_valign(Gtk.Align.FILL)
             container.append(label_box)
+            
             
             # Set fixed size for the container
             container.set_size_request(200, 150)
@@ -1699,7 +1705,7 @@ class WineCharmApp(Gtk.Application):
                 self.script_ui_data[script_key], container, script_key))
             
             return container
-
+        
         else:
             # LIST VIEW (unchanged)
             title_text = str(script_data.get('progname', script.stem)).replace('_', ' ')
@@ -1729,8 +1735,10 @@ class WineCharmApp(Gtk.Application):
             
             play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play")
             play_button.set_size_request(60, 36)
+            play_button.add_css_class("rounded-button")
             
             options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text="Options")
+            options_button.add_css_class("rounded-button")
             
             button_box.append(play_button)
             button_box.append(options_button)
@@ -1756,7 +1764,7 @@ class WineCharmApp(Gtk.Application):
             play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, btn, row))
             options_button.connect("clicked", lambda btn: self.show_options_for_script(
                 self.script_ui_data[script_key], row, script_key))
-
+            
             return row
 
     def toggle_overlay_buttons(self, script_key):
@@ -10900,6 +10908,9 @@ class WineCharmApp(Gtk.Application):
 
 
 ###################### 0.95
+
+
+
 
 
 
