@@ -22,6 +22,8 @@ import argparse
 import uuid
 import urllib.request
 import json
+import cairo
+import math
 
 from datetime import datetime, timedelta
 gi.require_version('Gtk', '4.0')
@@ -111,6 +113,7 @@ class WineCharmApp(Gtk.Application):
         self.called_from_settings = False
         self.open_button_handler_id = None
         self.lnk_processed_success_status = False
+        self.manually_killed = False
 
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
@@ -138,6 +141,10 @@ class WineCharmApp(Gtk.Application):
             .highlighted {
                 background-color: rgba(127, 127, 127, 0.15); 
             }
+            .yellow {
+                background-color: rgba(255, 255, 0, 0.25);
+                font-weight: bold;
+            }
             .red {
                 background-color: rgba(228, 0, 0, 0.25);
                 font-weight: bold;
@@ -161,6 +168,20 @@ class WineCharmApp(Gtk.Application):
             }
             progressbar.header-progress progress {
                 min-height: 4px;
+            }
+            .rounded-container {
+                border-radius: 5px;
+            }
+
+            .rxounded-icon {
+                border-radius: 8px;
+                background-color: @card_bg_color;
+            }
+
+            .rxounded-button {
+                border-radius: 999px;
+                min-width: 24px;
+                min-height: 24px;
             }
         """)
 
@@ -261,6 +282,10 @@ class WineCharmApp(Gtk.Application):
 
     def on_kill_all_clicked(self, action=None, param=None):
         self.print_method_name()
+
+        # Set the manually_stopped flag to True
+        self.manually_killed = True
+        
         try:
             winecharm_pids = []
             wine_exe_pids = []
@@ -305,9 +330,11 @@ class WineCharmApp(Gtk.Application):
         except Exception as e:
             print(f"Error retrieving process list: {e}")
 
-        # Optionally, clear the running processes dictionary
-        self.running_processes.clear()
-        GLib.timeout_add_seconds(0.5, self.load_script_list)
+        finally:
+            self.manually_killed = False
+            # Optionally, clear the running processes dictionary
+            self.running_processes.clear()
+            GLib.timeout_add_seconds(0.5, self.load_script_list)
 
     def on_help_clicked(self, action=None, param=None):
         self.print_method_name()
@@ -761,7 +788,7 @@ class WineCharmApp(Gtk.Application):
             'template': self.replace_home_with_tilde_in_path(str(self.template)),
             'arch': self.arch,
             'runner': self.replace_home_with_tilde_in_path(str(self.settings.get('runner', ''))),
-            'wine_debug': "WINEDEBUG=fixme-all DXVK_LOG_LEVEL=none",
+            'wine_debug': "WINEDEBUG=-fixme-all DXVK_LOG_LEVEL=none",
             'env_vars': '',
             'icon_view': self.icon_view,
             'single-prefix': self.single_prefix
@@ -787,6 +814,7 @@ class WineCharmApp(Gtk.Application):
             self.arch = settings.get('arch', "win64")
             self.icon_view = settings.get('icon_view', False)
             self.env_vars = settings.get('env_vars', '')
+            self.wine_debug = settings.get('wine_debug', '')
             self.single_prefix = settings.get('single-prefix', False)
             return settings
 
@@ -968,10 +996,10 @@ class WineCharmApp(Gtk.Application):
         self.flowbox.set_valign(Gtk.Align.START)
         self.flowbox.set_halign(Gtk.Align.FILL)
 
-        #if self.icon_view:
-        #    self.flowbox.set_max_children_per_line(8)
-        #else:
-        #    self.flowbox.set_max_children_per_line(4)
+        if self.icon_view:
+           self.flowbox.set_max_children_per_line(8)
+        else:
+           self.flowbox.set_max_children_per_line(4)
 
         self.flowbox.set_homogeneous(True)
         self.flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -1576,77 +1604,85 @@ class WineCharmApp(Gtk.Application):
         script = Path(str(script_data['script_path'])).expanduser()
         
         if self.icon_view:
-            # ICON VIEW: Build a layout using the full FlowBoxChild area.
+            # ICON VIEW
             container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             container.set_hexpand(True)
             container.set_vexpand(True)
             container.set_valign(Gtk.Align.FILL)
             container.set_halign(Gtk.Align.FILL)
+            container.add_css_class("rounded-container")
             
-            # Top horizontal box: options button | icon | play button.
-            top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=2)
+            # Top horizontal box: options button | icon | play button
+            top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)  # No spacing between widgets
             top_box.set_hexpand(True)
-            top_box.set_vexpand(False)
+            top_box.set_vexpand(True)
             top_box.set_valign(Gtk.Align.CENTER)
-            top_box.set_halign(Gtk.Align.CENTER)
+            top_box.set_halign(Gtk.Align.FILL)  # Fill horizontally
             
+            # Options button (expanded to fill available space)
             options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text="Options")
             options_button.add_css_class("flat")
-            options_button.set_size_request(60, 50)
+            options_button.add_css_class("rounded-button")
+            options_button.set_hexpand(True)  # Expand to fill available space
+            options_button.set_halign(Gtk.Align.FILL)
             
-            icon = self.load_icon(script, 96, 96)
+            # Icon (fixed size, centered)
+            icon = self.load_icon(script, 96, 96, 10)
             if icon:
+                icon_container = Gtk.Box()
+                icon_container.add_css_class("rounded-icon")
                 icon_image = Gtk.Image.new_from_paintable(icon)
                 icon_image.set_pixel_size(96)
                 icon_image.set_halign(Gtk.Align.CENTER)
+                icon_container.append(icon_image)
+                icon_container.set_hexpand(False)  # Do not expand
             else:
+                icon_container = Gtk.Box()
                 icon_image = Gtk.Image()
+                icon_container.append(icon_image)
+                icon_container.set_hexpand(False)
             
+            # Play button (expanded to fill available space)
             play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play")
             play_button.add_css_class("flat")
-            play_button.set_size_request(60, 50)
+            play_button.add_css_class("rounded-button")
+            play_button.set_hexpand(True)  # Expand to fill available space
+            play_button.set_halign(Gtk.Align.FILL)
             
+            # Append widgets to top_box
             top_box.append(options_button)
-            top_box.append(icon_image)
+            top_box.append(icon_container)
             top_box.append(play_button)
             container.append(top_box)
             
-            # Bottom: Label area.
+            # Bottom: Label area
             label_text = str(script_data.get('progname', script.stem)).replace('_', ' ')
-            line1, line2, line3 = self.wrap_text_at_24_chars(label_text)
-            if script.stem in self.new_scripts:
-                line1 = f"<b>{line1}</b>"
-                if line2:
-                    line2 = f"<b>{line2}</b>"
-                if line3:
-                    line3 = f"<b>{line3}</b>"
             label_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
             label_box.set_halign(Gtk.Align.CENTER)
             label_box.set_valign(Gtk.Align.CENTER)
+
             main_label = Gtk.Label()
             main_label.set_wrap(True)
+            main_label.set_max_width_chars(20)
+            main_label.set_lines(2)
+            main_label.set_ellipsize(Pango.EllipsizeMode.END)
             main_label.set_halign(Gtk.Align.CENTER)
-            main_label.set_markup(line1)
+            main_label.set_markup(label_text)
             label_box.append(main_label)
-            if line2:
-                second_label = Gtk.Label()
-                second_label.set_wrap(True)
-                second_label.set_halign(Gtk.Align.CENTER)
-                second_label.set_markup(line2)
-                label_box.append(second_label)
-            if line3:
-                third_label = Gtk.Label()
-                third_label.set_wrap(True)
-                third_label.set_halign(Gtk.Align.CENTER)
-                third_label.set_markup(line3)
-                label_box.append(third_label)
+
+            # Append label_box once
             container.append(label_box)
             
+            # Set fixed size for the container
+            container.set_size_request(40, 40)
+            
+            # Initial button states
             play_button.set_opacity(0)
             options_button.set_opacity(0)
             play_button.set_sensitive(False)
             options_button.set_sensitive(False)
             
+            # Store UI data
             self.script_ui_data[script_key] = {
                 'row': container,
                 'play_button': play_button,
@@ -1655,20 +1691,24 @@ class WineCharmApp(Gtk.Application):
                 'script_path': script
             }
             
+            # Add click gesture
             click = Gtk.GestureClick()
             click.connect("released", lambda gesture, n, x, y: self.toggle_overlay_buttons(script_key))
             container.add_controller(click)
             
+            # Connect button signals
             play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, btn, container))
             options_button.connect("clicked", lambda btn: self.show_options_for_script(
                 self.script_ui_data[script_key], container, script_key))
             
             return container
+        
         else:
-            # LIST VIEW: Use an Adw.ActionRow.
+            # LIST VIEW (unchanged)
             title_text = str(script_data.get('progname', script.stem)).replace('_', ' ')
             if script.stem in self.new_scripts:
                 title_text = f"<b>{title_text}</b>"
+            
             row = Adw.ActionRow(
                 title=title_text,
                 activatable=True
@@ -1676,21 +1716,31 @@ class WineCharmApp(Gtk.Application):
             row.set_hexpand(True)
             row.set_vexpand(True)
             row.add_css_class('activatable')
+            row.add_css_class('rounded-container')
             row.set_use_markup(True)
-            icon = self.load_icon(script, 40, 40)
+            
+            icon = self.load_icon(script, 40, 40, 4)
             if icon:
+                icon_container = Gtk.Box()
+                icon_container.add_css_class("rounded-icon")
                 icon_image = Gtk.Image.new_from_paintable(icon)
                 icon_image.set_pixel_size(40)
-                row.add_prefix(icon_image)
+                icon_container.append(icon_image)
+                row.add_prefix(icon_container)
+            
             button_box = Gtk.Box(spacing=6, valign=Gtk.Align.CENTER)
+            
             play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play")
             play_button.set_size_request(60, 36)
-            #play_button.add_css_class("flat")
+            play_button.add_css_class("rounded-button")
+            
             options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text="Options")
-            #options_button.add_css_class("flat")
+            options_button.add_css_class("rounded-button")
+            
             button_box.append(play_button)
             button_box.append(options_button)
             row.add_suffix(button_box)
+            
             play_button.set_opacity(0)
             options_button.set_opacity(0)
             play_button.set_sensitive(False)
@@ -1703,12 +1753,15 @@ class WineCharmApp(Gtk.Application):
                 'is_running': False,
                 'script_path': script
             }
+            
             click = Gtk.GestureClick()
             click.connect("released", lambda gesture, n, x, y: self.toggle_overlay_buttons(script_key))
             row.add_controller(click)
+            
             play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, btn, row))
             options_button.connect("clicked", lambda btn: self.show_options_for_script(
                 self.script_ui_data[script_key], row, script_key))
+            
             return row
 
     def toggle_overlay_buttons(self, script_key):
@@ -2011,6 +2064,7 @@ class WineCharmApp(Gtk.Application):
         wineprefix = Path(str(script_data.get('script_path', ''))).parent.expanduser().resolve()
         env_vars = str(script_data.get('env_vars', ''))
         args = str(script_data.get('args', ''))
+        wine_debug = self.wine_debug
 
         try:
             # Get the runner from the script data
@@ -2040,6 +2094,7 @@ class WineCharmApp(Gtk.Application):
             (
             f"export WINEPREFIX={shlex.quote(str(wineprefix))}; "
             f"cd {shlex.quote(str(exe_file.parent))} && "
+            f"{wine_debug} "
             f"{env_vars} "
             f"WINEPREFIX={shlex.quote(str(wineprefix))} "
             f"{shlex.quote(str(runner_path))} "
@@ -2347,7 +2402,8 @@ class WineCharmApp(Gtk.Application):
         return_code = process.returncode
 
         # Check if the process was manually stopped
-        manually_stopped = process_info.get("manually_stopped", False)
+        #manually_stopped = process_info.get("manually_stopped", False)
+        manually_stopped = process_info.get("manually_stopped", False) or self.manually_killed
 
         # Update the UI in the main thread
         GLib.idle_add(self.process_ended, script_key)
@@ -2356,6 +2412,9 @@ class WineCharmApp(Gtk.Application):
             # Handle error code 2 (cancelled by the user) gracefully
             if return_code == 2:
                 print("Process was cancelled by the user.")
+                return
+            if return_code == -9:
+                print("All Processes killed by the user.")
                 return
 
             # Show error dialog only if the process was not stopped manually
@@ -2933,7 +2992,7 @@ class WineCharmApp(Gtk.Application):
             'args': "",
             'sha256sum': sha256_hash.hexdigest(),
             'runner': runner_to_use,  # Use the determined runner
-            'wine_debug': "WINEDEBUG=fixme-all DXVK_LOG_LEVEL=none",
+            'wine_debug': "WINEDEBUG=-fixme-all DXVK_LOG_LEVEL=none",
             'env_vars': ""
         }
 
@@ -4331,29 +4390,10 @@ class WineCharmApp(Gtk.Application):
             print(f"Error opening file manager: {e}")
 
 ########################################  delete wineprefix
-    def load_icon(self, script, x, y):
-        icon_name = script.stem + ".png"
-        icon_dir = script.parent
-        icon_path = icon_dir / icon_name
-        default_icon_path = self.get_default_icon_path()
-
-        try:
-            # Load the icon at a higher resolution
-            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(icon_path), 128, 128)
-            # Scale down to the desired size
-            scaled_pixbuf = pixbuf.scale_simple(x, y, GdkPixbuf.InterpType.BILINEAR)
-            return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
-        except Exception:
-            try:
-                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_size(str(default_icon_path), 128, 128)
-                scaled_pixbuf = pixbuf.scale_simple(x, y, GdkPixbuf.InterpType.BILINEAR)
-                return Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
-            except Exception:
-                return None
-
-    def load_icon(self, script, x, y):
+    def load_icon(self, script, x, y, radius=3):
         if not hasattr(self, 'icon_cache'):
             self.icon_cache = {}
+        
         cache_key = (str(script), x, y)
         if cache_key in self.icon_cache:
             return self.icon_cache[cache_key]
@@ -4372,12 +4412,43 @@ class WineCharmApp(Gtk.Application):
 
         if pixbuf:
             scaled_pixbuf = pixbuf.scale_simple(x, y, GdkPixbuf.InterpType.BILINEAR)
-            texture = Gdk.Texture.new_for_pixbuf(scaled_pixbuf)
+            
+            # Create a new surface and context for the rounded corners
+            surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, x, y)
+            context = cairo.Context(surface)
+            
+            # Draw rounded rectangle
+            radius = radius  # Corner radius
+            context.arc(radius, radius, radius, math.pi, 3 * math.pi / 2)
+            context.arc(x - radius, radius, radius, 3 * math.pi / 2, 0)
+            context.arc(x - radius, y - radius, radius, 0, math.pi / 2)
+            context.arc(radius, y - radius, radius, math.pi / 2, math.pi)
+            context.close_path()
+            
+            # Create pattern from pixbuf and set as source
+            Gdk.cairo_set_source_pixbuf(context, scaled_pixbuf, 0, 0)
+            context.clip()
+            context.paint()
+            
+            # Get the surface data as bytes
+            surface_bytes = surface.get_data()
+            
+            # Create GBytes from the surface data
+            gbytes = GLib.Bytes.new(surface_bytes)
+            
+            # Create texture from the bytes
+            texture = Gdk.MemoryTexture.new(
+                x, y,
+                Gdk.MemoryFormat.B8G8R8A8,
+                gbytes,
+                surface.get_stride()
+            )
         else:
             texture = None
 
         self.icon_cache[cache_key] = texture
         return texture
+
 
     def create_icon_title_widget(self, script):
         self.print_method_name()
@@ -7440,7 +7511,7 @@ class WineCharmApp(Gtk.Application):
         script_args = str(script_data.get('args', ''))
         script_key = str(script_data.get('sha256sum', script_key))
         env_vars = str(script_data.get('env_vars', ''))
-        wine_debug = str(script_data.get('wine_debug', ''))
+        wine_debug = self.wine_debug
         exe_name = Path(str(exe_file)).name
         wineprefix = Path(str(script_data.get('script_path', ''))).parent.expanduser().resolve()
 
@@ -10841,7 +10912,6 @@ class WineCharmApp(Gtk.Application):
 
 
 
-            
 
 
 
