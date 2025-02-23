@@ -10,7 +10,6 @@ import hashlib
 import signal
 import re
 import yaml
-from pathlib import Path
 import sys
 import socket
 import time
@@ -24,9 +23,11 @@ import urllib.request
 import json
 import cairo
 import math
+from pathlib import Path
 from gettext import gettext as _
-
+from threading import Lock
 from datetime import datetime, timedelta
+
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
@@ -82,7 +83,8 @@ class WineCharmApp(Gtk.Application):
         
         # Initialize other attributes here
         self.new_scripts = set()  # Initialize new_scripts as an empty set
-
+        self.file_lock = Lock()
+        
         # Initialize other attributes that might be missing
         self.selected_script = None
         self.selected_script_name = None
@@ -3238,64 +3240,48 @@ class WineCharmApp(Gtk.Application):
 
     def reverse_process_reg_files(self, wineprefix):
         self.print_method_name()
-        print(f"Starting to process .reg files in {wineprefix}")
-        
-        # Get current username from the environment
-        current_username = os.getenv("USERNAME") or os.getenv("USER")
+        print(f"Processing .reg files in {wineprefix}")
+        current_username = os.getenv("USER")
         if not current_username:
-            print("Unable to determine the current username from the environment.")
+            print("No username found")
             return
-        print(f"Current username: {current_username}")
 
-        # Read the USERNAME from user.reg
         user_reg_path = os.path.join(wineprefix, "user.reg")
         if not os.path.exists(user_reg_path):
-            print(f"File not found: {user_reg_path}")
+            print(f"No user.reg at {user_reg_path}")
             return
-        
-        print(f"Reading user.reg file from {user_reg_path}")
-        with open(user_reg_path, 'r') as file:
-            content = file.read()
-        
-        match = re.search(r'"USERNAME"="([^"]+)"', content, re.IGNORECASE)
-        if not match:
-            print("Unable to determine the USERNAME from user.reg.")
-            return
-        
-        wine_username = match.group(1)
-        print(f"Found USERNAME in user.reg: {wine_username}")
 
-        # Define replacements
-        replacements = {
-            f"\\\\users\\\\{current_username}": f"\\\\users\\\\%USERNAME%",
-            f"\\\\home\\\\{current_username}": f"\\\\home\\\\%USERNAME%",
-            f'"USERNAME"="{current_username}"': f'"USERNAME"="%USERNAME%"'
-        }
-        print("Defined replacements:")
-        for old, new in replacements.items():
-            print(f"  {old} -> {new}")
+        with self.file_lock:  # Ensure thread safety
+            with open(user_reg_path, 'r') as file:
+                content = file.read()
+            
+            match = re.search(r'"USERNAME"="([^"]+)"', content, re.IGNORECASE)
+            if not match:
+                print("No USERNAME in user.reg")
+                return
+            wine_username = match.group(1)
 
-        # Process all .reg files in the wineprefix
-        for root, dirs, files in os.walk(wineprefix):
-            for file in files:
-                if file.endswith(".reg"):
-                    file_path = os.path.join(root, file)
-                    print(f"Processing {file_path}")
-                    
-                    with open(file_path, 'r') as reg_file:
-                        reg_content = reg_file.read()
-                    
-                    for old, new in replacements.items():
-                        if old in reg_content:
-                            reg_content = reg_content.replace(old, new)
-                            print(f"Replaced {old} with {new} in {file_path}")
-                        else:
-                            print(f"No instances of {old} found in {file_path}")
+            replacements = {
+                f"\\\\users\\\\{current_username}": f"\\\\users\\\\%USERNAME%",
+                f"\\\\home\\\\{current_username}": f"\\\\home\\\\%USERNAME%",
+                f'"USERNAME"="{current_username}"': f'"USERNAME"="%USERNAME%"'
+            }
 
-                    with open(file_path, 'w') as reg_file:
-                        reg_file.write(reg_content)
-                    print(f"Finished processing {file_path}")
-
+            for root, dirs, files in os.walk(wineprefix):
+                for file in files:
+                    if file.endswith(".reg"):
+                        file_path = os.path.join(root, file)
+                        with open(file_path, 'r') as reg_file:
+                            reg_content = reg_file.read()
+                        modified = False
+                        for old, new in replacements.items():
+                            if old in reg_content:
+                                reg_content = reg_content.replace(old, new)
+                                modified = True
+                        if modified:
+                            with open(file_path, 'w') as reg_file:
+                                reg_file.write(reg_content)
+                                print(f"Updated {file_path}")
         print(f"Completed processing .reg files in {wineprefix}")
 
 
