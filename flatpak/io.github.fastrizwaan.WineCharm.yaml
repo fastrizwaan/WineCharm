@@ -234,7 +234,8 @@ modules:
       - install -Dm644 io.github.fastrizwaan.WineCharm.svg /app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg
       - install -Dm755 io.github.fastrizwaan.WineCharm.desktop /app/share/applications/io.github.fastrizwaan.WineCharm.desktop
       - mkdir -p /app/share/icons/hicolor/scalable/actions
-      - install -Dm644 icons/* /app/share/icons/hicolor/scalable/actions
+      - install -Dm644 icons/* /app/share/icons/hicolor/scalable/actions  # Reverted to simpler install command
+
     sources:
       - type: file
         path: winecharm.py
@@ -244,3 +245,6 @@ modules:
         path: io.github.fastrizwaan.WineCharm.svg
       - type: file
         path: io.github.fastrizwaan.WineCharm.desktop
+      - type: dir
+        path: ../icons    # Point to the real directory
+        dest: icons       # Rename it to 'icons' in the build environment
