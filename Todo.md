@@ -26,8 +26,7 @@ Refactoring winecharm
 # Todo 0.98
 - [ ] show recommended dxvk, vkd3d, openal, corefonts (get them separate, arial, times, etc. for progress) and show show all winetricks dlls with a window with checkbox
 - [ ] show winetricks dlls
-- [ ] Show dialog for save directories with option to add directories
-- [ ] Load directories show dialog with included directories files to be extracted.
+- [x] Show dialog for save directories with option to add directories to .charm script
 - [ ] launch to Run without args (for epsxe)
 - [ ] determine max screensize and update the registry files for distribution of files. if GPURes values are found like these
         user.reg:"GPUResX"="1920"
@@ -35,6 +34,8 @@ Refactoring winecharm
 - [x] use args and env vars in headless .charm file launch
 - [x] create need-wineboot.yml and check in launch, then do wineboot -u for restore/import so that game runs.
 - [x] isolate dirs after restore
+- [x] fix download runner gtk error
+- [x] show single progress if single runner is being downloaded
 - [x] make icons unique
 
 
