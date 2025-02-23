@@ -1,5 +1,3 @@
-
-```markdown
 # WineCharm
 
 **WineCharm** is a graphical user interface (GUI) application designed to simplify running and managing Windows applications on Linux using Wine. Built with Python and GTK4/Libadwaita, WineCharm provides an intuitive interface for launching `.exe` and `.msi` files, managing Wine prefixes, templates, and runners, and creating portable backups. It supports both GUI and headless modes, making it versatile for different use cases.
@@ -202,5 +200,5 @@ WineCharm is licensed under the GNU General Public License (GPLv3+). See the `LI
 
 - **Developer**: Mohammed Asif Ali Rizvan
 - **Project Page**: [GitHub Repository](https://github.com/fastrizwaan/WineCharm)
-```
+
 
