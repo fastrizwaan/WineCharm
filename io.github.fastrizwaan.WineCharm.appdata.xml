@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.fastrizwaan.WineCharm</id>
+  <name>WineCharm</name>
+  <summary>A Charming Wine GUI Application</summary>
+  <description>
+    <p>WineCharm is a graphical user interface (GUI) application designed to simplify running and managing Windows applications on Linux using Wine. Built with Python and GTK4/Libadwaita, it provides an intuitive interface for launching .exe and .msi files, managing Wine prefixes, templates, and runners, and creating portable backups.</p>
+    <p>Key features include support for both GUI and headless modes, single prefix mode for space efficiency, desktop shortcuts, and compatibility with .prefix, .bottle, and .wzt backup files.</p>
+  </description>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <developer_name>Mohammed Asif Ali Rizvan</developer_name>
+  <url type="homepage">https://github.com/fastrizwaan/WineCharm</url>
+  <url type="bugtracker">https://github.com/fastrizwaan/WineCharm/issues</url>
+  <url type="vcs-browser">https://github.com/fastrizwaan/WineCharm</url>
+  <categories>
+    <category>Utility</category>
+    <category>Emulator</category>
+  </categories>
+  <keywords>
+    <keyword>Wine</keyword>
+    <keyword>Windows</keyword>
+    <keyword>Emulator</keyword>
+    <keyword>GUI</keyword>
+    <keyword>Gaming</keyword>
+  </keywords>
+  <launchable type="desktop-id">io.github.fastrizwaan.WineCharm.desktop</launchable>
+  <screenshots>
+    <!-- Add screenshot URLs or paths here once available -->
+    <screenshot type="default">
+      <image>https://github.com/fastrizwaan/WineCharm/raw/main/screenshots/main-window.png</image>
+      <caption>Main window showing script list</caption>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="0.97" date="2025-02-23">
+      <description>
+        <p>Initial release with full feature set including prefix management, template system, and Flatpak support.</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1" />
+  <requires>
+    <display_length compare="ge">0</display_length>
+  </requires>
+</component>
