@@ -24,6 +24,7 @@ import urllib.request
 import json
 import cairo
 import math
+from gettext import gettext as _
 
 from datetime import datetime, timedelta
 gi.require_version('Gtk', '4.0')
@@ -3234,9 +3235,6 @@ class WineCharmApp(Gtk.Application):
 
         dialog.connect("response", on_response)
         dialog.present(self.window)
-
-
-
 
     def reverse_process_reg_files(self, wineprefix):
         self.print_method_name()
@@ -6640,142 +6638,315 @@ class WineCharmApp(Gtk.Application):
 
         dialog.close()
 ########################
+    def is_valid_directory(self, path_obj, wineprefix):
+        """
+        Validate if a directory can be added to the backup list.
+        
+        Args:
+            path_obj (Path): The selected directory path.
+            wineprefix (Path): The wineprefix path.
+        
+        Returns:
+            tuple: (bool, str) - (is_valid, error_message)
+        """
+        # Ensure the directory is within the wineprefix
+        if not path_obj.is_relative_to(wineprefix):
+            return False, "Directory must be within Wine prefix"
+        
+        # Define directories to exclude exactly (not their subdirectories)
+        exact_exclusions = [
+            wineprefix,              # Wineprefix itself
+            wineprefix / "drive_c"   # drive_c itself
+        ]
+        
+        # Define directories to exclude including their subdirectories
+        subtree_exclusions = {
+            wineprefix / "dosdevices": "Cannot select dosdevices or its subdirectories",
+            wineprefix / "drive_c" / "windows": "Cannot select drive_c/windows or its subdirectories"
+        }
+        
+        # Check exact exclusions
+        if path_obj in exact_exclusions:
+            if path_obj == wineprefix:
+                return False, "Cannot select the wineprefix directory"
+            elif path_obj == wineprefix / "drive_c":
+                return False, "Cannot select the drive_c directory"
+        
+        # Check subtree exclusions
+        for excl, msg in subtree_exclusions.items():
+            try:
+                path_obj.relative_to(excl)
+                return False, msg  # Path is excl or a subdirectory of excl
+            except ValueError:
+                pass  # Not a match, continue checking
+        
+        return True, ""  # Directory is valid
+        
     def show_save_user_dirs_dialog(self, script, script_key, button):
-        self.print_method_name()
-        default_backup_name = f"{script.stem}_user_dirs_backup.tar.zst"
+        """Show dialog to select directories for backup."""
+        global _  # Explicitly declare _ as global to prevent shadowing
+        print("Method: show_save_user_dirs_dialog")
+        wineprefix = Path(script).parent
+        default_dir = wineprefix / "drive_c" / "users"
 
-        file_dialog = Gtk.FileDialog.new()
+        # Create Adw.AlertDialog
+        dialog = Adw.AlertDialog(
+            heading=_("Select Directories to Backup"),
+            body=_("Choose which directories to include in the backup.")
+        )
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("ok", _("OK"))
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
+        dialog.set_default_response("ok")
+        dialog.set_close_response("cancel")
+
+        # Create content container
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        
+        # Scrollable directory list
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_vexpand(True)
+        scrolled.set_min_content_height(200)
+        
+        # ListBox with CSS class
+        self.dir_list = Gtk.ListBox()
+        self.dir_list.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.dir_list.add_css_class("boxed-list")  # Modern GTK 4 styling
+        
+        # Add default directory
+        default_row = Gtk.ListBoxRow()
+        default_check = Gtk.CheckButton(label=str(default_dir))
+        default_check.set_active(True)
+        default_row.set_child(default_check)
+        self.dir_list.append(default_row)
+        
+        # Load saved directories from .charm file
+        script_data = self.extract_yaml_info(script_key)
+        saved_dirs = script_data.get('save_dirs', [])
+        for saved_dir in saved_dirs:
+            saved_path = Path(saved_dir).expanduser().resolve()
+            # Validate saved directory
+            valid, _unused = self.is_valid_directory(saved_path, wineprefix)
+            if valid and str(saved_path) != str(default_dir):
+                row = Gtk.ListBoxRow()
+                check = Gtk.CheckButton(label=str(saved_path))
+                check.set_active(True)
+                row.set_child(check)
+                self.dir_list.append(row)
+        
+        scrolled.set_child(self.dir_list)
+        content_box.append(scrolled)
+
+        # Add directory button
+        add_btn = Gtk.Button(label=_("Add Directory"))
+        add_btn.connect("clicked", self.on_add_directory, self.window, wineprefix)
+        content_box.append(add_btn)
+
+        dialog.set_extra_child(content_box)
+        dialog.connect("response", self.on_directory_dialog_response, script, script_key)
+        dialog.present(self.window)
+
+    def on_directory_dialog_response(self, dialog, response_id, script, script_key):
+        """Handle dialog response and save selected directories to .charm file."""
+        if response_id == "ok":
+            selected_dirs = [row.get_child().get_label() for row in self.dir_list 
+                            if row.get_child().get_active()]
+            self.show_save_file_dialog(script, script_key, selected_dirs)
+            
+            # Update the .charm file with selected directories
+            try:
+                script_data = self.extract_yaml_info(script_key)
+                script_path = Path(str(script_data['script_path'])).expanduser().resolve()
+                
+                # Convert paths to tilde format for storage
+                save_dirs = [self.replace_home_with_tilde_in_path(dir) for dir in selected_dirs]
+                script_data['save_dirs'] = save_dirs
+                
+                # Write updated data back to .charm file
+                with open(script_path, 'w') as file:
+                    yaml.dump(script_data, file, default_style="'", default_flow_style=False, width=10000)
+                print(f"Saved directories to {script_path}: {save_dirs}")
+            except Exception as e:
+                print(f"Error saving directories to .charm file: {e}")
+                GLib.idle_add(self.show_error_dialog, _("Error"), 
+                            _("Failed to save directories: {}").format(str(e)))
+        
+        dialog.close()
+
+    def on_add_directory(self, button, parent_dialog, wineprefix):
+        """Add a new directory to the backup list with validation."""
+        dir_dialog = Gtk.FileDialog()
+        dir_dialog.set_title(_("Select Directory to Add"))
+        dir_dialog.set_initial_folder(Gio.File.new_for_path(str(wineprefix)))
+
+        def on_dir_response(dlg, result):
+            try:
+                folder = dlg.select_folder_finish(result)
+                path = folder.get_path()
+                path_obj = Path(path)
+
+                # Validate the directory
+                valid, msg = self.is_valid_directory(path_obj, wineprefix)
+                if not valid:
+                    self.show_error_dialog(_("Error"), msg)
+                    return
+                
+                # Check for duplicates
+                if any(row.get_child().get_label() == path for row in self.dir_list):
+                    return  # Silently ignore duplicates
+                
+                # Add the directory to the list
+                row = Gtk.ListBoxRow()
+                check = Gtk.CheckButton(label=path)
+                check.set_active(True)
+                row.set_child(check)
+                self.dir_list.append(row)
+            except GLib.Error as e:
+                if e.code != Gtk.DialogError.DISMISSED:
+                    print(f"Directory selection error: {e}")
+
+        dir_dialog.select_folder(parent_dialog, None, on_dir_response)
+
+
+    def show_save_file_dialog(self, script, script_key, selected_dirs):
+        """Show dialog to choose backup file location."""
+        print("Method: show_save_file_dialog")
+        creation_date_and_time = datetime.now().strftime("%Y%m%d%H%M")
+        default_backup_name = f"{script.stem}-{creation_date_and_time}.saved"
+        file_dialog = Gtk.FileDialog()
         file_dialog.set_initial_name(default_backup_name)
+        file_dialog.save(self.window, None, 
+                        lambda dlg, res: self.on_save_user_dirs_dialog_response(dlg, res, script, script_key, selected_dirs))
 
-        file_dialog.save(self.window, None, lambda dlg, res: self.on_save_user_dirs_dialog_response(dlg, res, script, script_key))
-
-    def on_save_user_dirs_dialog_response(self, dialog, result, script, script_key):
-        self.print_method_name()
+    def on_save_user_dirs_dialog_response(self, dialog, result, script, script_key, selected_dirs):
+        """Handle save file dialog response."""
+        print("Method: on_save_user_dirs_dialog_response")
         try:
             backup_file = dialog.save_finish(result)
             if backup_file:
                 backup_path = backup_file.get_path()
                 print(f"Backup will be saved to: {backup_path}")
-
-                # Start the backup process in a separate thread
-                threading.Thread(target=self.save_user_dirs, args=(script, script_key, backup_path)).start()
-
+                threading.Thread(
+                    target=self.save_user_dirs,
+                    args=(script, script_key, backup_path, selected_dirs)
+                ).start()
         except GLib.Error as e:
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
-                print(f"An error occurred while saving the backup: {e}")
+                print(f"Save error: {e}")
 
-    def save_user_dirs(self, script, script_key, backup_path):
-        self.print_method_name()
+    def save_user_dirs(self, script, script_key, backup_path, selected_dirs):
+        """Save selected directories to a compressed archive."""
+        print("Method: save_user_dirs")
         wineprefix = Path(script).parent
-
-        # Define the user's directory in Wineprefix (usually found at drive_c/users)
-        users_dir = wineprefix / "drive_c" / "users"
-
-        if not users_dir.exists():
-            print(f"Error: User directories not found in Wineprefix {wineprefix}.")
-            return
-
         current_username = os.getenv("USER") or os.getenv("USERNAME")
         if not current_username:
-            print("Error: Unable to determine the current username.")
+            print("Error: Couldn't determine username")
             return
-
+        rel_paths = [str(Path(path).relative_to(wineprefix)) for path in selected_dirs 
+                    if Path(path).is_relative_to(wineprefix)]
+        if not rel_paths:
+            print("No valid directories selected")
+            return
         try:
-            # Backup command with zstd compression and path transformation
             tar_command = [
-                'tar', '-I', 'zstd -T0',  # Use zstd compression with all available CPU cores
-                '--transform', f"s|{current_username}|%USERNAME%|g",  # Rename directory
+                'tar', '-I', 'zstd -T0',
+                '--transform', f"s|{current_username}|%USERNAME%|g",
                 '-cf', backup_path,
-                '-C', str(users_dir),  # Change directory to parent of 'users'
-                '.'  # Archive all directories in the 'users' directory
-            ]
-
-            print(f"Running backup command: {' '.join(tar_command)}")
-            result = subprocess.run(tar_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
+                '-C', str(wineprefix)
+            ] + rel_paths
+            print(f"Executing: {' '.join(tar_command)}")
+            result = subprocess.run(tar_command, capture_output=True, text=True)
             if result.returncode != 0:
                 raise Exception(f"Backup failed: {result.stderr}")
-
-            print(f"Backup archive created at {backup_path}")
-            GLib.idle_add(self.show_info_dialog, "Saved", f"User directory Saved to {backup_path}")
+            print(f"Backup created at {backup_path}")
+            GLib.idle_add(self.show_info_dialog, _("Backup Complete"), 
+                         _("User directories saved to:\n{}").format(backup_path))
         except Exception as e:
-            print(f"Error during backup: {e}")
-
-
-
+            print(f"Backup error: {e}")
+            GLib.idle_add(self.show_error_dialog, _("Backup Failed"), str(e))
 
     def show_load_user_dirs_dialog(self, script, script_key, button):
-        self.print_method_name()
-        # Create a Gtk.FileDialog instance for loading the file
-        file_dialog = Gtk.FileDialog.new()
-
-        # Set filter to only allow tar.zst files
+        """Show dialog to load a backup file."""
+        print("Method: show_load_user_dirs_dialog")
+        file_dialog = Gtk.FileDialog()
         file_filter = Gtk.FileFilter()
-        file_filter.set_name("Backup Files (*.tar.zst)")
-        file_filter.add_pattern("*.tar.zst")
-
-        # Create a Gio.ListStore to hold the file filter (required by Gtk.FileDialog)
+        file_filter.set_name("Saved Files (*.sav.tar.zst, *.saved)")
+        file_filter.add_pattern("*.sav.tar.zst")
+        file_filter.add_pattern("*.saved")
         filter_list_store = Gio.ListStore.new(Gtk.FileFilter)
         filter_list_store.append(file_filter)
-
-        # Set the filters on the file dialog
         file_dialog.set_filters(filter_list_store)
-
-        # Open the dialog asynchronously to select the file to load
-        file_dialog.open(self.window, None, lambda dlg, res: self.on_load_user_dirs_dialog_response(dlg, res, script, script_key))
-
+        file_dialog.open(self.window, None, 
+                        lambda dlg, res: self.on_load_user_dirs_dialog_response(dlg, res, script, script_key))
 
     def on_load_user_dirs_dialog_response(self, dialog, result, script, script_key):
-        self.print_method_name()
+        """Handle load file dialog response with confirmation."""
+        print("Method: on_load_user_dirs_dialog_response")
         try:
             backup_file = dialog.open_finish(result)
             if backup_file:
                 backup_path = backup_file.get_path()
                 print(f"Backup will be loaded from: {backup_path}")
-
-                # Start the load process in a separate thread
-                threading.Thread(target=self.load_user_dirs, args=(script, script_key, backup_path)).start()
-
+                def on_confirm(confirm):
+                    if confirm:
+                        threading.Thread(target=self.load_user_dirs, 
+                                       args=(script, script_key, backup_path)).start()
+                self.confirm_restore(backup_path, on_confirm)
         except GLib.Error as e:
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
-                print(f"An error occurred while loading the backup: {e}")
+                print(f"Load error: {e}")
+
+    def confirm_restore(self, backup_path, callback):
+        """Show confirmation dialog before restoring."""
+        dialog = Adw.AlertDialog(
+            heading=_("Confirm Restore"),
+            body=_("Restoring from {} will overwrite existing user directories. Proceed?").format(backup_path)
+        )
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("restore", _("Restore"))
+        dialog.set_response_appearance("restore", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.connect("response", lambda d, r: callback(r == "restore"))
+        dialog.present(self.window)
 
     def load_user_dirs(self, script, script_key, backup_path):
-        self.print_method_name()
+        """Restore user directories from a backup file."""
+        print("Method: load_user_dirs")
         wineprefix = Path(script).parent
-        users_dir = wineprefix / "drive_c" / "users"
         if not wineprefix.exists():
-            print(f"Error: Wineprefix not found at {wineprefix}.")
+            print(f"Error: Wineprefix not found at {wineprefix}")
             return
-
         current_username = os.getenv("USER") or os.getenv("USERNAME")
         if not current_username:
-            print("Error: Unable to determine the current username.")
+            print("Error: Unable to determine username")
             return
-            
-
         try:
-            # Extraction command
+            extract_dir = wineprefix / "drive_c" / "users" if backup_path.endswith('.sav.tar.zst') else wineprefix
+            extract_dir.mkdir(parents=True, exist_ok=True)
             tar_command = [
-                'tar', '-I', 'zstd -d',  # Decompress with zstd
+                'tar', '-I', 'zstd -d',
                 '-xf', backup_path,
                 '--transform', f"s|%USERNAME%|{current_username}|g",
                 '--transform', f"s|XOUSERXO|{current_username}|g",
-                '-C', str(wineprefix / "drive_c" / "users")  # Extract in the drive_c directory
+                '-C', str(extract_dir)
             ]
-            print(f"Running load command: {' '.join(tar_command)}")
-            result = subprocess.run(tar_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
+            print(f"Executing: {' '.join(tar_command)}")
+            result = subprocess.run(tar_command, capture_output=True, text=True)
             if result.returncode != 0:
                 raise Exception(f"Restore failed: {result.stderr}")
-
-            print(f"Backup loaded from {backup_path}")
-            
-            GLib.idle_add(self.show_info_dialog, "Loaded", f"User directory extracted to {backup_path}")
-
+            print(f"Backup loaded to {extract_dir}")
+            GLib.idle_add(self.show_info_dialog, _("Restore Complete"), 
+                         _("User directories restored to:\n{}").format(extract_dir))
         except Exception as e:
-            print(f"Error during restore: {e}")
+            print(f"Restore error: {e}")
+            GLib.idle_add(self.show_error_dialog, _("Restore Failed"), str(e))
 
+
+    def show_error_dialog(self, title, message):
+        """Display an error dialog."""
+        dialog = Adw.AlertDialog(heading=title, body=message)
+        dialog.add_response("ok", _("OK"))
+        dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
+        dialog.present(self.window)
 ########################
     def import_game_directory(self, script, script_key, *args):
         self.print_method_name()
@@ -8085,7 +8256,7 @@ class WineCharmApp(Gtk.Application):
             print(f"Error loading runner data from cache: {e}")
             return None
 
-#### RUNNER download issue with progress and cancel        
+#### RUNNER download issue with progress and cancel    
     def on_settings_download_runner_clicked(self, callback=None):
         self.print_method_name()
         """
@@ -8145,7 +8316,6 @@ class WineCharmApp(Gtk.Application):
         dialog.connect("response", self.on_download_runner_response, combo_boxes, callback)
         dialog.present(self.window)
 
-
     def on_download_runner_response(self, dialog, response_id, combo_boxes, callback=None):
         self.print_method_name()
         """Handle response from runner selection dialog."""
@@ -8177,15 +8347,20 @@ class WineCharmApp(Gtk.Application):
                 progress_label = Gtk.Label(label="Starting download...")
                 runner_progress_bar = Gtk.ProgressBar()
                 total_progress_bar = Gtk.ProgressBar()
+                
                 content_box.append(progress_label)
                 content_box.append(runner_progress_bar)
-                content_box.append(total_progress_bar)
+                
+                total_runners = len(selected_runners)
+                if total_runners > 1:
+                    content_box.append(total_progress_bar)
+                else:
+                    total_progress_bar.set_visible(False)
 
                 # Add cancel button
                 progress_dialog.add_response("cancel", "Cancel")
                 progress_dialog.set_close_response("cancel")
                 
-                # Create cancellation event
                 cancel_event = threading.Event()
                 progress_dialog.connect("response", 
                     lambda d, r: cancel_event.set() if r == "cancel" else None
@@ -8208,13 +8383,26 @@ class WineCharmApp(Gtk.Application):
                 GLib.idle_add(callback)
 
     def download_runners_thread(self, selected_runners, progress_dialog, total_progress_bar,
-                            runner_progress_bar, progress_label, callback, cancel_event):
+                                runner_progress_bar, progress_label, callback, cancel_event):
         self.print_method_name()
-        """Threaded download process with cancellation support."""
         total_runners = len(selected_runners)
         download_success = True
         current_file = None
-        was_cancelled = False  # Track cancellation explicitly
+        was_cancelled = False
+
+        # Throttle UI updates
+        last_update_time = 0
+        update_interval = 250  # ms
+
+        def update_progress(label_text, runner_fraction, total_fraction):
+            nonlocal last_update_time
+            current_time = GLib.get_monotonic_time() // 1000  # ms
+            if current_time - last_update_time >= update_interval:
+                GLib.idle_add(progress_label.set_text, label_text)
+                GLib.idle_add(runner_progress_bar.set_fraction, min(1.0, runner_fraction))
+                if total_runners > 1:
+                    GLib.idle_add(total_progress_bar.set_fraction, min(1.0, total_fraction))
+                last_update_time = current_time
 
         try:
             for idx, (label, runner) in enumerate(selected_runners.items()):
@@ -8224,16 +8412,17 @@ class WineCharmApp(Gtk.Application):
                     break
 
                 current_file = self.runners_dir / f"{runner['name']}.tar.xz"
-                
-                # Update UI
-                GLib.idle_add(progress_label.set_text, f"Downloading {runner['name']}...")
-                GLib.idle_add(runner_progress_bar.set_fraction, 0.0)
+                update_progress(f"Downloading {runner['name']} ({idx + 1}/{total_runners})...", 0.0, idx / total_runners)
 
                 try:
                     self.download_and_extract_runner(
                         runner['name'],
                         runner['url'],
-                        lambda p: GLib.idle_add(runner_progress_bar.set_fraction, p),
+                        lambda p: update_progress(
+                            f"Downloading {runner['name']} ({idx + 1}/{total_runners})...",
+                            p,
+                            idx / total_runners + p / total_runners
+                        ),
                         cancel_event
                     )
                 except Exception as e:
@@ -8243,49 +8432,56 @@ class WineCharmApp(Gtk.Application):
                         break
                     else:
                         GLib.idle_add(
-                            self.show_info_dialog,
-                            "Download Error",
-                            f"Failed to download {runner['name']}: {e}"
+                            lambda: self.show_info_dialog(
+                                "Download Error",
+                                f"Failed to download {runner['name']}: {e}"
+                            )
                         )
 
-                # Update total progress
-                GLib.idle_add(total_progress_bar.set_fraction, (idx + 1) / total_runners)
+                if total_runners > 1:
+                    update_progress(f"Finished {runner['name']}", 1.0, (idx + 1) / total_runners)
+
+            if download_success and total_runners > 1:
+                update_progress("Download Complete", 1.0, 1.0)
 
         finally:
-            # Cleanup partial file if exists
             if current_file and current_file.exists():
                 current_file.unlink(missing_ok=True)
-            
-            # Handle final status in one place
-            if was_cancelled:
+
+            def finalize_ui(title, message):
                 GLib.idle_add(
-                    self.show_info_dialog,
+                    lambda: progress_dialog.close() if progress_dialog.get_mapped() else None
+                )
+                GLib.timeout_add(100, lambda: self.show_info_dialog(
+                    title,
+                    message,
+                    callback=callback if callback else None
+                ))
+
+            if was_cancelled:
+                finalize_ui(
                     "Download Cancelled",
-                    "The download was cancelled. Partially downloaded files have been deleted.",
-                    callback
+                    "The download was cancelled. Partially downloaded files have been deleted."
                 )
             elif download_success:
-                
-                GLib.idle_add(progress_dialog.close)
-                GLib.idle_add(
-                    self.show_info_dialog,
+                finalize_ui(
                     "Download Complete",
-                    "The runners have been successfully downloaded and extracted.",
-                    callback
+                    f"Successfully downloaded {total_runners} runner{'s' if total_runners > 1 else ''}."
                 )
             else:
-                GLib.idle_add(
-                    self.show_info_dialog,
+                finalize_ui(
                     "Download Incomplete",
-                    "Some runners failed to download.",
-                    callback
+                    "Some runners failed to download."
                 )
 
     def download_and_extract_runner(self, runner_name, download_url, progress_callback, cancel_event):
         self.print_method_name()
-        """Download and extract runner with cancellation support."""
+        """Download and extract runner with cancellation support and throttled updates."""
         runner_tar_path = self.runners_dir / f"{runner_name}.tar.xz"
         self.runners_dir.mkdir(parents=True, exist_ok=True)
+
+        last_progress = 0
+        progress_threshold = 0.05  # Update every 5%
 
         try:
             with urllib.request.urlopen(download_url) as response:
@@ -8294,36 +8490,42 @@ class WineCharmApp(Gtk.Application):
                 
                 with open(runner_tar_path, 'wb') as f:
                     while True:
-                        # Check for cancellation before each chunk
                         if cancel_event.is_set():
                             raise Exception("Download cancelled by user")
-                            
-                        # Read smaller chunks for more responsive cancellation
-                        chunk = response.read(4096)  # Reduced from 8192 to 4KB chunks
+                        
+                        chunk = response.read(4096)  # 4KB chunks
                         if not chunk:
                             break
-                            
+                        
                         f.write(chunk)
                         downloaded += len(chunk)
                         
-                        # Add intermediate cancellation check
                         if cancel_event.is_set():
                             raise Exception("Download cancelled by user")
                         
                         if total_size > 0 and progress_callback:
                             progress = downloaded / total_size
-                            GLib.idle_add(progress_callback, progress)
+                            if progress - last_progress >= progress_threshold or progress >= 1.0:
+                                progress_callback(progress)
+                                last_progress = progress
 
-            # Extract the file
-            subprocess.run(["tar", "-xf", str(runner_tar_path), "-C", str(self.runners_dir)], check=True)
+            # Extract asynchronously to avoid blocking
+            process = subprocess.Popen(
+                ["tar", "-xf", str(runner_tar_path), "-C", str(self.runners_dir)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            stdout, stderr = process.communicate()
+            if process.returncode != 0:
+                raise Exception(f"Extraction failed: {stderr.decode()}")
+
             runner_tar_path.unlink()
 
         except Exception as e:
             if runner_tar_path.exists():
                 runner_tar_path.unlink()
-            raise
+            raise  # Re-raise to handle in download_runners_thread 
 
-# Please fix the download runner method to have cancel capability, show cancel button instead of OK
 #### /RUNNER download issue with progress and cancel        
     def delete_runner(self, action=None):
         self.print_method_name()
