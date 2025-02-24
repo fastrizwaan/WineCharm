@@ -9175,24 +9175,19 @@ class WineCharmApp(Gtk.Application):
             self.connect_open_button_with_restore_backup_cancel()
             def restore_process():
                 try:
-                    # Determine the file extension and get the appropriate restore steps
                     if file_path.endswith(".wzt"):
                         restore_steps = self.get_wzt_restore_steps(file_path)
                     else:
                         restore_steps = self.get_restore_steps(file_path)
 
-                    # Perform restore steps
                     for step_text, step_func in restore_steps:
                         if self.stop_processing:
-                            # Handle cancellation
                             if backup_dir and backup_dir.exists():
                                 if extracted_prefix.exists():
                                     shutil.rmtree(extracted_prefix)
                                 shutil.move(str(backup_dir), str(extracted_prefix))
                                 print(f"Restored original directory from: {backup_dir}")
-                            GLib.idle_add(self.on_restore_completed)
-                            #GLib.idle_add(self.show_info_dialog, "Cancelled", "Restore process was cancelled")
-                            return
+                            return  # Finally block will handle UI reset
 
                         GLib.idle_add(self.show_initializing_step, step_text)
                         try:
@@ -9200,30 +9195,28 @@ class WineCharmApp(Gtk.Application):
                             GLib.idle_add(self.mark_step_as_done, step_text)
                         except Exception as e:
                             print(f"Error during step '{step_text}': {e}")
-                            # Handle failure
                             if backup_dir and backup_dir.exists():
                                 if extracted_prefix.exists():
                                     shutil.rmtree(extracted_prefix)
                                 shutil.move(str(backup_dir), str(extracted_prefix))
                             GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
-                            return
+                            return  # Finally block will handle UI reset
 
-                    # If successful, remove backup directory
+                    # Success case
                     if backup_dir and backup_dir.exists():
                         shutil.rmtree(backup_dir)
                         print(f"Removed backup directory: {backup_dir}")
 
-                    GLib.idle_add(self.on_restore_completed)
-
                 except Exception as e:
                     print(f"Error during restore process: {e}")
-                    # Handle failure
                     if backup_dir and backup_dir.exists():
                         if extracted_prefix.exists():
                             shutil.rmtree(extracted_prefix)
                         shutil.move(str(backup_dir), str(extracted_prefix))
                     GLib.idle_add(self.show_info_dialog, "Error", f"Restore failed: {str(e)}")
 
+                finally:
+                    GLib.idle_add(self.on_restore_completed)
             # Start the restore process in a new thread
             threading.Thread(target=restore_process).start()
 
