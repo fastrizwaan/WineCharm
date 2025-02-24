@@ -1,1 +1,1 @@
-../wcterm.py
+../src/wcterm.py

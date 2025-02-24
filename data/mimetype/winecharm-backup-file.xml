@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-winecharm-backup-file">
+    <comment>Winecharm Backup File</comment>
+    <generic-icon name="package-x-generic"/>
+    <glob pattern="*.wzt"/>
+    <glob pattern="*.prefix"/>
+    <glob pattern="*.bottle"/>
+  </mime-type>
+</mime-info>

@@ -38,25 +38,27 @@ finish-args:
   - --talk-name=org.a11y.Bus
     # Most Games write to their own directories
 #- --filesystem=host
-  - --filesystem=host
-  - --filesystem=xdg-desktop
-  - --filesystem=xdg-documents
-  - --filesystem=xdg-download
-  - --filesystem=xdg-music
-  - --filesystem=xdg-pictures
-  - --filesystem=xdg-videos
+  - --filesystem=host:ro
+  - --filesystem=xdg-desktop:ro
+  - --filesystem=xdg-documents:ro
+  - --filesystem=xdg-download:ro
+  - --filesystem=xdg-music:ro
+  - --filesystem=xdg-pictures:ro
+  - --filesystem=xdg-videos:ro
   - --filesystem=xdg-run/gvfs
   - --filesystem=xdg-run/gvfsd
+  - --filesystem=home/games:create
+  
   # WineZGUI import wine prefix Needs access to copy games and runners from wine, bottles, playonlinux, lutris, heroic launcher data directories. 
   # Using :ro messes up the path to /run/... instead of ~/ breaking copying
   # flatpak bug with :ro breaks realpath.
-  - --filesystem=~/Games
-  - --filesystem=~/.wine
-  - --filesystem=~/.var/app/org.winehq.Wine/data/wine
-  - --filesystem=~/.var/app/com.usebottles.bottles/data/bottles
-  - --filesystem=~/.var/app/com.playonlinux.PlayOnLinux4/data/PlayOnLinux/wineprefix
-  - --filesystem=~/.var/app/org.phoenicis.playonlinux/.Phoenicis/containers/wineprefix
-  - --filesystem=~/.var/appapp/io.github.fastrizwaan.Wine/data/winezgui
+  - --filesystem=~/Games:ro
+  - --filesystem=~/.wine:ro
+  - --filesystem=~/.var/app/org.winehq.Wine/data/wine:ro
+  - --filesystem=~/.var/app/com.usebottles.bottles/data/bottles:ro
+  - --filesystem=~/.var/app/com.playonlinux.PlayOnLinux4/data/PlayOnLinux/wineprefix:ro
+  - --filesystem=~/.var/app/org.phoenicis.playonlinux/.Phoenicis/containers/wineprefix:ro
+  - --filesystem=~/.var/appapp/io.github.fastrizwaan.Wine/data/winezgui:ro
 
 cleanup:
   - '*.a'
@@ -234,17 +236,17 @@ modules:
       - install -Dm644 io.github.fastrizwaan.WineCharm.svg /app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg
       - install -Dm755 io.github.fastrizwaan.WineCharm.desktop /app/share/applications/io.github.fastrizwaan.WineCharm.desktop
       - mkdir -p /app/share/icons/hicolor/scalable/actions
-      - install -Dm644 icons/* /app/share/icons/hicolor/scalable/actions  # Reverted to simpler install command
+      - install -Dm644 icons/*-symbolic.svg /app/share/icons/hicolor/scalable/actions  # Reverted to simpler install command
 
     sources:
       - type: file
-        path: winecharm.py
+        path: ../src/winecharm.py
       - type: file
-        path: wcterm.py
+        path: ../src/wcterm.py
       - type: file
-        path: io.github.fastrizwaan.WineCharm.svg
+        path: ../data/icons/io.github.fastrizwaan.WineCharm.svg
       - type: file
-        path: io.github.fastrizwaan.WineCharm.desktop
+        path: ../data/shortcut/io.github.fastrizwaan.WineCharm.desktop
       - type: dir
-        path: ../icons    # Point to the real directory
+        path: ../data/icons    # Point to the real directory
         dest: icons       # Rename it to 'icons' in the build environment

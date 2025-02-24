@@ -1,1 +1,1 @@
-../winecharm.py
+../src/winecharm.py

@@ -8,7 +8,7 @@ REQUIRED_PYTHON_MODULES=(
     "gi"
     "PyYAML"
     "psutil"
-    "argparse"  # argparse is part of standard library (Python >= 2.7) but including for safety
+    "argparse"  # argparse is part of standard library (Python >= 2.7) but included for safety
 )
 
 show_help() {
@@ -56,7 +56,6 @@ check_dependencies() {
         echo "on Debian:"
         echo "sudo dpkg --add-architecture i386 && sudo apt update -y
 sudo apt install zenity wine wine32 wine64 winetricks libimage-exiftool-perl icoutils gnome-terminal wget zstd winbind python3-yaml python3-psutil"
-        #return 1
     fi
 
     return 0
@@ -81,7 +80,7 @@ check_python_dependencies() {
     if [ ${#missing_modules[@]} -ne 0 ]; then
         echo "The following required Python modules are missing:"
         for module in "${missing_modules[@]}"; do
-            echo "  - $module"
+            echo "  - $prog"
         done
         echo ""
         echo "You can install them using pip:"
@@ -92,19 +91,34 @@ check_python_dependencies() {
     return 0
 }
 
-
 install_files() {
     echo "Installing WineCharm to $INSTALL_PATH..."
 
-    install -Dm755 winecharm.py "$INSTALL_PATH/bin/winecharm"
-    install -Dm644 io.github.fastrizwaan.WineCharm.svg "$INSTALL_PATH/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg"
-    install -Dm755 io.github.fastrizwaan.WineCharm.desktop "$INSTALL_PATH/share/applications/io.github.fastrizwaan.WineCharm.desktop"
-    install -Dm644 org.winehq.Wine.png "$INSTALL_PATH/share/icons/hicolor/128x128/apps/org.winehq.Wine.png"
+    # Install main script from src/
+    install -Dm755 src/winecharm.py "$INSTALL_PATH/bin/winecharm"
 
-    # Install action icons
-    for icon in icons/*.svg; do
+    # Install app icon from data/icons/
+    install -Dm644 data/icons/io.github.fastrizwaan.WineCharm.svg "$INSTALL_PATH/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg"
+
+    # Install .desktop file from data/shortcut/
+    install -Dm644 data/shortcut/io.github.fastrizwaan.WineCharm.desktop "$INSTALL_PATH/share/applications/io.github.fastrizwaan.WineCharm.desktop"
+
+    # Install additional Wine icon from data/icons/
+    install -Dm644 data/icons/org.winehq.Wine.png "$INSTALL_PATH/share/icons/hicolor/128x128/apps/org.winehq.Wine.png"
+
+    # Install action icons from data/icons/
+    for icon in data/icons/*-symbolic.svg; do
         install -Dm644 "$icon" "$INSTALL_PATH/share/icons/hicolor/scalable/actions/$(basename "$icon")"
     done
+
+    # Install MIME type definition from data/mimetype/
+    install -Dm644 data/mimetype/winecharm-backup-file.xml "$INSTALL_PATH/share/mime/packages/winecharm-backup-file.xml"
+
+    # Update system databases
+    echo "Updating MIME and icon caches..."
+    update-mime-database "$INSTALL_PATH/share/mime" &> /dev/null || echo "Failed to update MIME database."
+    gtk-update-icon-cache "$INSTALL_PATH/share/icons/hicolor/" &> /dev/null || echo "Failed to update icon cache."
+    update-desktop-database "$INSTALL_PATH/share/applications/" &> /dev/null || echo "Failed to update desktop database."
 
     echo "WineCharm installed successfully."
 }
@@ -112,15 +126,25 @@ install_files() {
 uninstall_files() {
     echo "Uninstalling WineCharm from $INSTALL_PATH..."
 
+    # Remove installed files
     rm -f "$INSTALL_PATH/bin/winecharm"
     rm -f "$INSTALL_PATH/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg"
     rm -f "$INSTALL_PATH/share/applications/io.github.fastrizwaan.WineCharm.desktop"
     rm -f "$INSTALL_PATH/share/icons/hicolor/128x128/apps/org.winehq.Wine.png"
 
     # Remove action icons
-    for icon in icons/*.svg; do
+    for icon in data/icons/*-symbolic.svg; do
         rm -f "$INSTALL_PATH/share/icons/hicolor/scalable/actions/$(basename "$icon")"
     done
+
+    # Remove MIME type definition
+    rm -f "$INSTALL_PATH/share/mime/packages/winecharm-backup-file.xml"
+
+    # Update system databases
+    echo "Updating MIME and icon caches after uninstall..."
+    update-mime-database "$INSTALL_PATH/share/mime" &> /dev/null || echo "Failed to update MIME database."
+    gtk-update-icon-cache "$INSTALL_PATH/share/icons/hicolor/" &> /dev/null || echo "Failed to update icon cache."
+    update-desktop-database "$INSTALL_PATH/share/applications/" &> /dev/null || echo "Failed to update desktop database."
 
     echo "WineCharm uninstalled successfully."
 }
@@ -178,4 +202,3 @@ if [ "$ACTION" == "install" ]; then
 elif [ "$ACTION" == "uninstall" ]; then
     uninstall_files
 fi
-
