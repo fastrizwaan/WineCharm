@@ -18,7 +18,7 @@ show_help() {
     echo "Options:"
     echo "  -i, --install         Install WineCharm"
     echo "  -u, --uninstall       Uninstall WineCharm"
-    echo "  -p, --prefix PATH     Specify installation prefix (default: /usr/local)"
+    echo "  -p, --prefix=PATH     Specify installation prefix (default: /usr/local)"
     echo "  -f, --force           Force installation even if dependencies are not met"
     echo "  -h, --help            Display this help and exit"
 }
@@ -54,8 +54,8 @@ check_dependencies() {
         echo "Please install them before proceeding or use the -f or --force option to install WineCharm anyway."
         echo ""
         echo "on Debian:"
-        echo "sudo dpkg --add-architecture i386 && sudo apt update -y
-sudo apt install zenity wine wine32 wine64 winetricks libimage-exiftool-perl icoutils gnome-terminal wget zstd winbind python3-yaml python3-psutil"
+        echo "sudo dpkg --add-architecture i386 && sudo apt update -y"
+        echo "sudo apt install zenity wine wine32 wine64 winetricks libimage-exiftool-perl icoutils gnome-terminal wget zstd winbind python3-yaml python3-psutil"
     fi
 
     return 0
@@ -80,7 +80,7 @@ check_python_dependencies() {
     if [ ${#missing_modules[@]} -ne 0 ]; then
         echo "The following required Python modules are missing:"
         for module in "${missing_modules[@]}"; do
-            echo "  - $prog"
+            echo "  - $module"  # Fixed from $prog to $module
         done
         echo ""
         echo "You can install them using pip:"
@@ -154,31 +154,31 @@ while [[ $# -gt 0 ]]; do
     key="$1"
     case $key in
         -i|--install)
-        ACTION="install"
-        shift
-        ;;
+            ACTION="install"
+            shift
+            ;;
         -u|--uninstall)
-        ACTION="uninstall"
-        shift
-        ;;
-        -p|--prefix)
-        INSTALL_PATH="$2"
-        shift
-        shift
-        ;;
+            ACTION="uninstall"
+            shift
+            ;;
+        -p|--prefix=*)
+            # Extract the value after --prefix=
+            INSTALL_PATH="${key#*=}"
+            shift
+            ;;
         -f|--force)
-        FORCE_INSTALL=true
-        shift
-        ;;
+            FORCE_INSTALL=true
+            shift
+            ;;
         -h|--help)
-        show_help
-        exit 0
-        ;;
+            show_help
+            exit 0
+            ;;
         *)
-        echo "Unknown option: $key"
-        show_help
-        exit 1
-        ;;
+            echo "Unknown option: $key"
+            show_help
+            exit 1
+            ;;
     esac
 done
 

@@ -227,26 +227,39 @@ modules:
 #    config-opts:
       #- -Dgtk3=false
       #- -Dgtk4=true
-               
+
+#  - name: WineCharm
+#    buildsystem: simple
+#    build-commands:
+#      - install -Dm755 winecharm.py /app/bin/winecharm
+#      - install -Dm755 wcterm.py    /app/bin/wcterm
+#      - install -Dm644 io.github.fastrizwaan.WineCharm.svg /app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg
+#      - install -Dm755 io.github.fastrizwaan.WineCharm.desktop /app/share/applications/io.github.fastrizwaan.WineCharm.desktop
+#      - mkdir -p /app/share/icons/hicolor/scalable/actions
+#      - install -Dm644 icons/*-symbolic.svg /app/share/icons/hicolor/scalable/actions  # Reverted to simpler install command
+#
+#    sources:
+#      - type: file
+#        path: ../src/winecharm.py
+#      - type: file
+#        path: ../src/wcterm.py
+#      - type: file
+#        path: ../data/icons/io.github.fastrizwaan.WineCharm.svg
+#      - type: file
+#        path: ../data/shortcut/io.github.fastrizwaan.WineCharm.desktop
+#      - type: dir
+#        path: ../data/icons    # Point to the real directory
+#        dest: icons       # Rename it to 'icons' in the build environment
+        
   - name: WineCharm
     buildsystem: simple
     build-commands:
-      - install -Dm755 winecharm.py /app/bin/winecharm
-      - install -Dm755 wcterm.py    /app/bin/wcterm
-      - install -Dm644 io.github.fastrizwaan.WineCharm.svg /app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg
-      - install -Dm755 io.github.fastrizwaan.WineCharm.desktop /app/share/applications/io.github.fastrizwaan.WineCharm.desktop
-      - mkdir -p /app/share/icons/hicolor/scalable/actions
-      - install -Dm644 icons/*-symbolic.svg /app/share/icons/hicolor/scalable/actions  # Reverted to simpler install command
+      - ./setup -i --prefix=/app 
+      - install -Dm755 src/wcterm.py    /app/bin/wcterm
 
     sources:
-      - type: file
-        path: ../src/winecharm.py
-      - type: file
-        path: ../src/wcterm.py
-      - type: file
-        path: ../data/icons/io.github.fastrizwaan.WineCharm.svg
-      - type: file
-        path: ../data/shortcut/io.github.fastrizwaan.WineCharm.desktop
-      - type: dir
-        path: ../data/icons    # Point to the real directory
-        dest: icons       # Rename it to 'icons' in the build environment
+      - type: git
+        tag: 0.99
+        commit: 9a88eece398bb967b0aee75a61df0d5249453f50
+        url: https://github.com/fastrizwaan/WineCharm.git
+
