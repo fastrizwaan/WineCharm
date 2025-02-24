@@ -53,7 +53,7 @@ class WineCharmApp(Gtk.Application):
         
         # Move the global variables to instance attributes
         self.debug = False
-        self.version = "0.98"
+        self.version = "0.99"
         # Paths and directories
         self.winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
         self.prefixes_dir = self.winecharmdir / "Prefixes"

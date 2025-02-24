@@ -33,7 +33,7 @@
     </screenshot>
   </screenshots>
   <releases>
-    <release version="0.98" date="2025-02-23">
+    <release version="0.99" date="2025-02-25">
       <description>
         <p>Initial release with full feature set including prefix management, template system, and Flatpak support.</p>
       </description>
