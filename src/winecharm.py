@@ -5114,6 +5114,9 @@ class WineCharmApp(Gtk.Application):
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                 print(f"An error occurred: {e}")
 
+    def clear_icon_cache_for_script(self, script_path):
+        script_str = str(script_path)
+        self.icon_cache = {k: v for k, v in self.icon_cache.items() if k[0] != script_str}
 
     def change_icon(self, script_path, new_icon_path):
         self.print_method_name()
@@ -5125,8 +5128,7 @@ class WineCharmApp(Gtk.Application):
             shutil.move(icon_path, backup_icon_path)
 
         shutil.copy(new_icon_path, icon_path)
-        
-        
+        self.clear_icon_cache_for_script(script_path)
 
     def extract_and_change_icon(self, script_path, exe_path):
         self.print_method_name()
@@ -5140,6 +5142,7 @@ class WineCharmApp(Gtk.Application):
         extracted_icon_path = self.extract_icon(exe_path, script_path.parent, script_path.stem, script_path.stem)
         if extracted_icon_path:
             shutil.move(extracted_icon_path, icon_path)
+            self.clear_icon_cache_for_script(script_path)
             
     def reset_shortcut_confirmation(self, script, script_key, button=None):
         self.print_method_name()
