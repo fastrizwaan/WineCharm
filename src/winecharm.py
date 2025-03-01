@@ -3645,7 +3645,7 @@ class WineCharmApp(Gtk.Application):
             ("Rename Prefix Directory", "rename-prefix-symbolic", self.rename_prefix_directory),
             ("Wine Config (winecfg)", "preferences-system-symbolic", self.wine_config),
             ("Registry Editor (regedit)", "dialog-password-symbolic", self.wine_registry_editor)
-
+            ("About", "dialog-information-symbolic", self.show_script_about),
         ]
 
         # Initial population of options
@@ -7752,6 +7752,93 @@ class WineCharmApp(Gtk.Application):
 
         except Exception as e:
             print(f"Error running EXE: {e}")
+
+    def show_script_about(self, script_path, script_key, button):
+        self.print_method_name()
+        """Display detailed information about the selected script and its wineprefix."""
+        if script_key not in self.script_list:
+            self.show_info_dialog("Error", "Script not found.")
+            return
+
+        script_data = self.script_list[script_key]
+        progname = script_data.get('progname', Path(script_key).stem)
+        wineprefix = Path(script_data.get('wineprefix', self.prefixes_dir / progname)).expanduser().resolve()
+        exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
+        script_path = Path(script_data.get('script_path', '')).expanduser().resolve()
+        runner = script_data.get('runner')
+        if not runner:
+            system_wine_display, _ = self.get_system_wine()
+        args = script_data.get('args', '')
+        env_vars = script_data.get('env_vars', '')
+
+        # Calculate wineprefix size
+        wineprefix_size = self.get_directory_size_for_about(wineprefix)
+
+        # Gather additional info
+        creation_time = datetime.fromtimestamp(script_path.stat().st_ctime).strftime('%Y-%m-%d %H:%M:%S') if script_path.exists() else "Unknown"
+        arch = self.get_template_arch(wineprefix) if wineprefix.exists() else "Unknown"
+
+        # Build the info message with Pango markup
+        info = (
+            f"<b>Program Name:</b> {progname}\n"
+            f"<b>Wineprefix:</b> {wineprefix}\n"
+            f"<b>Wineprefix Size:</b> {wineprefix_size}\n"
+            f"<b>Executable:</b> {exe_file}\n"
+            f"<b>Script Path:</b> {script_path}\n"
+            f"<b>Runner:</b> {runner or f"{system_wine_display}"}\n"
+            f"<b>Architecture:</b> {arch}\n"
+            f"<b>Arguments:</b> {args or 'None'}\n"
+            f"<b>Environment Variables:</b> {env_vars or 'None'}\n"
+            f"<b>Creation Time:</b> {creation_time}"
+        )
+
+        # Create a custom dialog with a label that supports markup
+        dialog = Adw.AlertDialog(
+            heading=f"About {progname}",
+            body=""
+        )
+
+        # Create a label with markup
+        info_label = Gtk.Label(label=info)
+        info_label.set_use_markup(True)  # Enable Pango markup
+        info_label.set_wrap(True)       # Wrap long lines
+        info_label.set_max_width_chars(50)  # Limit width for readability
+
+        # Add the label to a box for better layout control
+        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        content_box.append(info_label)
+        dialog.set_extra_child(content_box)
+
+        # Add a close button
+        dialog.add_response("close", "Close")
+        dialog.set_default_response("close")
+
+        # Present the dialog
+        dialog.present(self.window)
+
+    def get_directory_size_for_about(self, path):
+        self.print_method_name()
+        """
+        Calculate the total size of a directory in human-readable format.
+        """
+        if not path.exists():
+            print(f"The provided path '{path}' does not exist.")
+            return "Unknown (Directory not found)"
+
+        try:
+            total_size = sum(f.stat().st_size for f in path.glob('**/*') if f.is_file())
+            # Convert to human-readable format
+            if total_size < 1024:
+                return f"{total_size} bytes"
+            elif total_size < 1024 * 1024:
+                return f"{total_size / 1024:.2f} KB"
+            elif total_size < 1024 * 1024 * 1024:
+                return f"{total_size / (1024 * 1024):.2f} MB"
+            else:
+                return f"{total_size / (1024 * 1024 * 1024):.2f} GB"
+        except Exception as e:
+            print(f"Error calculating directory size: {e}")
+            return "Unknown (Error occurred)"
 
 #########   ######
     def replace_open_button_with_settings(self):
