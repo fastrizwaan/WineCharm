@@ -3644,7 +3644,7 @@ class WineCharmApp(Gtk.Application):
             ("Change Runner", "preferences-desktop-apps-symbolic", self.change_runner),
             ("Rename Prefix Directory", "rename-prefix-symbolic", self.rename_prefix_directory),
             ("Wine Config (winecfg)", "preferences-system-symbolic", self.wine_config),
-            ("Registry Editor (regedit)", "dialog-password-symbolic", self.wine_registry_editor)
+            ("Registry Editor (regedit)", "dialog-password-symbolic", self.wine_registry_editor),
             ("About", "dialog-information-symbolic", self.show_script_about),
         ]
 
