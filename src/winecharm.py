@@ -6700,28 +6700,34 @@ class WineCharmApp(Gtk.Application):
         # ListBox with CSS class
         self.dir_list = Gtk.ListBox()
         self.dir_list.set_selection_mode(Gtk.SelectionMode.NONE)
-        self.dir_list.add_css_class("boxed-list")  # Modern GTK 4 styling
-        
-        # Add default directory
-        default_row = Gtk.ListBoxRow()
-        default_check = Gtk.CheckButton(label=str(default_dir))
-        default_check.set_active(True)
-        default_row.set_child(default_check)
-        self.dir_list.append(default_row)
+        self.dir_list.add_css_class("boxed-list") 
         
         # Load saved directories from .charm file
         script_data = self.extract_yaml_info(script_key)
         saved_dirs = script_data.get('save_dirs', [])
-        for saved_dir in saved_dirs:
-            saved_path = Path(saved_dir).expanduser().resolve()
-            # Validate saved directory
-            valid, _unused = self.is_valid_directory(saved_path, wineprefix)
-            if valid and str(saved_path) != str(default_dir):
-                row = Gtk.ListBoxRow()
-                check = Gtk.CheckButton(label=str(saved_path))
-                check.set_active(True)
-                row.set_child(check)
-                self.dir_list.append(row)
+        
+        # Track if any valid directories are added
+        added_any = False
+        if saved_dirs:
+            for saved_dir in saved_dirs:
+                saved_path = Path(saved_dir).expanduser().resolve()
+                # Validate saved directory
+                valid, _unused = self.is_valid_directory(saved_path, wineprefix)
+                if valid:
+                    row = Gtk.ListBoxRow()
+                    check = Gtk.CheckButton(label=str(saved_path))
+                    check.set_active(True)
+                    row.set_child(check)
+                    self.dir_list.append(row)
+                    added_any = True
+        
+        # If no valid directories were added, add the default
+        if not added_any:
+            default_row = Gtk.ListBoxRow()
+            default_check = Gtk.CheckButton(label=str(default_dir))
+            default_check.set_active(True)
+            default_row.set_child(default_check)
+            self.dir_list.append(default_row)
         
         scrolled.set_child(self.dir_list)
         content_box.append(scrolled)
@@ -6734,6 +6740,7 @@ class WineCharmApp(Gtk.Application):
         dialog.set_extra_child(content_box)
         dialog.connect("response", self.on_directory_dialog_response, script, script_key)
         dialog.present(self.window)
+
 
     def on_directory_dialog_response(self, dialog, response_id, script, script_key):
         """Handle dialog response and save selected directories to .charm file."""
@@ -6937,6 +6944,9 @@ class WineCharmApp(Gtk.Application):
         dialog.set_response_appearance("ok", Adw.ResponseAppearance.DESTRUCTIVE)
         dialog.present(self.window)
 ########################
+
+
+        
     def import_game_directory(self, script, script_key, *args):
         self.print_method_name()
         script_data = self.script_list.get(script_key)
