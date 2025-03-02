@@ -7052,7 +7052,7 @@ class WineCharmApp(Gtk.Application):
             row_options_button = data['options_button']
         self.show_options_for_script(self.script_ui_data[script_key], row_button, script_key)
 
-
+        script_data = self.reload_script_data_from_charm(script_key)
         print("Game directory import completed.")
 
     def update_exe_file_path_in_script(self, script_path, new_exe_file):
@@ -7065,11 +7065,15 @@ class WineCharmApp(Gtk.Application):
             with open(script_path, "r") as file:
                 script_content = file.readlines()
 
+            # Convert PosixPath to string and update the exe_file path
+            new_exe_file_str = str(new_exe_file)  # Ensure it's a string
+            new_exe_file_tilde = self.replace_home_with_tilde_in_path(new_exe_file_str)
+
             # Update the exe_file path with the new location
             updated_content = []
             for line in script_content:
-                if line.startswith("exe_file:"):
-                    updated_content.append(f"exe_file: '{new_exe_file}'\n")
+                if line.startswith("'exe_file':"):
+                    updated_content.append(f"'exe_file': '{new_exe_file_tilde}'\n")
                 else:
                     updated_content.append(line)
 
@@ -7095,8 +7099,8 @@ class WineCharmApp(Gtk.Application):
             # Update the runner path with the new location
             updated_content = []
             for line in script_content:
-                if line.startswith("runner:"):
-                    updated_content.append(f"runner: '{new_runner}'\n")
+                if line.startswith("'runner':"):
+                    updated_content.append(f"'runner': '{new_runner}'\n")
                 else:
                     updated_content.append(line)
 
