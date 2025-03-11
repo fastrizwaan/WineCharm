@@ -841,7 +841,7 @@ class WineCharmApp(Gtk.Application):
 
         self.window = Gtk.ApplicationWindow(application=self)
         self.window.set_title("Wine Charm")
-        self.window.set_default_size(520, 680)
+        self.window.set_default_size(520, 740)
         self.window.add_css_class("common-background")
 
         self.headerbar = Gtk.HeaderBar()
@@ -995,7 +995,10 @@ class WineCharmApp(Gtk.Application):
 
         self.flowbox.set_homogeneous(True)
         self.flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
+        #self.flowbox.set_selection_mode(Gtk.SelectionMode.SINGLE)
+
         self.scrolled.set_child(self.flowbox)
+
 
         key_controller = Gtk.EventControllerKey()
         key_controller.connect("key-pressed", self.on_key_pressed)
@@ -1695,63 +1698,93 @@ class WineCharmApp(Gtk.Application):
             return container
 
         else:
-            # LIST VIEW (unchanged)
+            # LIST VIEW (reordered to [icon] [label text] [play and option buttons])
             title_text = str(script_data.get('progname', script.stem)).replace('_', ' ')
             if script.stem in self.new_scripts:
                 title_text = f"<b>{title_text}</b>"
             
-            row = Adw.ActionRow(
-                title=title_text,
-                activatable=True
-            )
-            row.set_hexpand(True)
-            row.set_vexpand(True)
-            row.add_css_class('activatable')
-            row.add_css_class('rounded-container')
-            row.set_use_markup(True)
+            # Use a horizontal container for the row
+            container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)  # Reduced spacing to 4
+            container.set_hexpand(True)  # Allow horizontal expansion to fill available space
+            container.set_vexpand(False)  # Prevent vertical expansion
+            container.add_css_class('rounded-container')
             
-            icon = self.load_icon(script, 40, 40, 4)
+            # Icon (smaller size, left-aligned, with padding before)
+            icon = self.load_icon(script, 40, 40, 4)  # Reduced icon size to 40x40
             if icon:
                 icon_container = Gtk.Box()
                 icon_container.add_css_class("rounded-icon")
                 icon_image = Gtk.Image.new_from_paintable(icon)
-                icon_image.set_pixel_size(40)
+                icon_image.set_pixel_size(40)  # Smaller pixel size
+                icon_image.set_halign(Gtk.Align.CENTER)
                 icon_container.append(icon_image)
-                row.add_prefix(icon_container)
+                icon_container.set_margin_start(6)  # Add 6 pixels of padding before the icon
+            else:
+                icon_container = Gtk.Box()
+                icon_image = Gtk.Image()
+                icon_container.append(icon_image)
+                icon_container.set_margin_start(6)  # Add 6 pixels of padding before the icon
+            container.append(icon_container)
             
-            button_box = Gtk.Box(spacing=6, valign=Gtk.Align.CENTER)
+            # Label text (centered vertically, wrapped if necessary, with expansion to fill space)
+            label_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            label_box.set_valign(Gtk.Align.CENTER)  # Center vertically in the row
+            label_box.set_halign(Gtk.Align.START)
+            label_box.set_hexpand(True)  # Allow the label to expand horizontally
+            
+            main_label = Gtk.Label()
+            main_label.set_wrap(True)
+            main_label.set_ellipsize(Pango.EllipsizeMode.END)  # Ellipsis if too long
+            main_label.set_halign(Gtk.Align.FILL)  # Fill horizontally within the label box
+            main_label.set_markup(title_text)
+            label_box.append(main_label)
+            
+            container.append(label_box)
+            
+            # Button box for play and options buttons (right-aligned, smaller and tightly packed, with padding after)
+            button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)  # Reduced spacing to 2
+            button_box.set_valign(Gtk.Align.CENTER)  # Center vertically in the row
+            button_box.set_halign(Gtk.Align.END)  # Right-align the button box
+            button_box.set_margin_end(6)  # Add 6 pixels of padding after the button box
             
             play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play")
-            play_button.set_size_request(60, 36)
+            play_button.set_size_request(60, 34)  # Maintain size (60px wide, 34px high)
             
             options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text="Options")
+            options_button.set_size_request(34, 34)  # Maintain size (34px wide, 34px high)
             
             button_box.append(play_button)
             button_box.append(options_button)
-            row.add_suffix(button_box)
+            container.append(button_box)
             
+            # Set a fixed size for the container to control width (optional, adjust as needed)
+            # container.set_size_request(480, -1)  # Adjust width as needed (e.g., 480 pixels), height dynamic
+            
+            # Initial button states
             play_button.set_opacity(0)
             options_button.set_opacity(0)
             play_button.set_sensitive(False)
             options_button.set_sensitive(False)
             
             self.script_ui_data[script_key] = {
-                'row': row,
+                'row': container,
                 'play_button': play_button,
                 'options_button': options_button,
                 'is_running': False,
                 'script_path': script
             }
             
+            # Add click gesture
             click = Gtk.GestureClick()
             click.connect("released", lambda gesture, n, x, y: self.toggle_overlay_buttons(script_key))
-            row.add_controller(click)
+            container.add_controller(click)
             
-            play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, btn, row))
+            # Connect button signals
+            play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, btn, container))
             options_button.connect("clicked", lambda btn: self.show_options_for_script(
-                self.script_ui_data[script_key], row, script_key))
+                self.script_ui_data[script_key], container, script_key))
 
-            return row
+            return container
 
     def toggle_overlay_buttons(self, script_key):
         # Hide overlay buttons and remove "blue" CSS from all other rows.
