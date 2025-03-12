@@ -117,7 +117,7 @@ class WineCharmApp(Gtk.Application):
         self.open_button_handler_id = None
         self.lnk_processed_success_status = False
         self.manually_killed = False
-
+        self.script_ui_data = {}
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
         self.script_buttons = {}
@@ -1458,43 +1458,25 @@ class WineCharmApp(Gtk.Application):
     def find_charm_files(self, prefixdir=None):
         self.print_method_name()
         """
-        Finds .charm files within the provided prefix directory, searching up to 2 levels deep.
-        
-        Args:
-            prefixdir (Path or str): The directory to search in. Defaults to self.prefixes_dir.
-
-        Returns:
-            List[Path]: A sorted list of .charm files found, sorted by modification time (newest first).
+        Finds .charm files efficiently, up to 2 levels deep.
+        Returns a list of Path objects sorted by modification time.
         """
         if prefixdir is None:
             prefixdir = self.prefixes_dir
         
-        # Ensure prefixdir is a Path object
         prefixdir = Path(prefixdir).expanduser().resolve()
-
-        # Check if the directory exists
-        if not prefixdir.exists() or not prefixdir.is_dir():
-            print(f"Directory does not exist: {prefixdir}")
-            return []
-
-        scripts = []
+        charm_files = []
         
-        # Walk through the directory, but limit the depth to 2
-        for root, dirs, files in os.walk(prefixdir):
-            current_depth = Path(root).relative_to(prefixdir).parts
-
-            # If the depth is greater than 2, prune the search space by not descending into subdirectories
-            if len(current_depth) >= 2:
-                dirs[:] = []  # Prune subdirectories
-                continue
-
-            # Collect .charm files
-            scripts.extend([Path(root) / file for file in files if file.endswith(".charm")])
-
-        # Sort files by modification time (newest first)
-        scripts.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        # Level 1: Direct children
+        charm_files.extend(prefixdir.glob("*.charm"))
         
-        return scripts
+        # Level 2: One level deeper
+        for subdir in prefixdir.iterdir():
+            if subdir.is_dir():
+                charm_files.extend(subdir.glob("*.charm"))
+        
+        # Sort by modification time (newest first)
+        return sorted(charm_files, key=lambda p: p.stat().st_mtime, reverse=True)
 
     def replace_open_button_with_launch(self, script, row, script_key):
         self.print_method_name()
@@ -1572,27 +1554,30 @@ class WineCharmApp(Gtk.Application):
 ############################### 1050 - 1682 ########################################
     def create_script_list(self):
         self.print_method_name()
-        # Clear the flowbox
+        """Create UI rows for scripts efficiently with batch updates, including highlighting."""
         self.flowbox.remove_all()
-
-        # Rebuild the script list
-        self.script_ui_data = {}  # Use script_data to hold all script-related data
-
-        # Iterate over self.script_list
-        for script_key, script_data in list(self.script_list.items()):
+        
+        if not self.script_list:
+            return
+        
+        self.script_ui_data = {}
+        
+        rows = []
+        for script_key, script_data in self.script_list.items():
             row = self.create_script_row(script_key, script_data)
             if row:
-                self.flowbox.append(row)
-
-            # After row creation, highlight if the process is running
-            if script_key in self.running_processes:
-                self.update_row_highlight(row, True)
-                self.script_ui_data[script_key]['highlighted'] = True
-                self.script_ui_data[script_key]['is_running'] = True  # Set is_running to True
-            else:
-                self.update_row_highlight(row, False)
-                self.script_ui_data[script_key]['highlighted'] = False
-                self.script_ui_data[script_key]['is_running'] = False  # Ensure is_running is False
+                rows.append(row)
+                if script_key in self.running_processes:
+                    self.update_row_highlight(row, True)
+                    self.script_ui_data[script_key]['highlighted'] = True
+                    self.script_ui_data[script_key]['is_running'] = True
+                else:
+                    self.update_row_highlight(row, False)
+                    self.script_ui_data[script_key]['highlighted'] = False
+                    self.script_ui_data[script_key]['is_running'] = False
+        
+        for row in rows:
+            self.flowbox.append(row)
 
 
     def create_script_row(self, script_key, script_data):
@@ -5636,8 +5621,8 @@ class WineCharmApp(Gtk.Application):
         button.set_child(Gtk.Image.new_from_icon_name(icon_name))
 
         # Update the maximum children per line in the flowbox based on the current view state
-        max_children_per_line = 8 if self.icon_view else 4
-        self.flowbox.set_max_children_per_line(max_children_per_line)
+        #max_children_per_line = 8 if self.icon_view else 4
+        #self.flowbox.set_max_children_per_line(max_children_per_line)
         # Recreate the script list with the new view
         self.create_script_list()
         GLib.idle_add(self.save_settings)
@@ -6305,65 +6290,63 @@ class WineCharmApp(Gtk.Application):
     def load_script_list(self, prefixdir=None):
         self.print_method_name()
         """
-        Loads all .charm files from the specified directory (or the default self.prefixes_dir)
-        into the self.script_list dictionary.
+        Load .charm files into self.script_list efficiently using a background thread.
+        Handles missing keys, updates files if necessary, and uses sha256sum as the key.
 
         Args:
             prefixdir (str or Path, optional): The directory to search for .charm files.
-                                               Defaults to self.prefixes_dir.
+                                            Defaults to self.prefixes_dir.
         """
         if prefixdir is None:
             prefixdir = self.prefixes_dir
 
-        # Clear existing script list when loading from default directory
-        if prefixdir == self.prefixes_dir:
-            self.script_list = {}
+        def load_in_background():
+            # Use a temporary dictionary to avoid modifying self.script_list directly
+            temp_script_list = {}
+            charm_files = list(self.find_charm_files(prefixdir))  # Get all .charm files efficiently
 
-        # Find all .charm files in the directory
-        scripts = self.find_charm_files(prefixdir)
+            for charm_file in charm_files:
+                if self.stop_processing:  # Allow interruption
+                    return
+                try:
+                    with open(charm_file, 'r', encoding='utf-8') as f:
+                        script_data = yaml.safe_load(f)
 
-        for script_file in scripts:
-            try:
-                with open(script_file, 'r') as f:
-                    script_data = yaml.safe_load(f)
+                    if not isinstance(script_data, dict):
+                        print(f"Warning: Invalid format in {charm_file}, skipping.")
+                        continue
 
-                if not isinstance(script_data, dict):
-                    print(f"Warning: Invalid format in {script_file}, skipping.")
-                    continue
+                    # Ensure required keys are present and correctly populated
+                    updated = False
+                    required_keys = ['exe_file', 'script_path', 'wineprefix', 'sha256sum']
 
-                # Ensure required keys are present and correctly populated
-                updated = False
-                required_keys = ['exe_file', 'script_path', 'wineprefix', 'sha256sum']
+                    # Initialize script_path to the current .charm file path if missing
+                    if 'script_path' not in script_data:
+                        script_data['script_path'] = self.replace_home_with_tilde_in_path(str(charm_file))
+                        updated = True
+                        print(f"Warning: script_path missing in {charm_file}. Added default value.")
 
-                # Initialize script_path to the current .charm file path if missing
-                if 'script_path' not in script_data:
-                    script_data['script_path'] = self.replace_home_with_tilde_in_path(str(script_file))
-                    updated = True
-                    print(f"Warning: script_path missing in {script_file}. Added default value.")
+                    # Set wineprefix to the parent directory of script_path if missing
+                    if 'wineprefix' not in script_data or not script_data['wineprefix']:
+                        wineprefix = str(Path(charm_file).parent)
+                        script_data['wineprefix'] = self.replace_home_with_tilde_in_path(wineprefix)
+                        updated = True
+                        print(f"Warning: wineprefix missing in {charm_file}. Set to {wineprefix}.")
 
-                # Set wineprefix to the parent directory of script_path if missing
-                if 'wineprefix' not in script_data or not script_data['wineprefix']:
-                    wineprefix = str(Path(script_file).parent)
-                    script_data['wineprefix'] = self.replace_home_with_tilde_in_path(wineprefix)
-                    updated = True
-                    print(f"Warning: wineprefix missing in {script_file}. Set to {wineprefix}.")
+                    # Replace any $HOME occurrences with ~ in all string paths
+                    for key in required_keys:
+                        if isinstance(script_data.get(key), str) and script_data[key].startswith(os.getenv("HOME")):
+                            new_value = self.replace_home_with_tilde_in_path(script_data[key])
+                            if new_value != script_data[key]:
+                                script_data[key] = new_value
+                                updated = True
 
-                # Replace any $HOME occurrences with ~ in all string paths
-                for key in required_keys:
-                    if isinstance(script_data.get(key), str) and script_data[key].startswith(os.getenv("HOME")):
-                        new_value = self.replace_home_with_tilde_in_path(script_data[key])
-                        if new_value != script_data[key]:
-                            script_data[key] = new_value
-                            updated = True
+                    # Regenerate sha256sum if missing
+                    should_generate_hash = False
+                    if 'sha256sum' not in script_data or script_data['sha256sum'] is None:
+                        should_generate_hash = True
 
-                # Regenerate sha256sum if missing
-                should_generate_hash = False
-                if 'sha256sum' not in script_data or script_data['sha256sum'] == None:
-                    should_generate_hash = True
-
-                if should_generate_hash:
-                    if 'exe_file' in script_data and script_data['exe_file']:
-                        # Generate hash from exe_file if it exists
+                    if should_generate_hash and 'exe_file' in script_data and script_data['exe_file']:
                         exe_path = Path(str(script_data['exe_file'])).expanduser().resolve()
                         if os.path.exists(exe_path):
                             sha256_hash = hashlib.sha256()
@@ -6372,32 +6355,46 @@ class WineCharmApp(Gtk.Application):
                                     sha256_hash.update(byte_block)
                             script_data['sha256sum'] = sha256_hash.hexdigest()
                             updated = True
-                            print(f"Generated sha256sum from exe_file in {script_file}")
+                            print(f"Generated sha256sum from exe_file in {charm_file}")
                         else:
-                            print(f"Warning: exe_file not found, not updating sha256sum from script file: {script_file}")
+                            print(f"Warning: exe_file not found, not updating sha256sum for {charm_file}")
 
-                # If updates are needed, rewrite the file
-                if updated:
-                    with open(script_file, 'w') as f:
-                        yaml.safe_dump(script_data, f)
-                    print(f"Updated script file: {script_file}")
+                    # If updates are needed, rewrite the file
+                    if updated:
+                        with self.file_lock:  # Ensure thread-safe file writing
+                            with open(charm_file, 'w') as f:
+                                #yaml.safe_dump(script_data, f)
+                                yaml.dump(script_data, f, default_style="'", default_flow_style=False, width=10000)
+                        print(f"Updated script file: {charm_file}")
 
-                # Store the actual file modification time
-                script_data['mtime'] = os.path.getmtime(script_file)
+                    # Store the actual file modification time
+                    script_data['mtime'] = os.path.getmtime(charm_file)
 
-                # Use 'sha256sum' as the key in script_list
-                script_key = script_data['sha256sum']
-                if prefixdir == self.prefixes_dir:
-                    self.script_list[script_key] = script_data
-                else:
-                    self.script_list = {script_key: script_data, **self.script_list}
+                    # Use 'sha256sum' as the key in script_list
+                    script_key = script_data['sha256sum']
+                    temp_script_list[script_key] = script_data
 
-            except yaml.YAMLError as yaml_err:
-                print(f"YAML error in {script_file}: {yaml_err}")
-            except Exception as e:
-                print(f"Error loading script {script_file}: {e}")
+                except yaml.YAMLError as yaml_err:
+                    print(f"YAML error in {charm_file}: {yaml_err}")
+                except Exception as e:
+                    print(f"Error loading {charm_file}: {e}")
+                    continue
 
+            # Update the main script_list and trigger UI update in the main thread
+            GLib.idle_add(self.update_script_list, temp_script_list, prefixdir == self.prefixes_dir)
+
+        # Start background thread
+        threading.Thread(target=load_in_background, daemon=True).start()
+
+    def update_script_list(self, temp_script_list, clear_existing=True):
+        """Update self.script_list and refresh UI in the main thread."""
+        self.print_method_name()
+        if clear_existing:
+            self.script_list = temp_script_list  # Replace the existing list
+        else:
+            self.script_list = {**temp_script_list, **self.script_list}  # Merge with existing list
         print(f"Loaded {len(self.script_list)} scripts.")
+        self.create_script_list()  # Refresh UI after loading
 
 ##########################
 
@@ -11287,6 +11284,8 @@ class WineCharmApp(Gtk.Application):
 
 
 ###################### 0.95
+
+
 
 
 
