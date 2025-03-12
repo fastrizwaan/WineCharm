@@ -1588,8 +1588,8 @@ class WineCharmApp(Gtk.Application):
             container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
             container.set_hexpand(True)
             container.set_vexpand(True)
-            container.set_valign(Gtk.Align.CENTER)  # Center vertically for better alignment
-            container.set_halign(Gtk.Align.CENTER)  # Center horizontally
+            container.set_halign(Gtk.Align.FILL)
+            container.set_valign(Gtk.Align.FILL)
             container.add_css_class("rounded-container")
             
             # Top horizontal box: options button | icon | play button
@@ -1644,7 +1644,7 @@ class WineCharmApp(Gtk.Application):
             main_label = Gtk.Label()
             main_label.set_wrap(True)
             main_label.set_max_width_chars(20)  # Wrap after ~20 chars
-            main_label.set_lines(2)  # Limit to 2 lines
+            #main_label.set_lines(2)  # Limit to 2 lines
             main_label.set_ellipsize(Pango.EllipsizeMode.END)  # Ellipsis if too long
             main_label.set_halign(Gtk.Align.CENTER)
             main_label.set_markup(label_text)
