@@ -2,6 +2,8 @@
 
 **WineCharm** is a graphical user interface (GUI) application designed to simplify running and managing Windows applications on Linux using Wine. Built with Python and GTK4/Libadwaita, WineCharm provides an intuitive interface for launching `.exe` and `.msi` files, managing Wine prefixes, templates, and runners, and creating portable backups. It supports both GUI and headless modes, making it versatile for different use cases.
 
+![WineCharm Icon View](https://github.com/fastrizwaan/WineCharm/releases/download/0.99.0/WineCharm_icon_view_selected.png)
+
 ## Features
 
 - **Launch Windows Applications**: Easily run `.exe` and `.msi` files with Wine.
@@ -102,19 +104,19 @@ sudo apt install zenity wine wine32 wine64 winetricks libimage-exiftool-perl ico
 2. Run the setup script:
    - Install to default prefix (`/usr/local`):
      ```bash
-     ./setup.sh --install
+     sudo ./setup --install
      ```
    - Install to a custom prefix:
      ```bash
-     ./setup.sh --install --prefix /custom/path
+     sudo ./setup --install --prefix /custom/path
      ```
    - Force installation (ignore missing dependencies):
      ```bash
-     ./setup.sh --install --force
+     sudo ./setup --install --force
      ```
    - Uninstall:
      ```bash
-     ./setup.sh --uninstall
+     sudo ./setup.sh --uninstall
      ```
 3. Verify:
    ```bash
