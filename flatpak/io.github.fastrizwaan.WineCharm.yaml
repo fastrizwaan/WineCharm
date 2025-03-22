@@ -38,7 +38,8 @@ finish-args:
   - --talk-name=org.a11y.Bus
     # Most Games write to their own directories
 #- --filesystem=host
-#  - --filesystem=host:ro
+  # Host RO required to run exe files from other locations 
+  - --filesystem=host:ro
   - --filesystem=xdg-run/gvfs:ro
   - --filesystem=xdg-run/gvfsd:ro
 #  - --filesystem=home/games:create
