@@ -28,12 +28,20 @@
   <screenshots>
     <!-- Add screenshot URLs or paths here once available -->
     <screenshot type="default">
-      <image>https://github.com/fastrizwaan/WineCharm/raw/main/screenshots/main-window.png</image>
+      <image>https://github.com/fastrizwaan/WineCharm/releases/download/0.99.0/WineCharm_icon_view_selected.png</image>
+      <caption>Main window showing Icon list</caption>
+    </screenshot>
+    <screenshot type="default">
+      <image>https://github.com/fastrizwaan/WineCharm/releases/download/0.99.0/WineCharm_list_view_selected.png</image>
       <caption>Main window showing script list</caption>
     </screenshot>
+    <screenshot type="default">
+      <image>https://github.com/fastrizwaan/WineCharm/releases/download/0.99.0/WineCharm_winword_options.png</image>
+      <caption>Window showing script options</caption>
+    </screenshot>    
   </screenshots>
   <releases>
-    <release version="0.99" date="2025-02-25">
+    <release version="0.99.0" date="2025-03-23">
       <description>
         <p>Initial release with full feature set including prefix management, template system, and Flatpak support.</p>
       </description>

@@ -36,7 +36,7 @@ from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pang
 
 
 
-class WineCharmApp(Gtk.Application):
+class WineCharmApp(Adw.Application):
     def __init__(self):
         self.count = 0
         self.log_file_path = os.path.expanduser('~/logfile.log')
@@ -379,25 +379,29 @@ class WineCharmApp(Gtk.Application):
             self.template = getattr(self, f'default_template_{self.arch}')
             self.template = self.expand_and_resolve_path(self.template)
 
-
         missing_programs = self.check_required_programs()
         if missing_programs:
             self.show_missing_programs_dialog(missing_programs)
         else:
             if not self.template.exists():
+                # If template doesn't exist, initialize it
                 self.initialize_template(self.template, self.on_template_initialized)
             else:
+                # Template already exists, set dynamic variables
                 self.set_dynamic_variables()
-                # Process the command-line file if the template already exists
+                # Process command-line file immediately if it exists
                 if self.command_line_file:
                     print("Template exists. Processing command-line file after UI initialization.")
-                    self.process_cli_file_later(self.command_line_file)
+                    # Use a small delay to ensure UI is ready
+                    GLib.timeout_add_seconds(0.5, self.process_cli_file_later, self.command_line_file)
+                
         # After loading scripts and building the UI, check for running processes
         self.set_dynamic_variables()
         self.check_running_processes_on_startup()
 
         # Start fetching runner URLs asynchronously
         threading.Thread(target=self.maybe_fetch_runner_urls).start()
+
 
     def remove_symlinks_and_create_directories(self, wineprefix):
         """
@@ -532,38 +536,23 @@ class WineCharmApp(Gtk.Application):
         # Ensure the spinner is stopped after initialization
         self.hide_processing_spinner()
         
-        #self.set_open_button_label("Open")
-        #self.set_open_button_icon_visible(True)
-        #self.search_button.set_sensitive(True)
-        #self.view_toggle_button.set_sensitive(True)
-        
-        # Disabled Cancel/Interruption
-        #if self.open_button_handler_id is not None:
-        #    self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
-
-        print("Template initialization completed and UI updated.")
+        # Success case
         self.show_initializing_step("Initialization Complete!")
         self.mark_step_as_done("Initialization Complete!")
         
+        # Process command-line file if it exists
         if self.command_line_file:
-            print("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
-            print(self.command_line_file)
-
+            print("Processing command-line file after template initialization")
             file_extension = Path(self.command_line_file).suffix.lower()
             if file_extension in ['.exe', '.msi']:
-                print("A"*100)
                 print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
-                print("Trying to process file inside on template initialized")
-
                 GLib.idle_add(self.show_processing_spinner, "Processing...")
                 self.process_cli_file(self.command_line_file)
             elif file_extension in ['.wzt', '.bottle', '.prefix']:
-                print("B"*100)
+                print(f"Restoring from backup: {self.command_line_file}")
                 self.restore_prefix_bottle_wzt_tar_zst(self.command_line_file)
-
             else:
-                print("C"*100)
-                print(f"Invalid file type: def on_open: {file_extension}. Only .exe or .msi files are allowed.")
+                print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
                 GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
                 self.command_line_file = None
                 return False
@@ -578,40 +567,32 @@ class WineCharmApp(Gtk.Application):
             self.show_options_for_settings()
         
         self.set_dynamic_variables()
-        #self.disconnect_open_button()
-        ##self.reconnect_open_button()
-        #self.show_options_for_settings()
-        #self.revert_open_button()
-        #self.called_from_settings = False
+
         
 
     def process_cli_file_later(self, file_path):
-        #self.create_main_window()
-        print("D"*100)
+        print("Processing CLI file later: {}".format(file_path))
 
         if file_path:
-
             file_extension = Path(file_path).suffix.lower()
             if file_extension in ['.exe', '.msi']:
-                print("A"*100)
-                print(f"Processing file: {file_path} (Valid extension: {file_extension})")
-                print("Trying to process file inside on template initialized")
-
+                print("Valid executable file detected: {}".format(file_path))
                 GLib.idle_add(self.show_processing_spinner, "Processing")
                 self.process_cli_file_in_thread(file_path)
             elif file_extension in ['.wzt', '.bottle', '.prefix']:
-                print("B"*100)
+                print("Valid backup file detected: {}".format(file_path))
                 GLib.idle_add(self.show_processing_spinner, "Restoring")
                 self.restore_prefix_bottle_wzt_tar_zst(file_path)
-
             else:
-                print("C"*100)
-                print(f"Invalid file type: def on_open: {file_extension}. Only .exe or .msi files are allowed.")
+                print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
                 GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
                 self.command_line_file = None
                 return False
 
-        self.create_script_list()
+        #self.create_script_list()
+        GLib.idle_add(self.create_script_list)
+        return False  # Return False to prevent this function from being called again
+
 
     def set_open_button_label(self, label_text):
         self.print_method_name()
@@ -8308,28 +8289,53 @@ class WineCharmApp(Gtk.Application):
             selected_index = runner_dropdown.get_selected()
             if selected_index == Gtk.INVALID_LIST_POSITION:
                 print("No runner selected.")
-            else:
-                new_runner_display, new_runner_path = all_runners[selected_index]
-                print(f"Selected new default runner: {new_runner_display} -> {new_runner_path}")
+                return
 
-                # Set the new runner path in self.settings
-                new_runner_value = '' if new_runner_display.startswith("System Wine") else new_runner_path
-                self.settings['runner'] = self.replace_home_with_tilde_in_path(new_runner_value)
+            new_runner_display, new_runner_path = all_runners[selected_index]
+            print(f"Selected new default runner: {new_runner_display} -> {new_runner_path}")
 
-                print(f"Runner path to be saved: {self.settings['runner']}")
+            # Check architecture compatibility for non-system runners
+            if new_runner_path:  # Skip check for System Wine
+                runner_path = Path(new_runner_path).expanduser().resolve().parent.parent
+                
+                print(f"runner_path = {runner_path}")
+                # Determine runner architecture
+                if (runner_path / "bin/wine64").exists():
+                    runner_arch = "win64"
+                elif (runner_path / "bin/wine").exists():
+                    runner_arch = "win32"
+                else:
+                    self.show_info_dialog(
+                        "Invalid Runner",
+                        "Selected runner is missing Wine binaries (bin/wine or bin/wine64)"
+                    )
+                    return
 
-                # Save the updated settings
-                self.save_settings()
+                # Get template architecture from settings
+                template_arch = self.settings.get("arch", "win64")
+                
+                # Check for 32-bit runner with 64-bit template
+                if template_arch == "win64" and runner_arch == "win32":
+                    self.show_info_dialog(
+                        "Architecture Mismatch",
+                        "Cannot use 32-bit runner with 64-bit template.\n\n"
+                        f"Template: {self.template} ({template_arch})\n"
+                        f"Runner: {new_runner_path} ({runner_arch})"
+                    )
+                    return
 
-                # Provide user feedback
-                self.show_info_dialog(
-                    "Default Runner Updated",
-                    f"The default runner has been set to {new_runner_display}."
-                )
+            # Update settings
+            new_runner_value = "" if new_runner_display.startswith("System Wine") else new_runner_path
+            self.settings["runner"] = self.replace_home_with_tilde_in_path(new_runner_value)
+            self.save_settings()
+
+            # Provide feedback
+            confirmation_message = f"The default runner has been set to {new_runner_display}"
+            if new_runner_path:
+                confirmation_message += f" ({runner_arch})"
+            self.show_info_dialog("Default Runner Updated", confirmation_message)
         else:
             print("Set default runner canceled.")
-
-        #dialog.close()
 
     def on_download_runner_clicked_default(self, dialog):
         self.print_method_name()
@@ -9539,43 +9545,101 @@ class WineCharmApp(Gtk.Application):
 
     def replace_strings_in_files(self, directory, find_replace_pairs):
         self.print_method_name()
-        for root, dirs, files in os.walk(directory):
-            for file in files:
-                file_path = os.path.join(root, file)
+        """
+        Replace strings in files with interruption support, progress tracking and error handling
+        """
+        try:
+            # Count total files for progress tracking
+            total_files = sum(1 for _, _, files in os.walk(directory) 
+                            for _ in files)
+            processed_files = 0
 
-                # Skip binary files
-                if self.is_binary_file(file_path):
-                    #print(f"Skipping binary file: {file_path}")
-                    continue
+            for root, dirs, files in os.walk(directory):
+                if self.stop_processing:
+                    raise Exception("Operation cancelled by user")
 
-                # Skip files where permission is denied
-                if not os.access(file_path, os.R_OK | os.W_OK):
-                    #print(f"Skipping file: {file_path} (Permission denied)")
-                    continue
+                for file in files:
+                    if self.stop_processing:
+                        raise Exception("Operation cancelled by user")
 
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
+                    processed_files += 1
+                    file_path = Path(root) / file
 
-                    for find, replace in find_replace_pairs.items():
-                        content = content.replace(find, replace)
+                    # Update progress
+                    if hasattr(self, 'progress_bar'):
+                        GLib.idle_add(
+                            lambda: self.progress_bar.set_fraction(processed_files / total_files)
+                        )
 
-                    with open(file_path, 'w', encoding='utf-8') as f:
-                        f.write(content)
+                    # Skip binary files
+                    if self.is_binary_file(file_path):
+                        #print(f"Skipping binary file: {file_path}")
+                        continue
 
-                    print(f"Replacements applied to file: {file_path}")
-                except (UnicodeDecodeError, FileNotFoundError, PermissionError) as e:
-                    print(f"Skipping file: {file_path} ({e})")
+                    # Skip files where permission is denied
+                    if not os.access(file_path, os.R_OK | os.W_OK):
+                        #print(f"Skipping file: {file_path} (Permission denied)")
+                        continue
+
+                    try:
+                        # Read file content
+                        with open(file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+
+                        modified = False
+                        new_content = content
+
+                        # Perform replacements
+                        for find_str, replace_str in find_replace_pairs.items():
+                            if find_str in new_content:
+                                new_content = new_content.replace(find_str, replace_str)
+                                modified = True
+
+                        # Write modified content if changes were made
+                        if modified:
+                            if self.stop_processing:
+                                raise Exception("Operation cancelled by user")
+                            
+                            # Create temporary file
+                            temp_path = file_path.with_suffix(file_path.suffix + '.tmp')
+                            try:
+                                with open(temp_path, 'w', encoding='utf-8') as f:
+                                    f.write(new_content)
+                                # Atomic replace
+                                temp_path.replace(file_path)
+                                print(f"Replacements applied to file: {file_path}")
+                            except Exception as e:
+                                if temp_path.exists():
+                                    temp_path.unlink()
+                                raise e
+
+                    except (UnicodeDecodeError, FileNotFoundError, PermissionError) as e:
+                        #   print(f"Skipping file: {file_path} ({e})")
+                        continue
+
+        except Exception as e:
+            if "Operation cancelled by user" in str(e):
+                print("String replacement operation cancelled")
+            raise
+
 
     def is_binary_file(self, file_path):
-        self.print_method_name()
+        #self.print_method_name()
+        """
+        Check if a file is binary with interruption support
+        """
         try:
+            if self.stop_processing:
+                raise Exception("Operation cancelled by user")
+                
             with open(file_path, 'rb') as f:
                 chunk = f.read(1024)
                 if b'\0' in chunk:
                     return True
         except Exception as e:
-            print(f"Could not check file {file_path} ({e})")
+            if "Operation cancelled by user" in str(e):
+                raise
+            #print(f"Could not check file {file_path} ({e})")
         return False
         
     def process_sh_files(self, directory):
@@ -10130,106 +10194,6 @@ class WineCharmApp(Gtk.Application):
             dialog.close()
 
 
-#################3 Replace strings update with interruption
-
-    def replace_strings_in_files(self, directory, find_replace_pairs):
-        self.print_method_name()
-        """
-        Replace strings in files with interruption support, progress tracking and error handling
-        """
-        try:
-            # Count total files for progress tracking
-            total_files = sum(1 for _, _, files in os.walk(directory) 
-                            for _ in files)
-            processed_files = 0
-
-            for root, dirs, files in os.walk(directory):
-                if self.stop_processing:
-                    raise Exception("Operation cancelled by user")
-
-                for file in files:
-                    if self.stop_processing:
-                        raise Exception("Operation cancelled by user")
-
-                    processed_files += 1
-                    file_path = Path(root) / file
-
-                    # Update progress
-                    if hasattr(self, 'progress_bar'):
-                        GLib.idle_add(
-                            lambda: self.progress_bar.set_fraction(processed_files / total_files)
-                        )
-
-                    # Skip binary files
-                    if self.is_binary_file(file_path):
-                        #print(f"Skipping binary file: {file_path}")
-                        continue
-
-                    # Skip files where permission is denied
-                    if not os.access(file_path, os.R_OK | os.W_OK):
-                        #print(f"Skipping file: {file_path} (Permission denied)")
-                        continue
-
-                    try:
-                        # Read file content
-                        with open(file_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
-
-                        modified = False
-                        new_content = content
-
-                        # Perform replacements
-                        for find_str, replace_str in find_replace_pairs.items():
-                            if find_str in new_content:
-                                new_content = new_content.replace(find_str, replace_str)
-                                modified = True
-
-                        # Write modified content if changes were made
-                        if modified:
-                            if self.stop_processing:
-                                raise Exception("Operation cancelled by user")
-                            
-                            # Create temporary file
-                            temp_path = file_path.with_suffix(file_path.suffix + '.tmp')
-                            try:
-                                with open(temp_path, 'w', encoding='utf-8') as f:
-                                    f.write(new_content)
-                                # Atomic replace
-                                temp_path.replace(file_path)
-                                print(f"Replacements applied to file: {file_path}")
-                            except Exception as e:
-                                if temp_path.exists():
-                                    temp_path.unlink()
-                                raise e
-
-                    except (UnicodeDecodeError, FileNotFoundError, PermissionError) as e:
-                        #   print(f"Skipping file: {file_path} ({e})")
-                        continue
-
-        except Exception as e:
-            if "Operation cancelled by user" in str(e):
-                print("String replacement operation cancelled")
-            raise
-
-    def is_binary_file(self, file_path):
-        #self.print_method_name()
-        """
-        Check if a file is binary with interruption support
-        """
-        try:
-            if self.stop_processing:
-                raise Exception("Operation cancelled by user")
-                
-            with open(file_path, 'rb') as f:
-                chunk = f.read(1024)
-                if b'\0' in chunk:
-                    return True
-        except Exception as e:
-            if "Operation cancelled by user" in str(e):
-                raise
-            #print(f"Could not check file {file_path} ({e})")
-        return False
-
 
 ##################################################################################### 
     def get_template_arch(self, template_path):
@@ -10671,59 +10635,7 @@ class WineCharmApp(Gtk.Application):
             self.runner_dropdown.set_model(Gtk.StringList.new([r[0] for r in all_runners]))
 
 ########################## fix default runner to handle arch difference
-    def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, all_runners):
-        self.print_method_name()
-        if response_id == "ok":
-            selected_index = runner_dropdown.get_selected()
-            if selected_index == Gtk.INVALID_LIST_POSITION:
-                print("No runner selected.")
-                return
 
-            new_runner_display, new_runner_path = all_runners[selected_index]
-            print(f"Selected new default runner: {new_runner_display} -> {new_runner_path}")
-
-            # Check architecture compatibility for non-system runners
-            if new_runner_path:  # Skip check for System Wine
-                runner_path = Path(new_runner_path).expanduser().resolve().parent.parent
-                
-                print(f"runner_path = {runner_path}")
-                # Determine runner architecture
-                if (runner_path / "bin/wine64").exists():
-                    runner_arch = "win64"
-                elif (runner_path / "bin/wine").exists():
-                    runner_arch = "win32"
-                else:
-                    self.show_info_dialog(
-                        "Invalid Runner",
-                        "Selected runner is missing Wine binaries (bin/wine or bin/wine64)"
-                    )
-                    return
-
-                # Get template architecture from settings
-                template_arch = self.settings.get("arch", "win64")
-                
-                # Check for 32-bit runner with 64-bit template
-                if template_arch == "win64" and runner_arch == "win32":
-                    self.show_info_dialog(
-                        "Architecture Mismatch",
-                        "Cannot use 32-bit runner with 64-bit template.\n\n"
-                        f"Template: {self.template} ({template_arch})\n"
-                        f"Runner: {new_runner_path} ({runner_arch})"
-                    )
-                    return
-
-            # Update settings
-            new_runner_value = "" if new_runner_display.startswith("System Wine") else new_runner_path
-            self.settings["runner"] = self.replace_home_with_tilde_in_path(new_runner_value)
-            self.save_settings()
-
-            # Provide feedback
-            confirmation_message = f"The default runner has been set to {new_runner_display}"
-            if new_runner_path:
-                confirmation_message += f" ({runner_arch})"
-            self.show_info_dialog("Default Runner Updated", confirmation_message)
-        else:
-            print("Set default runner canceled.")
 
 ##### Template Backup
     def backup_template(self, action=None):
@@ -11381,9 +11293,6 @@ class WineCharmApp(Gtk.Application):
 
 
 ###################### 0.95
-
-
-
 
 
 

@@ -3,7 +3,7 @@ sdk: org.gnome.Sdk
 runtime: org.gnome.Platform
 base: org.winehq.Wine
 base-version: stable-24.08
-runtime-version: &runtime-version '47'
+runtime-version: &runtime-version '48'
 command: winecharm
 
 #rename-icon: winezgui
@@ -40,8 +40,8 @@ finish-args:
 #- --filesystem=host
   # Host RO required to run exe files from other locations 
   - --filesystem=host:ro
-  - --filesystem=xdg-run/gvfs:ro
-  - --filesystem=xdg-run/gvfsd:ro
+  - --filesystem=xdg-run/gvfs
+  - --filesystem=xdg-run/gvfsd
 #  - --filesystem=home/games:create
   
   # WineZGUI import wine prefix Needs access to copy games and runners from wine, bottles, playonlinux, lutris, heroic launcher data directories. 
@@ -72,7 +72,6 @@ inherit-extensions:
   - org.freedesktop.Platform.ffmpeg-full
   - org.freedesktop.Platform.GL32
   - org.freedesktop.Platform.VAAPI.Intel.i386
-  - org.winehq.Wine.DLLs
   - org.winehq.Wine.gecko
   - org.winehq.Wine.mono
 
@@ -253,7 +252,9 @@ modules:
 
     sources:
       - type: git
-        tag: 0.99.0
+        tag: 0.99.1
         commit: 7ef5365dd6bc1358f57b18f4a51b5c582d48a67e
         url: https://github.com/fastrizwaan/WineCharm.git
+
+
 

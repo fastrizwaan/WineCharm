@@ -1,8 +1,50 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg height="16px" viewBox="0 0 16 16" width="16px" xmlns="http://www.w3.org/2000/svg">
-    <g fill="#2e3436">
-        <path d="m 1 2 h 14 v 2 h -14 z m 0 0"/>
-        <path d="m 1 7 h 14 v 2 h -14 z m 0 0"/>
-        <path d="m 1 12 h 14 v 2 h -14 z m 0 0"/>
-    </g>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   height="16px"
+   viewBox="0 0 16 16"
+   width="16px"
+   version="1.1"
+   id="svg3"
+   sodipodi:docname="open-menu-symbolic.svg"
+   inkscape:version="1.4 (e7c3feb100, 2024-10-09)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs3">
+    <rect
+       x="-8.7115555"
+       y="-3.1678384"
+       width="30.547013"
+       height="23.306239"
+       id="rect1" />
+  </defs>
+  <sodipodi:namedview
+     id="namedview3"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="8.8388348"
+     inkscape:cx="9.2206724"
+     inkscape:cy="14.028998"
+     inkscape:window-width="1292"
+     inkscape:window-height="991"
+     inkscape:window-x="26"
+     inkscape:window-y="23"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg3" />
+  <path
+     d="m 7.9449871,6.2558744 q 0.7701808,0 1.1679665,-0.338541 0.3977857,-0.338541 0.3977857,-0.998696 0,-0.6516914 -0.3977857,-0.9902324 Q 8.7151679,3.5814005 7.9449871,3.5814005 H 6.1422562 v 2.6744739 z m 0.1100258,5.5266816 q 0.981769,0 1.4726534,-0.414712 0.4993477,-0.414713 0.4993477,-1.252602 0,-0.820962 -0.4908841,-1.2272112 Q 9.0452454,8.473318 8.0550129,8.473318 H 6.1422562 v 3.309238 z M 11.084955,7.2376434 q 1.049477,0.3046869 1.624997,1.1256488 0.57552,0.820962 0.57552,2.0143188 0,1.828122 -1.235675,2.725255 Q 10.814122,14 8.2919917,14 H 2.883799 V 1.3639569 h 4.8919176 q 2.6321564,0 3.8085864,0.7955713 1.184893,0.7955714 1.184893,2.5475211 0,0.9225243 -0.431639,1.5742157 -0.43164,0.6432279 -1.252602,0.9563784 z"
+     id="text3"
+     style="font-weight:bold;font-size:17.3333px;font-family:'Droid Sans Tamil';-inkscape-font-specification:'Droid Sans Tamil Bold'"
+     aria-label="B" />
+  <text
+     xml:space="preserve"
+     id="text1"
+     style="fill:#000000;text-orientation:auto;-inkscape-font-specification:'Geologica Cursive Bold';font-family:'Geologica Cursive';font-size:16px;font-weight:bold;text-align:start;writing-mode:lr-tb;direction:ltr;white-space:pre;shape-inside:url(#rect1)" />
 </svg>
