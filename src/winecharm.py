@@ -3698,7 +3698,7 @@ class WineCharmApp(Adw.Application):
         self.script_options = [
             ("Show log", "mail-mark-junk-symbolic", self.show_log_file),
             ("Open Terminal", "utilities-terminal-symbolic", self.open_terminal),
-            ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
+            #("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
             ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager),
             ("Edit Script File", "text-editor-symbolic", self.open_script_file),
             ("Delete Wineprefix", "user-trash-symbolic", self.show_delete_wineprefix_confirmation),
@@ -4453,11 +4453,11 @@ class WineCharmApp(Adw.Application):
             print(f"Error opening terminal: {e}")
 
 
-    def install_dxvk_vkd3d(self, script, button):
-        self.print_method_name()
-        wineprefix = Path(script).parent
-        self.run_winetricks_script("vkd3d dxvk", wineprefix)
-        self.create_script_list()
+    #def install_dxvk_vkd3d(self, script, button):
+    #    self.print_method_name()
+    #    wineprefix = Path(script).parent
+    #    self.run_winetricks_script("vkd3d dxvk", wineprefix)
+    #    self.create_script_list()
 
     def open_filemanager(self, script, script_key, *args):
         self.count = 0
