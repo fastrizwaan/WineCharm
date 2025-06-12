@@ -23,11 +23,14 @@ Refactoring winecharm
 - [x] Add all info from .charm and buttons, row, label in self.all_scripts, use script_key (sha256sum)
 - [x] play/stop button, row highlight should be manageed.
 
-0.99.1
+0.99.3
 - [ ] Create script based script_data fetching see "def load_icon" method, and use that method to fetch script_data values.
 - [ ] Create Shortcuts for WineZGUI's Games, use restore wzt's logic. Create script files in PREFIXESDIR/WineZGUI_Shortcuts
 - [ ] Import on 1st start, and can be called from menu
 - [ ] If the .charm file is in PREFIXES_DIR/WineZGUI/script.charm; then on delete delete this shortcut. or perhaps deactivate all the dangerous options like rename, delete, reset, etc.; we should use WineZGUI's installed games and not alter their configuration/settings, except what's really needed.
+
+0.99.1
+- [x] port to libadwaita from gtk4 only
 
 # 0.99.0
 - [x] Beautiful list view
