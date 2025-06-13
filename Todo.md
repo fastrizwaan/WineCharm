@@ -24,7 +24,11 @@ Refactoring winecharm
 - [x] play/stop button, row highlight should be manageed.
 
 0.99.3
-- [ ] Create script based script_data fetching see "def load_icon" method, and use that method to fetch script_data values.
+- [] Load/not load from winezgui
+- [] empty winezgui processing needs load_script
+- [] show added scripts
+- [] add (winezgui) value using the copy of process_sh_files for winezgui
+
 - [ ] Create Shortcuts for WineZGUI's Games, use restore wzt's logic. Create script files in PREFIXESDIR/WineZGUI_Shortcuts
 - [ ] Import on 1st start, and can be called from menu
 - [ ] If the .charm file is in PREFIXES_DIR/WineZGUI/script.charm; then on delete delete this shortcut. or perhaps deactivate all the dangerous options like rename, delete, reset, etc.; we should use WineZGUI's installed games and not alter their configuration/settings, except what's really needed.

@@ -2265,6 +2265,7 @@ class WineCharmApp(Adw.Application):
 
             threading.Thread(target=wineboot_operation, daemon=True).start()
         else:
+
             execute_launch()
 
     def get_runner(self, script_data):

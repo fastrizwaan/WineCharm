@@ -252,8 +252,8 @@ modules:
 
     sources:
       - type: git
-        tag: 0.99.1
-        commit: 7ef5365dd6bc1358f57b18f4a51b5c582d48a67e
+        #tag: 0.99.1
+        commit: 1e077d646b7e5d32c83718f0b5aa91a4efd09f12
         url: https://github.com/fastrizwaan/WineCharm.git
 
 
