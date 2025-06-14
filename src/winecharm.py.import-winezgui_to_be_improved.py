@@ -2007,7 +2007,7 @@ class WineCharmApp(Adw.Application):
             exe_parent_name = process_info.get("exe_parent_name")
             unique_id = process_info.get("unique_id")
             if script and script.exists():
-                wineprefix = script.parent
+                wineprefix = Path(script.parent).expanduser().resolve() 
                 print(f"Processing wineprefix: {wineprefix}")
                 if wineprefix:
                     script_data = self.script_list.get(script_key, {})
@@ -9680,24 +9680,26 @@ class WineCharmApp(Adw.Application):
                         env_vars = self.load_and_fix_yaml(env_var_file_path, "environment-variable.yml")
                         args = self.load_and_fix_yaml(cmdline_file_path, "cmdline.yml")
 
+                        # Check if directory contains "winezgui/WineZGUI" (case-insensitive)
+                        if 'winezgui'.lower() in str(directory).lower():
+                            progname = f"{progname} (WineZGUI)"
+
                         yml_path = sh_file.replace('.sh', '.charm')
                         self.create_charm_file({
                             'exe_file': self.replace_home_with_tilde_in_path(str(exe_file)),
                             'script_path': self.replace_home_with_tilde_in_path(str(yml_path)),
                             'wineprefix': self.replace_home_with_tilde_in_path(str(directory)),
-                            'progname': progname,
+                            'progname': progname,  # Use modified progname
                             'sha256sum': sha256sum,
                             'runner': runner,
                             'args': args,  # Include command-line arguments
                             'env_vars': env_vars  # Include environment variables
                         }, yml_path)
 
-                        
                         ## Add the new script data directly to the script list
                         self.new_scripts.add(Path(yml_path).stem)
                         print(f"Created {yml_path}")
                         created_charm_files = True  # Mark that at least one .charm file was created
-                        
 
                     except Exception as e:
                         print(f"Error parsing INFOFILE {info_file_path}: {e}")
@@ -11545,6 +11547,7 @@ class WineCharmApp(Adw.Application):
             return None
 
 
+#################
 
 
 

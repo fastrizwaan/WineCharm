@@ -52,7 +52,7 @@ finish-args:
   - --filesystem=~/.var/app/com.usebottles.bottles/data/bottles:ro
   - --filesystem=~/.var/app/com.playonlinux.PlayOnLinux4/data/PlayOnLinux/wineprefix:ro
   - --filesystem=~/.var/app/org.phoenicis.playonlinux/.Phoenicis/containers/wineprefix:ro
-  - --filesystem=~/.var/app/io.github.fastrizwaan.WineZGUI/data/winezgui/Prefixes:rw
+  - --filesystem=~/.var/app/io.github.fastrizwaan.WineZGUI/data/winezgui:rw
 
 cleanup:
   - '*.a'
