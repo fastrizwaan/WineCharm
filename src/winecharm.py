@@ -388,6 +388,7 @@ class WineCharmApp(Adw.Application):
             if not self.template.exists():
                 # If template doesn't exist, initialize it
                 self.initialize_template(self.template, self.on_template_initialized)
+                self.process_winezgui_sh_files()
             else:
                 # Template already exists, set dynamic variables
                 self.set_dynamic_variables()
