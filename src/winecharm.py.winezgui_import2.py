@@ -9630,9 +9630,10 @@ class WineCharmApp(Adw.Application):
         self.print_method_name()
         """
         Process all .sh files and convert them to .charm files.
+        Returns a list of created .charm file paths or an empty list if none created.
         """
         sh_files = self.find_sh_files(directory)
-        created_charm_files = False  # Track whether any .charm file is created
+        created_charm_files = []  # Track paths of created .charm files
         
         print(f"sh_files = \n {sh_files}")
         
@@ -9699,7 +9700,7 @@ class WineCharmApp(Adw.Application):
                         ## Add the new script data directly to the script list
                         self.new_scripts.add(Path(yml_path).stem)
                         print(f"Created {yml_path}")
-                        created_charm_files = True  # Mark that at least one .charm file was created
+                        created_charm_files.append(yml_path)  # Add to list of created files
 
                     except Exception as e:
                         print(f"Error parsing INFOFILE {info_file_path}: {e}")
@@ -9721,6 +9722,9 @@ class WineCharmApp(Adw.Application):
                 print(f"Scripts created for .exe files in {directory}")
         else:
             self.track_all_lnk_files(directory)
+
+        return created_charm_files  # Return list of created .charm file paths
+
 
     def load_and_fix_yaml(self, yaml_file_path, filename):
         self.print_method_name()
@@ -11452,104 +11456,6 @@ class WineCharmApp(Adw.Application):
 
 
 #################
-    def process_sh_files(self, directory):
-        self.print_method_name()
-        """
-        Process all .sh files and convert them to .charm files.
-        Returns a list of created .charm file paths or an empty list if none created.
-        """
-        sh_files = self.find_sh_files(directory)
-        created_charm_files = []  # Track paths of created .charm files
-        
-        print(f"sh_files = \n {sh_files}")
-        
-        for sh_file in sh_files:
-            variables = self.extract_infofile_path_from_sh(sh_file)
-            exe_file = variables.get('EXE_FILE', '')
-            progname = variables.get('PROGNAME', '')
-            sha256sum = variables.get('CHECKSUM', '')
-
-            print(" = "*20)
-            print(f"""
-            exe_file = {exe_file}
-            progname = {progname}
-            sha256sum = {sha256sum}
-            """)
-            # Regenerate sha256sum if missing
-            if exe_file and not sha256sum:
-                sha256_hash = hashlib.sha256()
-                try:
-                    with open(exe_file, "rb") as f:
-                        for byte_block in iter(lambda: f.read(4096), b""):
-                            sha256_hash.update(byte_block)
-                    sha256sum = sha256_hash.hexdigest()
-                    print(f"Warning: sha256sum missing in {exe_file}. Regenerated hash.")
-                except FileNotFoundError:
-                    print(f"Error: {exe_file} not found. Cannot compute sha256sum.")
-
-            info_file_path = variables.get('INFOFILE')
-            if info_file_path:
-                info_file_path = os.path.join(os.path.dirname(sh_file), info_file_path)
-                if os.path.exists(info_file_path):
-                    try:
-                        info_data = self.parse_info_file(info_file_path)
-                        runner = info_data.get('Runner', '')
-                        
-                        # Set runner to empty string if it's '/app/bin/wine'
-                        if runner == '/app/bin/wine':
-                            runner = ''
-                            
-                        # Locate environment-variable.yml and cmdline.yml
-                        env_var_file_path = os.path.join(os.path.dirname(sh_file), "environment-variable.yml")
-                        cmdline_file_path = os.path.join(os.path.dirname(sh_file), "cmdline.yml")
-
-                        # Load environment variables and command-line arguments
-                        env_vars = self.load_and_fix_yaml(env_var_file_path, "environment-variable.yml")
-                        args = self.load_and_fix_yaml(cmdline_file_path, "cmdline.yml")
-
-                        # Check if directory contains "winezgui/WineZGUI" (case-insensitive)
-                        if 'winezgui'.lower() in str(directory).lower():
-                            progname = f"{progname} (WineZGUI)"
-
-                        yml_path = sh_file.replace('.sh', '.charm')
-                        self.create_charm_file({
-                            'exe_file': self.replace_home_with_tilde_in_path(str(exe_file)),
-                            'script_path': self.replace_home_with_tilde_in_path(str(yml_path)),
-                            'wineprefix': self.replace_home_with_tilde_in_path(str(directory)),
-                            'progname': progname,  # Use modified progname
-                            'sha256sum': sha256sum,
-                            'runner': runner,
-                            'args': args,  # Include command-line arguments
-                            'env_vars': env_vars  # Include environment variables
-                        }, yml_path)
-
-                        ## Add the new script data directly to the script list
-                        self.new_scripts.add(Path(yml_path).stem)
-                        print(f"Created {yml_path}")
-                        created_charm_files.append(yml_path)  # Add to list of created files
-
-                    except Exception as e:
-                        print(f"Error parsing INFOFILE {info_file_path}: {e}")
-                else:
-                    print(f"INFOFILE {info_file_path} not found")
-            else:
-                print(f"No INFOFILE found in {sh_file}")
-
-        # If no .charm files were created, create scripts for .lnk and .exe files
-        if not created_charm_files:
-            print(f"No .charm files created. Proceeding to create scripts for .lnk and .exe files in {directory}")
-            self.create_scripts_for_lnk_files(directory)
-            print(f"Scripts created for .lnk files in {directory}")
-
-            if self.lnk_processed_success_status:
-                print("Skipping create_scripts_for_exe_files creation: .lnk files processed successfully.")
-            else:
-                self.create_scripts_for_exe_files(directory)
-                print(f"Scripts created for .exe files in {directory}")
-        else:
-            self.track_all_lnk_files(directory)
-
-        return created_charm_files  # Return list of created .charm file paths
 
 
 ##################
