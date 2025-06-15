@@ -39,9 +39,8 @@ finish-args:
     # Most Games write to their own directories
 #- --filesystem=host
   # Host RO required to run exe files from other locations 
-  - --filesystem=host:ro
-#  - --filesystem=xdg-run/gvfs
-  - --filesystem=xdg-run/gvfsd
+  - --filesystem=xdg-run/gvfs
+  #- --filesystem=xdg-run/gvfsd
 #  - --filesystem=home/games:create
   
   # WineZGUI import wine prefix Needs access to copy games and runners from wine, bottles, playonlinux, lutris, heroic launcher data directories. 
@@ -253,7 +252,7 @@ modules:
     sources:
       - type: git
         #tag: 0.99.1
-        commit: 4649b8880cb9f0e7f0fecc9f6e08f1f6219bf6fe
+        commit: 8546b92ce94d55563f7ce9142d91aa81a864594c
         url: https://github.com/fastrizwaan/WineCharm.git
 
 
