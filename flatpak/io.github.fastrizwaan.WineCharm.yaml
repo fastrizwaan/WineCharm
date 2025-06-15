@@ -40,7 +40,7 @@ finish-args:
 #- --filesystem=host
   # Host RO required to run exe files from other locations 
   - --filesystem=host:ro
-  - --filesystem=xdg-run/gvfs
+#  - --filesystem=xdg-run/gvfs
   - --filesystem=xdg-run/gvfsd
 #  - --filesystem=home/games:create
   

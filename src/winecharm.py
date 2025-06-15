@@ -127,6 +127,7 @@ class WineCharmApp(Adw.Application):
             ("☠️ Kill all...", self.on_kill_all_clicked),
             ("🍾 Restore...", self.restore_from_backup),
             ("📥 Import Wine Directory", self.on_import_wine_directory_clicked),
+            ("📥 Import WineZGUI Scripts...", self.process_winezgui_sh_files)
             ("❓ Help...", self.on_help_clicked),
             ("📖 About...", self.on_about_clicked),
             ("🚪 Quit...", self.quit_app)
@@ -200,7 +201,8 @@ class WineCharmApp(Adw.Application):
         self.set_accels_for_action("win.back", ["<Ctrl>BackSpace"])
 
         self.count = 0
-
+        self.winezgui_prefixes_dir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineZGUI/data/winezgui/Prefixes")).resolve()
+        
     def print_method_name(self):
         return
         self.count = self.count + 1 
@@ -1423,25 +1425,33 @@ class WineCharmApp(Adw.Application):
     def find_charm_files(self, prefixdir=None):
         self.print_method_name()
         """
-        Finds .charm files efficiently, up to 2 levels deep.
+        Finds .charm files efficiently, up to 2 levels deep in both WineCharm and WineZGUI prefix directories.
         Returns a list of Path objects sorted by modification time.
         """
-        if prefixdir is None:
-            prefixdir = self.prefixes_dir
-        
-        prefixdir = Path(prefixdir).expanduser().resolve()
         charm_files = []
         
-        # Level 1: Direct children
-        charm_files.extend(prefixdir.glob("*.charm"))
-        
-        # Level 2: One level deeper
-        for subdir in prefixdir.iterdir():
-            if subdir.is_dir():
-                charm_files.extend(subdir.glob("*.charm"))
-        
-        # Sort by modification time (newest first)
+        # Search in WineCharm's prefixes_dir
+        if prefixdir is None or prefixdir == self.prefixes_dir:
+            winecharm_dir = Path(self.prefixes_dir).expanduser().resolve()
+            if winecharm_dir.exists():
+                charm_files.extend(winecharm_dir.glob("*.charm"))
+                for subdir in winecharm_dir.iterdir():
+                    if subdir.is_dir():
+                        charm_files.extend(subdir.glob("*.charm"))
+
+        # Search in WineZGUI's prefixes_dir
+        if prefixdir is None or prefixdir == self.winezgui_prefixes_dir:
+            winezgui_dir = Path(self.winezgui_prefixes_dir).expanduser().resolve()
+            if winezgui_dir.exists():
+                charm_files.extend(winezgui_dir.glob("*.charm"))
+                for subdir in winezgui_dir.iterdir():
+                    if subdir.is_dir():
+                        charm_files.extend(subdir.glob("*.charm"))
+
+        # Remove duplicates and sort by modification time (newest first)
+        charm_files = list(set(charm_files))
         return sorted(charm_files, key=lambda p: p.stat().st_mtime, reverse=True)
+
 
     def replace_open_button_with_launch(self, script, row, script_key):
         self.print_method_name()
@@ -6354,18 +6364,15 @@ class WineCharmApp(Adw.Application):
 
         Args:
             prefixdir (str or Path, optional): The directory to search for .charm files.
-                                            Defaults to self.prefixes_dir.
+                                            Defaults to None, which searches both self.prefixes_dir
+                                            and self.winezgui_prefixes_dir.
         """
-        if prefixdir is None:
-            prefixdir = self.prefixes_dir
-
         def load_in_background():
-            # Use a temporary dictionary to avoid modifying self.script_list directly
             temp_script_list = {}
-            charm_files = list(self.find_charm_files(prefixdir))  # Get all .charm files efficiently
+            charm_files = list(self.find_charm_files(prefixdir))
 
             for charm_file in charm_files:
-                if self.stop_processing:  # Allow interruption
+                if self.stop_processing:
                     return
                 try:
                     with open(charm_file, 'r', encoding='utf-8') as f:
@@ -6375,24 +6382,20 @@ class WineCharmApp(Adw.Application):
                         print(f"Warning: Invalid format in {charm_file}, skipping.")
                         continue
 
-                    # Ensure required keys are present and correctly populated
                     updated = False
                     required_keys = ['exe_file', 'script_path', 'wineprefix', 'sha256sum']
 
-                    # Initialize script_path to the current .charm file path if missing
                     if 'script_path' not in script_data:
                         script_data['script_path'] = self.replace_home_with_tilde_in_path(str(charm_file))
                         updated = True
                         print(f"Warning: script_path missing in {charm_file}. Added default value.")
 
-                    # Set wineprefix to the parent directory of script_path if missing
                     if 'wineprefix' not in script_data or not script_data['wineprefix']:
                         wineprefix = str(Path(charm_file).parent)
                         script_data['wineprefix'] = self.replace_home_with_tilde_in_path(wineprefix)
                         updated = True
                         print(f"Warning: wineprefix missing in {charm_file}. Set to {wineprefix}.")
 
-                    # Replace any $HOME occurrences with ~ in all string paths
                     for key in required_keys:
                         if isinstance(script_data.get(key), str) and script_data[key].startswith(os.getenv("HOME")):
                             new_value = self.replace_home_with_tilde_in_path(script_data[key])
@@ -6400,7 +6403,6 @@ class WineCharmApp(Adw.Application):
                                 script_data[key] = new_value
                                 updated = True
 
-                    # Regenerate sha256sum if missing
                     should_generate_hash = False
                     if 'sha256sum' not in script_data or script_data['sha256sum'] is None:
                         should_generate_hash = True
@@ -6418,18 +6420,14 @@ class WineCharmApp(Adw.Application):
                         else:
                             print(f"Warning: exe_file not found, not updating sha256sum for {charm_file}")
 
-                    # If updates are needed, rewrite the file
                     if updated:
-                        with self.file_lock:  # Ensure thread-safe file writing
-                            with open(charm_file, 'w') as f:
-                                #yaml.safe_dump(script_data, f)
+                        with self.file_lock:
+                            with open(charm_file, 'w', encoding='utf-8') as f:
                                 yaml.dump(script_data, f, default_style="'", default_flow_style=False, width=10000)
                         print(f"Updated script file: {charm_file}")
 
-                    # Store the actual file modification time
                     script_data['mtime'] = os.path.getmtime(charm_file)
 
-                    # Use 'sha256sum' as the key in script_list
                     script_key = script_data['sha256sum']
                     temp_script_list[script_key] = script_data
 
@@ -6439,10 +6437,8 @@ class WineCharmApp(Adw.Application):
                     print(f"Error loading {charm_file}: {e}")
                     continue
 
-            # Update the main script_list and trigger UI update in the main thread
-            GLib.idle_add(self.update_script_list, temp_script_list, prefixdir == self.prefixes_dir)
+            GLib.idle_add(self.update_script_list, temp_script_list, prefixdir is None)
 
-        # Start background thread
         threading.Thread(target=load_in_background, daemon=True).start()
 
     def update_script_list(self, temp_script_list, clear_existing=True):
@@ -9627,9 +9623,10 @@ class WineCharmApp(Adw.Application):
         self.print_method_name()
         """
         Process all .sh files and convert them to .charm files.
+        Returns a list of created .charm file paths or an empty list if none created.
         """
         sh_files = self.find_sh_files(directory)
-        created_charm_files = False  # Track whether any .charm file is created
+        created_charm_files = []  # Track paths of created .charm files
         
         print(f"sh_files = \n {sh_files}")
         
@@ -9664,7 +9661,11 @@ class WineCharmApp(Adw.Application):
                     try:
                         info_data = self.parse_info_file(info_file_path)
                         runner = info_data.get('Runner', '')
-
+                        
+                        # Set runner to empty string if it's '/app/bin/wine'
+                        if runner == '/app/bin/wine':
+                            runner = ''
+                            
                         # Locate environment-variable.yml and cmdline.yml
                         env_var_file_path = os.path.join(os.path.dirname(sh_file), "environment-variable.yml")
                         cmdline_file_path = os.path.join(os.path.dirname(sh_file), "cmdline.yml")
@@ -9673,24 +9674,26 @@ class WineCharmApp(Adw.Application):
                         env_vars = self.load_and_fix_yaml(env_var_file_path, "environment-variable.yml")
                         args = self.load_and_fix_yaml(cmdline_file_path, "cmdline.yml")
 
+                        # Check if directory contains "winezgui/WineZGUI" (case-insensitive)
+                        if 'winezgui'.lower() in str(directory).lower():
+                            progname = f"{progname} (WineZGUI)"
+
                         yml_path = sh_file.replace('.sh', '.charm')
                         self.create_charm_file({
                             'exe_file': self.replace_home_with_tilde_in_path(str(exe_file)),
                             'script_path': self.replace_home_with_tilde_in_path(str(yml_path)),
                             'wineprefix': self.replace_home_with_tilde_in_path(str(directory)),
-                            'progname': progname,
+                            'progname': progname,  # Use modified progname
                             'sha256sum': sha256sum,
                             'runner': runner,
                             'args': args,  # Include command-line arguments
                             'env_vars': env_vars  # Include environment variables
                         }, yml_path)
 
-                        
                         ## Add the new script data directly to the script list
                         self.new_scripts.add(Path(yml_path).stem)
                         print(f"Created {yml_path}")
-                        created_charm_files = True  # Mark that at least one .charm file was created
-                        
+                        created_charm_files.append(yml_path)  # Add to list of created files
 
                     except Exception as e:
                         print(f"Error parsing INFOFILE {info_file_path}: {e}")
@@ -9712,6 +9715,9 @@ class WineCharmApp(Adw.Application):
                 print(f"Scripts created for .exe files in {directory}")
         else:
             self.track_all_lnk_files(directory)
+
+        return created_charm_files  # Return list of created .charm file paths
+
 
     def load_and_fix_yaml(self, yaml_file_path, filename):
         self.print_method_name()
@@ -11275,6 +11281,49 @@ class WineCharmApp(Adw.Application):
 
 ###################### 0.95
 
+
+
+    def process_winezgui_sh_files(self, action=None, param=None):
+        self.print_method_name()
+        """
+        Process WineZGUI .sh files to create corresponding .charm files in their prefix directories.
+        """
+        self.show_processing_spinner("Processing WineZGUI Scripts...")
+        
+        def process_in_background():
+            try:
+                if not self.winezgui_prefixes_dir.exists():
+                    GLib.idle_add(self.show_info_dialog, "Directory Not Found", f"WineZGUI prefixes directory not found: {self.winezgui_prefixes_dir}")
+                    return
+
+                # Collect unique prefix directories containing .sh files
+                prefix_dirs = set()
+                for subdir in self.winezgui_prefixes_dir.iterdir():
+                    if subdir.is_dir() and list(subdir.glob("*.sh")):
+                        prefix_dirs.add(subdir)
+
+                if not prefix_dirs:
+                    GLib.idle_add(self.show_info_dialog, "No Scripts Found", "No .sh files found in WineZGUI prefixes directory.")
+                    return
+
+                created_count = 0
+                created_charm_files = set()  # Track unique .charm files to avoid duplicates
+                for prefix_dir in prefix_dirs:
+                    if self.stop_processing:
+                        break
+                    charm_files = self.process_sh_files(prefix_dir)
+                    # Add only new, unique .charm files to the set
+                    for charm_file in charm_files:
+                        if charm_file not in created_charm_files:
+                            created_charm_files.add(charm_file)
+                            created_count += 1
+
+                GLib.idle_add(self.show_info_dialog, "Processing Complete", f"Created {created_count} .charm files from WineZGUI scripts.")
+
+            finally:
+                GLib.idle_add(self.hide_processing_spinner)
+                GLib.idle_add(self.load_script_list)
+        threading.Thread(target=process_in_background, daemon=True).start()
 
 
 
