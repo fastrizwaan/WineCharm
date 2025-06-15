@@ -127,7 +127,7 @@ class WineCharmApp(Adw.Application):
             ("☠️ Kill all...", self.on_kill_all_clicked),
             ("🍾 Restore...", self.restore_from_backup),
             ("📥 Import Wine Directory", self.on_import_wine_directory_clicked),
-            ("📥 Import WineZGUI Scripts...", self.process_winezgui_sh_files)
+            ("📥 Import WineZGUI Scripts...", self.process_winezgui_sh_files),
             ("❓ Help...", self.on_help_clicked),
             ("📖 About...", self.on_about_clicked),
             ("🚪 Quit...", self.quit_app)
@@ -202,7 +202,7 @@ class WineCharmApp(Adw.Application):
 
         self.count = 0
         self.winezgui_prefixes_dir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineZGUI/data/winezgui/Prefixes")).resolve()
-        
+
     def print_method_name(self):
         return
         self.count = self.count + 1 

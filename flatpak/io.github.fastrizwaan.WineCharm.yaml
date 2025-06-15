@@ -152,8 +152,8 @@ modules:
       ldflags: "-fpic"
     sources:
     - type: archive
-      url: https://www.cpan.org/src/5.0/perl-5.38.0.tar.xz
-      sha256: eca551caec3bc549a4e590c0015003790bdd1a604ffe19cc78ee631d51f7072e
+      url: https://www.cpan.org/src/5.0/perl-5.40.2.tar.xz
+      sha256: 0551c717458e703ef7972307ab19385edfa231198d88998df74e12226abf563b
     - type: script
       dest-filename: configure
       commands:
@@ -169,8 +169,8 @@ modules:
       - make install 
     sources:
       - type: archive
-        url: https://github.com/exiftool/exiftool/archive/refs/tags/12.68.tar.gz
-        sha256: 49273f93edcd32eee3725b458a2c7151d8e353281dc52bfa3d063c92962ab6d8
+        url: https://exiftool.org/Image-ExifTool-13.30.tar.gz
+        sha256: 885afd06c4efcc60d1df703cc88ba7ddc3bb6fed854cfbaa9e6cd72adfbe8da9
         
   - name: desktop-file-utils
     build-options:
@@ -253,7 +253,7 @@ modules:
     sources:
       - type: git
         #tag: 0.99.1
-        commit: 1e077d646b7e5d32c83718f0b5aa91a4efd09f12
+        commit: c5815023a59ec374b4b7df74462b5c8d74fdd526
         url: https://github.com/fastrizwaan/WineCharm.git
 
 
