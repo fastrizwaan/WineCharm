@@ -1206,11 +1206,9 @@ class WineCharmApp(Adw.Application):
                 if hasattr(self, 'launch_button') and self.launch_button is not None:
                     if self.launch_button.get_parent() != self.vbox:
                         self.vbox.prepend(self.launch_button)
-                        self.window.set_focus(None)
                 else:
                     if self.open_button.get_parent() != self.vbox:
                         self.vbox.prepend(self.open_button)
-                        self.window.set_focus(None)
                 
                 self.search_active = False
                 
@@ -2311,6 +2309,8 @@ class WineCharmApp(Adw.Application):
                     
                     # Schedule main launch after wineboot completes
                     GLib.idle_add(execute_launch)
+                    self.window.set_focus(None)
+
 
                 except subprocess.CalledProcessError as e:
                     error_msg = f"Wineboot failed (code {e.returncode}): {e.stderr}"
@@ -2325,8 +2325,8 @@ class WineCharmApp(Adw.Application):
 
             threading.Thread(target=wineboot_operation, daemon=True).start()
         else:
-
             execute_launch()
+            self.window.set_focus(None)
 
     def get_runner(self, script_data):
         self.print_method_name()
