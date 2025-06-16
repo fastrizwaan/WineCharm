@@ -1270,8 +1270,9 @@ class WineCharmApp(Adw.Application):
         file_filter = Gtk.FileFilter()
         file_filter.set_name("EXE and MSI files")
         file_filter.add_mime_type("application/x-ms-dos-executable")
-        file_filter.add_pattern("*.exe")
-        file_filter.add_pattern("*.msi")
+        # Add patterns for case-insensitive extensions
+        for ext in [".exe", ".EXE", ".msi", ".MSI"]:
+            file_filter.add_pattern(ext)
         return file_filter
 
     def on_open_file_dialog_response(self, dialog, result):
