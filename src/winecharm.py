@@ -11479,7 +11479,7 @@ def main():
                 sys.exit(1)
 
         # For .exe, .msi, .bottle, .prefix, or .wzt files, handle via GUI mode
-        elif file_extension in ['.exe', '.msi', '.bottle', '.prefix', '.wzt', '.EXE', '.MSI', '.BOTTLE', '.PREFIX, '.WZT']:
+        elif file_extension in ['.exe', '.msi', '.bottle', '.prefix', '.wzt', '.EXE', '.MSI', '.BOTTLE', '.PREFIX,' '.WZT']:
                 if app.SOCKET_FILE.exists():
                 try:
                     # Send the file to an existing running instance
