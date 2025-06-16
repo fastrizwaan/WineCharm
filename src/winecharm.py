@@ -11345,7 +11345,6 @@ class WineCharmApp(Adw.Application):
 
 
 
-
 def parse_args():
     WineCharmApp().print_method_name()
     """
@@ -11532,10 +11531,6 @@ def main():
         app.command_line_file = args.file
     app.start_socket_server()
     app.run(sys.argv)
-
-
-
-
 
 
 if __name__ == "__main__":
