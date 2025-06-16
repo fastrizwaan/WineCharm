@@ -24,9 +24,9 @@ Refactoring winecharm
 - [x] play/stop button, row highlight should be manageed.
 
 0.99.3
-- [ ] Import on 1st start, and can be called from menu
-- [] show added scripts count
-- [] Create Shortcuts for WineZGUI's Games, use restore wzt's logic. Create script files in PREFIXESDIR/WineZGUI_Shortcuts
+- [x] Import on 1st start, and can be called from menu
+- [x] show added scripts count
+
 
 0.99.1
 - [x] port to libadwaita from gtk4 only

@@ -222,7 +222,6 @@ modules:
       - type: file
         path: io.github.fastrizwaan.WineCharm.metainfo.xml
         
-      - type: file
-        path: wcterm.py
+
       
 
