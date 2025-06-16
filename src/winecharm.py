@@ -1135,18 +1135,64 @@ class WineCharmApp(Adw.Application):
 
     def on_key_pressed(self, controller, keyval, keycode, state):
         self.print_method_name()
+        
+        # Check if Ctrl is pressed to handle Ctrl+F
+        if state & Gdk.ModifierType.CONTROL_MASK and keyval == Gdk.KEY_f:
+            self.search_button.set_active(not self.search_button.get_active())
+            return True
+
+        # Handle Escape key to close search
         if keyval == Gdk.KEY_Escape:
             self.search_button.set_active(False)
+            self.search_entry.set_text("")
             
             # Reset the appropriate view based on context
             if hasattr(self, 'settings_flowbox') and self.settings_flowbox.get_parent() is not None:
-                self.search_entry.set_text("")
                 self.populate_settings_options()
             elif hasattr(self, 'script_options_flowbox') and self.script_options_flowbox.get_parent() is not None:
-                self.search_entry.set_text("")
-                self.populate_script_options()  # Removed extra arguments
+                self.populate_script_options()
             else:
                 self.filter_script_list("")
+                
+            # Clear focus to prevent any widget (e.g., Open button) from being focused
+            self.window.set_focus(None)
+            return True
+
+        # Check if the key is a printable character and search is not active
+        if not self.search_active and self.is_printable_key(keyval):
+            # Activate search mode
+            self.search_button.set_active(True)
+            
+            # Get the character from the keyval
+            key_string = Gdk.keyval_to_unicode(keyval)
+            if key_string:
+                key_char = chr(key_string)
+                # Set the search entry text to the typed character
+                self.search_entry.set_text(key_char)
+                # Move cursor to the end of the text
+                self.search_entry.set_position(-1)
+                # Trigger search
+                self.on_search_entry_changed(self.search_entry)
+            return True
+
+        return False
+
+    def is_printable_key(self, keyval):
+        """
+        Check if the keyval corresponds to a printable character.
+        """
+        # Convert keyval to unicode character
+        char = Gdk.keyval_to_unicode(keyval)
+        if char == 0:
+            return False
+        # Check if the character is printable (alphanumeric, symbols, etc.)
+        return chr(char).isprintable() and keyval not in (
+            Gdk.KEY_Return, Gdk.KEY_Tab, Gdk.KEY_BackSpace, 
+            Gdk.KEY_Left, Gdk.KEY_Right, Gdk.KEY_Up, Gdk.KEY_Down,
+            Gdk.KEY_Control_L, Gdk.KEY_Control_R, Gdk.KEY_Alt_L, 
+            Gdk.KEY_Alt_R, Gdk.KEY_Shift_L, Gdk.KEY_Shift_R
+        )
+
 
     def on_search_button_clicked(self, button):
         self.print_method_name()
@@ -11327,8 +11373,7 @@ class WineCharmApp(Adw.Application):
                 GLib.idle_add(self.load_script_list)
         threading.Thread(target=process_in_background, daemon=True).start()
 
-
-
+###############
 
 
 
