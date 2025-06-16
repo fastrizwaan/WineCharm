@@ -6,9 +6,12 @@ base-version: stable-24.08
 runtime-version: &runtime-version '48'
 command: winecharm
 
-#rename-icon: winezgui
-#rename-desktop-file: winezgui.desktop
 finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=pulseaudio
+  - --socket=x11
+  - --system-talk-name=org.freedesktop.UDisks2
   - --allow=devel # For Wine crash handling
   - --allow=multiarch
   - --device=all
@@ -16,37 +19,26 @@ finish-args:
   - --env=WINEDLLPATH=/app/dlls/lib32:/app/dlls/lib:/app/lib32/wine/wined3d:/app/lib/wine/wined3d
   - --env=LD_LIBRARY_PATH=/app/lib:/app/lib32
 
-    # Need to link .desktop files
-  - --filesystem=~/.local/share/applications:create
-  - --filesystem=~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm:create
 
-
-  - --share=ipc
-  - --share=network
-  - --socket=pulseaudio
-  - --socket=x11
-  - --system-talk-name=org.freedesktop.UDisks2
-
-
-#  - --talk-name=io.github.fastrizwaan.WineCharm
-#  - --own-name=io.github.fastrizwaan.WineCharm
 
 
   
-  # WineZGUI import wine prefix Needs access to copy games and runners from wine, bottles, playonlinux, lutris, heroic launcher data directories. 
-  # Using :ro messes up the path to /run/... instead of ~/ breaking copying
-  # flatpak bug with :ro breaks realpath.
+  # Need to link .desktop files from WineCharm/data/Prefix, if user needs them
+  - --filesystem=~/.local/share/applications:create
+  # Access dirs, same as org.winehq.Wine
   - --filesystem=xdg-desktop
   - --filesystem=xdg-documents
   - --filesystem=xdg-pictures
   - --filesystem=xdg-music
   - --filesystem=xdg-videos
   - --filesystem=xdg-download
-  - --filesystem=~/.wine:ro
-  - --filesystem=~/.var/app/org.winehq.Wine/data/wine:ro
-  - --filesystem=~/.var/app/com.usebottles.bottles/data/bottles:ro
-  - --filesystem=~/.var/app/com.playonlinux.PlayOnLinux4/data/PlayOnLinux/wineprefix:ro
-  - --filesystem=~/.var/app/org.phoenicis.playonlinux/.Phoenicis/containers/wineprefix:ro
+  # If the user wants to copy a wine prefix or a runner from these dirs; permissions same as winezgui
+  - --filesystem=~/.wine
+  - --filesystem=~/.var/app/org.winehq.Wine/data/wine
+  - --filesystem=~/.var/app/com.usebottles.bottles/data/bottles
+  - --filesystem=~/.var/app/com.playonlinux.PlayOnLinux4/data/PlayOnLinux/wineprefix
+  - --filesystem=~/.var/app/org.phoenicis.playonlinux/.Phoenicis/containers/wineprefix
+  # I'm the author of WineZGUI also, so will create simple text files there.
   - --filesystem=~/.var/app/io.github.fastrizwaan.WineZGUI/data/winezgui:rw
 
 cleanup:
@@ -207,49 +199,30 @@ modules:
           packagetype: bdist_wheel
 
   - name: vte
+    buildsystem: meson
     sources:
       - type: git
         url: https://gitlab.gnome.org/GNOME/vte.git/
         commit: 3f66edbf598129bafde3baa91ccfb345056418c3
-    buildsystem: meson
-#    config-opts:
-      #- -Dgtk3=false
-      #- -Dgtk4=true
 
-#  - name: WineCharm
-#    buildsystem: simple
-#    build-commands:
-#      - install -Dm755 winecharm.py /app/bin/winecharm
-#      - install -Dm755 wcterm.py    /app/bin/wcterm
-#      - install -Dm644 io.github.fastrizwaan.WineCharm.svg /app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg
-#      - install -Dm755 io.github.fastrizwaan.WineCharm.desktop /app/share/applications/io.github.fastrizwaan.WineCharm.desktop
-#      - mkdir -p /app/share/icons/hicolor/scalable/actions
-#      - install -Dm644 icons/*-symbolic.svg /app/share/icons/hicolor/scalable/actions  # Reverted to simpler install command
-#
-#    sources:
-#      - type: file
-#        path: ../src/winecharm.py
-#      - type: file
-#        path: ../src/wcterm.py
-#      - type: file
-#        path: ../data/icons/io.github.fastrizwaan.WineCharm.svg
-#      - type: file
-#        path: ../data/shortcut/io.github.fastrizwaan.WineCharm.desktop
-#      - type: dir
-#        path: ../data/icons    # Point to the real directory
-#        dest: icons       # Rename it to 'icons' in the build environment
         
   - name: WineCharm
     buildsystem: simple
     build-commands:
       - ./setup -i --prefix=/app 
       - install -Dm755 src/wcterm.py    /app/bin/wcterm
-
+      - mkdir -p /app/share/metainfo
+      - install -Dm644 io.github.fastrizwaan.WineCharm.metainfo.xml /app/share/metainfo/
     sources:
       - type: git
         #tag: 0.99.1
         commit: 8546b92ce94d55563f7ce9142d91aa81a864594c
         url: https://github.com/fastrizwaan/WineCharm.git
 
-
+      - type: file
+        path: io.github.fastrizwaan.WineCharm.metainfo.xml
+        
+      - type: file
+        path: wcterm.py
+      
 
