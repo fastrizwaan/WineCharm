@@ -11500,7 +11500,6 @@ def main():
             # Check if it's a supported backup file type
             if file_extension in ['.bottle', '.prefix', '.wzt', '.WZT', '.BOTTLE', '.PREFIX']:
                 app.command_line_file = args.file
-                app.connect_open_button_with_restore_backup_cancel()
             else:
                 # Invalid file type, print error and handle accordingly
                 print(f"Invalid file type: {file_extension}. Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed.")
