@@ -5173,11 +5173,11 @@ class WineCharmApp(Adw.Application):
         file_filter.add_mime_type("image/jpeg")  # For .jpg and .jpeg
 
         file_filter.add_mime_type("application/x-ms-dos-executable")
-        file_filter.add_pattern("*.exe")
-        file_filter.add_pattern("*.msi")
-        file_filter.add_pattern("*.jpg")
-        file_filter.add_pattern("*.jpeg")
-        
+
+        # Add patterns for case-insensitive extensions
+        for ext in [".exe", ".EXE", ".msi", ".MSI", ".wzt", ".WZT", ".bottle", ".BOTTLE", ".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG", ".svg", ".SVG"]:
+            file_filter.add_pattern(ext)
+
         filter_model = Gio.ListStore.new(Gtk.FileFilter)
         filter_model.append(file_filter)
         file_dialog.set_filters(filter_model)
@@ -11479,8 +11479,8 @@ def main():
                 sys.exit(1)
 
         # For .exe, .msi, .bottle, .prefix, or .wzt files, handle via GUI mode
-        elif file_extension in ['.exe', '.msi', '.bottle', '.prefix', '.wzt']:
-            if app.SOCKET_FILE.exists():
+        elif file_extension in ['.exe', '.msi', '.bottle', '.prefix', '.wzt', '.EXE', '.MSI', '.BOTTLE', '.PREFIX, '.WZT']:
+                if app.SOCKET_FILE.exists():
                 try:
                     # Send the file to an existing running instance
                     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
@@ -11497,7 +11497,7 @@ def main():
 
         else:
             # Check if it's a supported backup file type
-            if file_extension in ['.bottle', '.prefix', '.wzt']:
+            if file_extension in ['.bottle', '.prefix', '.wzt', '.WZT', '.BOTTLE', '.PREFIX']:
                 app.command_line_file = args.file
             else:
                 # Invalid file type, print error and handle accordingly
@@ -11527,7 +11527,7 @@ def main():
                 return
 
     # Start the socket server and run the application (GUI mode)
-    if args.file and file_extension in ['.bottle', '.prefix', '.wzt']:
+    if args.file and file_extension in ['.bottle', '.prefix', '.wzt', '.WZT', '.BOTTLE', '.PREFIX']:
         app.command_line_file = args.file
     app.start_socket_server()
     app.run(sys.argv)
