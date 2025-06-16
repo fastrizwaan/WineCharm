@@ -1206,9 +1206,11 @@ class WineCharmApp(Adw.Application):
                 if hasattr(self, 'launch_button') and self.launch_button is not None:
                     if self.launch_button.get_parent() != self.vbox:
                         self.vbox.prepend(self.launch_button)
+                        self.window.set_focus(None)
                 else:
                     if self.open_button.get_parent() != self.vbox:
                         self.vbox.prepend(self.open_button)
+                        self.window.set_focus(None)
                 
                 self.search_active = False
                 
