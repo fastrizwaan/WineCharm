@@ -19,33 +19,29 @@ finish-args:
     # Need to link .desktop files
   - --filesystem=~/.local/share/applications:create
   - --filesystem=~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm:create
-    # Desktop shortcut runs wine script from host
-  #- --talk-name=org.freedesktop.Flatpak
-  #- --talk-name=org.freedesktop.Flatpak
+
 
   - --share=ipc
   - --share=network
   - --socket=pulseaudio
   - --socket=x11
   - --system-talk-name=org.freedesktop.UDisks2
-  - --talk-name=org.freedesktop.Notifications
 
-  - --talk-name=io.github.fastrizwaan.WineCharm
-  - --own-name=io.github.fastrizwaan.WineCharm
-  # Additional D-Bus services that might be required by your application or its dependencies
-  - --talk-name=org.gnome.SettingsDaemon
-  - --talk-name=org.gnome.SessionManager
-  - --talk-name=org.a11y.Bus
-    # Most Games write to their own directories
-#- --filesystem=host
-  # Host RO required to run exe files from other locations 
-  - --filesystem=xdg-run/gvfs
-  #- --filesystem=xdg-run/gvfsd
-#  - --filesystem=home/games:create
+
+#  - --talk-name=io.github.fastrizwaan.WineCharm
+#  - --own-name=io.github.fastrizwaan.WineCharm
+
+
   
   # WineZGUI import wine prefix Needs access to copy games and runners from wine, bottles, playonlinux, lutris, heroic launcher data directories. 
   # Using :ro messes up the path to /run/... instead of ~/ breaking copying
   # flatpak bug with :ro breaks realpath.
+  - --filesystem=xdg-desktop
+  - --filesystem=xdg-documents
+  - --filesystem=xdg-pictures
+  - --filesystem=xdg-music
+  - --filesystem=xdg-videos
+  - --filesystem=xdg-download
   - --filesystem=~/.wine:ro
   - --filesystem=~/.var/app/org.winehq.Wine/data/wine:ro
   - --filesystem=~/.var/app/com.usebottles.bottles/data/bottles:ro
