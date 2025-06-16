@@ -1271,7 +1271,7 @@ class WineCharmApp(Adw.Application):
         file_filter.set_name("EXE and MSI files")
         file_filter.add_mime_type("application/x-ms-dos-executable")
         # Add patterns for case-insensitive extensions
-        for ext in [".exe", ".EXE", ".msi", ".MSI"]:
+        for ext in ["*.exe", "*.EXE", "*.msi", "*.MSI"]:
             file_filter.add_pattern(ext)
         return file_filter
 
@@ -5176,7 +5176,7 @@ class WineCharmApp(Adw.Application):
         file_filter.add_mime_type("application/x-ms-dos-executable")
 
         # Add patterns for case-insensitive extensions
-        for ext in [".exe", ".EXE", ".msi", ".MSI", ".wzt", ".WZT", ".bottle", ".BOTTLE", ".jpg", ".JPG", ".jpeg", ".JPEG", ".png", ".PNG", ".svg", ".SVG"]:
+        for ext in ["*.exe", "*.EXE", "*.msi", "*.MSI", "*.wzt", "*.WZT", "*.bottle", "*.BOTTLE", "*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.png", "*.PNG", "*.svg", "*.SVG"]:
             file_filter.add_pattern(ext)
 
         filter_model = Gio.ListStore.new(Gtk.FileFilter)
