@@ -3804,6 +3804,7 @@ class WineCharmApp(Adw.Application):
 
     def populate_script_options(self, filter_text=""):
         self.print_method_name()
+        print("-x"*20)
         """
         Populate the script options flowbox with filtered options.
         """
@@ -3835,7 +3836,9 @@ class WineCharmApp(Adw.Application):
 
                 # Handle the log button sensitivity
                 if label == "Show log":
-                    log_file_path = self.current_script.parent / f"{self.current_script.stem}.log"
+                    # Replace underscores with spaces in the script stem for the log file name
+                    log_file_name = f"{self.current_script.stem.replace('_', ' ')}.log"
+                    log_file_path = self.current_script.parent / log_file_name
                     # Debug output
                     print(f"Log file path: {log_file_path}")
                     print(f"Exists: {log_file_path.exists()}")
@@ -3856,7 +3859,6 @@ class WineCharmApp(Adw.Application):
                     "clicked",
                     lambda btn, cb=callback: self.callback_wrapper(cb, self.current_script, self.current_script_key, btn)
                 )
-
 ######################### CREATE BOTTLE
     # Get directory size method
     def get_directory_size(self, path):
@@ -4424,12 +4426,16 @@ class WineCharmApp(Adw.Application):
 
     def show_log_file(self, script, script_key, *args):
         self.print_method_name()
-        log_file_path = Path(script.parent) / f"{script.stem}.log"
+        log_file_name = f"{script.stem.replace('_', ' ')}.log"
+        log_file_path = Path(script.parent) / log_file_name
+        print(f"Opening log file: {log_file_path}")  # Debug
         if log_file_path.exists() and log_file_path.stat().st_size > 0:
             try:
                 subprocess.run(["xdg-open", str(log_file_path)], check=True)
             except subprocess.CalledProcessError as e:
                 print(f"Error opening log file: {e}")
+        else:
+            print(f"Log file does not exist or is empty: {log_file_path}")
 
 
     def open_terminal(self, script, script_key, *args):
