@@ -2518,8 +2518,8 @@ class WineCharmApp(Adw.Application):
             # Create scrolled text view for log content
             scrolled_window = Gtk.ScrolledWindow()
             scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-            scrolled_window.set_min_content_width(640)
-            scrolled_window.set_min_content_height(480)
+            scrolled_window.set_min_content_width(530)
+            scrolled_window.set_min_content_height(300)
 
             log_view = Gtk.TextView()
             log_view.set_editable(False)
@@ -2534,8 +2534,24 @@ class WineCharmApp(Adw.Application):
 
             # Configure dialog buttons
             log_dialog.add_response("close", "Close")
+            log_dialog.add_response("copy", "Copy to Clipboard")
             log_dialog.set_default_response("close")
             log_dialog.set_close_response("close")
+
+            # Handle log dialog responses
+            def on_log_response(dialog, response):
+                self.print_method_name()
+                if response == "copy":
+                    # Get the text buffer and copy its content to clipboard
+                    text_buffer = log_view.get_buffer()
+                    start, end = text_buffer.get_bounds()
+                    text = text_buffer.get_text(start, end, True)
+                    clipboard = self.window.get_clipboard()
+                    clipboard.set(text)
+                dialog.close()
+
+            # Connect response handler for log dialog
+            log_dialog.connect("response", on_log_response)
 
             # Present the log dialog
             log_dialog.present(self.window)
@@ -3820,7 +3836,19 @@ class WineCharmApp(Adw.Application):
                 # Handle the log button sensitivity
                 if label == "Show log":
                     log_file_path = self.current_script.parent / f"{self.current_script.stem}.log"
-                    if not log_file_path.exists() or log_file_path.stat().st_size == 0:
+                    # Debug output
+                    print(f"Log file path: {log_file_path}")
+                    print(f"Exists: {log_file_path.exists()}")
+                    print(f"Size: {log_file_path.stat().st_size if log_file_path.exists() else 0}")
+                    try:
+                        if log_file_path.exists() and log_file_path.stat().st_size > 0:
+                            print("Setting Show log button to sensitive")
+                            option_button.set_sensitive(True)
+                        else:
+                            print("Setting Show log button to insensitive")
+                            option_button.set_sensitive(False)
+                    except Exception as e:
+                        print(f"Error checking log file: {e}")
                         option_button.set_sensitive(False)
 
                 # Connect the button callback
