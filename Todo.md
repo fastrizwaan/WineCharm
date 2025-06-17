@@ -26,6 +26,7 @@ Refactoring winecharm
 0.99.3
 - [x] Import on 1st start, and can be called from menu
 - [x] show added scripts count
+- [x] show log fix
 
 
 0.99.1
