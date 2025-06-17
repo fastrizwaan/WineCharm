@@ -216,8 +216,8 @@ modules:
       - install -Dm644 io.github.fastrizwaan.WineCharm.metainfo.xml /app/share/metainfo/
     sources:
       - type: git
-        #tag: 0.99.1
-        commit: 77ff4d892f970b5c7a0594c85065324335f89815
+        tag: 0.99.3
+        commit: 80a5c9e00a4c14051bfb9cbbac46740a951f1ed3
         url: https://github.com/fastrizwaan/WineCharm.git
 
       - type: file
