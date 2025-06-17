@@ -32,6 +32,7 @@ finish-args:
   - --filesystem=xdg-music
   - --filesystem=xdg-videos
   - --filesystem=xdg-download
+
   # If the user wants to copy a wine prefix or a runner from these dirs; permissions same as winezgui
   - --filesystem=~/.wine
   - --filesystem=~/.var/app/org.winehq.Wine/data/wine
@@ -165,8 +166,8 @@ modules:
     buildsystem: meson
     sources:
       - type: archive
-        url: https://www.freedesktop.org/software/desktop-file-utils/releases/desktop-file-utils-0.27.tar.xz
-        sha256: a0817df39ce385b6621880407c56f1f298168c040c2032cedf88d5b76affe836
+        url: https://www.freedesktop.org/software/desktop-file-utils/releases/desktop-file-utils-0.28.tar.xz
+        sha256: 4401d4e231d842c2de8242395a74a395ca468cd96f5f610d822df33594898a70
 
   - name: psutil
     buildsystem: simple
@@ -216,7 +217,7 @@ modules:
     sources:
       - type: git
         #tag: 0.99.1
-        commit: f30fcea721e8ba29db01c6cd99bbbf5f3b99704c
+        commit: c8dce074fca85f2a5c6d9a896c3ca3ae9a1f12d7
         url: https://github.com/fastrizwaan/WineCharm.git
 
       - type: file
