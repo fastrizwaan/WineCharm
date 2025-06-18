@@ -19,12 +19,6 @@ finish-args:
   - --env=WINEDLLPATH=/app/dlls/lib32:/app/dlls/lib:/app/lib32/wine/wined3d:/app/lib/wine/wined3d
   - --env=LD_LIBRARY_PATH=/app/lib:/app/lib32
 
-
-
-
-  
-  # Need to link .desktop files from WineCharm/data/Prefix, if user needs them
-  - --filesystem=~/.local/share/applications:create
   # Access dirs, same as org.winehq.Wine
   - --filesystem=xdg-desktop
   - --filesystem=xdg-documents
@@ -33,14 +27,19 @@ finish-args:
   - --filesystem=xdg-videos
   - --filesystem=xdg-download
 
-  # If the user wants to copy a wine prefix or a runner from these dirs; permissions same as winezgui
+  
+  # Need to symlink .desktop files from WineCharm/data/Prefix, if user needs them
+  - --filesystem=~/.local/share/applications
+  
+  # If the user wants to copy a wine prefix or a runner from these dirs; permissions same as io.github.fastrizwaan.WineZGUI
   - --filesystem=~/.wine
-  - --filesystem=~/.var/app/org.winehq.Wine/data/wine
-  - --filesystem=~/.var/app/com.usebottles.bottles/data/bottles
-  - --filesystem=~/.var/app/com.playonlinux.PlayOnLinux4/data/PlayOnLinux/wineprefix
-  - --filesystem=~/.var/app/org.phoenicis.playonlinux/.Phoenicis/containers/wineprefix
-  # I'm the author of WineZGUI also, so will create simple text files there.
-  - --filesystem=~/.var/app/io.github.fastrizwaan.WineZGUI/data/winezgui:rw
+  - --filesystem=~/.var/app/org.winehq.Wine/data/wine:ro
+  - --filesystem=~/.var/app/com.usebottles.bottles/data/bottles:ro
+  - --filesystem=~/.var/app/com.playonlinux.PlayOnLinux4/data/PlayOnLinux/wineprefix:ro
+  - --filesystem=~/.var/app/org.phoenicis.playonlinux/.Phoenicis/containers/wineprefix:ro
+  
+  # I'm the author of WineZGUI also, so will create simple text files there, to import existing .sh scripts to WineCharm .yaml (.charm) files.
+  - --filesystem=~/.var/app/io.github.fastrizwaan.WineZGUI/data/winezgui
 
 cleanup:
   - '*.a'
@@ -93,6 +92,7 @@ modules:
       - mkdir -p /app/utils
 
   - name: vulkan-tools
+
     buildsystem: cmake-ninja
     config-opts:
       - -DGLSLANG_INSTALL_DIR=/app
