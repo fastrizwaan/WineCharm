@@ -80,7 +80,7 @@ check_python_dependencies() {
     if [ ${#missing_modules[@]} -ne 0 ]; then
         echo "The following required Python modules are missing:"
         for module in "${missing_modules[@]}"; do
-            echo "  - $module"  # Fixed from $prog to $module
+            echo "  - $module"
         done
         echo ""
         echo "You can install them using pip:"
@@ -114,11 +114,15 @@ install_files() {
     # Install MIME type definition from data/mimetype/
     install -Dm644 data/mimetype/winecharm-backup-file.xml "$INSTALL_PATH/share/mime/packages/winecharm-backup-file.xml"
 
+    # Install metainfo file from data/appdata/
+    install -Dm644 data/appdata/io.github.fastrizwaan.WineCharm.metainfo.xml "$INSTALL_PATH/share/metainfo/io.github.fastrizwaan.WineCharm.metainfo.xml"
+
     # Update system databases
-    echo "Updating MIME and icon caches..."
+    echo "Updating MIME, icon, and appdata caches..."
     update-mime-database "$INSTALL_PATH/share/mime" &> /dev/null || echo "Failed to update MIME database."
     gtk-update-icon-cache "$INSTALL_PATH/share/icons/hicolor/" &> /dev/null || echo "Failed to update icon cache."
     update-desktop-database "$INSTALL_PATH/share/applications/" &> /dev/null || echo "Failed to update desktop database."
+    update-appdata-cache "$INSTALL_PATH/share/metainfo/" &> /dev/null || echo "Failed to update appdata cache."
 
     echo "WineCharm installed successfully."
 }
@@ -140,11 +144,15 @@ uninstall_files() {
     # Remove MIME type definition
     rm -f "$INSTALL_PATH/share/mime/packages/winecharm-backup-file.xml"
 
+    # Remove metainfo file
+    rm -f "$INSTALL_PATH/share/metainfo/io.github.fastrizwaan.WineCharm.metainfo.xml"
+
     # Update system databases
-    echo "Updating MIME and icon caches after uninstall..."
+    echo "Updating MIME, icon, and appdata caches after uninstall..."
     update-mime-database "$INSTALL_PATH/share/mime" &> /dev/null || echo "Failed to update MIME database."
     gtk-update-icon-cache "$INSTALL_PATH/share/icons/hicolor/" &> /dev/null || echo "Failed to update icon cache."
     update-desktop-database "$INSTALL_PATH/share/applications/" &> /dev/null || echo "Failed to update desktop database."
+    update-appdata-cache "$INSTALL_PATH/share/metainfo/" &> /dev/null || echo "Failed to update appdata cache."
 
     echo "WineCharm uninstalled successfully."
 }
