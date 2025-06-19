@@ -1,0 +1,3 @@
+[console_scripts]
+wcterm = winecharm.wcterm:main
+winecharm = winecharm.winecharm:main
