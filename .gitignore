@@ -8,3 +8,4 @@ flatpak/*.flatpak
 .codegpt
 
 dist/
+build
