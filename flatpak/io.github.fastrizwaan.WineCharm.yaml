@@ -72,7 +72,6 @@ add-extensions:
     autodelete: false
 
 modules:
- 
   # Create 32-bit directories
   - name: compat
     buildsystem: simple
@@ -91,7 +90,6 @@ modules:
       - mkdir -p /app/utils
 
   - name: vulkan-tools
-
     buildsystem: cmake-ninja
     config-opts:
       - -DGLSLANG_INSTALL_DIR=/app
@@ -204,16 +202,14 @@ modules:
       - type: git
         url: https://gitlab.gnome.org/GNOME/vte.git/
         commit: 3f66edbf598129bafde3baa91ccfb345056418c3
-
         
   - name: WineCharm
     buildsystem: simple
     build-commands:
       - pip3 install --no-deps --no-build-isolation --ignore-installed --prefix=${FLATPAK_DEST} .
-
     sources:
       - type: git
-        #tag: 0.99.3
+        tag: 0.99.3
         commit: cbfa6f3aee742a80a7d72178053db67454a3689c
         url: https://github.com/fastrizwaan/WineCharm.git
 
