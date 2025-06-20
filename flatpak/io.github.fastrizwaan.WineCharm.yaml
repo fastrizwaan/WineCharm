@@ -27,7 +27,6 @@ finish-args:
   - --filesystem=xdg-videos
   - --filesystem=xdg-download
 
-  
   # Need to symlink .desktop files from WineCharm/data/Prefix, if user needs them
   - --filesystem=~/.local/share/applications
   
@@ -38,7 +37,7 @@ finish-args:
   - --filesystem=~/.var/app/com.playonlinux.PlayOnLinux4/data/PlayOnLinux/wineprefix:ro
   - --filesystem=~/.var/app/org.phoenicis.playonlinux/.Phoenicis/containers/wineprefix:ro
   
-  # I'm the author of WineZGUI also, so will create simple text files there, to import existing .sh scripts to WineCharm .yaml (.charm) files.
+  # I'm the author of WineZGUI. So WineCharm will create simple text files there, imports existing .sh scripts to WineCharm .yaml (.charm) files.
   - --filesystem=~/.var/app/io.github.fastrizwaan.WineZGUI/data/winezgui
 
 cleanup:
@@ -210,13 +209,12 @@ modules:
   - name: WineCharm
     buildsystem: simple
     build-commands:
-      - ./setup -i --prefix=/app 
-      - install -Dm755 src/wcterm.py    /app/bin/wcterm
+      - pip3 install --no-deps --no-build-isolation --ignore-installed --prefix=${FLATPAK_DEST} .
 
     sources:
       - type: git
-        tag: 0.99.3
-        commit: 94fe9e69c6dd984d0fea949576ef7907dbec083c
+        #tag: 0.99.3
+        commit: cbfa6f3aee742a80a7d72178053db67454a3689c
         url: https://github.com/fastrizwaan/WineCharm.git
 
 
