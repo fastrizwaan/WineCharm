@@ -126,6 +126,35 @@ class WineCharmApp(Adw.Application):
         self.lnk_processed_success_status = False
         self.manually_killed = False
         self.script_ui_data = {}
+        
+        # Import methods from show_html module
+        ui_methods = [
+            # File opening methods
+            'create_main_window',
+            'add_keyboard_actions',
+            'create_sort_actions',
+            'on_search_button_clicked',
+            'on_key_pressed',
+            'on_search_entry_activated',
+            'on_search_entry_changed',
+            'filter_script_list',
+            'on_open_button_clicked',
+            'open_file_dialog',
+            'create_file_filter',
+            'on_open_file_dialog_response',
+            'on_back_button_clicked',
+            'open_filemanager_winecharm',
+            'open_terminal_winecharm',
+            'setup_accelerator_context',
+            'remove_accelerator_context',
+        ]
+        
+        # Import methods from show_html
+        for method_name in ui_methods:
+            if hasattr(ui, method_name):
+                setattr(self, method_name, getattr(ui, method_name).__get__(self, WineCharmApp))
+                
+                
         # Register the SIGINT signal handler
         signal.signal(signal.SIGINT, self.handle_sigint)
         self.script_buttons = {}
@@ -191,9 +220,10 @@ class WineCharmApp(Adw.Application):
             self.css_provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
-
-
-
+        
+        self.back_button = Gtk.Button.new_from_icon_name("go-previous-symbolic")
+        self.back_button.connect("clicked", self.on_back_button_clicked)
+        self.open_button_handler_id = None
 
         # Runner cache file
         self.runner_cache_file = self.winecharmdir / "runner_cache.yaml"
@@ -210,32 +240,8 @@ class WineCharmApp(Adw.Application):
         self.count = 0
         self.winezgui_prefixes_dir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineZGUI/data/winezgui/Prefixes")).resolve()
 
-        # Import methods from show_html module
-        ui_methods = [
-            # File opening methods
-            'create_main_window',
-            'add_keyboard_actions',
-            'create_sort_actions',
-            'on_search_button_clicked',
-            'on_key_pressed',
-            'on_search_entry_activated',
-            'on_search_entry_changed',
-            'filter_script_list',
-            'on_open_button_clicked',
-            'open_file_dialog',
-            'create_file_filter',
-            'on_open_file_dialog_response',
-            'on_back_button_clicked',
-            'open_filemanager_winecharm',
-            'open_terminal_winecharm',
-            'setup_accelerator_context',
-            'remove_accelerator_context',
-        ]
-        
-        # Import methods from show_html
-        for method_name in ui_methods:
-            if hasattr(ui, method_name):
-                setattr(self, method_name, getattr(ui, method_name).__get__(self, WineCharmApp))
+
+
     def print_method_name(self):
         return
         self.count = self.count + 1 
@@ -899,6 +905,80 @@ class WineCharmApp(Adw.Application):
         open_terminal_action.connect("activate", self.open_terminal_winecharm)
         self.window.add_action(open_terminal_action)
 
+    def open_filemanager_winecharm(self, action, param):
+        self.print_method_name()
+        wineprefix = Path(self.winecharmdir)  # Replace with the actual wineprefix path
+        print(f"Opening file manager for {wineprefix}")
+        command = ["xdg-open", str(wineprefix)]
+        try:
+            subprocess.Popen(command)
+        except Exception as e:
+            print(f"Error opening file manager: {e}")
+
+    def open_terminal_winecharm(self, param=None, action=None):
+        self.print_method_name()
+        # Set wineprefix to self.template
+        wineprefix = Path(self.template).expanduser().resolve()
+
+        print(f"Opening terminal for {wineprefix}")
+
+        self.ensure_directory_exists(wineprefix)
+
+        # Load settings to get the runner
+        settings = self.load_settings()
+        runner = settings.get('runner', 'wine')  # Default to 'wine' if runner is not specified
+        runner_path = Path(runner).expanduser().resolve()
+        runner_dir = runner_path.parent.resolve()
+
+        if shutil.which("flatpak-spawn"):
+            command = [
+                "wcterm", "bash", "--norc", "-c",
+                (
+                    rf'export PS1="[\u@\h:\w]\$ "; '
+                    f'export WINEPREFIX={shlex.quote(str(wineprefix))}; '
+                    f'export PATH={shlex.quote(str(runner_dir))}:$PATH; '
+                    f'cd {shlex.quote(str(wineprefix))}; '
+                    'exec bash --norc -i'
+                )
+            ]
+        else:
+            # List of terminal commands to check
+            terminal_commands = [
+                ("ptyxis", ["ptyxis", "--"]),
+                ("gnome-terminal", ["gnome-terminal", "--wait", "--"]),
+                ("konsole", ["konsole", "-e"]),
+                ("xfce4-terminal", ["xfce4-terminal", "--disable-server", "-x"]),
+            ]
+
+            # Find the first available terminal
+            terminal_command = None
+            for terminal, command_prefix in terminal_commands:
+                if shutil.which(terminal):
+                    terminal_command = command_prefix
+                    break
+
+            if not terminal_command:
+                print("No suitable terminal emulator found.")
+                return
+
+            command = terminal_command + [
+                "bash", "--norc", "-c",
+                (
+                    rf'export PS1="[\u@\h:\w]\$ "; '
+                    f'export WINEPREFIX={shlex.quote(str(wineprefix))}; '
+                    f'export PATH={shlex.quote(str(runner_dir))}:$PATH; '
+                    f'cd {shlex.quote(str(wineprefix))}; '
+                    'exec bash --norc -i'
+                )
+            ]
+
+        print(f"Running command: {command}")
+
+        try:
+            subprocess.Popen(command)
+        except Exception as e:
+            print(f"Error opening terminal: {e}")
+
 
 
 
@@ -922,6 +1002,122 @@ class WineCharmApp(Adw.Application):
 
 
 
+    def on_search_entry_activated(self, entry):
+        self.print_method_name()
+        search_term = entry.get_text().lower()
+        self.filter_script_list(search_term)
+
+    def on_search_entry_changed(self, entry):
+        self.print_method_name()
+        search_term = entry.get_text().lower()
+        # Check if we're in settings view
+        if hasattr(self, 'settings_flowbox') and self.settings_flowbox.get_parent() is not None:
+            self.populate_settings_options(search_term)
+        elif hasattr(self, 'script_options_flowbox') and self.script_options_flowbox.get_parent() is not None:
+            self.populate_script_options(search_term)  # Only pass search term
+        else:
+            self.filter_script_list(search_term)
+
+    def filter_script_list(self, search_term):
+        self.print_method_name()
+        """
+        Filters the script list based on the search term and updates the UI accordingly.
+        
+        Parameters:
+            search_term (str): The term to search for within exe_name, script_name (script_path.stem), or progname.
+        """
+        # Normalize the search term for case-insensitive matching
+        search_term = search_term.lower()
+        
+        # Clear the existing flowbox to prepare for the filtered scripts
+        self.flowbox.remove_all()
+        
+        # Flag to check if any scripts match the search term
+        found_match = False
+        
+        # Iterate over all scripts in self.script_list using script_key and script_data
+        for script_key, script_data in list(self.script_list.items()):
+            # Resolve the script path, executable name, and get the progname
+            script_path = Path(str(script_data['script_path'])).expanduser().resolve()
+            exe_name = Path(str(script_data['exe_file'])).expanduser().resolve().name
+            progname = str(script_data.get('progname', '')).lower()  # Fallback to empty string if 'progname' is missing
+            
+            # Check if the search term is present in the exe_name, script_name (stem), or progname
+            if (search_term in exe_name.lower() or 
+                search_term in script_path.stem.lower() or 
+                search_term in progname):
+                found_match = True
+                
+                # Create a script row. Ensure that create_script_row accepts script_key and script_data
+                row = self.create_script_row(script_key, script_data)
+                
+                # Append the created row to the flowbox for display
+                self.flowbox.append(row)
+                
+                # If the script is currently running, update the UI to reflect its running state
+                if script_key in self.running_processes:
+                    #self.update_ui_for_running_process(script_key, row, self.running_processes)
+                    self.update_ui_for_running_process(self.running_processes)
+
+
+        if not found_match:
+            print(f"No matches found for search term: {search_term}")
+
+
+    def on_open_button_clicked(self, button):
+        self.print_method_name()
+        self.open_file_dialog()
+
+    def open_file_dialog(self):
+        self.print_method_name()
+        file_dialog = Gtk.FileDialog.new()
+        filter_model = Gio.ListStore.new(Gtk.FileFilter)
+        filter_model.append(self.create_file_filter())
+        file_dialog.set_filters(filter_model)
+        file_dialog.open(self.window, None, self.on_open_file_dialog_response)
+
+    def create_file_filter(self):
+        self.print_method_name()
+        file_filter = Gtk.FileFilter()
+        file_filter.set_name("EXE and MSI files")
+        file_filter.add_mime_type("application/x-ms-dos-executable")
+        # Add patterns for case-insensitive extensions
+        for ext in ["*.exe", "*.EXE", "*.msi", "*.MSI"]:
+            file_filter.add_pattern(ext)
+        return file_filter
+
+    def on_open_file_dialog_response(self, dialog, result):
+        self.print_method_name()
+        try:
+            file = dialog.open_finish(result)
+            if file:
+                file_path = file.get_path()
+                print("- - - - - - - - - - - - - -self.show_processing_spinner")
+                self.monitoring_active = False
+                
+                # If there's already a processing thread, stop it
+                if hasattr(self, 'processing_thread') and self.processing_thread and self.processing_thread.is_alive():
+                    self.stop_processing = True
+                    self.processing_thread.join(timeout=0.5)  # Wait briefly for thread to stop
+                    self.hide_processing_spinner()
+                    self.set_open_button_label("Open")
+                    self.set_open_button_icon_visible(True)
+                    return
+
+                # Show processing spinner
+                self.show_processing_spinner("Processing...")
+                
+                # Start a new background thread to process the file
+                self.stop_processing = False
+                self.processing_thread = threading.Thread(target=self.process_cli_file_in_thread, args=(file_path,))
+                self.processing_thread.start()
+
+        except GLib.Error as e:
+            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+                print(f"An error occurred: {e}")
+        finally:
+            self.window.set_visible(True)
+            self.monitoring_active = True
 
     def process_cli_file_in_thread(self, file_path):
         try:
@@ -949,7 +1145,57 @@ class WineCharmApp(Adw.Application):
             
             GLib.timeout_add_seconds(0.5, self.create_script_list)
 
+    def on_back_button_clicked(self, button):
+        self.print_method_name()
+        # If search is active, toggle it off first
+        if self.search_active:
+            self.search_button.set_active(False)
 
+        # Reset the header bar title and visibility of buttons
+        self.headerbar.set_title_widget(self.title_box)
+        self.menu_button.set_visible(True)
+        self.search_button.set_visible(True)
+        self.view_toggle_button.set_visible(True)
+        self.back_button.set_visible(False)
+
+        # Remove the "Launch" button if it exists
+        if hasattr(self, 'launch_button') and self.launch_button is not None:
+            if self.launch_button.get_parent() == self.vbox:
+                self.vbox.remove(self.launch_button)
+            self.launch_button = None
+
+        # Restore the "Open" button
+        if self.open_button.get_parent() != self.vbox:
+            self.vbox.prepend(self.open_button)
+        self.open_button.set_visible(True)
+        
+        # Restore original open button functionality
+        self.restore_open_button()
+
+        # Ensure the correct child is set in the main_frame
+        if self.main_frame.get_child() != self.scrolled:
+            self.main_frame.set_child(self.scrolled)
+
+        self.remove_accelerator_context()
+            
+        # Restore the script list
+        self.create_script_list()
+        
+    def remove_accelerator_context(self):
+        # Cleanup accelerator group when leaving options view
+        if hasattr(self, 'accel_group'):
+            self.window.remove_accel_group(self.accel_group)
+            del self.accel_group
+            
+    def setup_accelerator_context(self):
+        self.print_method_name()
+        controller = Gtk.ShortcutController()
+        shortcut = Gtk.Shortcut(
+            trigger=Gtk.ShortcutTrigger.parse_string("<Ctrl>BackSpace"),
+            action=Gtk.CallbackAction.new(lambda *_: self.on_back_button_clicked(None))
+        )
+        controller.add_shortcut(shortcut)
+        self.window.add_controller(controller)
         
     def wrap_text_at_24_chars(self, text):
         #self.print_method_name()
