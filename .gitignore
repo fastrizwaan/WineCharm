@@ -9,3 +9,4 @@ flatpak/*.flatpak
 
 dist/
 build
+src/winecharm.egg-info/
