@@ -13,7 +13,7 @@ gi.require_version('Adw', '1')
 
 def create_main_window(self):
     self.print_method_name()
-
+    
         
     self.back_button = Gtk.Button.new_from_icon_name("go-previous-symbolic")
     self.back_button.connect("clicked", self.on_back_button_clicked)

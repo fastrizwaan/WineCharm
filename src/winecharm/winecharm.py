@@ -210,7 +210,8 @@ class WineCharmApp(Adw.Application):
         self.count = 0
         self.winezgui_prefixes_dir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineZGUI/data/winezgui/Prefixes")).resolve()
 
-        # Import methods from show_html module
+##################### Import Methods from files #####################
+        # Import methods from ui module
         ui_methods = [
             # File opening methods
             'create_main_window',
@@ -232,10 +233,15 @@ class WineCharmApp(Adw.Application):
             'remove_accelerator_context',
         ]
         
-        # Import methods from show_html
+        # Import methods from ui
         for method_name in ui_methods:
             if hasattr(ui, method_name):
                 setattr(self, method_name, getattr(ui, method_name).__get__(self, WineCharmApp))
+                
+                
+                
+##################### / Import Methods from files #####################                
+                
     def print_method_name(self):
         return
         self.count = self.count + 1 
