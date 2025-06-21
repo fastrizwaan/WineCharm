@@ -1178,3 +1178,80 @@ def replace_launch_button(self, ui_state, row, script_key):
     except Exception as e:
         print(f"Error in replace_launch_button: {e}")
         self.launch_button = None
+
+def on_view_toggle_button_clicked(self, button):
+    self.print_method_name()
+    # Toggle the icon view state
+    self.icon_view = not self.icon_view
+
+    # Update the icon for the toggle button based on the current view state
+    icon_name = "view-grid-symbolic" if self.icon_view else "view-list-symbolic"
+    button.set_child(Gtk.Image.new_from_icon_name(icon_name))
+
+    # Update the maximum children per line in the flowbox based on the current view state
+    #max_children_per_line = 8 if self.icon_view else 4
+    #self.flowbox.set_max_children_per_line(max_children_per_line)
+    # Recreate the script list with the new view
+    self.create_script_list()
+    GLib.idle_add(self.save_settings)
+
+def show_processing_spinner(self, label_text):
+    self.print_method_name()
+
+    # Clear existing content
+    self.flowbox.remove_all()
+
+    if hasattr(self, 'progress_bar'):
+        self.vbox.remove(self.progress_bar)
+        del self.progress_bar
+
+    # Ensure main flowbox is visible
+    self.main_frame.set_child(self.scrolled)
+    
+    # Add progress bar
+    self.progress_bar = Gtk.ProgressBar()
+    self.progress_bar.add_css_class("header-progress")
+    self.progress_bar.set_show_text(False)
+    self.progress_bar.set_margin_top(0)
+    self.progress_bar.set_margin_bottom(0)
+    self.progress_bar.set_fraction(0.0)
+    #self.progress_bar.set_size_request(420, -1)
+    self.vbox.prepend(self.progress_bar)
+    self.flowbox.remove_all()
+    
+    # Update button label
+    self.set_open_button_label(label_text)
+    
+    # Initialize steps
+    self.step_boxes = []
+    
+    # Disable UI elements
+    self.search_button.set_sensitive(False)
+    self.view_toggle_button.set_sensitive(False)
+    self.menu_button.set_sensitive(False)
+
+def hide_processing_spinner(self):
+    self.print_method_name()
+    """Restore UI state after process completion with safe widget removal"""
+    try:
+        if hasattr(self, 'progress_bar'):
+            self.vbox.remove(self.progress_bar)
+            del self.progress_bar
+
+        # Update button back to original state
+        self.set_open_button_label("Open")
+            
+        # Safely re-enable UI elements
+        if hasattr(self, 'search_button'):
+            self.search_button.set_sensitive(True)
+        if hasattr(self, 'view_toggle_button'):
+            self.view_toggle_button.set_sensitive(True)
+        if hasattr(self, 'menu_button'):    
+            self.menu_button.set_sensitive(True)
+
+        # Clear step tracking safely
+        if hasattr(self, 'step_boxes'):
+            self.step_boxes = []
+            
+    except Exception as e:
+        print(f"Error in hide_processing_spinner: {e}")
