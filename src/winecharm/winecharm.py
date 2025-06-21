@@ -40,7 +40,7 @@ if os.path.dirname(__file__) not in sys.path:
     sys.path.insert(0, os.path.dirname(__file__))
 
 try:
-    from winecharm import ui, settings, template_manager, runner_manager, single_prefix, restore, backup, winezgui_importer, import_wine_dir, import_game_dir,create_script
+    from winecharm import ui, settings, template_manager, runner_manager, single_prefix, restore, backup, winezgui_importer, import_wine_dir, import_game_dir, create_script, check_required_programs, set_wine_arch
 except ImportError:
     import ui
     import settings
@@ -53,7 +53,9 @@ except ImportError:
     import import_wine_dir
     import import_game_dir
     import create_script
-    
+    import check_required_programs
+    import set_wine_arch
+
 class WineCharmApp(Adw.Application):
     def __init__(self):
         self.count = 0
@@ -214,6 +216,10 @@ class WineCharmApp(Adw.Application):
 ##################### Import Methods from files #####################
         # Define method mappings
         module_methods = {
+            check_required_programs: [
+                'check_required_programs',
+                'show_missing_programs_dialog',
+            ],
             ui: [
                 'create_main_window',
                 'add_keyboard_actions',
@@ -441,6 +447,9 @@ class WineCharmApp(Adw.Application):
                 'is_lnk_file_processed',
                 'create_scripts_for_lnk_files',
                 'extract_exe_files_from_lnk',
+            ],
+            set_wine_arch: [
+                'set_wine_arch',
             ],
         }
 
@@ -806,72 +815,6 @@ class WineCharmApp(Adw.Application):
                     done_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
                     step_box.prepend(done_icon)
                     break
-
-    def check_required_programs(self):
-        self.print_method_name()
-        #if shutil.which("flatpak-spawn"):
-        #    return []
-            
-        # List of supported terminals
-        terminal_options = [
-            'ptyxis',
-            'gnome-terminal',
-            'konsole',
-            'xfce4-terminal',
-            'wcterm'
-        ]
-        
-        # Base required programs
-        required_programs = [
-            'exiftool',
-            'wine',
-            'winetricks',
-            'wrestool',
-            'icotool',
-            'pgrep',
-            'xdg-open'
-        ]
-        
-        # Check if at least one terminal is available
-        terminal_found = any(shutil.which(term) for term in terminal_options)
-        if not terminal_found:
-            # If no terminal is found, add "terminal-emulator" as a missing requirement
-            missing_programs = [prog for prog in required_programs if not shutil.which(prog)]
-            missing_programs.append("terminal-emulator")
-            return missing_programs
-            
-        return [prog for prog in required_programs if not shutil.which(prog)]
-
-    def show_missing_programs_dialog(self, missing_programs):
-        self.print_method_name()
-        if not missing_programs:
-            return
-            
-        message_parts = []
-        
-        # Handle terminal emulator message
-        if "terminal-emulator" in missing_programs:
-            message_parts.append(
-                "Missing required terminal emulator.\nPlease install one of the following:\n"
-                "• ptyxis\n"
-                "• gnome-terminal\n"
-                "• konsole\n"
-                "• xfce4-terminal"
-            )
-            # Remove terminal-emulator from the list for other missing programs
-            other_missing = [prog for prog in missing_programs if prog != "terminal-emulator"]
-            if other_missing:
-                message_parts.append("\nOther missing required programs:\n" + 
-                                  "\n".join(f"• {prog}" for prog in other_missing))
-        else:
-            message_parts.append("The following required programs are missing:\n" +
-                               "\n".join(f"• {prog}" for prog in missing_programs))
-            
-        message = "\n".join(message_parts)
-        
-        GLib.timeout_add_seconds(1, self.show_info_dialog,"Missing Programs", message)
-
-        
 
 
 
@@ -5206,94 +5149,7 @@ class WineCharmApp(Adw.Application):
 
     # Implement placeholders for each setting's callback function
 
-    def set_wine_arch(self):
-        self.print_method_name()
-        """
-        Allow the user to set the Wine architecture using Adw.AlertDialog.
-        """
-        # Create AlertDialog
-        dialog = Adw.AlertDialog(
-            heading="Set Wine Architecture",
-            body="Select the default architecture for new prefixes:"
-        )
 
-        # Create radio buttons for architecture selection
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        win32_radio = Gtk.CheckButton(label="32-bit (win32)")
-        win64_radio = Gtk.CheckButton(label="64-bit (win64)")
-        win64_radio.set_group(win32_radio)
-
-        # Set current selection
-        current_arch = self.arch
-        win32_radio.set_active(current_arch == 'win32')
-        win64_radio.set_active(current_arch == 'win64')
-
-        # Add radio buttons to dialog
-        vbox.append(win32_radio)
-        vbox.append(win64_radio)
-        dialog.set_extra_child(vbox)
-
-        # Configure dialog buttons
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("ok", "OK")
-        dialog.set_default_response("ok")
-        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
-
-        # Response handler
-        def on_response(dialog, response):
-            self.print_method_name()
-            if response == "ok":
-                new_arch = 'win32' if win32_radio.get_active() else 'win64'
-                if new_arch != current_arch:
-                    self.main_frame.set_child(None)
-                    handle_architecture_change(new_arch)
-            dialog.close()
-
-        # Architecture change handler
-        def handle_architecture_change(new_arch):
-            self.print_method_name()
-            # Determine paths based on selected architecture
-            new_template = self.default_template_win32 if new_arch == 'win32' else self.default_template_win64
-            single_prefix_dir = self.single_prefix_dir_win32 if new_arch == 'win32' else self.single_prefix_dir_win64
-
-            # Update settings
-            self.arch = new_arch
-            self.template = new_template
- 
-            self.settings['template'] = self.replace_home_with_tilde_in_path(str(new_template))
-            self.settings['arch'] = self.replace_home_with_tilde_in_path(str(new_arch))
-            self.save_settings()
-            
-            # Resolve template path
-            new_template = Path(new_template).expanduser().resolve()
-            
-            # Initialize new template if needed
-            if not new_template.exists():
-                print(f"Initializing new {new_arch} template...")
-                self.on_back_button_clicked(None)
-                self.called_from_settings = True
-                self.initialize_template(new_template, 
-                                    lambda: finalize_arch_change(single_prefix_dir),
-                                    arch=new_arch)
-            else:
-                print(f"Using existing {new_arch} template")
-                self.show_options_for_settings()
-                finalize_arch_change(single_prefix_dir)
-
-        # Finalization handler
-        def finalize_arch_change(single_prefix_dir):
-            self.print_method_name()
-            if self.single_prefix and not single_prefix_dir.exists():
-                print(f"Copying to {single_prefix_dir.name}...")
-                self.copy_template(single_prefix_dir)
-            self.set_dynamic_variables()
-            self.show_options_for_settings()
-
-        self.show_options_for_settings()
-        # Connect response signal and present dialog
-        dialog.connect("response", on_response)
-        dialog.present(self.window)
-        
 ################
 
 
