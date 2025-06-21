@@ -44,7 +44,7 @@
     </screenshot>
   </screenshots>
   <releases>
-    <release version="0.99.3" date="2025-06-17">
+    <release version="0.99.4" date="2025-06-22">
       <description>
         <p>Initial release with full feature set including prefix management, template system, and Flatpak support.</p>
       </description>
