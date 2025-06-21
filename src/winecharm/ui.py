@@ -258,10 +258,7 @@ def populate_script_options(self, filter_text=""):
     self.print_method_name()
     print("-x"*20)
     """
-    Populate the script options flowbox with filtered options and update button states/highlights.
-    
-    Parameters:
-        filter_text (str): The term to filter options by (case-insensitive).
+    Populate the script options flowbox with filtered options.
     """
     # Clear existing options
     while child := self.script_options_flowbox.get_first_child():
@@ -308,20 +305,6 @@ def populate_script_options(self, filter_text=""):
                 except Exception as e:
                     print(f"Error checking log file: {e}")
                     option_button.set_sensitive(False)
-
-            # Update button state and highlight for running processes
-            if self.current_script_key in self.running_processes:
-                # If the script is running, highlight the button and update its state
-                option_button.add_css_class("highlighted")
-                print(f"Added 'highlighted' to option button for script_key: {self.current_script_key}")
-                if label.lower() in ["play", "stop"]:  # Adjust for buttons that toggle between play/stop
-                    self.set_play_stop_button_state(option_button, True)
-            else:
-                # If the script is not running, ensure no highlight and reset button state
-                option_button.remove_css_class("highlighted")
-                print(f"Removed 'highlighted' from option button for script_key: {self.current_script_key}")
-                if label.lower() in ["play", "stop"]:
-                    self.set_play_stop_button_state(option_button, False)
 
             # Connect the button callback
             option_button.connect(
@@ -702,3 +685,496 @@ def restore_open_button(self):
     )
 
 
+def create_script_list(self):
+    self.print_method_name()
+    """Create UI rows for scripts efficiently with batch updates, including highlighting."""
+    self.flowbox.remove_all()
+    
+    if not self.script_list:
+        return
+    
+    self.script_ui_data = {}
+    
+    rows = []
+    for script_key, script_data in self.script_list.items():
+        row = self.create_script_row(script_key, script_data)
+        if row:
+            rows.append(row)
+            if script_key in self.running_processes:
+                self.update_row_highlight(row, True)
+                self.script_ui_data[script_key]['highlighted'] = True
+                self.script_ui_data[script_key]['is_running'] = True
+            else:
+                self.update_row_highlight(row, False)
+                self.script_ui_data[script_key]['highlighted'] = False
+                self.script_ui_data[script_key]['is_running'] = False
+    
+    for row in rows:
+        self.flowbox.append(row)
+
+
+def create_script_row(self, script_key, script_data):
+    script = Path(str(script_data['script_path'])).expanduser()
+    
+    # Common title text setup
+    title_text = str(script_data.get('progname', script.stem)).replace('_', ' ')
+    if script.stem in self.new_scripts:
+        title_text = f"<b>{title_text}</b>"
+
+    if self.icon_view:
+        # ICON VIEW
+        container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        container.add_css_class("rounded-container")
+        container.set_size_request(100, 100)
+        container.set_hexpand(True)
+        #container.set_vexpand(True)
+        container.set_halign(Gtk.Align.FILL)
+        #container.set_valign(Gtk.Align.FILL)
+        # Top: Horizontal box for [options][icon][play]
+        top_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        top_box.set_hexpand(True)
+        top_box.set_vexpand(True)
+        #top_box.set_valign(Gtk.Align.CENTER)
+        #top_box.set_halign(Gtk.Align.FILL)
+        top_box.set_size_request(50,50)
+        # Options button (larger, consistent width, initially hidden)
+        options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text="Options")
+        options_button.add_css_class("flat")
+        options_button.set_size_request(32, -1)  # Consistent width with play button
+        options_button.set_hexpand(True)
+        options_button.set_margin_start(0)
+        options_button.set_margin_end(0)
+        options_button.set_margin_top(0)
+        options_button.set_margin_bottom(0)
+        options_button.set_opacity(0)  # Hidden by default
+        options_button.set_sensitive(False)
+        #options_button.set_halign(Gtk.Align.FILL)
+        #options_button.set_halign(Gtk.Align.FILL)
+        top_box.append(options_button)
+
+        # Icon (centered)
+        icon = self.load_icon(script, 96, 96, 10)
+        icon_container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        icon_container.set_hexpand(True)  # Allow icon to expand in the center
+        icon_container.set_halign(Gtk.Align.CENTER)
+        #icon_container.set_valign(Gtk.Align.CENTER)
+        if icon:
+            icon_container.add_css_class("rounded-icon")
+            icon_image = Gtk.Image.new_from_paintable(icon)
+            icon_image.set_pixel_size(96)
+            icon_image.set_halign(Gtk.Align.CENTER)
+            #icon_image.set_valign(Gtk.Align.CENTER)
+            icon_container.append(icon_image)
+        else:
+            icon_image = Gtk.Image()
+            icon_container.append(icon_image)
+        icon_container.set_margin_top(0)
+        icon_container.set_margin_bottom(1)
+        top_box.append(icon_container)
+
+        # Play button (larger, consistent width, initially hidden)
+        play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play")
+        play_button.add_css_class("flat")
+        #play_button.set_halign(Gtk.Align.FILL)
+        play_button.set_size_request(36, -1)  # Consistent width with options button
+        play_button.set_opacity(0)  # Hidden by default
+        play_button.set_sensitive(False)
+        play_button.set_hexpand(True)
+        top_box.append(play_button)
+
+        container.append(top_box)
+
+        # Bottom: Label (always visible, ellipsized, color changes with "blue" class)
+        label_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        label_box.set_halign(Gtk.Align.CENTER)
+        #label_box.set_valign(Gtk.Align.FILL)
+        main_label = Gtk.Label()
+        main_label.set_max_width_chars(18)
+        main_label.set_lines(2)
+        main_label.set_wrap(True)
+        main_label.set_ellipsize(Pango.EllipsizeMode.END)
+        #main_label.set_valign(Gtk.Align.FILL)
+        main_label.set_markup(title_text)
+        main_label.set_tooltip_text(str(script_data.get('progname', script.stem)))
+        label_box.append(main_label)
+
+
+        #label_box.set_size_request(-1, 40)
+        label_box.set_opacity(1)  # Always visible
+        label_box.set_sensitive(True)  # Always active
+        
+        container.append(label_box)
+
+        # Store UI data
+        self.script_ui_data[script_key] = {
+            'row': container,
+            'play_button': play_button,
+            'options_button': options_button,
+            'label_box': label_box,
+            'button_box': top_box,
+            'label_button_box': None,
+            'is_running': False,
+            'script_path': script,
+            'showing_buttons': False
+        }
+
+        # Add click gesture to the icon container
+        click = Gtk.GestureClick()
+        click.connect("released", lambda gesture, n, x, y: self.toggle_overlay_buttons(script_key))
+        icon_container.add_controller(click)
+
+        # Connect button signals
+        play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, btn, container))
+        options_button.connect("clicked", lambda btn: self.show_options_for_script(
+            self.script_ui_data[script_key], container, script_key))
+
+        return container
+
+    if not self.icon_view:
+        # LIST VIEW (unchanged)
+        container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        container.add_css_class('rounded-container')
+
+        # Icon (left-aligned)
+        script = Path(str(script_data['script_path'])).expanduser()
+        title_text = str(script_data.get('progname', script.stem)).replace('_', ' ')
+        if script.stem in self.new_scripts:
+            title_text = f"<b>{title_text}</b>"
+        
+        icon = self.load_icon(script, 40, 40, 4)
+        if icon:
+            icon_container = Gtk.Box()
+            icon_container.add_css_class("rounded-icon")
+            icon_image = Gtk.Image.new_from_paintable(icon)
+            icon_image.set_pixel_size(40)
+            icon_image.set_halign(Gtk.Align.CENTER)
+            icon_container.append(icon_image)
+            icon_container.set_margin_start(6)
+        else:
+            icon_container = Gtk.Box()
+            icon_image = Gtk.Image()
+            icon_container.append(icon_image)
+            icon_container.set_margin_start(6)
+        container.append(icon_container)
+
+        # Container for label or buttons
+        label_button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        label_button_box.set_hexpand(True)
+        label_button_box.set_valign(Gtk.Align.CENTER)
+
+        # Create label_box
+        label_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+        label_box.set_hexpand(True)
+        main_label = Gtk.Label()
+        main_label.set_hexpand(True)
+        main_label.set_halign(Gtk.Align.START)
+        main_label.set_wrap(True)
+        main_label.set_max_width_chars(25)
+        main_label.set_ellipsize(Pango.EllipsizeMode.END)
+        main_label.set_markup(title_text)
+        label_box.append(main_label)
+
+        # Create button_box
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        button_box.set_hexpand(True)
+        box_main_label = Gtk.Label()
+        box_main_label.set_markup(title_text)
+        box_main_label.set_wrap(True)
+        box_main_label.set_max_width_chars(15)
+        box_main_label.set_ellipsize(Pango.EllipsizeMode.END)
+        
+        spacer = Gtk.Box()
+        spacer.set_hexpand(True)
+        
+        play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play")
+        play_button.set_size_request(60, -1)
+        play_button.set_opacity(1)
+        play_button.set_sensitive(True)
+        
+        options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text="Options")
+        options_button.set_size_request(34, -1)
+        options_button.set_opacity(1)
+        options_button.set_sensitive(True)
+        
+        button_box.append(box_main_label)
+        button_box.append(spacer)
+        button_box.append(play_button)
+        button_box.append(options_button)
+        button_box.set_margin_end(4)
+        button_box.set_size_request(60, 34)
+        label_button_box.append(label_box)
+        container.append(label_button_box)
+
+        # Store UI data
+        self.script_ui_data[script_key] = {
+            'row': container,
+            'play_button': play_button,
+            'options_button': options_button,
+            'label_box': label_box,
+            'button_box': button_box,
+            'label_button_box': label_button_box,
+            'is_running': False,
+            'script_path': script,
+            'showing_buttons': False
+        }
+
+        # Add click gesture
+        click = Gtk.GestureClick()
+        click.connect("released", lambda gesture, n, x, y: self.toggle_overlay_buttons(script_key))
+        container.add_controller(click)
+
+        # Connect button signals
+        play_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, btn, container))
+        options_button.connect("clicked", lambda btn: self.show_options_for_script(
+            self.script_ui_data[script_key], container, script_key))
+        
+        return container
+
+
+def toggle_overlay_buttons(self, script_key):
+    # Hide buttons and reset other rows
+    for key, ui in self.script_ui_data.items():
+        if key != script_key and ui.get('showing_buttons', False):
+            if self.icon_view:
+                ui['play_button'].set_opacity(0)
+                ui['play_button'].set_sensitive(False)
+                ui['options_button'].set_opacity(0)
+                ui['options_button'].set_sensitive(False)
+                # Label remains visible, no change needed
+            else:
+                ui['label_button_box'].remove(ui['button_box'])
+                ui['label_button_box'].append(ui['label_box'])
+            ui['showing_buttons'] = False
+            ui['row'].remove_css_class("blue")
+
+    # Toggle the current row
+    ui = self.script_ui_data.get(script_key)
+    if not ui:
+        return
+
+    showing_buttons = ui.get('showing_buttons', False)
+
+    if self.icon_view:
+        if showing_buttons:
+            # Hide buttons, label stays visible
+            ui['play_button'].set_opacity(0)
+            ui['play_button'].set_sensitive(False)
+            ui['options_button'].set_opacity(0)
+            ui['options_button'].set_sensitive(False)
+            ui['showing_buttons'] = False
+            ui['row'].remove_css_class("blue")
+        else:
+            # Show buttons, label stays visible
+            ui['play_button'].set_opacity(1)
+            ui['play_button'].set_sensitive(True)
+            ui['options_button'].set_opacity(1)
+            ui['options_button'].set_sensitive(True)
+            ui['showing_buttons'] = True
+            ui['row'].add_css_class("blue")
+    else:
+        label_button_box = ui['label_button_box']
+        if showing_buttons:
+            label_button_box.remove(ui['button_box'])
+            label_button_box.append(ui['label_box'])
+            ui['showing_buttons'] = False
+            ui['row'].remove_css_class("blue")
+        else:
+            label_button_box.remove(ui['label_box'])
+            label_button_box.append(ui['button_box'])
+            ui['showing_buttons'] = True
+            ui['row'].add_css_class("blue")
+
+    # Update play button icon based on running state
+    pb = ui['play_button']
+    if ui.get("is_running"):
+        pb.set_icon_name("media-playback-stop-symbolic")
+        pb.set_tooltip_text("Stop")
+    else:
+        pb.set_icon_name("media-playback-start-symbolic")
+        pb.set_tooltip_text("Play")
+    
+def show_buttons(self, play_button, options_button):
+    self.print_method_name()
+    play_button.set_visible(True)
+    options_button.set_visible(True)
+
+def hide_buttons(self, play_button, options_button):
+    self.print_method_name()
+    if play_button is not None:
+        play_button.set_visible(False)
+    if options_button is not None:
+        options_button.set_visible(False)
+
+def on_script_row_clicked(self, script_key):
+    self.count = 0
+    self.print_method_name()
+    """
+    Handles the click event on a script row, manages row highlighting, and play/stop button state.
+    
+    Args:
+        script_key (str): The unique key for the script (e.g., sha256sum).
+    """
+    # Retrieve the current script data for the clicked row
+    current_data = self.script_ui_data.get(script_key)
+    if not current_data:
+        print(f"No script data found for script_key: {script_key}")
+        return
+
+    # Track the previously clicked row and update the `is_clicked_row` state
+    for key, data in self.script_ui_data.items():
+        if data['is_clicked_row']:
+            # If the previously clicked row is not the current one, remove the blue highlight
+            if key != script_key:
+                data['is_clicked_row'] = False
+                data['row'].remove_css_class("blue")
+                self.hide_buttons(data['play_button'], data['options_button'])
+                print(f"Removing 'blue' highlight for previously clicked row with script_key: {key}")
+
+    # Toggle the `is_clicked_row` state for the currently clicked row
+    current_data['is_clicked_row'] = not current_data['is_clicked_row']
+    print(f"script_key = {script_key} is set to data['is_clicked_row'] = {current_data['is_clicked_row']}")
+
+    # Update the UI based on the new `is_clicked_row` state
+    row = current_data['row']
+    play_button = current_data['play_button']
+    options_button = current_data['options_button']
+    is_running = current_data['is_running']
+    is_clicked = current_data['is_clicked_row']
+
+    if is_clicked:
+        # Highlight the current row in blue and show the buttons
+        row.remove_css_class("highlight")
+        row.add_css_class("blue")
+        self.show_buttons(play_button, options_button)
+        print(f"Highlighting clicked row for script_key: {script_key} with 'blue'")
+    else:
+        # Remove highlight and hide buttons for the current row if it's not running
+        row.remove_css_class("blue")
+        self.hide_buttons(play_button, options_button)
+        print(f"Removing 'blue' highlight for clicked row with script_key: {script_key}")
+
+    # Update the play/stop button state
+    if is_running:
+        # If the script is running: set play button to 'Stop' and add 'highlighted' class
+        self.set_play_stop_button_state(play_button, True)
+        row.add_css_class("highlighted")
+        print(f"Script {script_key} is running. Setting play button to 'Stop' and adding 'highlighted'.")
+    else:
+        # If the script is not running and not clicked, reset play button and highlight
+        if not is_clicked:
+            self.set_play_stop_button_state(play_button, False)
+            row.remove_css_class("highlighted")
+            print(f"Script {script_key} is not running. Setting play button to 'Play' and removing 'highlighted'.")
+
+        # If the script is not running but clicked, ensure it stays highlighted in blue
+        if is_clicked and not is_running:
+            row.add_css_class("blue")
+            print(f"Preserving 'blue' highlight for clicked but not running script_key: {script_key}")
+
+def set_play_stop_button_state(self, button, is_playing):
+    # Check if the button already has a child (Gtk.Image)
+    current_child = button.get_child()
+    
+    if current_child and isinstance(current_child, Gtk.Image):
+        # Reuse the existing Gtk.Image child
+        image = current_child
+    else:
+        # Create a new Gtk.Image if none exists
+        image = Gtk.Image()
+        button.set_child(image)
+    
+    # Set the icon name and tooltip based on the state
+    if is_playing:
+        image.set_from_icon_name("media-playback-stop-symbolic")
+        button.set_tooltip_text("Stop")
+    else:
+        image.set_from_icon_name("media-playback-start-symbolic")
+        button.set_tooltip_text("Play")
+    
+    # Explicitly set pixel size to ensure crisp rendering
+    # image.set_pixel_size(24)
+    
+    # Ensure the icon is re-rendered cleanly
+    image.queue_draw()
+    
+def update_row_highlight(self, row, highlight):
+    #self.print_method_name()
+    if highlight:
+        row.add_css_class("highlighted")
+    else:
+        #row.remove_css_class("blue")
+        row.remove_css_class("highlighted")
+
+
+def replace_open_button_with_launch(self, script, row, script_key):
+    self.print_method_name()
+    script_data = self.extract_yaml_info(script_key)
+    if not script_data:
+        return None
+        
+    if self.open_button.get_parent():
+        self.vbox.remove(self.open_button)
+
+    self.launch_button = Gtk.Button()
+    self.launch_button.set_size_request(-1, 40)
+
+    #yaml_info = self.extract_yaml_info(script)
+    script_key = script_data['sha256sum']  # Use sha256sum as the key
+
+    if script_key in self.running_processes:
+        launch_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
+        self.launch_button.set_tooltip_text("Stop")
+    else:
+        launch_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+        self.launch_button.set_tooltip_text("Play")
+
+    self.launch_button.set_child(launch_icon)
+    self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, self.launch_button, row))
+
+    # Store the script_key associated with this launch button
+    self.launch_button_exe_name = script_key
+
+    self.vbox.prepend(self.launch_button)
+    self.launch_button.set_visible(True)
+
+def replace_launch_button(self, ui_state, row, script_key):
+    self.print_method_name()
+    """
+    Replace the open button with a launch button.
+    """
+    try:
+        # Remove existing launch button if it exists
+        if hasattr(self, 'launch_button') and self.launch_button is not None:
+            parent = self.launch_button.get_parent()
+            if parent is not None:
+                parent.remove(self.launch_button)
+
+        # Create new launch button
+        self.launch_button = Gtk.Button()
+        self.launch_button.set_size_request(-1, 40)
+        
+        # Set initial icon state
+        is_running = script_key in self.running_processes
+        launch_icon = Gtk.Image.new_from_icon_name(
+            "media-playback-stop-symbolic" if is_running
+            else "media-playback-start-symbolic"
+        )
+        self.launch_button.set_tooltip_text("Stop" if is_running else "Play")
+        self.launch_button.set_child(launch_icon)
+        
+        # Connect click handler
+        self.launch_button.connect(
+            "clicked",
+            lambda btn: self.toggle_play_stop(script_key, self.launch_button, row)
+        )
+        
+        # Add to vbox
+        if hasattr(self, 'vbox') and self.vbox is not None:
+            if self.open_button.get_parent() == self.vbox:
+                self.vbox.remove(self.open_button)
+            self.vbox.prepend(self.launch_button)
+            self.launch_button.set_visible(True)
+        
+    except Exception as e:
+        print(f"Error in replace_launch_button: {e}")
+        self.launch_button = None
