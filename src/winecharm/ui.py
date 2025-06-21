@@ -1255,3 +1255,16 @@ def hide_processing_spinner(self):
             
     except Exception as e:
         print(f"Error in hide_processing_spinner: {e}")
+
+
+def disable_open_button(self):
+    self.print_method_name()
+    if self.open_button:
+        self.open_button.set_sensitive(False)
+    print("Open button disabled.")
+
+def enable_open_button(self):
+    self.print_method_name()
+    if self.open_button:
+        self.open_button.set_sensitive(True)
+    print("Open button enabled.")
