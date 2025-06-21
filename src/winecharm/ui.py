@@ -12,7 +12,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
 
-from gi.repository import GLib, Gio, Gtk, Gdk, Adw
+from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 
 def create_main_window(self):
     self.print_method_name()
