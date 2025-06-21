@@ -274,6 +274,13 @@ class WineCharmApp(Adw.Application):
                 'hide_processing_spinner',
                 'disable_open_button',
                 'enable_open_button',
+                'set_open_button_icon_visible',
+                'set_open_button_label',
+                'show_initializing_step',
+                'mark_step_as_done',
+                'on_cancel_button_clicked',
+                'show_info_dialog',
+                'update_ui_for_running_script_on_startup',
             ],
             settings: [
                 'on_settings_clicked',
@@ -834,93 +841,8 @@ class WineCharmApp(Adw.Application):
         return False  # Return False to prevent this function from being called again
 
 
-    def set_open_button_label(self, label_text):
-        self.print_method_name()
-        """Helper method to update the open button's label"""
-        box = self.open_button.get_child()
-        if not box:
-            return
-            
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Label):
-                child.set_label(label_text)
-            elif isinstance(child, Gtk.Image):
-                child.set_visible(False)  # Hide the icon during processing
-            child = child.get_next_sibling()
-
-    def show_initializing_step(self, step_text):
-        self.print_method_name()
-        """
-        Show a new processing step in the flowbox
-        """
         
 
-        if hasattr(self, 'progress_bar'):
-            # Calculate total steps dynamically
-            if hasattr(self, 'total_steps'):
-                total_steps = self.total_steps
-            else:
-                # Default for bottle creation
-                total_steps = 8
-            
-            current_step = len(self.step_boxes) + 1
-            progress = current_step / total_steps
-            
-            # Update progress bar
-            self.progress_bar.set_fraction(progress)
-            self.progress_bar.set_text(f"Step {current_step}/{total_steps}")
-            
-            # Create step box
-            step_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-            step_box.set_margin_start(12)
-            step_box.set_margin_end(12)
-            step_box.set_margin_top(6)
-            step_box.set_margin_bottom(6)
-            
-            # Add status icon and label
-            step_spinner = Gtk.Spinner()
-            step_label = Gtk.Label(label=step_text)
-            step_label.set_halign(Gtk.Align.START)
-            step_label.set_hexpand(True)
-            
-            step_box.append(step_spinner)
-            step_box.append(step_label)
-            step_spinner.start()
-
-            
-            # Add to flowbox
-            flowbox_child = Gtk.FlowBoxChild()
-            flowbox_child.set_child(step_box)
-            self.flowbox.append(flowbox_child)
-            
-            # Store reference
-            self.step_boxes.append((step_box, step_spinner, step_label))
-
-    def mark_step_as_done(self, step_text):
-        self.print_method_name()
-        """
-        Mark a step as completed in the flowbox
-        """
-        if hasattr(self, 'step_boxes'):
-            for step_box, step_spinner, step_label in self.step_boxes:
-                if step_label.get_text() == step_text:
-                    step_box.remove(step_spinner)
-                    done_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic")
-                    step_box.prepend(done_icon)
-                    break
-
-
-
-        
-    def set_open_button_icon_visible(self, visible):
-        self.print_method_name()
-        box = self.open_button.get_child()
-        child = box.get_first_child()
-        while child:
-            if isinstance(child, Gtk.Image):
-                child.set_visible(visible)
-            child = child.get_next_sibling()
             
     def on_activate(self, *args):
         self.print_method_name()
@@ -1968,24 +1890,7 @@ class WineCharmApp(Adw.Application):
             GLib.idle_add(self.process_ended, script_key)
 
        
-    def update_ui_for_running_script_on_startup(self, script_key):
-        self.print_method_name()
-        ui_state = self.script_ui_data.get(script_key)
-        if not ui_state:
-            print(f"No UI state found for script_key: {script_key}")
-            return
 
-        row = ui_state.get('row')
-        play_button = ui_state.get('play_button')
-
-        # Update UI elements
-        if row:
-            self.update_row_highlight(row, True)
-            row.add_css_class("highlighted")
-
-        if play_button:
-            self.set_play_stop_button_state(play_button, True)
-            ui_state['is_running'] = True  # Ensure is_running is set
 
             
 ############################### 1050 - 1682 ########################################
@@ -2005,28 +1910,7 @@ class WineCharmApp(Adw.Application):
 
 
 
-    def show_info_dialog(self, title, message, callback=None):
-        self.print_method_name()
-        dialog = Adw.AlertDialog(
-            heading=title,
-            body=message
-        )
-        
-        # Add response using non-deprecated method
-        dialog.add_response("ok", "OK")
-        
-        # Configure dialog properties
-        dialog.props.default_response = "ok"
-        dialog.props.close_response = "ok"
 
-        def on_response(d, r):
-            self.print_method_name()
-            #d.close()
-            if callback is not None:
-                callback()
-
-        dialog.connect("response", on_response)
-        dialog.present(self.window)
 
     def reverse_process_reg_files(self, wineprefix):
         self.print_method_name()
@@ -2264,11 +2148,7 @@ class WineCharmApp(Adw.Application):
             # Go back to the previous view
             self.on_back_button_clicked(None)
 
-    def on_cancel_button_clicked(self, button, parent, original_button):
-        self.print_method_name()
-        # Restore the original button as the child of the FlowBoxChild
-        parent.set_child(original_button)
-        original_button.set_sensitive(True)
+
 
     def run_command(self, command):
         self.print_method_name()
