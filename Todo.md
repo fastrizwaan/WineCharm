@@ -30,7 +30,8 @@ Refactoring winecharm
 - [x] do not show not found dialog for winezgui
 - [x] wow64 with bin/wine be treated as win64 arch
 - [x] show dialog to run wineboot -u
-- [x] Create bottle hangs with ~/AOCSETUP.EXE ( do not include not detecting?) flatpak shows can't access proplery.
+- [x] Create bottle hangs with ~/AOCSETUP.EXE ( do not include not detecting?) flatpak shows can't access properly.
+- [x] restore loads scripts properly on success.
 - 
 - [ ] Set Default runner on system with wine; 32 bits packages not installed; use wine64 or suggest user for get wine64 runner
 Error validating runner /var/home/rizvan/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Runners/wine-10.0-amd64/bin/wine: [Errno 2] No such file or directory: '/var/home/rizvan/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Runners/wine-10.0-amd64/bin/wine'
