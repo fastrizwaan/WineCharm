@@ -230,6 +230,7 @@ class WineCharmApp(Adw.Application):
                 'remove_accelerator_context',
             ],
             settings: [
+                'on_settings_clicked',
                 'load_settings',
                 'save_settings',
                 'set_dynamic_variables',
@@ -450,10 +451,7 @@ class WineCharmApp(Adw.Application):
             self.ensure_directory_exists(directory)
 
 
-    def on_settings_clicked(self, action=None, param=None):
-        self.print_method_name()
-        print("Settings action triggered")
-        # You can add code here to open a settings window or dialog.
+
 
     def find_matching_processes(self, exe_name_pattern):
         self.print_method_name()
