@@ -1212,3 +1212,15 @@ def create_template(self, action=None):
 def configure_template(self, action=None):
     pass
 
+def revert_open_button(self):
+    self.print_method_name()
+    """
+    Cleanup after template restore completion.
+    """
+    self.hide_processing_spinner()
+    self.reconnect_open_button()
+    self.show_options_for_settings()
+    print("Template created successfully")
+
+
+

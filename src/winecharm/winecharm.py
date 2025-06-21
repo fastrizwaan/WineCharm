@@ -284,6 +284,7 @@ class WineCharmApp(Adw.Application):
                 'perform_template_clone',
                 'create_template',
                 'configure_template',
+                'revert_open_button',
             ],
             runner_manager: [
                 'get_runner',
@@ -5294,74 +5295,6 @@ class WineCharmApp(Adw.Application):
         dialog.present(self.window)
         
 ################
-
-######################################################### Initiazlie template and import directory imrpovement
-
-
-
-
-
-
-    def on_cancel_import_clicked(self, button):
-        self.print_method_name()
-        """
-        Handle cancel button click during wine directory import
-        """
-        dialog = Adw.AlertDialog(
-            title="Cancel Import",
-            body="Do you want to cancel the wine directory import process?"
-        )
-        dialog.add_response("continue", "Continue")
-        dialog.add_response("cancel", "Cancel Import")
-        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
-        dialog.connect("response", self.on_cancel_import_dialog_response)
-        dialog.present(self.window)
-
-    def on_cancel_import_dialog_response(self, dialog, response):
-        self.print_method_name()
-        """
-        Handle cancel dialog response for wine directory import
-        """
-        if response == "cancel":
-            self.stop_processing = True
-        dialog.close()
-
-############################################### 4444444444444444444444444 New initialize template
-
-
-
-##################################################################################### 
-
-        
-
-########################## fix default runner to handle arch difference
-
-
-
-    def revert_open_button(self):
-        self.print_method_name()
-        """
-        Cleanup after template restore completion.
-        """
-        self.hide_processing_spinner()
-        self.reconnect_open_button()
-        self.show_options_for_settings()
-        print("Template created successfully")
-    
-
-
-
-
-###################### 0.95
-
-
-
-
-###############
-
-
-
-
 
 
 
