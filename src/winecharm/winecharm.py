@@ -1029,7 +1029,6 @@ class WineCharmApp(Adw.Application):
         return sorted(charm_files, key=lambda p: p.stat().st_mtime, reverse=True)
 
 
-############################### 1050 - 1682 ########################################
 
 
     def find_and_remove_wine_created_shortcuts(self):
@@ -1893,7 +1892,6 @@ class WineCharmApp(Adw.Application):
 
 
             
-############################### 1050 - 1682 ########################################
 
 
 
@@ -1961,11 +1959,7 @@ class WineCharmApp(Adw.Application):
 
 
 
-##### /BACKUP PREFIX xx
 
-
-
-########################################  delete wineprefix
     def load_icon(self, script, x=24, y=24, radius=3):
         """Load icon for the script with specified dimensions and corner radius."""
         if not hasattr(self, 'icon_cache'):
@@ -2076,7 +2070,6 @@ class WineCharmApp(Adw.Application):
         return hbox
 
 
-######################################## / delete wineprefix
 
     def get_script_keys_from_wineprefix(self, wineprefix):
         self.print_method_name()
@@ -2334,8 +2327,6 @@ class WineCharmApp(Adw.Application):
 
 
 
-
-############# IMPORT Wine Directory
 
 
 
