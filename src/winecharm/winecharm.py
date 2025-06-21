@@ -590,7 +590,18 @@ class WineCharmApp(Adw.Application):
 
     def on_help_clicked(self, action=None, param=None):
         self.print_method_name()
-        print("Help action triggered")
+        import subprocess
+        import shutil
+        try:
+            if shutil.which("xdg-open") is None:
+                raise FileNotFoundError("xdg-open not found on system")
+            url = "https://github.com/fastrizwaan/WineCharm/wiki"
+            subprocess.run(["xdg-open", url], check=True)
+            print(f"Help action triggered: Opened {url}")
+        except (subprocess.CalledProcessError, FileNotFoundError) as e:
+            print(f"Error opening help URL: {e}")
+        
+        
         # You can add code here to show a help dialog or window.
 
     def on_about_clicked(self, action=None, param=None):
