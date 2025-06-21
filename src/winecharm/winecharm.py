@@ -40,9 +40,13 @@ if os.path.dirname(__file__) not in sys.path:
     sys.path.insert(0, os.path.dirname(__file__))
 
 try:
-    from winecharm import ui
+    from winecharm import ui, settings, template_manager, runner_manager, single_prefix
 except ImportError:
     import ui
+    import settings
+    import template_manager
+    import runner_manager
+    import single_prefix
 
 class WineCharmApp(Adw.Application):
     def __init__(self):
@@ -130,16 +134,6 @@ class WineCharmApp(Adw.Application):
         signal.signal(signal.SIGINT, self.handle_sigint)
         self.script_buttons = {}
         self.current_clicked_row = None  # Initialize current clicked row
-        self.hamburger_actions = [
-            ("🛠️ Settings...", self.show_options_for_settings),
-            ("☠️ Kill all...", self.on_kill_all_clicked),
-            ("🍾 Restore...", self.restore_from_backup),
-            ("📥 Import Wine Directory", self.on_import_wine_directory_clicked),
-            ("📥 Import WineZGUI Scripts...", self.process_winezgui_sh_files),
-            ("❓ Help...", self.on_help_clicked),
-            ("📖 About...", self.on_about_clicked),
-            ("🚪 Quit...", self.quit_app)
-        ]
 
         self.css_provider = Gtk.CssProvider()
         self.css_provider.load_from_data(b"""
@@ -198,7 +192,7 @@ class WineCharmApp(Adw.Application):
         # Runner cache file
         self.runner_cache_file = self.winecharmdir / "runner_cache.yaml"
         self.runner_data = None  # Will hold the runner data after fetching
-        self.settings = self.load_settings()  # Add this line
+
 
         # Set keyboard accelerators
         self.set_accels_for_action("win.search", ["<Ctrl>f"])
@@ -211,36 +205,149 @@ class WineCharmApp(Adw.Application):
         self.winezgui_prefixes_dir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineZGUI/data/winezgui/Prefixes")).resolve()
 
 ##################### Import Methods from files #####################
-        # Import methods from ui module
-        ui_methods = [
-            # File opening methods
-            'create_main_window',
-            'add_keyboard_actions',
-            'create_sort_actions',
-            'on_search_button_clicked',
-            'on_key_pressed',
-            'on_search_entry_activated',
-            'on_search_entry_changed',
-            'filter_script_list',
-            'on_open_button_clicked',
-            'open_file_dialog',
-            'create_file_filter',
-            'on_open_file_dialog_response',
-            'on_back_button_clicked',
-            'open_filemanager_winecharm',
-            'open_terminal_winecharm',
-            'setup_accelerator_context',
-            'remove_accelerator_context',
-        ]
-        
-        # Import methods from ui
-        for method_name in ui_methods:
-            if hasattr(ui, method_name):
-                setattr(self, method_name, getattr(ui, method_name).__get__(self, WineCharmApp))
-                
-                
+        # Define method mappings
+        module_methods = {
+            ui: [
+                'create_main_window',
+                'add_keyboard_actions',
+                'create_sort_actions',
+                'on_search_button_clicked',
+                'on_key_pressed',
+                'on_search_entry_activated',
+                'on_search_entry_changed',
+                'filter_script_list',
+                'on_open_button_clicked',
+                'open_file_dialog',
+                'create_file_filter',
+                'on_open_file_dialog_response',
+                'on_back_button_clicked',
+                'open_filemanager_winecharm',
+                'open_terminal_winecharm',
+                'setup_accelerator_context',
+                'remove_accelerator_context',
+            ],
+            settings: [
+                'load_settings',
+                'save_settings',
+                'set_dynamic_variables',
+                'replace_open_button_with_settings', 
+                'show_options_for_settings',
+                'populate_settings_options',
+            ],
+            template_manager: [
+                'initialize_template', 'on_template_initialized',
+                'copy_template',
+                'on_cancel_template_init_clicked',
+                'on_cancel_template_init_dialog_response',
+                'cleanup_cancelled_template_init',
+                'reset_ui_after_template_init',
+                'get_template_arch',
+                'set_default_template',
+                'delete_template',
+                'import_template',
+                'on_import_template_response',
+                'process_template_import',
+                'verify_template_source',
+                'clean_template_files',
+                'handle_template_import_error',
+                'on_import_template_directory_completed',
+                'backup_template',
+                'on_backup_template_response',
+                'create_template_backup',
+                'connect_cancel_button_for_template_backup',
+                'on_cancel_template_backup_clicked',
+                'on_cancel_template_backup_dialog_response',
+                'cleanup_cancelled_template_backup',
+                'restore_template_from_backup',
+                'on_restore_template_file_dialog_response',
+                'restore_template_tar_zst',
+                'extract_template_backup',
+                'extract_template_dir',
+                'get_template_restore_steps',
+                'check_template_disk_space',
+                'on_template_restore_completed',
+                'clone_template',
+                'on_template_selected_for_clone',
+                'on_clone_name_changed',
+                'on_clone_template_response',
+                'perform_template_clone',
+                'create_template',
+                'configure_template',
+            ],
+            runner_manager: [
+                'get_runner',
+                'update_runner_path_in_script',
+                'change_runner',
+                'on_change_runner_response',
+                'get_valid_runners',
+                'validate_runner',
+                'on_download_runner_clicked',
+                'on_runner_download_complete',
+                'get_system_wine',
+                'show_no_runners_available_dialog',
+                'set_default_runner',
+                '_on_dropdown_factory_setup',
+                '_on_dropdown_factory_bind',
+                'on_set_default_runner_response',
+                'on_download_runner_clicked_default',
+                'on_runner_download_complete_default_runner',
+                'maybe_fetch_runner_urls',
+                'cache_is_stale',
+                'fetch_runner_urls_from_github',
+                'parse_runner_data',
+                'get_runner_category',
+                'save_runner_data_to_cache',
+                'load_runner_data_from_cache',
+                'on_settings_download_runner_clicked',
+                'on_download_runner_response',
+                'download_runners_thread',
+                'download_and_extract_runner',
+                'delete_runner',
+                'on_delete_runner_response',
+                'backup_runner',
+                'on_backup_runner_response',
+                'create_runner_backup',
+                'restore_runner',
+                'extract_runner_archive',
+                'archive_contains_wine',
+                'import_runner',
+                'on_import_runner_response',
+                'process_runner_import',
+                'verify_runner_source',
+                'verify_runner_binary',
+                'set_runner_permissions',
+                'handle_runner_import_error',
+                'on_import_runner_directory_completed',
+                'refresh_runner_list',
+                'show_confirm_dialog',
+            ],
+            single_prefix: [
+                'single_prefix_mode',
+                'handle_prefix_mode_change',
+                'finalize_prefix_mode_change',
+            ],
+        }
+
+        # Bind methods to self
+        for module, methods in module_methods.items():
+            for method_name in methods:
+                if hasattr(module, method_name):
+                    setattr(self, method_name, getattr(module, method_name).__get__(self, WineCharmApp))         
                 
 ##################### / Import Methods from files #####################                
+        self.hamburger_actions = [
+            ("🛠️ Settings...", self.show_options_for_settings),
+            ("☠️ Kill all...", self.on_kill_all_clicked),
+            ("🍾 Restore...", self.restore_from_backup),
+            ("📥 Import Wine Directory", self.on_import_wine_directory_clicked),
+            ("📥 Import WineZGUI Scripts...", self.process_winezgui_sh_files),
+            ("❓ Help...", self.on_help_clicked),
+            ("📖 About...", self.on_about_clicked),
+            ("🚪 Quit...", self.quit_app)
+        ]
+
+        self.settings = self.load_settings()  # Add this line
+################### / __init__ #################
                 
     def print_method_name(self):
         return
@@ -427,7 +534,7 @@ class WineCharmApp(Adw.Application):
             if not self.template.exists():
                 # If template doesn't exist, initialize it
                 self.initialize_template(self.template, self.on_template_initialized)
-                self.process_winezgui_sh_files()
+                self.process_winezgui_sh_files(suppress_no_scripts_dialog=True) 
             else:
                 # Template already exists, set dynamic variables
                 self.set_dynamic_variables()
@@ -473,142 +580,6 @@ class WineCharmApp(Adw.Application):
                     print(f"Error processing {item}: {e}")
 
 
-    def initialize_template(self, template_dir, callback, arch='win64'):
-        """
-        Modified template initialization with architecture support
-        """
-        template_dir = Path(template_dir) if not isinstance(template_dir, Path) else template_dir
-        
-        self.create_required_directories()
-        self.initializing_template = True
-        self.stop_processing = False
-        self.current_arch = arch  # Store current architecture
-        
-        # Disabled Cancel/Interruption
-        ## Disconnect open button handler
-        #if self.open_button_handler_id is not None:
-        #    self.open_button.disconnect(self.open_button_handler_id)
-        #    self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_template_init_clicked)
-        self.disconnect_open_button()
-        
-
-        # Architecture-specific steps
-        steps = [
-            ("Initializing wineprefix", 
-            f"WINEARCH={arch} WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-            ("Replace symbolic links with directories", 
-            lambda: self.remove_symlinks_and_create_directories(template_dir)),
-            ("Installing arial", 
-            f"WINEPREFIX='{template_dir}' winetricks -q arial"),
-            # ("Installing tahoma", 
-            # f"WINEPREFIX='{template_dir}' winetricks -q tahoma"),
-            # ("Installing times", 
-            # f"WINEPREFIX='{template_dir}' winetricks -q times"),
-            # ("Installing courier", 
-            # f"WINEPREFIX='{template_dir}' winetricks -q courier"),
-            # ("Installing webdings", 
-            # f"WINEPREFIX='{template_dir}' winetricks -q webdings"),
-            ("Installing openal", 
-            f"WINEPREFIX='{template_dir}' winetricks -q openal"),
-            #("Installing vkd3d", 
-            #f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
-            #("Installing dxvk", 
-            #f"WINEPREFIX='{template_dir}' winetricks -q dxvk"),
-        ]
-        
-        # Set total steps and initialize progress UI
-        self.total_steps = len(steps)
-        self.show_processing_spinner(f"Initializing {template_dir.name} Template...")
-
-        def initialize():
-            for index, (step_text, command) in enumerate(steps, 1):
-                if self.stop_processing:
-                    GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
-                    return
-                    
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    if callable(command):
-                        command()
-                    else:
-                        process = subprocess.Popen(command, shell=True, 
-                                                stdout=subprocess.PIPE, 
-                                                stderr=subprocess.PIPE)
-                        while process.poll() is None:
-                            if self.stop_processing:
-                                process.terminate()
-                                try:
-                                    process.wait(timeout=2)
-                                except subprocess.TimeoutExpired:
-                                    process.kill()
-                                GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
-                                return
-                            time.sleep(0.1)
-                        
-                        if process.returncode != 0:
-                            raise subprocess.CalledProcessError(process.returncode, command)
-                    
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                    if hasattr(self, 'progress_bar'):
-                        GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
-                    
-                except subprocess.CalledProcessError as e:
-                    print(f"Error initializing template: {e}")
-                    GLib.idle_add(self.cleanup_cancelled_template_init, template_dir)
-                    return
-                    
-            if not self.stop_processing:
-                GLib.idle_add(lambda: self.on_template_initialized(arch))
-                GLib.idle_add(self.hide_processing_spinner)
-                self.disconnect_open_button()
-                GLib.idle_add(self.reset_ui_after_template_init)
-        threading.Thread(target=initialize).start()
-
-    def on_template_initialized(self, arch=None):
-        print(f"Template initialization complete for {arch if arch else 'default'} architecture.")
-        self.initializing_template = False
-        # Update architecture setting if we were initializing a specific arch
-        if arch:
-            self.arch = arch
-            # Set template path based on architecture
-            self.template = self.default_template_win32 if arch == 'win32' \
-                else self.default_template_win64
-            self.save_settings()
-        
-        # Ensure the spinner is stopped after initialization
-        self.hide_processing_spinner()
-        
-        # Success case
-        self.show_initializing_step("Initialization Complete!")
-        self.mark_step_as_done("Initialization Complete!")
-        
-        # Process command-line file if it exists
-        if self.command_line_file:
-            print("Processing command-line file after template initialization")
-            file_extension = Path(self.command_line_file).suffix.lower()
-            if file_extension in ['.exe', '.msi']:
-                print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
-                GLib.idle_add(self.show_processing_spinner, "Processing...")
-                self.process_cli_file(self.command_line_file)
-            elif file_extension in ['.wzt', '.bottle', '.prefix']:
-                print(f"Restoring from backup: {self.command_line_file}")
-                self.restore_prefix_bottle_wzt_tar_zst(self.command_line_file)
-            else:
-                print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
-                GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
-                self.command_line_file = None
-                return False
-
-        # If not called from settings create script list else go to settings
-        if not self.called_from_settings:
-            self.reconnect_open_button()
-            GLib.timeout_add_seconds(0.5, self.create_script_list)
-        
-        if self.called_from_settings:
-            GLib.idle_add(lambda: self.replace_open_button_with_settings())
-            self.show_options_for_settings()
-        
-        self.set_dynamic_variables()
 
         
 
@@ -777,64 +748,9 @@ class WineCharmApp(Adw.Application):
         GLib.timeout_add_seconds(1, self.show_info_dialog,"Missing Programs", message)
 
         
-    def set_dynamic_variables(self):
-        self.print_method_name()
-        # Check if Settings.yaml exists and set the template and arch accordingly
-        if self.settings_file.exists():
-            settings = self.load_settings()  # Assuming load_settings() returns a dictionary
-            self.template = self.expand_and_resolve_path(settings.get('template', self.default_template_win64))
-            self.arch = settings.get('arch', "win64")
-            self.icon_view = settings.get('icon_view', False)
-            self.single_prefix = settings.get('single-prefix', False)
-        else:
-            self.template = self.expand_and_resolve_path(self.default_template_win64)
-            self.arch = "win64"
-            self.runner = ""
-            self.template = self.default_template_win64  # Set template to the initialized one
-            self.icon_view = False
-            self.single_prefix = False
 
-        self.save_settings()
 
-    def save_settings(self):
-        self.print_method_name()
-        """Save current settings to the Settings.yaml file."""
-        settings = {
-            'template': self.replace_home_with_tilde_in_path(str(self.template)),
-            'arch': self.arch,
-            'runner': self.replace_home_with_tilde_in_path(str(self.settings.get('runner', ''))),
-            'wine_debug': "WINEDEBUG=-fixme-all DXVK_LOG_LEVEL=none",
-            'env_vars': '',
-            'icon_view': self.icon_view,
-            'single-prefix': self.single_prefix
-        }
 
-        try:
-            with open(self.settings_file, 'w') as settings_file:
-                yaml.dump(settings, settings_file, default_style="'", default_flow_style=False, width=10000)
-            #print(f"Settings saved to {self.settings_file} with content:\n{settings}")
-        except Exception as e:
-            print(f"Error saving settings: {e}")
-
-    def load_settings(self):
-        self.print_method_name()
-        """Load settings from the Settings.yaml file."""
-        if self.settings_file.exists():
-            with open(self.settings_file, 'r') as settings_file:
-                settings = yaml.safe_load(settings_file) or {}
-
-            # Expand and resolve paths when loading
-            self.template = self.expand_and_resolve_path(settings.get('template', self.default_template_win64))
-            self.runner = self.expand_and_resolve_path(settings.get('runner', ''))
-            self.arch = settings.get('arch', "win64")
-            self.icon_view = settings.get('icon_view', False)
-            self.env_vars = settings.get('env_vars', '')
-            self.wine_debug = settings.get('wine_debug', '')
-            self.single_prefix = settings.get('single-prefix', False)
-            return settings
-
-        # If no settings file, return an empty dictionary
-        return {}
         
     def set_open_button_icon_visible(self, visible):
         self.print_method_name()
@@ -938,9 +854,13 @@ class WineCharmApp(Adw.Application):
             if not Path(abs_file_path).exists():
                 print(f"File does not exist: {abs_file_path}")
                 return
-
+            # get runner from settings
+            self.load_settings()
+            print(self.runner)
+            use_runner = str(self.expand_and_resolve_path(self.runner))
+            print(use_runner)
             # Perform the heavy processing here
-            self.create_yaml_file(abs_file_path, None)
+            self.create_yaml_file(abs_file_path, None, runner_override=use_runner)
 
             # Schedule GUI updates in the main thread
             #GLib.idle_add(self.update_gui_after_file_processing, abs_file_path)
@@ -1853,70 +1773,7 @@ class WineCharmApp(Adw.Application):
             execute_launch()
             self.window.set_focus(None)
 
-    def get_runner(self, script_data):
-        self.print_method_name()
-        """
-        Extracts and resolves the runner from the script data.
 
-        Args:
-            script_data (dict): The script data containing runner information.
-
-        Returns:
-            Path or str: The resolved runner path or command.
-        """
-        self.debug = True  # Enable debugging
-
-        # Get the runner from the script data, fallback to 'wine' if not provided
-        runner = script_data.get('runner', '').strip()
-        if not runner:
-            if self.debug:
-                print("Runner not specified in script data, falling back to 'wine'.")
-            runner = "wine"
-
-        if self.debug:
-            print(f"Using runner: {runner}")
-
-        # If the runner is a path (e.g., /usr/bin/wine), resolve it
-        try:
-            if runner != "wine":
-                runner = Path(runner).expanduser().resolve()
-                if self.debug:
-                    print(f"Runner resolved as absolute path: {runner}")
-        except Exception as e:
-            print(f"Error resolving runner path: {e}")
-            raise ValueError(f"Invalid runner path: {runner}. Error: {e}")
-
-        # Check if the runner is a valid path or command
-        runner_path = None
-        if isinstance(runner, Path) and runner.is_absolute():
-            runner_path = runner
-        else:
-            runner_path = self.find_command_in_path(runner)
-
-        # Verify if the runner exists
-        if not runner_path:
-            raise FileNotFoundError(f"The runner '{runner}' was not found.")
-
-        if self.debug:
-            print(f"Resolved runner path: {runner_path}")
-
-        try:
-            # Check if the runner works by running 'runner --version'
-            result = subprocess.run(
-                [str(runner_path), "--version"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=os.environ.copy()
-            )
-            if result.returncode != 0:
-                raise Exception(result.stderr.strip())
-            if self.debug:
-                print(f"Runner version: {result.stdout.strip()}")
-        except Exception as e:
-            raise RuntimeError(f"Failed to run '{runner_path} --version'. Error: {e}")
-
-        return runner_path
 
     def find_command_in_path(self, command):
         self.print_method_name()
@@ -5072,20 +4929,7 @@ class WineCharmApp(Adw.Application):
             productname_match = re.search(r'Product Name\s+:\s+(.+)', product_output)
             return productname_match.group(1).strip() if productname_match else None
 
-    def copy_template(self, dest_dir, source_template=None):
-        self.print_method_name()
-        if source_template is None:
-            source_template = self.template
-        source_template = Path(source_template)
-        dest_dir = Path(dest_dir)
-        
-        if source_template.exists():
-            #shutil.copytree(source_template, dest_dir, symlinks=True, dirs_exist_ok=True)
-            self.custom_copytree(source_template, dest_dir)
-            print(f"Copied template {source_template} to {dest_dir}")
-        else:
-            print(f"Template {source_template} does not exist. Creating empty prefix.")
-            self.ensure_directory_exists(dest_dir)
+
 
     def create_desktop_entry(self, progname, script_path, icon_path, wineprefix, category = "Game"):
         self.print_method_name()
@@ -6780,32 +6624,6 @@ class WineCharmApp(Adw.Application):
         except Exception as e:
             print(f"Error updating script path: {e}")
 
-    def update_runner_path_in_script(self, script_path, new_runner):
-        self.print_method_name()
-        """
-        Update the .charm file to point to the new location of runner.
-        """
-        try:
-            # Read the script file
-            with open(script_path, "r") as file:
-                script_content = file.readlines()
-
-            # Update the runner path with the new location
-            updated_content = []
-            for line in script_content:
-                if line.startswith("'runner':"):
-                    updated_content.append(f"'runner': '{new_runner}'\n")
-                else:
-                    updated_content.append(line)
-
-            # Write the updated content back to the file
-            with open(script_path, "w") as file:
-                file.writelines(updated_content)
-
-            print(f"Updated runner in {script_path} to {new_runner}")
-
-        except Exception as e:
-            print(f"Error updating script path: {e}")
 
 
     def get_do_not_bundle_directories(self):
@@ -6999,197 +6817,6 @@ class WineCharmApp(Adw.Application):
 
         return True
 
-    def change_runner(self, script, script_key, *args):
-        self.print_method_name()
-        """
-        Display a dialog to change the runner for the given script.
-        """
-        self.selected_script = script
-        self.selected_script_key = script_key
-
-        # Gather valid runners (existing logic remains the same)
-        all_runners = self.get_valid_runners(self.runners_dir, is_bundled=False)
-        wineprefix = Path(script).parent
-        prefix_runners_dir = wineprefix / "Runner"
-        all_runners.extend(self.get_valid_runners(prefix_runners_dir, is_bundled=True))
-        
-        # Add System Wine (existing logic remains the same)
-        system_wine_display, _ = self.get_system_wine()
-        if system_wine_display:
-            all_runners.insert(0, (system_wine_display, ""))
-
-        if not all_runners:
-            self.show_no_runners_available_dialog()
-            return
-
-        # Create AlertDialog
-        dialog = Adw.AlertDialog(
-            heading="Change Runner",
-            body="Select a runner for the script:"
-        )
-
-        # Create DropDown with StringList model
-        display_names = [display for display, _ in all_runners]
-        model = Gtk.StringList.new(display_names)
-        dropdown = Gtk.DropDown(model=model)
-        
-        # Determine current runner
-        current_runner = self.script_list.get(script_key, {}).get('runner', '')
-        if current_runner:
-            current_runner = os.path.abspath(os.path.expanduser(current_runner))
-
-        # Set initial selection
-        runner_paths = [path for _, path in all_runners]
-        try:
-            selected_index = runner_paths.index(current_runner)
-        except ValueError:
-            selected_index = 0  # Fallback to first item if not found
-
-        dropdown.set_selected(selected_index)
-
-        # Create download button
-        download_button = Gtk.Button(
-            icon_name="emblem-downloads-symbolic",
-            tooltip_text="Download Runner"
-        )
-        download_button.connect("clicked", lambda btn: self.on_download_runner_clicked(dialog))
-
-        # Create layout
-        hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        hbox.append(dropdown)
-        hbox.append(download_button)
-        
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        content_box.append(hbox)
-        dialog.set_extra_child(content_box)
-
-        # Configure dialog buttons
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("ok", "OK")
-        dialog.set_default_response("ok")
-        dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
-
-        # Connect response handler
-        dialog.connect("response", self.on_change_runner_response, dropdown, all_runners, script_key)
-        dialog.present(self.window)
-
-    def on_change_runner_response(self, dialog, response_id, dropdown, all_runners, script_key):
-        self.print_method_name()
-        """Handle runner selection response"""
-        if response_id == "ok":
-            selected_idx = dropdown.get_selected()
-            if 0 <= selected_idx < len(all_runners):
-                new_display, new_path = all_runners[selected_idx]
-                # System Wine handling and update logic remains the same
-                new_value = '' if "System Wine" in new_display else new_path
-                script_data = self.script_list.get(script_key, {})
-                script_data['runner'] = self.replace_home_with_tilde_in_path(new_value)
-                
-                try:
-                    with open(Path(str(script_data['script_path'])).expanduser(), 'w') as f:
-                        yaml.dump(script_data, f, default_style="'", default_flow_style=False, width=10000)
-                    print(f"Updated runner to {new_display}")
-                except Exception as e:
-                    print(f"Update error: {e}")
-                    self.show_info_dialog("Update Failed", str(e))
-        dialog.close()
-
-
-    def get_valid_runners(self, runners_dir, is_bundled=False):
-        self.print_method_name()
-        """
-        Get a list of valid runners from a given directory.
-
-        Args:
-            runners_dir: Path to the directory containing runner subdirectories.
-            is_bundled: Boolean indicating if these runners are from a wineprefix/Runner directory.
-
-        Returns:
-            List of tuples: (display_name, runner_path).
-        """
-        valid_runners = []
-        try:
-            for runner_dir in runners_dir.iterdir():
-                runner_path = runner_dir / "bin/wine"
-                if runner_path.exists() and self.validate_runner(runner_path):
-                    display_name = runner_dir.name
-                    if is_bundled:
-                        display_name += " (Bundled)"
-                    valid_runners.append((display_name, str(runner_path)))
-        except FileNotFoundError:
-            print(f"{runners_dir} not found. Ignoring.")
-        return valid_runners
-
-    def validate_runner(self, wine_binary):
-        self.print_method_name()
-        """
-        Validate the Wine runner by checking if `wine --version` executes successfully.
-
-        Args:
-            wine_binary: Path to the wine binary.
-
-        Returns:
-            True if the runner works, False otherwise.
-        """
-        try:
-            result = subprocess.run([str(wine_binary), "--version"], capture_output=True, text=True, timeout=5)
-            return result.returncode == 0
-        except Exception as e:
-            print(f"Error validating runner {wine_binary}: {e}")
-            return False
-
-
-
-    def on_download_runner_clicked(self, dialog):
-        self.print_method_name()
-        """
-        Handle the "Download Runner" button click from the change_runner dialog.
-        """
-        dialog.close()
-        # Pass the callback method to handle the completion
-        self.on_settings_download_runner_clicked(callback=self.on_download_complete)
-
-    def on_download_complete(self):
-        """
-        Callback method to handle the completion of the runner download.
-        Reopens the change_runner dialog.
-        """
-        # Reopen the change_runner dialog after the download complete dialog is closed
-        self.change_runner(self.selected_script, self.selected_script_key)
-
-    def get_system_wine(self):
-        self.print_method_name()
-        """
-        Check if System Wine is available and return its version.
-        """
-        try:
-            result = subprocess.run(["wine", "--version"], capture_output=True, text=True, check=True)
-            version = result.stdout.strip()
-            return f"System Wine ({version})", ""
-        except subprocess.CalledProcessError:
-            print("System Wine not available.")
-            return None, None
-
-    def show_no_runners_available_dialog(self):
-        self.print_method_name()
-        """
-        Show a dialog when no runners are available, prompting the user to download one.
-        """
-        dialog = Adw.AlertDialog(
-            heading="No Runners Available",
-            body="No Wine runners were found. Please download a runner to proceed."
-        )
-
-        # Add dialog responses (buttons)
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("download", "Download Runner")
-        dialog.set_response_appearance("download", Adw.ResponseAppearance.SUGGESTED)
-        dialog.set_default_response("download")
-
-        # Connect response handler
-        dialog.connect("response", lambda d, r: self.on_download_runner_clicked_default(d) if r == "download" else None)
-        
-        dialog.present(self.window)
 
             
     def rename_prefix_directory(self, script, script_key, *args):
@@ -7549,20 +7176,6 @@ class WineCharmApp(Adw.Application):
             return "Unknown (Error occurred)"
 
 #########   ######
-    def replace_open_button_with_settings(self):
-        self.print_method_name()
-        # Remove existing click handler from open button only if it exists
-        if hasattr(self, 'open_button_handler_id') and self.open_button_handler_id is not None:
-            self.open_button.disconnect(self.open_button_handler_id)
-        
-        self.set_open_button_label("Settings")
-        self.set_open_button_icon_visible(False)
-        
-        # Connect new click handler
-        self.open_button_handler_id = self.open_button.connect(
-            "clicked",
-            lambda btn: print("Settings clicked")
-        )
 
 
     def restore_open_button(self):
@@ -7579,829 +7192,11 @@ class WineCharmApp(Adw.Application):
             self.on_open_button_clicked
         )
 
-    def show_options_for_settings(self, action=None, param=None):
-        self.print_method_name()
-        """
-        Display the settings options with search functionality using existing search mechanism.
-        """
-        # Add accelerator context for settings view
-        self.setup_accelerator_context()
 
-        self.search_button.set_active(False)
-        # Ensure the search button is visible and the search entry is cleared
-        self.search_button.set_visible(True)
-        self.search_entry.set_text("")
-        self.main_frame.set_child(None)
 
-        # Create a scrolled window for settings options
-        scrolled_window = Gtk.ScrolledWindow()
-        scrolled_window.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scrolled_window.set_vexpand(True)
 
-        self.settings_flowbox = Gtk.FlowBox()
-        self.settings_flowbox.set_valign(Gtk.Align.START)
-        self.settings_flowbox.set_halign(Gtk.Align.FILL)
-        self.settings_flowbox.set_max_children_per_line(4)
-        self.settings_flowbox.set_selection_mode(Gtk.SelectionMode.NONE)
-        self.settings_flowbox.set_vexpand(True)
-        self.settings_flowbox.set_hexpand(True)
-        scrolled_window.set_child(self.settings_flowbox)
 
-        self.main_frame.set_child(scrolled_window)
-
-        # Store settings options as instance variable for filtering
-        self.settings_options = [
-            ("Runner Set Default", "runner-set-default-symbolic", self.set_default_runner),
-            ("Runner Download", "runner-download-symbolic", self.on_settings_download_runner_clicked),
-            ("Runner Import", "runner-import-symbolic", self.import_runner),
-            ("Runner Backup", "runner-backup-symbolic", self.backup_runner),
-            ("Runner Restore", "runner-restore-symbolic", self.restore_runner),
-            ("Runner Delete", "runner-delete-symbolic", self.delete_runner),
-            ("Template Set Default", "template-default-symbolic", self.set_default_template),
-            ("Template Configure", "template-configure-symbolic", self.configure_template),
-            ("Template Terminal", "template-terminal-symbolic", self.open_terminal_winecharm),
-            ("Template Import", "template-import-symbolic", self.import_template),
-            ("Template Create", "template-create-symbolic", self.create_template),
-            ("Template Clone", "template-clone-symbolic", self.clone_template),
-            ("Template Backup", "template-backup-symbolic", self.backup_template),
-            ("Template Restore", "template-restore-symbolic", self.restore_template_from_backup),
-            ("Template Delete", "template-delete-symbolic", self.delete_template),
-            ("Set Wine Arch", "set-wine-arch-symbolic", self.set_wine_arch),
-            ("Single Prefix Mode", "single-prefix-mode-symbolic", self.single_prefix_mode),
-        ]
-
-        # Initial population of options
-        self.populate_settings_options()
-
-        # Hide unnecessary UI components
-        self.menu_button.set_visible(False)
-        self.view_toggle_button.set_visible(False)
-
-        if self.back_button.get_parent() is None:
-            self.headerbar.pack_start(self.back_button)
-        self.back_button.set_visible(True)
-
-        self.replace_open_button_with_settings()
-        self.selected_row = None
-
-    def populate_settings_options(self, filter_text=""):
-        self.print_method_name()
-        """
-        Populate the settings flowbox with filtered options.
-        """
-        # Clear existing options using GTK4's method
-        while child := self.settings_flowbox.get_first_child():
-            self.settings_flowbox.remove(child)
-
-        # Add filtered options
-        filter_text = filter_text.lower()
-        for label, icon_name, callback in self.settings_options:
-            if filter_text in label.lower():
-                option_button = Gtk.Button()
-                option_button.set_size_request(-1, 40)
-                option_button.add_css_class("flat")
-                option_button.add_css_class("normal-font")
-
-                option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-                option_button.set_child(option_hbox)
-
-                option_icon = Gtk.Image.new_from_icon_name(icon_name)
-                option_label = Gtk.Label(label=label)
-                option_label.set_xalign(0)
-                option_label.set_hexpand(True)
-                option_label.set_ellipsize(Pango.EllipsizeMode.END)
-                option_hbox.append(option_icon)
-                option_hbox.append(option_label)
-
-                self.settings_flowbox.append(option_button)
-                option_button.connect("clicked", lambda btn, cb=callback: cb())
-
-#####################  single prefix mode
-
-    def single_prefix_mode(self):
-        self.print_method_name()
-        dialog = Adw.AlertDialog(
-            heading="Single Prefix Mode",
-            body="Choose prefix mode for new games:\nSingle prefix saves space but makes it harder to backup individual games."
-        )
-
-        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-        
-        # Create radio buttons with fresh state
-        single_prefix_radio = Gtk.CheckButton(label="Single Prefix Mode")
-        multiple_prefix_radio = Gtk.CheckButton(label="Multiple Prefix Mode")
-        multiple_prefix_radio.set_group(single_prefix_radio)
-        
-        # Always refresh from settings before showing dialog
-        self.load_settings()  # Ensure latest values
-        current_state = self.single_prefix
-        single_prefix_radio.set_active(current_state)
-        multiple_prefix_radio.set_active(not current_state)
-
-        vbox.append(single_prefix_radio)
-        vbox.append(multiple_prefix_radio)
-        dialog.set_extra_child(vbox)
-
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("apply", "Apply")
-        dialog.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
-        dialog.set_default_response("cancel")
-
-        def on_response(dialog, response):
-            self.print_method_name()
-            if response == "apply":
-                new_state = single_prefix_radio.get_active()
-                if new_state != current_state:
-                    self.handle_prefix_mode_change(new_state)
-            dialog.close()
-
-        dialog.connect("response", on_response)
-        dialog.present(self.window)
-
-    def handle_prefix_mode_change(self, new_state):
-        self.print_method_name()
-        previous_state = self.single_prefix
-        self.single_prefix = new_state
-        
-        try:
-            # Determine architecture-specific paths
-            template_dir = (self.default_template_win32 if self.arch == 'win32' 
-                            else self.default_template_win64)
-            single_dir = (self.single_prefix_dir_win32 if self.arch == 'win32'
-                        else self.single_prefix_dir_win64)
-
-            # Initialize template if needed
-            if not template_dir.exists():
-                self.initialize_template(template_dir, 
-                                    lambda: self.finalize_prefix_mode_change(single_dir),
-                                    arch=self.arch)
-            else:
-                self.finalize_prefix_mode_change(single_dir)
-                
-            self.save_settings()
-            print(f"Prefix mode changed to {'Single' if new_state else 'Multiple'}")
-            
-        except Exception as e:
-            print(f"Error changing prefix mode: {e}")
-            self.single_prefix = previous_state  # Rollback on error
-            self.save_settings()
-            self.show_error_dialog("Mode Change Failed", str(e))
-        
-        finally:
-            self.set_dynamic_variables()
-
-    def finalize_prefix_mode_change(self, single_dir):
-        self.print_method_name()
-        if self.single_prefix:
-            if not single_dir.exists():
-                print("Creating single prefix copy...")
-                self.copy_template(single_dir)
-        else:
-            print("Reverting to multiple prefixes")
-##################### / single prefix mode
-
     # Implement placeholders for each setting's callback function
-    def set_default_runner(self, action=None):
-        self.print_method_name()
-        """
-        Display a dialog to set the default runner for the application.
-        Updates the Settings.yaml file.
-        """
-        # Gather valid runners
-        all_runners = self.get_valid_runners(self.runners_dir, is_bundled=False)
-
-        # Add System Wine to the list if available
-        system_wine_display, _ = self.get_system_wine()
-        if system_wine_display:
-            all_runners.insert(0, (system_wine_display, ""))
-
-        if not all_runners:
-            self.show_no_runners_available_dialog()
-            return
-
-        # Get default runner from settings
-        settings = self.load_settings()
-        default_runner = os.path.abspath(os.path.expanduser(settings.get('runner', '')))
-
-        # Build runner paths list
-        runner_paths_in_list = [
-            os.path.abspath(os.path.expanduser(rp)) for _, rp in all_runners
-        ]
-
-        # Validate default runner
-        if default_runner and default_runner not in runner_paths_in_list:
-            if self.validate_runner(default_runner):
-                runner_name = Path(default_runner).parent.name
-                all_runners.append((f"{runner_name} (from settings)", default_runner))
-            else:
-                print(f"Invalid default runner: {default_runner}")
-                default_runner = ''
-
-        # Create widgets
-        runner_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        
-        # Create StringList and populate it
-        runner_list = Gtk.StringList()
-        combo_runner_paths = []
-        for display_name, runner_path in all_runners:
-            runner_list.append(display_name)
-            combo_runner_paths.append(os.path.abspath(os.path.expanduser(runner_path)))
-
-        # Create factory with proper item rendering
-        factory = Gtk.SignalListItemFactory()
-        factory.connect("setup", self._on_dropdown_factory_setup)
-        factory.connect("bind", self._on_dropdown_factory_bind)
-
-        # Find selected index
-        selected_index = next((i for i, rp in enumerate(combo_runner_paths) if rp == default_runner), 0)
-
-        # Create dropdown with factory
-        runner_dropdown = Gtk.DropDown(
-            model=runner_list,
-            factory=factory,
-            selected=selected_index
-        )
-        runner_dropdown.set_hexpand(True)
-
-        # Create download button
-        download_button = Gtk.Button(
-            icon_name="emblem-downloads-symbolic",
-            tooltip_text="Download Runner"
-        )
-        download_button.connect("clicked", lambda btn: self.on_download_runner_clicked_default(dialog))
-
-        # Assemble widgets
-        runner_hbox.append(runner_dropdown)
-        runner_hbox.append(download_button)
-        
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        content_box.append(runner_hbox)
-
-        # Create and configure dialog
-        dialog = Adw.AlertDialog(
-            heading="Set Default Runner",
-            body="Select the default runner for the application:",
-            extra_child=content_box
-        )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("ok", "OK")
-        dialog.props.default_response = "ok"
-        dialog.props.close_response = "cancel"
-
-        # Connect signals
-        dialog.connect("response", self.on_set_default_runner_response, runner_dropdown, all_runners)
-        dialog.present(self.window)
-
-    def _on_dropdown_factory_setup(self, factory, list_item):
-        self.print_method_name()
-        """Setup factory items for the dropdown"""
-        label = Gtk.Label()
-        label.set_xalign(0)
-        label.set_margin_start(6)
-        label.set_margin_end(6)
-        list_item.set_child(label)
-
-    def _on_dropdown_factory_bind(self, factory, list_item):
-        self.print_method_name()
-        """Bind data to factory items"""
-        label = list_item.get_child()
-        string_obj = list_item.get_item()
-        if string_obj and isinstance(string_obj, Gtk.StringObject):
-            label.set_label(string_obj.get_string())
-
-    def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, all_runners):
-        self.print_method_name()
-        if response_id == "ok":
-            selected_index = runner_dropdown.get_selected()
-            if selected_index == Gtk.INVALID_LIST_POSITION:
-                print("No runner selected.")
-                return
-
-            new_runner_display, new_runner_path = all_runners[selected_index]
-            print(f"Selected new default runner: {new_runner_display} -> {new_runner_path}")
-
-            # Check architecture compatibility for non-system runners
-            if new_runner_path:  # Skip check for System Wine
-                runner_path = Path(new_runner_path).expanduser().resolve().parent.parent
-                
-                print(f"runner_path = {runner_path}")
-                # Determine runner architecture
-                if (runner_path / "bin/wine64").exists():
-                    runner_arch = "win64"
-                elif (runner_path / "bin/wine").exists():
-                    runner_arch = "win32"
-                else:
-                    self.show_info_dialog(
-                        "Invalid Runner",
-                        "Selected runner is missing Wine binaries (bin/wine or bin/wine64)"
-                    )
-                    return
-
-                # Get template architecture from settings
-                template_arch = self.settings.get("arch", "win64")
-                
-                # Check for 32-bit runner with 64-bit template
-                if template_arch == "win64" and runner_arch == "win32":
-                    self.show_info_dialog(
-                        "Architecture Mismatch",
-                        "Cannot use 32-bit runner with 64-bit template.\n\n"
-                        f"Template: {self.template} ({template_arch})\n"
-                        f"Runner: {new_runner_path} ({runner_arch})"
-                    )
-                    return
-
-            # Update settings
-            new_runner_value = "" if new_runner_display.startswith("System Wine") else new_runner_path
-            self.settings["runner"] = self.replace_home_with_tilde_in_path(new_runner_value)
-            self.save_settings()
-
-            # Provide feedback
-            confirmation_message = f"The default runner has been set to {new_runner_display}"
-            if new_runner_path:
-                confirmation_message += f" ({runner_arch})"
-            self.show_info_dialog("Default Runner Updated", confirmation_message)
-        else:
-            print("Set default runner canceled.")
-
-    def on_download_runner_clicked_default(self, dialog):
-        self.print_method_name()
-        """
-        Handle the "Download Runner" button click from the set_default_runner dialog.
-        """
-        dialog.close()
-        # Start the download process with the appropriate callback
-        self.on_settings_download_runner_clicked(callback=self.on_download_complete_default_runner)
-
-    def on_download_complete_default_runner(self):
-        self.print_method_name()
-        """
-        Callback method to handle the completion of the runner download.
-        Reopens the set_default_runner dialog.
-        """
-        # Reopen the set_default_runner dialog after the download completes
-        self.set_default_runner()
-
-
-
-    def maybe_fetch_runner_urls(self):
-        self.print_method_name()
-        """
-        Fetch the runner URLs only if the cache is older than 1 day or missing.
-        """
-        if self.cache_is_stale():
-            print("Cache is stale or missing. Fetching new runner data.")
-            runner_data = self.fetch_runner_urls_from_github()
-            if runner_data:
-                self.save_runner_data_to_cache(runner_data)
-            else:
-                print("Failed to fetch runner data.")
-        else:
-            print("Using cached runner data.")
-
-        # Load runner data into memory
-        self.runner_data = self.load_runner_data_from_cache()
-
-    def cache_is_stale(self):
-        self.print_method_name()
-        """
-        Check if the cache file is older than 24 hours or missing.
-        """
-        if not self.runner_cache_file.exists():
-            return True  # Cache file doesn't exist
-
-        # Get the modification time of the cache file
-        mtime = self.runner_cache_file.stat().st_mtime
-        last_modified = datetime.fromtimestamp(mtime)
-        now = datetime.now()
-
-        # Check if it's older than 1 day
-        return (now - last_modified) > timedelta(hours=1)
-
-    def fetch_runner_urls_from_github(self):
-        self.print_method_name()
-        """
-        Fetch the runner URLs dynamically from the GitHub API.
-        """
-        url = "https://api.github.com/repos/Kron4ek/Wine-Builds/releases"
-        try:
-            with urllib.request.urlopen(url) as response:
-                if response.status != 200:
-                    print(f"Failed to fetch runner URLs: {response.status}")
-                    return None
-
-                # Parse the response JSON
-                release_data = json.loads(response.read().decode('utf-8'))
-                return self.parse_runner_data(release_data)
-
-        except Exception as e:
-            print(f"Error fetching runner URLs: {e}")
-            return None
-
-    def parse_runner_data(self, release_data):
-        self.print_method_name()
-        """
-        Parse runner data from the GitHub API response.
-        """
-        categories = {
-            "proton": [],
-            "stable": [],
-            "devel": [],
-            "tkg": [],
-            "wow64": []
-        }
-
-        for release in release_data:
-            for asset in release.get('assets', []):
-                download_url = asset.get('browser_download_url')
-                if download_url and download_url.endswith(".tar.xz"):
-                    category = self.get_runner_category(download_url)
-                    if category:
-                        categories[category].append({
-                            "name": download_url.split('/')[-1].replace(".tar.xz", ""),
-                            "url": download_url
-                        })
-        return categories
-
-    def get_runner_category(self, url):
-        #self.print_method_name()
-        """
-        Determine the category of the runner based on its URL.
-        """
-        stable_pattern = r"/\d+\.0/"
-        if "proton" in url:
-            return "proton"
-        elif "wow64" in url:
-            return "wow64"
-        elif "tkg" in url:
-            return "tkg"
-        elif "staging" in url:
-            return "devel"
-        elif re.search(stable_pattern, url):
-            return "stable"
-        else:
-            return "devel"
-
-    def save_runner_data_to_cache(self, runner_data):
-        self.print_method_name()
-        """
-        Save the runner data to the cache file in YAML format.
-        """
-        try:
-            with open(self.runner_cache_file, 'w') as f:
-                yaml.dump(runner_data, f, default_style="'", default_flow_style=False, width=10000)
-            print(f"Runner data cached to {self.runner_cache_file}")
-        except Exception as e:
-            print(f"Error saving runner data to cache: {e}")
-
-    def load_runner_data_from_cache(self):
-        self.print_method_name()
-        """
-        Load runner data from the cache file.
-        """
-        try:
-            with open(self.runner_cache_file, 'r') as f:
-                return yaml.safe_load(f)
-        except Exception as e:
-            print(f"Error loading runner data from cache: {e}")
-            return None
-
-#### RUNNER download issue with progress and cancel    
-    def on_settings_download_runner_clicked(self, callback=None):
-        self.print_method_name()
-        """
-        Handle the "Runner Download" option click.
-        Use the cached runners loaded at startup, or notify if not available.
-        """
-        if not self.runner_data:
-            self.show_info_dialog(
-                "Runner data not available",
-                "Please try again in a moment or restart the application."
-            )
-            if callback:
-                GLib.idle_add(callback)
-            return
-
-        # Create selection dialog using Adw.AlertDialog
-        dialog = Adw.AlertDialog(
-            heading="Download Wine Runner",
-            body="Select the runners you wish to download."
-        )
-
-        # Dialog content setup
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        dialog.set_extra_child(content_box)
-
-        # Dropdown setup
-        dropdown_data = [
-            ("Wine Proton", self.runner_data.get("proton", [])),
-            ("Wine Stable", self.runner_data.get("stable", [])),
-            ("Wine Devel", self.runner_data.get("devel", [])),
-            ("Wine-tkg", self.runner_data.get("tkg", [])),
-            ("Wine-WoW64", self.runner_data.get("wow64", []))
-        ]
-
-        combo_boxes = {}
-        for label_text, file_list in dropdown_data:
-            hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-            label = Gtk.Label(label=label_text, xalign=0, width_chars=12)
-            
-            # Create dropdown with StringList model
-            names = ["Choose..."] + [file['name'] for file in file_list]
-            model = Gtk.StringList.new(names)
-            dropdown = Gtk.DropDown(model=model)
-            dropdown.set_selected(0)
-            
-            combo_boxes[label_text] = {"dropdown": dropdown, "file_list": file_list}
-            hbox.append(label)
-            hbox.append(dropdown)
-            content_box.append(hbox)
-
-        # Configure dialog buttons
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("download", "Download")
-        dialog.set_default_response("download")
-        dialog.set_close_response("cancel")
-
-        dialog.connect("response", self.on_download_runner_response, combo_boxes, callback)
-        dialog.present(self.window)
-
-    def on_download_runner_response(self, dialog, response_id, combo_boxes, callback=None):
-        self.print_method_name()
-        """Handle response from runner selection dialog."""
-        if response_id == "download":
-            selected_runners = {}
-            for label, data in combo_boxes.items():
-                dropdown = data['dropdown']
-                file_list = data['file_list']
-                selected_pos = dropdown.get_selected()
-                
-                if selected_pos != 0:
-                    model = dropdown.get_model()
-                    selected_name = model.get_string(selected_pos)
-                    selected_runner = next((r for r in file_list if r['name'] == selected_name), None)
-                    if selected_runner:
-                        selected_runners[label] = selected_runner
-
-            if selected_runners:
-                # Create progress dialog
-                progress_dialog = Adw.AlertDialog(
-                    heading="Downloading Runners",
-                    body=""
-                )
-                
-                # Progress UI setup
-                content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-                progress_dialog.set_extra_child(content_box)
-                
-                progress_label = Gtk.Label(label="Starting download...")
-                runner_progress_bar = Gtk.ProgressBar()
-                total_progress_bar = Gtk.ProgressBar()
-                
-                content_box.append(progress_label)
-                content_box.append(runner_progress_bar)
-                
-                total_runners = len(selected_runners)
-                if total_runners > 1:
-                    content_box.append(total_progress_bar)
-                else:
-                    total_progress_bar.set_visible(False)
-
-                # Add cancel button
-                progress_dialog.add_response("cancel", "Cancel")
-                progress_dialog.set_close_response("cancel")
-                
-                cancel_event = threading.Event()
-                progress_dialog.connect("response", 
-                    lambda d, r: cancel_event.set() if r == "cancel" else None
-                )
-                
-                progress_dialog.present(self.window)
-
-                # Start download thread
-                threading.Thread(
-                    target=self.download_runners_thread,
-                    args=(selected_runners, progress_dialog, total_progress_bar,
-                        runner_progress_bar, progress_label, callback, cancel_event),
-                    daemon=True
-                ).start()
-            else:
-                if callback:
-                    GLib.idle_add(callback)
-        else:
-            if callback:
-                GLib.idle_add(callback)
-
-    def download_runners_thread(self, selected_runners, progress_dialog, total_progress_bar,
-                                runner_progress_bar, progress_label, callback, cancel_event):
-        self.print_method_name()
-        total_runners = len(selected_runners)
-        download_success = True
-        current_file = None
-        was_cancelled = False
-
-        # Throttle UI updates
-        last_update_time = 0
-        update_interval = 250  # ms
-
-        def update_progress(label_text, runner_fraction, total_fraction):
-            nonlocal last_update_time
-            current_time = GLib.get_monotonic_time() // 1000  # ms
-            if current_time - last_update_time >= update_interval:
-                GLib.idle_add(progress_label.set_text, label_text)
-                GLib.idle_add(runner_progress_bar.set_fraction, min(1.0, runner_fraction))
-                if total_runners > 1:
-                    GLib.idle_add(total_progress_bar.set_fraction, min(1.0, total_fraction))
-                last_update_time = current_time
-
-        try:
-            for idx, (label, runner) in enumerate(selected_runners.items()):
-                if cancel_event.is_set():
-                    download_success = False
-                    was_cancelled = True
-                    break
-
-                current_file = self.runners_dir / f"{runner['name']}.tar.xz"
-                update_progress(f"Downloading {runner['name']} ({idx + 1}/{total_runners})...", 0.0, idx / total_runners)
-
-                try:
-                    self.download_and_extract_runner(
-                        runner['name'],
-                        runner['url'],
-                        lambda p: update_progress(
-                            f"Downloading {runner['name']} ({idx + 1}/{total_runners})...",
-                            p,
-                            idx / total_runners + p / total_runners
-                        ),
-                        cancel_event
-                    )
-                except Exception as e:
-                    download_success = False
-                    if "cancelled" in str(e).lower():
-                        was_cancelled = True
-                        break
-                    else:
-                        GLib.idle_add(
-                            lambda: self.show_info_dialog(
-                                "Download Error",
-                                f"Failed to download {runner['name']}: {e}"
-                            )
-                        )
-
-                if total_runners > 1:
-                    update_progress(f"Finished {runner['name']}", 1.0, (idx + 1) / total_runners)
-
-            if download_success and total_runners > 1:
-                update_progress("Download Complete", 1.0, 1.0)
-
-        finally:
-            if current_file and current_file.exists():
-                current_file.unlink(missing_ok=True)
-
-            def finalize_ui(title, message):
-                GLib.idle_add(
-                    lambda: progress_dialog.close() if progress_dialog.get_mapped() else None
-                )
-                GLib.timeout_add(100, lambda: self.show_info_dialog(
-                    title,
-                    message,
-                    callback=callback if callback else None
-                ))
-
-            if was_cancelled:
-                finalize_ui(
-                    "Download Cancelled",
-                    "The download was cancelled. Partially downloaded files have been deleted."
-                )
-            elif download_success:
-                finalize_ui(
-                    "Download Complete",
-                    f"Successfully downloaded {total_runners} runner{'s' if total_runners > 1 else ''}."
-                )
-            else:
-                finalize_ui(
-                    "Download Incomplete",
-                    "Some runners failed to download."
-                )
-
-    def download_and_extract_runner(self, runner_name, download_url, progress_callback, cancel_event):
-        self.print_method_name()
-        """Download and extract runner with cancellation support and throttled updates."""
-        runner_tar_path = self.runners_dir / f"{runner_name}.tar.xz"
-        self.runners_dir.mkdir(parents=True, exist_ok=True)
-
-        last_progress = 0
-        progress_threshold = 0.05  # Update every 5%
-
-        try:
-            with urllib.request.urlopen(download_url) as response:
-                total_size = int(response.headers.get('Content-Length', 0))
-                downloaded = 0
-                
-                with open(runner_tar_path, 'wb') as f:
-                    while True:
-                        if cancel_event.is_set():
-                            raise Exception("Download cancelled by user")
-                        
-                        chunk = response.read(4096)  # 4KB chunks
-                        if not chunk:
-                            break
-                        
-                        f.write(chunk)
-                        downloaded += len(chunk)
-                        
-                        if cancel_event.is_set():
-                            raise Exception("Download cancelled by user")
-                        
-                        if total_size > 0 and progress_callback:
-                            progress = downloaded / total_size
-                            if progress - last_progress >= progress_threshold or progress >= 1.0:
-                                progress_callback(progress)
-                                last_progress = progress
-
-            # Extract asynchronously to avoid blocking
-            process = subprocess.Popen(
-                ["tar", "-xf", str(runner_tar_path), "-C", str(self.runners_dir)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
-            stdout, stderr = process.communicate()
-            if process.returncode != 0:
-                raise Exception(f"Extraction failed: {stderr.decode()}")
-
-            runner_tar_path.unlink()
-
-        except Exception as e:
-            if runner_tar_path.exists():
-                runner_tar_path.unlink()
-            raise  # Re-raise to handle in download_runners_thread 
-
-#### /RUNNER download issue with progress and cancel        
-    def delete_runner(self, action=None):
-        self.print_method_name()
-        """
-        Allow the user to delete a selected runner using modern Adw.AlertDialog and DropDown.
-        """
-        # Get valid runners
-        all_runners = self.get_valid_runners(self.runners_dir, is_bundled=False)
-        if not all_runners:
-            self.show_info_dialog("No Runners Available", "No runners found to delete.")
-            return
-
-        # Create AlertDialog
-        dialog = Adw.AlertDialog(
-            heading="Delete Runner",
-            body="Select a runner to delete:"
-        )
-
-        # Create DropDown with StringList model
-        display_names = [display_name for display_name, _ in all_runners]
-        model = Gtk.StringList.new(display_names)
-        dropdown = Gtk.DropDown(model=model)
-        dropdown.set_selected(0)
-
-        # Build directory paths list
-        runner_dirs = [os.path.join(self.runners_dir, name) for name, _ in all_runners]
-
-        # Add dropdown to dialog content
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        content_box.append(dropdown)
-        dialog.set_extra_child(content_box)
-
-        # Configure dialog buttons
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("delete", "Delete")
-        dialog.set_default_response("delete")
-        dialog.set_close_response("cancel")
-
-        # Connect response handler
-        dialog.connect("response", self.on_delete_runner_response, dropdown, runner_dirs)
-        dialog.present(self.window)
-
-    def on_delete_runner_response(self, dialog, response_id, dropdown, runner_dirs):
-        self.print_method_name()
-        """Handle delete dialog response with proper DropDown integration."""
-        if response_id == "delete":
-            selected_idx = dropdown.get_selected()
-            if 0 <= selected_idx < len(runner_dirs):
-                target_dir = runner_dirs[selected_idx]
-                try:
-                    if os.path.isdir(target_dir):
-                        shutil.rmtree(target_dir)
-                        self.show_info_dialog(
-                            "Deletion Successful",
-                            f"Runner '{os.path.basename(target_dir)}' was successfully deleted."
-                        )
-                    else:
-                        raise FileNotFoundError(f"Directory not found: {target_dir}")
-                except Exception as e:
-                    self.show_info_dialog(
-                        "Deletion Error",
-                        f"Failed to delete runner: {str(e)}"
-                    )
-            else:
-                self.show_info_dialog("Invalid Selection", "No valid runner selected.")
-
-        dialog.close()
 
     def set_wine_arch(self):
         self.print_method_name()
@@ -8492,317 +7287,11 @@ class WineCharmApp(Adw.Application):
         dialog.present(self.window)
         
 ################
-    def backup_runner(self, action=None):
-        self.print_method_name()
-        """
-        Allow the user to backup a runner.
-        """
-        # Gather valid runners from runners_dir
-        all_runners = self.get_valid_runners(self.runners_dir, is_bundled=False)
 
-        # If no runners are available, show a message
-        if not all_runners:
-            self.show_info_dialog("No Runners Available", "No runners found to backup.")
-            return
-
-        # Create the AlertDialog
-        dialog = Adw.AlertDialog(
-            heading="Backup Runner",
-            body="Select a runner to backup:"
-        )
-
-        # Create the DropDown for runners
-        display_names = [display_name for display_name, _ in all_runners]
-        model = Gtk.StringList.new(display_names)
-        dropdown = Gtk.DropDown(model=model)
-        dropdown.set_selected(0)
-        combo_runner_paths = [os.path.abspath(os.path.expanduser(runner_path)) for _, runner_path in all_runners]
-
-        # Add the DropDown to the content box
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        content_box.append(dropdown)
-
-        # Configure dialog buttons
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("ok", "OK")
-        dialog.set_default_response("ok")
-        dialog.set_close_response("cancel")
-        dialog.set_extra_child(content_box)
-
-        dialog.connect("response", self.on_backup_runner_response, dropdown, combo_runner_paths)
-        dialog.present(self.window)
-
-    def on_backup_runner_response(self, dialog, response_id, dropdown, combo_runner_paths):
-        self.print_method_name()
-        if response_id == "ok":
-            selected_index = dropdown.get_selected()
-            if selected_index < 0 or selected_index >= len(combo_runner_paths):
-                print("No runner selected.")
-                self.show_info_dialog("No Runner Selected", "Please select a runner to backup.")
-                dialog.close()
-                return
-            runner_path = combo_runner_paths[selected_index]
-            model = dropdown.get_model()
-            runner_name = model.get_string(selected_index)
-            print(f"Selected runner to backup: {runner_name} -> {runner_path}")
-
-            # Present a Gtk.FileDialog to select the destination to save the backup archive
-            file_dialog = Gtk.FileDialog.new()
-            file_dialog.set_initial_name(f"{runner_name}.tar.zst")
-
-            # Create file filters
-            file_filter = Gtk.FileFilter()
-            file_filter.set_name("Tarball archives (*.tar.gz, *.tar.xz, *.tar.zst)")
-            file_filter.add_pattern("*.tar.gz")
-            file_filter.add_pattern("*.tar.xz")
-            file_filter.add_pattern("*.tar.zst")
-
-            # Create a Gio.ListStore to hold the filters
-            filter_list_store = Gio.ListStore.new(Gtk.FileFilter)
-            filter_list_store.append(file_filter)
-
-            # Set the filters on the dialog
-            file_dialog.set_filters(filter_list_store)
-
-            # Define the callback for when the file dialog is closed
-            def on_save_file_dialog_response(dialog, result):
-                self.print_method_name()
-                try:
-                    save_file = dialog.save_finish(result)
-                    if save_file:
-                        destination_path = save_file.get_path()
-                        print(f"Backup destination selected: {destination_path}")
-                        # Start the backup process in a separate thread
-                        threading.Thread(target=self.create_runner_backup, args=(runner_path, destination_path)).start()
-                        self.show_info_dialog("Backup Complete", f"Runner backup saved to {destination_path}.")
-                except GLib.Error as e:
-                    if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
-                        print(f"An error occurred: {e}")
-
-            # Show the save dialog
-            file_dialog.save(self.window, None, on_save_file_dialog_response)
-        else:
-            print("Backup runner canceled.")
-
-        dialog.close()
-
-
-    def create_runner_backup(self, runner_path, destination_path):
-        self.print_method_name()
-        """
-        Create a backup archive of the runner at runner_path, saving it to destination_path.
-        """
-        try:
-            # Determine the compression based on the file extension
-            ext = os.path.splitext(destination_path)[1]
-            if ext == ".gz":
-                compression_option = "-z"  # gzip
-            elif ext == ".xz":
-                compression_option = "-J"  # xz
-            elif ext == ".zst":
-                compression_option = "--zstd"  # zstd
-            else:
-                compression_option = ""  # no compression
-
-            # Use pathlib.Path for path manipulations
-            runner_path = Path(runner_path)
-            runner_dir = runner_path.parent.parent # Get the parent directory of the runner binary
-            runner_name = runner_dir.name  # Get the name of the runner directory
-            print(f"Creating backup of runner: {runner_name} from {runner_dir} to {destination_path}")
-
-            # Use tar to create the archive
-            tar_command = ["tar"]
-            if compression_option:
-                tar_command.append(compression_option)
-            tar_command.extend(["-cvf", destination_path, "-C", str(self.runners_dir), runner_name])
-
-            print(f"Running tar command: {' '.join(tar_command)}")
-
-            subprocess.run(tar_command, check=True)
-
-            print("Backup created successfully.")
-        except Exception as e:
-            print(f"Error creating runner backup: {e}")
-            # Show error dialog from the main thread
-            GLib.idle_add(self.show_info_dialog, "Backup Error", f"Failed to create runner backup: {e}")
-########### Restore RUnner
-    def restore_runner(self, action=None):
-        self.print_method_name()
-        """
-        Allow the user to restore a runner from a backup archive.
-        """
-        # Present a Gtk.FileDialog to select the archive file
-        file_dialog = Gtk.FileDialog.new()
-
-        # Create file filters
-        file_filter = Gtk.FileFilter()
-        file_filter.set_name("Tarball archives (*.tar.gz, *.tar.xz, *.tar.zst)")
-        file_filter.add_pattern("*.tar.gz")
-        file_filter.add_pattern("*.tar.xz")
-        file_filter.add_pattern("*.tar.zst")
-
-        # Create a Gio.ListStore to hold the filters
-        filter_list_store = Gio.ListStore.new(Gtk.FileFilter)
-        filter_list_store.append(file_filter)
-
-        # Set the filters on the dialog
-        file_dialog.set_filters(filter_list_store)
-
-        # Define the callback for when the file dialog is closed
-        def on_open_file_dialog_response(dialog, result):
-            self.print_method_name()
-            try:
-                file = dialog.open_finish(result)
-                if file:
-                    archive_path = file.get_path()
-                    print(f"Selected archive to restore: {archive_path}")
-
-                    # Check if the archive contains bin/wine
-                    if self.archive_contains_wine(archive_path):
-                        # Start the extraction in a separate thread
-                        threading.Thread(target=self.extract_runner_archive, args=(archive_path,)).start()
-                        self.show_info_dialog("Restore Complete", "Runner restored successfully.")
-                    else:
-                        print("Selected archive does not contain a valid runner.")
-                        self.show_info_dialog("Invalid Archive", "The selected archive does not contain a valid runner.")
-            except GLib.Error as e:
-                if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
-                    print(f"An error occurred: {e}")
-
-        # Show the open dialog
-        file_dialog.open(self.window, None, on_open_file_dialog_response)
-
-    def extract_runner_archive(self, archive_path):
-        self.print_method_name()
-        """
-        Extract the runner archive to runners_dir.
-        """
-        try:
-            # Ensure the runners directory exists
-            self.runners_dir.mkdir(parents=True, exist_ok=True)
-
-            # Use tar to extract the archive
-            tar_command = ["tar", "-xvf", archive_path, "-C", str(self.runners_dir)]
-            print(f"Running tar command: {' '.join(tar_command)}")
-            subprocess.run(tar_command, check=True)
-
-            print("Runner restored successfully.")
-        except Exception as e:
-            print(f"Error extracting runner archive: {e}")
-            # Show error dialog from the main thread
-            GLib.idle_add(self.show_info_dialog, "Restore Error", f"Failed to restore runner: {e}")
-
-
-    def archive_contains_wine(self, archive_path):
-        self.print_method_name()
-        """
-        Check if the archive contains bin/wine.
-        """
-        try:
-            # Use tar -tf to list the contents
-            tar_command = ["tar", "-tf", archive_path]
-            result = subprocess.run(tar_command, check=True, capture_output=True, text=True)
-            file_list = result.stdout.splitlines()
-            for file in file_list:
-                if "bin/wine" in file:
-                    return True
-            return False
-        except Exception as e:
-            print(f"Error checking archive contents: {e}")
-            return False
 ######################################################### Initiazlie template and import directory imrpovement
 
 
 
-    def on_cancel_template_init_clicked(self, button):
-        self.print_method_name()
-        """
-        Handle cancel button click during template initialization
-        """
-        dialog = Adw.AlertDialog(
-            title="Cancel Initialization",
-            body="Do you want to cancel the template initialization process?"
-        )
-        dialog.add_response("continue", "Continue")
-        dialog.add_response("cancel", "Cancel Initialization")
-        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
-        dialog.connect("response", self.on_cancel_template_init_dialog_response)
-        dialog.present(self.window)
-
-    def on_cancel_template_init_dialog_response(self, dialog, response):
-        self.print_method_name()
-        """
-        Handle cancel dialog response for template initialization
-        """
-        if response == "cancel":
-            self.stop_processing = True
-        dialog.close()
-
-    def cleanup_cancelled_template_init(self, template_dir):
-        self.print_method_name()
-        """
-        Clean up after template initialization is cancelled, create a basic template,
-        and update settings.yml
-        """
-        template_dir = Path(template_dir) if not isinstance(template_dir, Path) else template_dir
-        
-        try:
-            if template_dir.exists():
-                shutil.rmtree(template_dir)
-                print(f"Removed incomplete template directory: {template_dir}")
-            
-            # Create the directory
-            template_dir.mkdir(parents=True, exist_ok=True)
-                
-            # Initialize basic wineprefix with minimal setup
-            basic_steps = [
-                ("Creating basic wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-                ("Setting up directories", lambda: self.remove_symlinks_and_create_directories(template_dir))
-            ]
-            
-            for step_text, command in basic_steps:
-                GLib.idle_add(self.show_initializing_step, step_text)
-                try:
-                    if callable(command):
-                        command()
-                    else:
-                        subprocess.run(command, shell=True, check=True)
-                    GLib.idle_add(self.mark_step_as_done, step_text)
-                except Exception as e:
-                    print(f"Error during basic template setup: {e}")
-                    raise
-                    
-            print("Initialized basic wineprefix")
-            
-            # Update template in settings
-            self.template = template_dir
-            self.save_settings()
-            print(f"Updated settings with new template path: {template_dir}")
-            
-        except Exception as e:
-            print(f"Error during template cleanup: {e}")
-        finally:
-            self.initializing_template = False
-            self.stop_processing = False
-            GLib.idle_add(self.reset_ui_after_template_init)
-            self.show_info_dialog("Basic Template Created", 
-                        "A basic template was created and settings were updated. Some features may be limited.")
-
-
-    def reset_ui_after_template_init(self):
-        self.print_method_name()
-        """
-        Reset UI elements after template initialization and show confirmation
-        """
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)
-        self.hide_processing_spinner()
-        
-        if self.open_button_handler_id is not None:
-            self.open_button.disconnect(self.open_button_handler_id)
-            self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
-        
-        self.flowbox.remove_all()
 
 
 
@@ -9792,661 +8281,12 @@ class WineCharmApp(Adw.Application):
 
 
 ##################################################################################### 
-    def get_template_arch(self, template_path):
-        self.print_method_name()
-        """Extract architecture from template's system.reg file"""
-        system_reg = Path(template_path) / "system.reg"
-        if not system_reg.exists():
-            return "win64"  # Default assumption
+
         
-        try:
-            with open(system_reg, "r") as f:
-                for line in f:
-                    if line.startswith("#arch="):
-                        return line.strip().split("=")[1].lower()
-        except Exception as e:
-            print(f"Error reading {system_reg}: {e}")
-        
-        return "win64"  # Fallback if not found
-
-    def set_default_template(self, action=None):
-        self.print_method_name()
-        """Set default template with architecture auto-detection and update"""
-        # Collect templates with architecture info
-        templates = []
-        for template_dir in self.templates_dir.iterdir():
-            if template_dir.is_dir() and (template_dir / "system.reg").exists():
-                arch = self.get_template_arch(template_dir)
-                display_name = f"{template_dir.name} ({arch.upper()})"
-                templates.append((display_name, str(template_dir.resolve()), arch))
-
-        # Add default templates if they exist
-        default_templates = [
-            (self.default_template_win64, "win64"),
-            (self.default_template_win32, "win32")
-        ]
-        for dt_path, dt_arch in default_templates:
-            if dt_path.exists() and not any(str(dt_path) == t[1] for t in templates):
-                display_name = f"{dt_path.name} ({dt_arch.upper()})"
-                templates.append((display_name, str(dt_path.resolve()), dt_arch))
-
-        if not templates:
-            self.show_info_dialog("No Templates", "No valid templates found.")
-            return
-
-        # Create dropdown list
-        template_list = Gtk.StringList()
-        current_template = self.expand_and_resolve_path(self.settings.get('template', ""))
-        current_index = 0
-        
-        # Sort templates and find current selection
-        sorted_templates = sorted(templates, key=lambda x: x[0].lower())
-        for i, (display, path, arch) in enumerate(sorted_templates):
-            template_list.append(display)
-            if Path(path) == current_template:
-                current_index = i
-
-        dropdown = Gtk.DropDown(model=template_list, selected=current_index)
-        dropdown.set_hexpand(True)
-
-        # Dialog layout
-        content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        content.append(Gtk.Label(label="Select template:"))
-        content.append(dropdown)
-
-        dialog = Adw.AlertDialog(
-            heading="Set Default Template",
-            body="Template architecture will be set automatically",
-            extra_child=content
-        )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("ok", "Save")
-        dialog.set_default_response("ok")
-
-        def on_response(dialog, response_id):
-            self.print_method_name()
-            if response_id == "ok":
-                selected_idx = dropdown.get_selected()
-                if selected_idx != Gtk.INVALID_LIST_POSITION:
-                    # Get selected template data
-                    display_name, template_path, arch = sorted_templates[selected_idx]
-                    
-                    # Update settings
-                    self.settings['template'] = self.replace_home_with_tilde_in_path(template_path)
-                    self.settings['arch'] = arch
-                    
-                    # Update instance variables
-                    self.template = Path(template_path).resolve()
-                    self.arch = arch
-                    
-                    self.save_settings()
-                    
-                    self.show_info_dialog(
-                        "Template Updated",
-                        f"Set default template to:\n{display_name}\n"
-                        f"Architecture: {arch.upper()}"
-                    )
-        dialog.connect("response", on_response)
-        dialog.present(self.window)
-
-############# Delete template
-    def delete_template(self, action=None):
-        self.print_method_name()
-        """Delete a template directory with safety checks and settings updates"""
-        self.load_settings()  # Ensure fresh settings
-        current_arch = self.settings.get('arch', 'win64')
-        self.template = self.settings.get('template', self.default_template_win64)
-        print("-="*50)
-        # Resolve default template paths for current architecture
-        default_templates = {
-            'win64': self.default_template_win64.expanduser().resolve(),
-            'win32': self.default_template_win32.expanduser().resolve()
-        }
-        current_default = default_templates[current_arch]
-
-        # Collect templates with architecture info
-        templates = []
-        for template_dir in self.templates_dir.iterdir():
-            tpl_path = template_dir.resolve()
-            if template_dir.is_dir() and (template_dir / "system.reg").exists():
-                arch = self.get_template_arch(template_dir)
-                display_name = f"{template_dir.name} ({arch.upper()})"
-                is_current_default = (tpl_path == current_default)
-                templates.append((display_name, tpl_path, arch, is_current_default))
-
-        if not templates:
-            self.show_info_dialog("No Templates", "No templates found to delete.")
-            return
-
-        # Create dialog components
-        dialog = Adw.AlertDialog(
-            heading="Delete Template",
-            body="Select a template to permanently delete:"
-        )
-
-        # Create dropdown with template names
-        model = Gtk.StringList.new([name for name, _, _, _ in templates])
-        dropdown = Gtk.DropDown(model=model)
-        dropdown.set_selected(0)
-
-        # Add to dialog content
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        content_box.append(dropdown)
-        dialog.set_extra_child(content_box)
-
-        # Configure dialog buttons
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("delete", "Delete")
-        dialog.set_default_response("delete")
-
-        def on_response(dialog, response_id, dropdown, templates):
-            self.print_method_name()
-            if response_id == "delete":
-                selected_idx = dropdown.get_selected()
-                if 0 <= selected_idx < len(templates):
-                    display_name, template_path, template_arch, is_current_default = templates[selected_idx]
-                    
-                    # Immediate prevention checks
-                    if is_current_default:
-                        self.show_info_dialog(
-                            "Protected Template",
-                            f"Cannot delete the active / default {current_arch} template!\n"
-                            "Switch architectures / template first to delete this template."
-                        )
-                        return
-
-                    # Deletion execution
-                    def perform_deletion():
-                        try:
-                            shutil.rmtree(template_path)
-                            # Clear settings reference if needed
-                            if self.settings.get('template', '') == str(template_path):
-                                self.settings['template'] = ''
-                                self.save_settings()
-                            self.show_info_dialog("Deleted", f"Removed: {display_name}")
-                        except Exception as e:
-                            self.show_info_dialog("Error", f"Deletion failed: {str(e)}")
-
-                    # Additional confirmation for non-default templates
-                    confirm_dialog = Adw.AlertDialog(
-                        heading="Confirm Deletion",
-                        body=f"Permanently delete:\n{display_name}?"
-                    )
-                    confirm_dialog.add_response("cancel", "Keep")
-                    confirm_dialog.add_response("delete", "Delete Forever")
-                    confirm_dialog.connect("response", 
-                        lambda d, r: perform_deletion() if r == "delete" else None
-                    )
-                    confirm_dialog.present(self.window)
-
-            dialog.close()
-
-        dialog.connect("response", on_response, dropdown, templates)
-        dialog.present(self.window)
-
-################## import template
-    def import_template(self, action=None, param=None):
-        self.print_method_name()
-        """Import a Wine directory as a template into the templates directory."""
-        file_dialog = Gtk.FileDialog.new()
-        file_dialog.set_modal(True)
-        file_dialog.select_folder(self.window, None, self.on_import_template_response)
-
-    def on_import_template_response(self, dialog, result):
-        self.print_method_name()
-        try:
-            folder = dialog.select_folder_finish(result)
-            if folder:
-                src = Path(folder.get_path())
-                if not (src / "system.reg").exists():
-                    GLib.idle_add(self.show_info_dialog, "Invalid Template", 
-                                "Selected directory is not a valid Wine prefix")
-                    return
-
-                template_name = src.name
-                dst = self.templates_dir / template_name
-                backup_dir = self.templates_dir / f"{template_name}_backup_{int(time.time())}"
-
-                steps = [
-                    ("Verifying template", lambda: self.verify_template_source(src)),
-                    ("Backing up existing template", lambda: self.backup_existing_directory(dst, backup_dir)),
-                    ("Copying template files", lambda: self.custom_copytree(src, dst)),
-                    ("Processing registry files", lambda: self.process_reg_files(dst)),
-                    ("Standardizing user directories", lambda: self.rename_and_merge_user_directories(dst)),
-                    ("Cleaning template files", lambda: self.clean_template_files(dst)),
-                ]
-
-                self.show_processing_spinner(f"Importing {template_name}")
-                self.connect_open_button_with_import_wine_directory_cancel()
-                threading.Thread(target=self.process_template_import, args=(steps, dst, backup_dir)).start()
-
-        except GLib.Error as e:
-            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
-                print(f"Template import error: {e}")
-
-    def process_template_import(self, steps, dst, backup_dir):
-        self.print_method_name()
-        """Handle template import with error handling and rollback"""
-        self.stop_processing = False
-        self.total_steps = len(steps)
-        
-        try:
-            for index, (step_text, step_func) in enumerate(steps, 1):
-                if self.stop_processing:
-                    raise Exception("Operation cancelled by user")
-                    
-                GLib.idle_add(self.show_initializing_step, step_text)
-                step_func()
-                GLib.idle_add(self.mark_step_as_done, step_text)
-                GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
-
-            GLib.idle_add(self.show_info_dialog, "Success", 
-                        f"Template '{dst.name}' imported successfully")
-            self.cleanup_backup(backup_dir)
-
-        except Exception as e:
-            GLib.idle_add(self.handle_template_import_error, dst, backup_dir, str(e))
-            
-        finally:
-            GLib.idle_add(self.on_import_template_directory_completed)
-
-    def verify_template_source(self, src):
-        self.print_method_name()
-        """Validate the source directory contains a valid Wine prefix"""
-        required_files = ["system.reg", "userdef.reg", "dosdevices"]
-        missing = [f for f in required_files if not (src / f).exists()]
-        if missing:
-            raise Exception(f"Missing required Wine files: {', '.join(missing)}")
-
-    def clean_template_files(self, template_path):
-        self.print_method_name()
-        """Remove unnecessary files from the template"""
-        # Remove any existing charm files
-        for charm_file in template_path.glob("*.charm"):
-            charm_file.unlink()
-        
-        # Clean desktop files
-        applications_dir = template_path / "drive_c/users" / os.getenv("USER") / "Desktop"
-        if applications_dir.exists():
-            for desktop_file in applications_dir.glob("*.desktop"):
-                desktop_file.unlink()
-
-    def handle_template_import_error(self, dst, backup_dir, error_msg):
-        self.print_method_name()
-        """Handle template import errors and cleanup"""
-        try:
-            if dst.exists():
-                shutil.rmtree(dst)
-            if backup_dir.exists():
-                backup_dir.rename(dst)
-        except Exception as e:
-            error_msg += f"\nCleanup error: {str(e)}"
-        
-        self.show_info_dialog("Template Import Failed", error_msg)
-    
-    def on_import_template_directory_completed(self):
-        self.print_method_name()
-        """
-        Called when the template import process is complete. Updates UI, restores scripts, and resets the open button.
-        """
-        # Reconnect open button and reset its label
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)
-        
-        self.hide_processing_spinner()
-
-        # This will disconnect open_button handler, use this then reconnect the open
-        #if self.open_button_handler_id is not None:
-        #    self.open_button.disconnect(self.open_button_handler_id)
-
-        self.reconnect_open_button()
-        self.show_options_for_settings()
-        print("Template directory import completed.")
-        
-##################### Import runner
-    def import_runner(self, action=None, param=None):
-        self.print_method_name()
-        """Import a Wine runner into the runners directory."""
-        file_dialog = Gtk.FileDialog.new()
-        file_dialog.set_modal(True)
-        file_dialog.select_folder(self.window, None, self.on_import_runner_response)
-
-    def on_import_runner_response(self, dialog, result):
-        self.print_method_name()
-        try:
-            folder = dialog.select_folder_finish(result)
-            if folder:
-                src = Path(folder.get_path())
-                if not self.verify_runner_source(src):
-                    GLib.idle_add(self.show_info_dialog, "Invalid Runner", 
-                                "Selected directory is not a valid Wine runner")
-                    return
-
-                runner_name = src.name
-                dst = self.runners_dir / runner_name
-                backup_dir = self.runners_dir / f"{runner_name}_backup_{int(time.time())}"
-
-                steps = [
-                    ("Verifying runner", lambda: self.verify_runner_binary(src)),
-                    ("Backing up existing runner", lambda: self.backup_existing_directory(dst, backup_dir)),
-                    ("Copying runner files", lambda: self.custom_copytree(src, dst)),
-                    ("Validating installation", lambda: self.validate_runner(dst / "bin/wine")),
-                    ("Setting permissions", lambda: self.set_runner_permissions(dst)),
-                ]
-
-                self.show_processing_spinner(f"Importing {runner_name}")
-                self.connect_open_button_with_import_wine_directory_cancel()
-                threading.Thread(target=self.process_runner_import, args=(steps, dst, backup_dir)).start()
-
-        except GLib.Error as e:
-            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
-                print(f"Runner import error: {e}")
-
-    def process_runner_import(self, steps, dst, backup_dir):
-        self.print_method_name()
-        """Handle runner import with error handling and rollback"""
-        self.stop_processing = False
-        self.total_steps = len(steps)
-        
-        try:
-            for index, (step_text, step_func) in enumerate(steps, 1):
-                if self.stop_processing:
-                    raise Exception("Operation cancelled by user")
-                    
-                GLib.idle_add(self.show_initializing_step, step_text)
-                step_func()
-                GLib.idle_add(self.mark_step_as_done, step_text)
-                GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
-
-            GLib.idle_add(self.show_info_dialog, "Success", 
-                        f"Runner '{dst.name}' imported successfully")
-            self.cleanup_backup(backup_dir)
-            GLib.idle_add(self.refresh_runner_list)
-
-        except Exception as e:
-            GLib.idle_add(self.handle_runner_import_error, dst, backup_dir, str(e))
-            
-        finally:
-            GLib.idle_add(self.on_import_runner_directory_completed)
-
-    def verify_runner_source(self, src):
-        self.print_method_name()
-        """Validate the source directory contains a valid Wine runner"""
-        wine_binary = src / "bin/wine"
-        return wine_binary.exists() and self.validate_runner(wine_binary)
-
-    def verify_runner_binary(self, src):
-        self.print_method_name()
-        """Explicit validation check for the runner binary"""
-        wine_binary = src / "bin/wine"
-        if not wine_binary.exists():
-            raise Exception("Missing Wine binary (bin/wine)")
-        if not self.validate_runner(wine_binary):
-            raise Exception("Wine binary validation failed")
-
-    def set_runner_permissions(self, runner_path):
-        self.print_method_name()
-        """Set executable permissions for critical runner files"""
-        wine_binary = runner_path / "bin/wine"
-        wineserver = runner_path / "bin/wineserver"
-        
-        try:
-            wine_binary.chmod(0o755)
-            wineserver.chmod(0o755)
-            for bin_file in (runner_path / "bin").glob("*"):
-                if bin_file.is_file():
-                    bin_file.chmod(0o755)
-        except Exception as e:
-            print(f"Warning: Could not set permissions - {e}")
-
-    def handle_runner_import_error(self, dst, backup_dir, error_msg):
-        self.print_method_name()
-        """Handle runner import errors and cleanup"""
-        try:
-            if dst.exists():
-                shutil.rmtree(dst)
-            if backup_dir.exists():
-                backup_dir.rename(dst)
-        except Exception as e:
-            error_msg += f"\nCleanup error: {str(e)}"
-        
-        self.show_info_dialog("Runner Import Failed", error_msg)
-
-    def on_import_runner_directory_completed(self):
-        self.print_method_name()
-        """Finalize runner import UI updates"""
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)
-        self.hide_processing_spinner()
-        self.reconnect_open_button()
-        self.show_options_for_settings()
-        print("Runner import process completed.")
-
-    def refresh_runner_list(self):
-        self.print_method_name()
-        """Refresh the runner list in settings UI"""
-        if hasattr(self, 'runner_dropdown'):
-            all_runners = self.get_all_runners()
-            string_objs = [Gtk.StringObject.new(r[0]) for r in all_runners]
-            self.runner_dropdown.set_model(Gtk.StringList.new([r[0] for r in all_runners]))
 
 ########################## fix default runner to handle arch difference
 
 
-##### Template Backup
-    def backup_template(self, action=None):
-        self.print_method_name()
-        """
-        Allow the user to backup a template with interruptible process.
-        """
-        all_templates = [t.name for t in self.templates_dir.iterdir() if t.is_dir()]
-        if not all_templates:
-            self.show_info_dialog("No Templates Available", "No templates found to backup.")
-            return
-
-        dialog = Adw.AlertDialog(
-            heading="Backup Template",
-            body="Select a template to backup:"
-        )
-        model = Gtk.StringList.new(all_templates)
-        dropdown = Gtk.DropDown(model=model)
-        dropdown.set_selected(0)
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        content_box.append(dropdown)
-
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("ok", "OK")
-        dialog.set_default_response("ok")
-        dialog.set_close_response("cancel")
-        dialog.set_extra_child(content_box)
-
-        dialog.connect("response", self.on_backup_template_response, dropdown, all_templates)
-        dialog.present(self.window)
-
-    def on_backup_template_response(self, dialog, response_id, dropdown, templates):
-        self.print_method_name()
-        if response_id == "ok":
-            selected_index = dropdown.get_selected()
-            if 0 <= selected_index < len(templates):
-                template_name = templates[selected_index]
-                template_path = self.templates_dir / template_name
-
-                file_dialog = Gtk.FileDialog.new()
-                file_dialog.set_initial_name(f"{template_name}.template")
-                file_filter = Gtk.FileFilter()
-                file_filter.set_name("Template Archives")
-                file_filter.add_pattern("*.template")
-                filters = Gio.ListStore.new(Gtk.FileFilter)
-                filters.append(file_filter)
-                file_dialog.set_filters(filters)
-
-                def on_save_response(dlg, result):
-                    try:
-                        save_file = dlg.save_finish(result)
-                        if save_file:
-                            dest_path = save_file.get_path()
-                            threading.Thread(
-                                target=self.create_template_backup,
-                                args=(template_path, dest_path)
-                            ).start()
-                    except GLib.Error as e:
-                        if e.domain == 'gtk-dialog-error-quark' and e.code == 2:
-                            print("Backup Template Cancelled!")
-                            return
-                        print(f"Backup Template failedfailed: {e}")
-
-                file_dialog.save(self.window, None, on_save_response)
-        dialog.close()
-
-    def create_template_backup(self, template_path, dest_path):
-        self.print_method_name()
-        """
-        Create compressed template archive using zstd compression with interruptible progress.
-        """
-        self.stop_processing = False
-        self.current_backup_path = dest_path
-        usershome = os.path.expanduser('~')
-        current_username = os.getenv("USER") or os.getenv("USERNAME")
-        if not current_username:
-            raise Exception("Unable to determine the current username from the environment.")
-        find_replace_pairs = {usershome: '~', f'\'{usershome}': '\'~\''}
-        find_replace_media_username = {f'/media/{current_username}/': '/media/%USERNAME%/'}
-        restore_media_username = {'/media/%USERNAME%/': f'/media/{current_username}/'}
-
-        def perform_backup_steps():
-            self.print_method_name()
-            try:
-                steps = [
-                    (f"Replace \"{usershome}\" with '~' in files", lambda: self.replace_strings_in_files(template_path, find_replace_pairs)),
-                    ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(template_path)),
-                    (f"Replace \"/media/{current_username}\" with '/media/%USERNAME%' in files", lambda: self.replace_strings_in_files(template_path, find_replace_media_username)),
-                    ("Creating backup archive", lambda: run_backup()),
-                    ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(template_path)),
-                    (f"Revert %USERNAME% with \"{current_username}\" in script files", lambda: self.replace_strings_in_files(template_path, restore_media_username)),
-                ]
-
-                self.total_steps = len(steps)
-                
-                for step_text, step_func in steps:
-                    if self.stop_processing:
-                        GLib.idle_add(self.cleanup_cancelled_template_backup)
-                        return
-
-                    GLib.idle_add(self.show_initializing_step, step_text)
-                    try:
-                        # Run step and handle output
-                        step_func()
-                        if self.stop_processing:
-                            GLib.idle_add(self.cleanup_cancelled_template_backup)
-                            return
-                        GLib.idle_add(self.mark_step_as_done, step_text)
-                    except Exception as e:
-                        if not self.stop_processing:
-                            GLib.idle_add(self.show_info_dialog, "Backup Failed", 
-                                        f"Error during '{step_text}': {e}")
-                        GLib.idle_add(self.cleanup_cancelled_template_backup)
-                        return
-
-                GLib.idle_add(self.show_info_dialog, "Backup Complete", 
-                            f"Template saved to {dest_path}")
-            finally:
-                GLib.idle_add(self.hide_processing_spinner)
-                GLib.idle_add(self.revert_open_button)
-
-        def run_backup():
-            self.print_method_name()
-            if self.stop_processing:
-                raise Exception("Operation cancelled by user")
-
-            cmd = [
-                'tar',
-                '-I', 'zstd -T0',
-                '--transform', f"s|{template_path.name}/drive_c/users/{current_username}|{template_path.name}/drive_c/users/%USERNAME%|g",
-                '-cvf', dest_path,
-                '-C', str(template_path.parent),
-                template_path.name
-            ]
-
-            # Start process with piped output
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                universal_newlines=True
-            )
-
-            # Start output reader thread
-            def read_output():
-                self.print_method_name()
-                while True:
-                    output = process.stdout.readline()
-                    if output == '' and process.poll() is not None:
-                        break
-                    if output:
-                        print(output.strip())
-
-            output_thread = threading.Thread(target=read_output)
-            output_thread.start()
-
-            # Monitor process with periodic checks
-            while process.poll() is None:
-                if self.stop_processing:
-                    process.terminate()
-                    try:
-                        process.wait(timeout=2)
-                        if Path(dest_path).exists():
-                            Path(dest_path).unlink()
-                    except subprocess.TimeoutExpired:
-                        process.kill()
-                    raise Exception("Backup cancelled by user")
-                time.sleep(0.1)
-
-            output_thread.join()
-
-            if process.returncode != 0 and not self.stop_processing:
-                raise Exception(f"Backup failed with code {process.returncode}")
-
-        self.show_processing_spinner("Exporting...")
-        self.connect_cancel_button_for_template_backup()
-        threading.Thread(target=perform_backup_steps, daemon=True).start()
-
-    def connect_cancel_button_for_template_backup(self):
-        self.print_method_name()
-        if hasattr(self, 'open_button_handler_id') and self.open_button_handler_id is not None:
-            self.open_button.disconnect(self.open_button_handler_id)
-        self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_template_backup_clicked)
-        self.set_open_button_label("Cancel")
-        self.set_open_button_icon_visible(False)
-
-    def on_cancel_template_backup_clicked(self, button):
-        self.print_method_name()
-        dialog = Adw.AlertDialog(
-            heading="Cancel Backup",
-            body="Do you want to cancel the template backup process?"
-        )
-        dialog.add_response("continue", "Continue")
-        dialog.add_response("cancel", "Cancel Backup")
-        dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
-        dialog.connect("response", self.on_cancel_template_backup_dialog_response)
-        dialog.present(self.window)
-
-    def on_cancel_template_backup_dialog_response(self, dialog, response):
-        self.print_method_name()
-        if response == "cancel":
-            self.stop_processing = True
-        dialog.close()
-
-    def cleanup_cancelled_template_backup(self):
-        self.print_method_name()
-        try:
-            if hasattr(self, 'current_backup_path') and self.current_backup_path and Path(self.current_backup_path).exists():
-                Path(self.current_backup_path).unlink()
-        except Exception as e:
-            print(f"Error deleting partial backup file: {e}")
-        finally:
-            self.hide_processing_spinner()
-            self.show_info_dialog("Cancelled", "Template backup was cancelled")
-            self.revert_open_button()
 
     def revert_open_button(self):
         self.print_method_name()
@@ -10459,440 +8299,14 @@ class WineCharmApp(Adw.Application):
         print("Template created successfully")
     
 
-#################### NEW RESTORE template like restore wzt
-    def restore_template_from_backup(self, action=None, param=None):
-        self.print_method_name()
-        # Step 1: Create required directories if needed
-        self.create_required_directories()
 
-        # Step 2: Create a new Gtk.FileDialog instance
-        file_dialog = Gtk.FileDialog.new()
-
-        # Step 3: Create file filter for .wzt files only
-        file_filter_wzt = Gtk.FileFilter()
-        file_filter_wzt.set_name("WineCharm Template Files (*.template)")
-        file_filter_wzt.add_pattern("*.template")
-
-        # Step 4: Set the filter on the dialog
-        filter_model = Gio.ListStore.new(Gtk.FileFilter)
-        filter_model.append(file_filter_wzt)  # Only WZT files for templates
-        file_dialog.set_filters(filter_model)
-
-        # Step 5: Open the dialog and handle the response
-        file_dialog.open(self.window, None, self.on_restore_template_file_dialog_response)
-
-    def on_restore_template_file_dialog_response(self, dialog, result):
-        self.print_method_name()
-        try:
-            file = dialog.open_finish(result)
-            if file:
-                file_path = file.get_path()
-                print(f"Selected template file: {file_path}")
-                self.restore_template_tar_zst(file_path)
-        except GLib.Error as e:
-            if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
-                print(f"An error occurred: {e}")
-
-    def restore_template_tar_zst(self, file_path):
-        self.print_method_name()
-        """
-        Restore a template from a .wzt backup file to the templates directory.
-        """
-        self.stop_processing = False
-        
-        try:
-            # Determine extracted template directory
-            extracted_template = self.extract_template_dir(file_path)
-            if not extracted_template:
-                raise Exception("Failed to determine template directory name")
-            
-            # Handle existing directory
-            backup_dir = None
-            if extracted_template.exists():
-                timestamp = int(time.time())
-                backup_dir = extracted_template.parent / f"{extracted_template.name}_backup_{timestamp}"
-                shutil.move(str(extracted_template), str(backup_dir))
-                print(f"Backed up existing template directory to: {backup_dir}")
-
-            # UI setup
-            GLib.idle_add(self.flowbox.remove_all)
-            self.show_processing_spinner("Restoring Template")
-            self.connect_open_button_with_restore_backup_cancel()
-
-            def restore_process():
-                self.print_method_name()
-                try:
-                    # Get WZT restore steps modified for templates
-                    restore_steps = self.get_template_restore_steps(file_path)
-
-                    for step_text, step_func in restore_steps:
-                        if self.stop_processing:
-                            # Handle cancellation by restoring backup
-                            if backup_dir and backup_dir.exists():
-                                if extracted_template.exists():
-                                    shutil.rmtree(extracted_template)
-                                shutil.move(str(backup_dir), str(extracted_template))
-                                print(f"Restored original template directory from: {backup_dir}")
-                            GLib.idle_add(self.on_template_restore_completed)
-                            return
-
-                        GLib.idle_add(self.show_initializing_step, step_text)
-                        try:
-                            step_func()
-                            GLib.idle_add(self.mark_step_as_done, step_text)
-                        except Exception as e:
-                            print(f"Error during step '{step_text}': {e}")
-                            # Restore backup on failure
-                            if backup_dir and backup_dir.exists():
-                                if extracted_template.exists():
-                                    shutil.rmtree(extracted_template)
-                                shutil.move(str(backup_dir), str(extracted_template))
-                            GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
-                            return
-
-                    # Cleanup backup after successful restore
-                    if backup_dir and backup_dir.exists():
-                        shutil.rmtree(backup_dir)
-                        print(f"Removed backup directory: {backup_dir}")
-
-                    GLib.idle_add(self.on_template_restore_completed)
-
-                except Exception as e:
-                    print(f"Error during template restore: {e}")
-                    if backup_dir and backup_dir.exists():
-                        if extracted_template.exists():
-                            shutil.rmtree(extracted_template)
-                        shutil.move(str(backup_dir), str(extracted_template))
-                    GLib.idle_add(self.show_info_dialog, "Error", f"Template restore failed: {str(e)}")
-
-            # Start restore thread
-            threading.Thread(target=restore_process).start()
-
-        except Exception as e:
-            print(f"Error initiating template restore: {e}")
-            GLib.idle_add(self.show_info_dialog, "Error", f"Failed to start template restore: {str(e)}")
-
-    def extract_template_backup(self, file_path):
-        self.print_method_name()
-        """
-        Extract template backup to templates directory with process management.
-        """
-        current_username = os.getenv("USER") or os.getenv("USERNAME")
-        if not current_username:
-            raise Exception("Unable to determine current username")
-
-        try:
-            # Create new process group
-            def preexec_function():
-                os.setpgrp()
-
-            # Get template name from archive
-            list_process = subprocess.Popen(
-                ['tar', '-tf', file_path],
-                stdout=subprocess.PIPE,
-                preexec_fn=preexec_function,
-                universal_newlines=True
-            )
-            
-            with self.process_lock:
-                self.current_process = list_process
-            
-            if self.stop_processing:
-                self._kill_current_process()
-                raise Exception("Operation cancelled by user")
-                
-            output, _ = list_process.communicate()
-            extracted_template_name = output.splitlines()[0].split('/')[0]
-            extracted_template_dir = Path(self.templates_dir) / extracted_template_name
-
-            print(f"Extracting template to: {extracted_template_dir}")
-
-            # Extract archive
-            extract_process = subprocess.Popen(
-                ['tar', '-xf', file_path, '-C', self.templates_dir,
-                "--transform", rf"s|XOUSERXO|{current_username}|g", 
-                "--transform", rf"s|%USERNAME%|{current_username}|g"],
-                preexec_fn=preexec_function
-            )
-            
-            with self.process_lock:
-                self.current_process = extract_process
-
-            while extract_process.poll() is None:
-                if self.stop_processing:
-                    print("Cancelling template extraction...")
-                    self._kill_current_process()
-                    if extracted_template_dir.exists():
-                        shutil.rmtree(extracted_template_dir, ignore_errors=True)
-                    raise Exception("Operation cancelled by user")
-                time.sleep(0.1)
-
-            if extract_process.returncode != 0:
-                raise Exception(f"Template extraction failed with code {extract_process.returncode}")
-
-            return extracted_template_dir
-
-        except Exception as e:
-            print(f"Template extraction error: {e}")
-            if "Operation cancelled by user" not in str(e):
-                raise
-            return None
-        finally:
-            with self.process_lock:
-                self.current_process = None
-
-    def extract_template_dir(self, file_path):
-        self.print_method_name()
-        """
-        Determine template directory name from backup file.
-        """
-        try:
-            extracted_template_name = subprocess.check_output(
-                ["bash", "-c", f"tar -tf '{file_path}' | head -n2 | grep '/$' | head -n1 | cut -f1 -d '/'"]
-            ).decode('utf-8').strip()
-
-            if not extracted_template_name:
-                raise Exception("No directory found in template archive")
-
-            return Path(self.templates_dir) / extracted_template_name
-        
-        except subprocess.CalledProcessError as e:
-            print(f"Error extracting template directory: {e}")
-            return None
-        except Exception as e:
-            print(f"Error: {e}")
-            return None
-
-    def get_template_restore_steps(self, file_path):
-        self.print_method_name()
-        """
-        Return steps for template restore using WZT format.
-        """
-        return [
-            ("Checking Disk Space", lambda: self.check_template_disk_space(file_path)),
-            ("Extracting Template File", lambda: self.extract_template_backup(file_path)),
-            ("Processing Configuration Files", lambda: self.perform_replacements(self.extract_template_dir(file_path))),
-            ("Updating Shortcut List", lambda: self.find_and_save_lnk_files(self.extract_template_dir(file_path))),
-            ("Finalizing Template Structure", lambda: self.remove_symlinks_and_create_directories(self.extract_template_dir(file_path))),
-            ("Replace symbolic links with directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
-            ("Create Wineboot Required file", lambda: self.create_wineboot_required_file(self.extract_prefix_dir(file_path)))
-        ]
-
-    def check_template_disk_space(self, file_path):
-        self.print_method_name()
-        """
-        Check disk space in templates directory against backup size.
-        """
-        try:
-            # Get available space in templates directory
-            df_output = subprocess.check_output(['df', '--output=avail', str(self.templates_dir)]).decode().splitlines()[1]
-            available_space = int(df_output.strip()) * 1024  # Convert KB to bytes
-
-            # Get compressed size
-            compressed_size = Path(file_path).stat().st_size
-
-            # Quick check if compressed size is less than 1/4 available space
-            if compressed_size * 4 <= available_space:
-                print(f"Quick space check passed for template")
-                return True
-
-            # Full check with uncompressed size
-            uncompressed_size = self.get_total_uncompressed_size(file_path)
-            if available_space >= uncompressed_size:
-                print(f"Template disk space check passed")
-                return True
-            
-            # Show error if insufficient space
-            GLib.idle_add(
-                self.show_info_dialog, "Insufficient Space",
-                f"Need {uncompressed_size/(1024*1024):.1f}MB, only {available_space/(1024*1024):.1f}MB available."
-            )
-            return False
-
-        except subprocess.CalledProcessError as e:
-            print(f"Disk check error: {e}")
-            return False
-
-    def on_template_restore_completed(self):
-        self.print_method_name()
-        """
-        Cleanup after template restore completion.
-        """
-        self.hide_processing_spinner()
-        self.reconnect_open_button()
-        self.show_options_for_settings()
-        print("Template restore completed successfully")
-
-
-################ clone template
-    def clone_template(self, action=None):
-        self.print_method_name()
-        """
-        Allow the user to clone a template with an editable name suggestion.
-        """
-        all_templates = [t.name for t in self.templates_dir.iterdir() if t.is_dir()]
-        if not all_templates:
-            self.show_info_dialog("No Templates Available", "No templates found to clone.")
-            return
-
-        dialog = Adw.AlertDialog(
-            heading="Clone Template",
-            body="Select a template to clone and enter a new name:"
-        )
-
-        # Template selection dropdown
-        model = Gtk.StringList.new(all_templates)
-        dropdown = Gtk.DropDown(model=model)
-        dropdown.set_selected(0)
-
-        # Editable name entry with placeholder
-        entry = Gtk.Entry()
-        entry.set_placeholder_text("Set Template Clone Name")
-        entry.set_activates_default(True)
-        
-        # Connect signals
-        dropdown.connect("notify::selected", self.on_template_selected_for_clone, entry, all_templates)
-        entry.connect("changed", self.on_clone_name_changed, dropdown, all_templates)
-
-        # Container layout
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        content_box.append(dropdown)
-        content_box.append(entry)
-
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("ok", "OK")
-        dialog.set_default_response("ok")
-        dialog.set_close_response("cancel")
-        dialog.set_extra_child(content_box)
-
-        dialog.connect("response", self.on_clone_template_response, dropdown, entry, all_templates)
-        dialog.present(self.window)
-
-    def on_template_selected_for_clone(self, dropdown, _pspec, entry, templates):
-        self.print_method_name()
-        """Update entry text when template selection changes"""
-        selected_index = dropdown.get_selected()
-        if 0 <= selected_index < len(templates):
-            template_name = templates[selected_index]
-            new_name = f"{template_name} (clone)"
-            entry.set_text(new_name)
-            entry.set_position(len(new_name))  # Move cursor to end
-
-    def on_clone_name_changed(self, entry, dropdown, templates):
-        self.print_method_name()
-        """Real-time validation of clone name"""
-        new_name = entry.get_text().strip()
-        dest_path = self.templates_dir / new_name
-        
-        # Clear previous error styling
-        entry.remove_css_class("error")
-        
-        # Validate new name
-        if not new_name:
-            entry.add_css_class("error")
-        elif dest_path.exists():
-            entry.add_css_class("error")
-
-    def on_clone_template_response(self, dialog, response_id, dropdown, entry, templates):
-        self.print_method_name()
-        if response_id == "ok":
-            selected_index = dropdown.get_selected()
-            new_name = entry.get_text().strip()
-
-            if 0 <= selected_index < len(templates):
-                source_name = templates[selected_index]
-                source_path = self.templates_dir / source_name
-                dest_path = self.templates_dir / new_name
-
-                # Final validation
-                if not new_name:
-                    self.show_info_dialog("Invalid Name", "Please enter a name for the clone.")
-                    return
-                if dest_path.exists():
-                    self.show_info_dialog("Error", "A template with this name already exists.")
-                    return
-
-                # Start cloning process
-                self.show_processing_spinner("Cloning template...")
-                threading.Thread(
-                    target=self.perform_template_clone,
-                    args=(source_path, dest_path),
-                    daemon=True
-                ).start()
-
-        dialog.close()
-
-    def perform_template_clone(self, source_path, dest_path):
-        self.print_method_name()
-        """Perform the actual directory copy with error handling"""
-        try:
-            self.custom_copytree(source_path, dest_path)
-            GLib.idle_add(self.show_info_dialog, 
-                "Clone Successful", 
-                f"Successfully cloned to {dest_path.name}"
-            )
-        except Exception as e:
-            GLib.idle_add(self.show_info_dialog,
-                "Clone Error",
-                f"An error occurred: {str(e)}"
-            )
-        finally:
-            GLib.idle_add(self.on_template_restore_completed)
-
-########### Create Template
-    def create_template(self, action=None):
-        self.print_method_name()
-        dialog = Adw.AlertDialog(
-            heading="Create Template",
-            body="Enter a name and select architecture:"
-        )
-        content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        
-        entry = Gtk.Entry()
-        entry.set_placeholder_text("Template Name")
-        content_box.append(entry)
-        
-        radio_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        win32_radio = Gtk.CheckButton(label="32-bit (win32)")
-        win64_radio = Gtk.CheckButton(label="64-bit (win64)")
-        win64_radio.set_group(win32_radio)
-        win64_radio.set_active(True)
-        radio_box.append(win32_radio)
-        radio_box.append(win64_radio)
-        content_box.append(radio_box)
-        
-        dialog.set_extra_child(content_box)
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("ok", "OK")
-        dialog.set_default_response("ok")
-        
-        def on_response(dialog, response):
-            self.print_method_name()
-            if response == "ok":
-                name = entry.get_text().strip()
-                if not name:
-                    self.show_info_dialog("Invalid Name", "Please enter a valid name.")
-                else:
-                    arch = "win32" if win32_radio.get_active() else "win64"
-                    prefix_dir = self.templates_dir / name
-                    self.called_from_settings = True
-                    self.initialize_template(prefix_dir, callback=None, arch=arch)
-
-            dialog.close()
-        
-        dialog.connect("response", on_response)
-        dialog.present(self.window)
-
-
-    def configure_template(self, action=None):
-        pass
 
 
 ###################### 0.95
 
 
 
-    def process_winezgui_sh_files(self, action=None, param=None):
+    def process_winezgui_sh_files(self, action=None, param=None, prompt=None, suppress_no_scripts_dialog=False):
         self.print_method_name()
         """
         Process WineZGUI .sh files to create corresponding .charm files in their prefix directories.
@@ -10911,7 +8325,7 @@ class WineCharmApp(Adw.Application):
                     if subdir.is_dir() and list(subdir.glob("*.sh")):
                         prefix_dirs.add(subdir)
 
-                if not prefix_dirs:
+                if not prefix_dirs and not suppress_no_scripts_dialog:
                     GLib.idle_add(self.show_info_dialog, "No Scripts Found", "No .sh files found in WineZGUI prefixes directory.")
                     return
 
@@ -10927,7 +8341,8 @@ class WineCharmApp(Adw.Application):
                             created_charm_files.add(charm_file)
                             created_count += 1
 
-                GLib.idle_add(self.show_info_dialog, "Processing Complete", f"Created {created_count} .charm files from WineZGUI scripts.")
+                if created_count > 0:  # Show dialog only if .charm files were created
+                    GLib.idle_add(self.show_info_dialog, "Processing Complete", f"Created {created_count} .charm files from WineZGUI scripts.")
 
             finally:
                 GLib.idle_add(self.hide_processing_spinner)

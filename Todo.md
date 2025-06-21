@@ -23,6 +23,21 @@ Refactoring winecharm
 - [x] Add all info from .charm and buttons, row, label in self.all_scripts, use script_key (sha256sum)
 - [x] play/stop button, row highlight should be manageed.
 
+
+0.99.4
+- [x] Settings default Runner in settings, then creating new script like AOCSETUP
+- [x] Default Runner is not respected by newly created .charm script, fix it.
+- [x] do not show not found dialog for winezgui
+- [x] wow64 with bin/wine be treated as win64 arch
+- [x] show dialog to run wineboot -u
+- [x] Create bottle hangs with ~/AOCSETUP.EXE ( do not include not detecting?) flatpak shows can't access proplery.
+- 
+- [ ] Set Default runner on system with wine; 32 bits packages not installed; use wine64 or suggest user for get wine64 runner
+Error validating runner /var/home/rizvan/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Runners/wine-10.0-amd64/bin/wine: [Errno 2] No such file or directory: '/var/home/rizvan/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Runners/wine-10.0-amd64/bin/wine'
+Error validating runner /var/home/rizvan/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Runners/wine-10.0-amd64/bin/wine: [Errno 2] No such file or directory: '/var/home/rizvan/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Runners/wine-10.0-amd64/bin/wine'
+Invalid default runner: /var/home/rizvan/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm/Runners/wine-10.0-amd64/bin/wine
+
+
 0.99.3
 - [x] Import on 1st start, and can be called from menu
 - [x] show added scripts count

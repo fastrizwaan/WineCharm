@@ -1,15 +1,18 @@
+#!/usr/bin/env python3
+
 import gi
-from gi.repository import Gtk, Adw, Gio, Gdk, GLib
-from pathlib import Path
-import shlex
+import threading
 import subprocess
-import os
 import shutil
+import shlex
+import yaml
+from pathlib import Path
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
 
+from gi.repository import GLib, Gio, Gtk, Gdk, Adw
 
 def create_main_window(self):
     self.print_method_name()
