@@ -215,10 +215,12 @@ class WineCharmApp(Adw.Application):
                 'add_keyboard_actions',
                 'create_sort_actions',
                 'on_search_button_clicked',
+                'populate_script_options',
                 'on_key_pressed',
                 'on_search_entry_activated',
                 'on_search_entry_changed',
                 'filter_script_list',
+                'update_ui_for_running_process',
                 'on_open_button_clicked',
                 'open_file_dialog',
                 'create_file_filter',
@@ -228,6 +230,7 @@ class WineCharmApp(Adw.Application):
                 'open_terminal_winecharm',
                 'setup_accelerator_context',
                 'remove_accelerator_context',
+                'restore_open_button',
             ],
             settings: [
                 'on_settings_clicked',
@@ -2379,89 +2382,9 @@ class WineCharmApp(Adw.Application):
             
 ############################### 1050 - 1682 ########################################
 
-    def update_running_processes(self, current_running_processes):
-        self.print_method_name()
-        """
-        Update `self.running_processes` to match `current_running_processes`.
-        Remove processes that have ended externally.
-        """
-        ended_keys = [key for key in self.running_processes if key not in current_running_processes]
 
-        for script_key in ended_keys:
-            self.monitoring_active = True
-            self.start_monitoring()
-            self.process_ended(script_key)
 
-        # Update `self.running_processes` to reflect currently running processes
-        self.running_processes = current_running_processes
 
-    def update_ui_for_running_process(self, current_running_processes):
-        self.print_method_name()
-        """
-        Update the UI to reflect the state of running processes.
-        
-        Args:
-            current_running_processes (dict): A dictionary containing details of the current running processes.
-        """
-        # Iterate over all scripts in script_ui_data to update the UI state
-        for script_key, ui_state in self.script_ui_data.items():
-            if not ui_state:
-                print(f"No script data found for script_key: {script_key}")
-                continue
-
-            # Retrieve row, play_button, and options_button
-            row = ui_state.get('row')
-            play_button = ui_state.get('play_button')
-            options_button = ui_state.get('options_button')
-
-            if script_key in current_running_processes:
-                # If the script is running, add the highlighted class and update button states
-                if not ui_state['is_running']:  # Only update if the current state is not already running
-                    if row:
-                        self.update_row_highlight(row, True)
-                        row.add_css_class("highlighted")
-                        print(f"Added 'highlighted' to row for script_key: {script_key}")
-
-                    # Set the play button to 'Stop' since the script is running
-                    if play_button:
-                        self.set_play_stop_button_state(play_button, True)
-
-                    # Update internal running state
-                    ui_state['is_running'] = True
-
-            else:
-                # If the script is not running, remove highlight and reset buttons, but only if it's marked as running
-                if ui_state['is_running']:  # Only update if the current state is marked as running
-                    if row:
-                        self.update_row_highlight(row, False)
-                        row.remove_css_class("highlighted")
-                        #row.remove_css_class("blue")
-                        print(f"Removed 'highlighted' from row for script_key: {script_key}")
-
-                    # Set play button back to 'Play'
-                    if play_button:
-                        self.set_play_stop_button_state(play_button, False)
-
-                    # Update internal state to not running
-                    ui_state['is_running'] = False
-                    ui_state['is_clicked_row'] = False
-
-            # Update the play/stop button visibility if the script row is currently clicked
-            if ui_state.get('is_clicked_row', False):
-                if play_button and options_button:
-                    self.show_buttons(play_button, options_button)
-                    self.set_play_stop_button_state(play_button, True)
-                    print(f"Updated play/stop button for clicked row with script_key: {script_key}")
-
-            # Update the launch button state if it matches the script_key
-            if self.launch_button and getattr(self, 'launch_button_exe_name', None) == script_key:
-                if script_key in current_running_processes:
-                    self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
-                    self.launch_button.set_tooltip_text("Stop")
-                else:
-                    self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-                    self.launch_button.set_tooltip_text("Play")
-                print(f"Updated launch button for script_key: {script_key}")
 
     def extract_yaml_info(self, script_key):
         self.print_method_name()
@@ -2945,65 +2868,6 @@ class WineCharmApp(Adw.Application):
 
         self.open_button.set_visible(False)
         self.replace_launch_button(ui_state, row, script_key)
-
-    def populate_script_options(self, filter_text=""):
-        self.print_method_name()
-        print("-x"*20)
-        """
-        Populate the script options flowbox with filtered options.
-        """
-        # Clear existing options
-        while child := self.script_options_flowbox.get_first_child():
-            self.script_options_flowbox.remove(child)
-
-        # Add filtered options
-        filter_text = filter_text.lower()
-        for label, icon_name, callback in self.script_options:
-            if filter_text in label.lower():
-                option_button = Gtk.Button()
-                option_button.set_size_request(-1, 40)
-                option_button.add_css_class("flat")
-                option_button.add_css_class("normal-font")
-
-                option_hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-                option_button.set_child(option_hbox)
-
-                option_icon = Gtk.Image.new_from_icon_name(icon_name)
-                option_label = Gtk.Label(label=label)
-                option_label.set_xalign(0)
-                option_label.set_hexpand(True)
-                option_label.set_ellipsize(Pango.EllipsizeMode.END)
-                option_hbox.append(option_icon)
-                option_hbox.append(option_label)
-
-                self.script_options_flowbox.append(option_button)
-
-                # Handle the log button sensitivity
-                if label == "Show log":
-                    # Replace underscores with spaces in the script stem for the log file name
-                    log_file_name = f"{self.current_script.stem.replace('_', ' ')}.log"
-                    log_file_path = self.current_script.parent / log_file_name
-                    # Debug output
-                    print(f"Log file path: {log_file_path}")
-                    print(f"Exists: {log_file_path.exists()}")
-                    print(f"Size: {log_file_path.stat().st_size if log_file_path.exists() else 0}")
-                    try:
-                        if log_file_path.exists() and log_file_path.stat().st_size > 0:
-                            print("Setting Show log button to sensitive")
-                            option_button.set_sensitive(True)
-                        else:
-                            print("Setting Show log button to insensitive")
-                            option_button.set_sensitive(False)
-                    except Exception as e:
-                        print(f"Error checking log file: {e}")
-                        option_button.set_sensitive(False)
-
-                # Connect the button callback
-                option_button.connect(
-                    "clicked",
-                    lambda btn, cb=callback: self.callback_wrapper(cb, self.current_script, self.current_script_key, btn)
-                )
-
 
 
 
@@ -6366,19 +6230,6 @@ class WineCharmApp(Adw.Application):
 #########   ######
 
 
-    def restore_open_button(self):
-        self.print_method_name()
-        # Remove settings click handler
-        if hasattr(self, 'open_button_handler_id'):
-            self.open_button.disconnect(self.open_button_handler_id)
-        
-        self.set_open_button_label("Open")
-        self.set_open_button_icon_visible(True)
-        # Reconnect original click handler
-        self.open_button_handler_id = self.open_button.connect(
-            "clicked",
-            self.on_open_button_clicked
-        )
 
 
 

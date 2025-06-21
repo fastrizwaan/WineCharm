@@ -10,6 +10,11 @@ gi.require_version('Adw', '1')
 
 from gi.repository import Gtk, Pango, Adw
 
+def on_settings_clicked(self, action=None, param=None):
+    self.print_method_name()
+    print("Settings action triggered")
+    # You can add code here to open a settings window or dialog.
+    
 def load_settings(self):
     self.print_method_name()
     """Load settings from the Settings.yaml file."""
