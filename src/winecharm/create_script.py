@@ -39,16 +39,13 @@ def determine_progname(self, productname, exe_no_space, exe_name):
         return productname if productname and not any(char.isdigit() for char in productname) and productname.isascii() else exe_no_space
 
 
-def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner_override=None):
-    self.print_method_name()
-    # Determine runner_to_use
-    if runner_override is not None:
-        runner_to_use = runner_override
+def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False):
+    # If the launch script has a different runner use that runner
+    #self.show_processing_spinner("Copying Files...")
+    if self.runner_to_use:
+        runner_to_use = self.replace_home_with_tilde_in_path(str(self.runner_to_use))
     else:
-        if self.runner_to_use:
-            runner_to_use = self.replace_home_with_tilde_in_path(str(self.runner_to_use))
-        else:
-            runner_to_use = ""
+        runner_to_use = ""
 
     self.create_required_directories()
     exe_file = Path(exe_path).resolve()
@@ -62,9 +59,7 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
             sha256_hash.update(byte_block)
     sha256sum = sha256_hash.hexdigest()[:10]
     script_key = sha256_hash.hexdigest()
-    # string to path
-    self.template = Path(self.template).expanduser().resolve()
-    print(f"         => create_yaml_file -> self.template = {self.template}")
+
     # Determine prefix directory
     if prefix_dir is None:
         if self.single_prefix:
@@ -76,31 +71,20 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
                 prefix_dir = self.single_prefix_dir_win64
                 template_to_use = self.default_template_win64
             
-
             # Create prefix from template if needed
             if not prefix_dir.exists():
                 #self.copy_template(prefix_dir, template_to_use)
                 print("--->if not prefix_dir.exists():")
-                self.custom_copytree(self.template, prefix_dir)
+                self.custom_copytree(template_to_use, prefix_dir)
         else:
-            # if the user has deleted the current in use runner and open an exe, it should use the default arch based runner.
-            if not self.template.exists():
-                # Use architecture-specific single prefix directory
-                if self.arch == 'win32':
-                    template_to_use = self.default_template_win32
-                else:
-                    template_to_use = self.default_template_win64
-                print(f"Error: {self.template} has been deleted, using {template_to_use}")
-                GLib.idle_add(self.show_info_dialog, "Template Deleted", f"{self.template}.name has been deleted, using {template_to_use}.name")
-                self.template = template_to_use
-
             # Create new unique prefix per executable
             prefix_dir = self.prefixes_dir / f"{exe_no_space}-{sha256sum[:10]}"
             if not prefix_dir.exists():
-                if self.template.exists():
-                    print("===>if self.template.exists():")
-                    print(f"->>>{self.template} is being copied")
-                    self.custom_copytree(self.template, prefix_dir)
+                template_to_use = self.default_template_win32 if self.arch == 'win32' else self.default_template_win64
+                if template_to_use.exists():
+                    #self.copy_template(prefix_dir, template_to_use)
+                    print("===>if template_to_use.exists():")
+                    self.custom_copytree(template_to_use, prefix_dir)
                 else:
                     self.ensure_directory_exists(prefix_dir)
         # Resolve the generated or selected prefix directory
@@ -149,7 +133,7 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
     # Create YAML file with proper naming
     yaml_file_path = prefix_dir / f"{exe_no_space if use_exe_name else progname.replace(' ', '_')}.charm"
 
-    # Prepare YAML data with runner_to_use
+    # Prepare YAML data
     yaml_data = {
         'exe_file': self.replace_home_with_tilde_in_path(str(exe_file)),
         'script_path': self.replace_home_with_tilde_in_path(str(yaml_file_path)),
@@ -157,14 +141,14 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
         'progname': progname,
         'args': "",
         'sha256sum': sha256_hash.hexdigest(),
-        'runner': runner_to_use,  # Use the determined runner
-        'wine_debug': "WINEDEBUG=-fixme-all DXVK_LOG_LEVEL=none",
-        'env_vars': ""
+        'runner': runner_to_use,
+        'wine_debug': "WINEDEBUG=fixme-all DXVK_LOG_LEVEL=none",  # Set a default or allow it to be empty
+        'env_vars': ""  # Initialize with an empty string or set a default if necessary
     }
 
     # Write the new YAML file
     with open(yaml_file_path, 'w') as yaml_file:
-        yaml.dump(yaml_data, open(yaml_file_path, 'w'), default_style="'", default_flow_style=False, width=10000)
+        yaml.dump(yaml_data, yaml_file, default_flow_style=False, width=1000)
 
     # Update yaml_data with resolved paths
     yaml_data['exe_file'] = str(exe_file.expanduser().resolve())
@@ -191,6 +175,7 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
     print(f"Created new charm file: {yaml_file_path} with script_key {script_key}")
     
     GLib.idle_add(self.create_script_list)
+
 
 
 
