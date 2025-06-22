@@ -425,12 +425,16 @@ def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, a
         # Check architecture compatibility for non-system runners
         if new_runner_path:  # Skip check for System Wine
             runner_path = Path(new_runner_path).expanduser().resolve().parent.parent
-            
             print(f"runner_path = {runner_path}")
             # Determine runner architecture
             if (runner_path / "bin/wine64").exists():
+                print("win64 detected")
                 runner_arch = "win64"
+            elif (runner_path / "bin/wine").exists() and "wow64" in str(runner_path):
+                print("wow64 detected")
+                runner_arch = "win64"                
             elif (runner_path / "bin/wine").exists():
+                print("win32 detected")
                 runner_arch = "win32"
             else:
                 self.show_info_dialog(
@@ -457,13 +461,59 @@ def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, a
         self.settings["runner"] = self.replace_home_with_tilde_in_path(new_runner_value)
         self.save_settings()
 
-        # Provide feedback
+        # Resolve and expand self.template for WINEPREFIX
+        wineprefix = Path(self.template).expanduser().resolve()
+
+        # Show confirmation dialog for runner update
         confirmation_message = f"The default runner has been set to {new_runner_display}"
         if new_runner_path:
             confirmation_message += f" ({runner_arch})"
         self.show_info_dialog("Default Runner Updated", confirmation_message)
+
+        # Ask user if they want to run wineboot -u for non-system runners
+        print("* * * * * *")
+        print(f"new_runner_value = {new_runner_value}")
+        print(f"new_runner_path = {new_runner_path}")
+        print("* * * * * *")
+        def on_wineboot_confirm_response(dialog, response_id):
+            if response_id == "yes":
+                def wineboot_operation():
+                    try:
+                        runner_dir = Path(new_runner_path).expanduser().resolve().parent
+                        prerun_command = [
+                            "sh", "-c",
+                            f"export PATH={shlex.quote(str(runner_dir))}:$PATH; "
+                            f"WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k; "
+                            f"WINEPREFIX={shlex.quote(str(wineprefix))} wineboot -u;"
+                        ]
+                        
+                        if self.debug:
+                            print(f"Running wineboot: {' '.join(prerun_command)}")
+
+                        subprocess.run(prerun_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                        
+                        # Provide feedback in the main thread
+                        GLib.idle_add(self.show_info_dialog, "Wineboot Completed", f"Updated Wine prefix for {new_runner_display} at {wineprefix}")
+
+                    except subprocess.CalledProcessError as e:
+                        error_msg = f"Wineboot failed (code {e.returncode}): {e.stderr}"
+                        GLib.idle_add(self.show_info_dialog, "Wineboot Error", error_msg)
+                    except Exception as e:
+                        error_msg = f"Wineboot error: {str(e)}"
+                        GLib.idle_add(self.show_info_dialog, "Wineboot Error", error_msg)
+
+                # Start wineboot in a separate thread
+                threading.Thread(target=wineboot_operation, daemon=True).start()
+
+        # Show confirmation dialog for running wineboot
+        self.show_confirm_dialog(
+            "Run Wineboot?",
+            f"Do you want to run wineboot to update the Wine prefix for {new_runner_display} at {wineprefix}?",
+            callback=on_wineboot_confirm_response
+        )
     else:
         print("Set default runner canceled.")
+        
 
 def on_download_runner_clicked_default(self, dialog):
     self.print_method_name()
@@ -1316,108 +1366,6 @@ def show_confirm_dialog(self, title, message, callback=None):
     dialog.connect("response", on_response)
     dialog.present(self.window)
 
-def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, all_runners):
-    self.print_method_name()
-    if response_id == "ok":
-        selected_index = runner_dropdown.get_selected()
-        if selected_index == Gtk.INVALID_LIST_POSITION:
-            print("No runner selected.")
-            return
 
-        new_runner_display, new_runner_path = all_runners[selected_index]
-        print(f"Selected new default runner: {new_runner_display} -> {new_runner_path}")
-
-        # Check architecture compatibility for non-system runners
-        if new_runner_path:  # Skip check for System Wine
-            runner_path = Path(new_runner_path).expanduser().resolve().parent.parent
-            print(f"runner_path = {runner_path}")
-            # Determine runner architecture
-            if (runner_path / "bin/wine64").exists():
-                print("win64 detected")
-                runner_arch = "win64"
-            elif (runner_path / "bin/wine").exists() and "wow64" in str(runner_path):
-                print("wow64 detected")
-                runner_arch = "win64"                
-            elif (runner_path / "bin/wine").exists():
-                print("win32 detected")
-                runner_arch = "win32"
-            else:
-                self.show_info_dialog(
-                    "Invalid Runner",
-                    "Selected runner is missing Wine binaries (bin/wine or bin/wine64)"
-                )
-                return
-
-            # Get template architecture from settings
-            template_arch = self.settings.get("arch", "win64")
-            
-            # Check for 32-bit runner with 64-bit template
-            if template_arch == "win64" and runner_arch == "win32":
-                self.show_info_dialog(
-                    "Architecture Mismatch",
-                    "Cannot use 32-bit runner with 64-bit template.\n\n"
-                    f"Template: {self.template} ({template_arch})\n"
-                    f"Runner: {new_runner_path} ({runner_arch})"
-                )
-                return
-
-        # Update settings
-        new_runner_value = "" if new_runner_display.startswith("System Wine") else new_runner_path
-        self.settings["runner"] = self.replace_home_with_tilde_in_path(new_runner_value)
-        self.save_settings()
-
-        # Resolve and expand self.template for WINEPREFIX
-        wineprefix = Path(self.template).expanduser().resolve()
-
-        # Show confirmation dialog for runner update
-        confirmation_message = f"The default runner has been set to {new_runner_display}"
-        if new_runner_path:
-            confirmation_message += f" ({runner_arch})"
-        self.show_info_dialog("Default Runner Updated", confirmation_message)
-
-        # Ask user if they want to run wineboot -u for non-system runners
-        print("* * * * * *")
-        print(f"new_runner_value = {new_runner_value}")
-        print(f"new_runner_path = {new_runner_path}")
-        print("* * * * * *")
-        def on_wineboot_confirm_response(dialog, response_id):
-            if response_id == "yes":
-                def wineboot_operation():
-                    try:
-                        runner_dir = Path(new_runner_path).expanduser().resolve().parent
-                        prerun_command = [
-                            "sh", "-c",
-                            f"export PATH={shlex.quote(str(runner_dir))}:$PATH; "
-                            f"WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k; "
-                            f"WINEPREFIX={shlex.quote(str(wineprefix))} wineboot -u;"
-                        ]
-                        
-                        if self.debug:
-                            print(f"Running wineboot: {' '.join(prerun_command)}")
-
-                        subprocess.run(prerun_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                        
-                        # Provide feedback in the main thread
-                        GLib.idle_add(self.show_info_dialog, "Wineboot Completed", f"Updated Wine prefix for {new_runner_display} at {wineprefix}")
-
-                    except subprocess.CalledProcessError as e:
-                        error_msg = f"Wineboot failed (code {e.returncode}): {e.stderr}"
-                        GLib.idle_add(self.show_info_dialog, "Wineboot Error", error_msg)
-                    except Exception as e:
-                        error_msg = f"Wineboot error: {str(e)}"
-                        GLib.idle_add(self.show_info_dialog, "Wineboot Error", error_msg)
-
-                # Start wineboot in a separate thread
-                threading.Thread(target=wineboot_operation, daemon=True).start()
-
-        # Show confirmation dialog for running wineboot
-        self.show_confirm_dialog(
-            "Run Wineboot?",
-            f"Do you want to run wineboot to update the Wine prefix for {new_runner_display} at {wineprefix}?",
-            callback=on_wineboot_confirm_response
-        )
-    else:
-        print("Set default runner canceled.")
-        
 
         
