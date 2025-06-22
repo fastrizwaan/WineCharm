@@ -1376,7 +1376,11 @@ def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, a
         self.show_info_dialog("Default Runner Updated", confirmation_message)
 
         # Ask user if they want to run wineboot -u for non-system runners
-        if new_runner_path:  # Only prompt for wineboot if a non-system runner is selected
+        print("* * * * * *")
+        print(f"new_runner_value = {new_runner_value}")
+        print(f"new_runner_path = {new_runner_path}")
+        print("* * * * * *")
+        if new_runner_path or new_runner_value: 
             def on_wineboot_confirm_response(dialog, response_id):
                 if response_id == "yes":
                     def wineboot_operation():
