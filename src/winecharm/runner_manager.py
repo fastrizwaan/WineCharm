@@ -1380,43 +1380,42 @@ def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, a
         print(f"new_runner_value = {new_runner_value}")
         print(f"new_runner_path = {new_runner_path}")
         print("* * * * * *")
-        if new_runner_path or new_runner_value: 
-            def on_wineboot_confirm_response(dialog, response_id):
-                if response_id == "yes":
-                    def wineboot_operation():
-                        try:
-                            runner_dir = Path(new_runner_path).expanduser().resolve().parent
-                            prerun_command = [
-                                "sh", "-c",
-                                f"export PATH={shlex.quote(str(runner_dir))}:$PATH; "
-                                f"WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k; "
-                                f"WINEPREFIX={shlex.quote(str(wineprefix))} wineboot -u;"
-                            ]
-                            
-                            if self.debug:
-                                print(f"Running wineboot: {' '.join(prerun_command)}")
+        def on_wineboot_confirm_response(dialog, response_id):
+            if response_id == "yes":
+                def wineboot_operation():
+                    try:
+                        runner_dir = Path(new_runner_path).expanduser().resolve().parent
+                        prerun_command = [
+                            "sh", "-c",
+                            f"export PATH={shlex.quote(str(runner_dir))}:$PATH; "
+                            f"WINEPREFIX={shlex.quote(str(wineprefix))} wineserver -k; "
+                            f"WINEPREFIX={shlex.quote(str(wineprefix))} wineboot -u;"
+                        ]
+                        
+                        if self.debug:
+                            print(f"Running wineboot: {' '.join(prerun_command)}")
 
-                            subprocess.run(prerun_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                            
-                            # Provide feedback in the main thread
-                            GLib.idle_add(self.show_info_dialog, "Wineboot Completed", f"Updated Wine prefix for {new_runner_display} at {wineprefix}")
+                        subprocess.run(prerun_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                        
+                        # Provide feedback in the main thread
+                        GLib.idle_add(self.show_info_dialog, "Wineboot Completed", f"Updated Wine prefix for {new_runner_display} at {wineprefix}")
 
-                        except subprocess.CalledProcessError as e:
-                            error_msg = f"Wineboot failed (code {e.returncode}): {e.stderr}"
-                            GLib.idle_add(self.show_info_dialog, "Wineboot Error", error_msg)
-                        except Exception as e:
-                            error_msg = f"Wineboot error: {str(e)}"
-                            GLib.idle_add(self.show_info_dialog, "Wineboot Error", error_msg)
+                    except subprocess.CalledProcessError as e:
+                        error_msg = f"Wineboot failed (code {e.returncode}): {e.stderr}"
+                        GLib.idle_add(self.show_info_dialog, "Wineboot Error", error_msg)
+                    except Exception as e:
+                        error_msg = f"Wineboot error: {str(e)}"
+                        GLib.idle_add(self.show_info_dialog, "Wineboot Error", error_msg)
 
-                    # Start wineboot in a separate thread
-                    threading.Thread(target=wineboot_operation, daemon=True).start()
+                # Start wineboot in a separate thread
+                threading.Thread(target=wineboot_operation, daemon=True).start()
 
-            # Show confirmation dialog for running wineboot
-            self.show_confirm_dialog(
-                "Run Wineboot?",
-                f"Do you want to run wineboot to update the Wine prefix for {new_runner_display} at {wineprefix}?",
-                callback=on_wineboot_confirm_response
-            )
+        # Show confirmation dialog for running wineboot
+        self.show_confirm_dialog(
+            "Run Wineboot?",
+            f"Do you want to run wineboot to update the Wine prefix for {new_runner_display} at {wineprefix}?",
+            callback=on_wineboot_confirm_response
+        )
     else:
         print("Set default runner canceled.")
         
