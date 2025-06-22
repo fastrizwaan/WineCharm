@@ -945,7 +945,7 @@ class WineCharmApp(Adw.Application):
             use_runner = str(self.expand_and_resolve_path(self.runner))
             print(use_runner)
             # Perform the heavy processing here
-            self.create_yaml_file(abs_file_path, None, runner_override=use_runner)
+            self.create_yaml_file(abs_file_path, None, runner_override=self.runner)
 
             # Schedule GUI updates in the main thread
             #GLib.idle_add(self.update_gui_after_file_processing, abs_file_path)
