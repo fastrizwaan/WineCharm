@@ -15,7 +15,7 @@ gi.require_version('Adw', '1')
 
 from gi.repository import GLib, Gio, Gtk, Adw
 
-def initialize_template(self, template_dir, callback, arch='win64'):
+def initialize_template(self, template_dir, callback, arch='win64', new=False):
     """
     Modified template initialization with architecture support
     """
@@ -100,13 +100,13 @@ def initialize_template(self, template_dir, callback, arch='win64'):
                 return
                 
         if not self.stop_processing:
-            GLib.idle_add(lambda: self.on_template_initialized(arch))
+            GLib.idle_add(lambda: self.on_template_initialized(arch, new))
             GLib.idle_add(self.hide_processing_spinner)
             self.disconnect_open_button()
             GLib.idle_add(self.reset_ui_after_template_init)
     threading.Thread(target=initialize).start()
 
-def on_template_initialized(self, arch=None):
+def on_template_initialized(self, arch=None, new=False):
     print(f"Template initialization complete for {arch if arch else 'default'} architecture.")
     self.initializing_template = False
     # Update architecture setting if we were initializing a specific arch
@@ -123,6 +123,8 @@ def on_template_initialized(self, arch=None):
     # Success case
     self.show_initializing_step("Initialization Complete!")
     self.mark_step_as_done("Initialization Complete!")
+    
+
     
     # Process command-line file if it exists
     if self.command_line_file:
@@ -141,16 +143,28 @@ def on_template_initialized(self, arch=None):
             self.command_line_file = None
             return False
 
-    # If not called from settings create script list else go to settings
+    # If not called from settings, reconnect open button; else, go to settings
     if not self.called_from_settings:
         self.reconnect_open_button()
-        GLib.timeout_add_seconds(0.5, self.create_script_list)
+        # Skip create_script_list here since it's handled above for new=True
+        if not new:
+            GLib.timeout_add_seconds(0.5, self.create_script_list)
     
     if self.called_from_settings:
         GLib.idle_add(lambda: self.replace_open_button_with_settings())
         self.show_options_for_settings()
     
     self.set_dynamic_variables()
+    # Run script processing for first launch if new=True
+    if new:
+        print("- - - - - - - ")
+        print("- - - - - - - ")
+        print("First launch: Processing scripts after template initialization.")
+        print("- - - - - - - ")
+        print("- - - - - - - ")
+        self.process_winezgui_sh_files(suppress_no_scripts_dialog=True)
+        self.load_script_list()
+        self.create_script_list()
             
 def copy_template(self, dest_dir, source_template=None):
     self.print_method_name()

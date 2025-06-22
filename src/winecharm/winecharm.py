@@ -754,8 +754,8 @@ class WineCharmApp(Adw.Application):
         # Clear or initialize the script list
         self.set_dynamic_variables()
         self.script_list = {}
-        self.load_script_list()
-        self.create_script_list()
+
+
 
         if not self.template:
             self.template = getattr(self, f'default_template_{self.arch}')
@@ -767,8 +767,7 @@ class WineCharmApp(Adw.Application):
         else:
             if not self.template.exists():
                 # If template doesn't exist, initialize it
-                self.initialize_template(self.template, self.on_template_initialized)
-                self.process_winezgui_sh_files(suppress_no_scripts_dialog=True) 
+                self.initialize_template(self.template, self.on_template_initialized, new=True)
             else:
                 # Template already exists, set dynamic variables
                 self.set_dynamic_variables()
@@ -778,7 +777,10 @@ class WineCharmApp(Adw.Application):
                     # Use a small delay to ensure UI is ready
                     GLib.timeout_add_seconds(0.5, self.process_cli_file_later, self.command_line_file)
                 
+                
         # After loading scripts and building the UI, check for running processes
+        self.load_script_list()
+        self.create_script_list()        
         self.set_dynamic_variables()
         self.check_running_processes_on_startup()
 
