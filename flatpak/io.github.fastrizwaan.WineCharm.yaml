@@ -89,8 +89,6 @@ modules:
       - mkdir -p /app/lib32/ffmpeg
       - mkdir -p /app/utils
 
-
-
   - name: icoutils
     build-options:
       no-debuginfo: true  
@@ -177,8 +175,8 @@ modules:
       - pip3 install --no-deps --no-build-isolation --ignore-installed --prefix=${FLATPAK_DEST} .
     sources:
       - type: git
-        #tag: 0.99.3
-        commit: 53e678705ff65d6f507eebc1bc752d0543a4af1f
+        tag: 0.99.4
+        commit: 261b357e8b6b8614c50629ff8af55470e9bbd173
         url: https://github.com/fastrizwaan/WineCharm.git
 
 
