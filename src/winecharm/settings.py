@@ -24,7 +24,7 @@ def load_settings(self):
 
         # Expand and resolve paths when loading
         self.template = self.expand_and_resolve_path(settings.get('template', self.default_template_win64))
-        self.runner = self.expand_and_resolve_path(settings.get('runner', ''))
+        self.runner = settings.get('runner', '')
         self.arch = settings.get('arch', "win64")
         self.icon_view = settings.get('icon_view', False)
         self.env_vars = settings.get('env_vars', '')
