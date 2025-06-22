@@ -430,8 +430,8 @@ def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, a
             if (runner_path / "bin/wine64").exists():
                 print("win64 detected")
                 runner_arch = "win64"
-            elif (runner_path / "bin/wine").exists() and "wow64" in str(runner_path):
-                print("wow64 detected")
+            elif (runner_path / "bin/wine").exists() and ("wow64" in str(runner_path) or "amd64" in str(runner_path)):
+                print("wow64/amd64 detected")
                 runner_arch = "win64"                
             elif (runner_path / "bin/wine").exists():
                 print("win32 detected")
