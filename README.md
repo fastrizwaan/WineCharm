@@ -18,15 +18,16 @@
 
 ## Installation
 
+### Flatpak Installation (Recommended)
+
+WineCharm can be installed as a Flatpak, providing a sandboxed environment with all dependencies included.
+
 <a href="https://flathub.org/apps/details/io.github.fastrizwaan.WineCharm"><img width='240' alt='Download on Flathub' src='https://dl.flathub.org/assets/badges/flathub-badge-en.png'/></a>
 
 ```
 flatpak --user install flathub io.github.fastrizwaan.WineCharm
 ```
 
-### Flatpak Installation (Recommended)
-
-WineCharm can be installed as a Flatpak, providing a sandboxed environment with all dependencies included.
 
 #### Build from Source (Flatpak)
 
