@@ -44,6 +44,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.99.5" date="2025-06-25">
+      <description>
+        <p>bug fix: runner related</p>
+      </description>
+    </release>
     <release version="0.99.4" date="2025-06-22">
       <description>
         <p>Initial release with full feature set including prefix management, template system, and Flatpak support.</p>
