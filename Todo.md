@@ -25,6 +25,18 @@ Refactoring winecharm
 
 
 0.99.4
+- [x] use get_runner to get runner from script
+    try:
+        # Get the runner from the script data
+        runner = self.get_runner(script_data)
+        runner_dir = runner.parent.resolve()
+    except Exception as e:
+        print(f"Error getting runner: {e}")
+        return
+- [x] for non script runner, use get_runner() method without argument
+
+- [x] Restore wzt properly show steps
+- [x] Restore cancel show the list after dialog
 - [x] Settings default Runner in settings, then creating new script like AOCSETUP
 - [x] Default Runner is not respected by newly created .charm script, fix it.
 - [x] do not show not found dialog for winezgui

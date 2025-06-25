@@ -599,9 +599,9 @@ def open_terminal_winecharm(self, param=None, action=None):
     self.ensure_directory_exists(wineprefix)
 
     # Load settings to get the runner
-    settings = self.load_settings()
-    runner = settings.get('runner', 'wine')  # Default to 'wine' if runner is not specified
-    runner_path = Path(runner).expanduser().resolve()
+    # Get runner from settings (automatically loads settings)
+    runner_path = self.get_runner()
+    print(f"Using runner from settings: {runner_path}")
     runner_dir = runner_path.parent.resolve()
 
     if shutil.which("flatpak-spawn"):

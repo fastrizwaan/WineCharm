@@ -939,16 +939,13 @@ class WineCharmApp(Adw.Application):
             if not Path(abs_file_path).exists():
                 print(f"File does not exist: {abs_file_path}")
                 return
-            # get runner from settings
-            self.load_settings()
-            print(self.runner)
-            use_runner = str(self.expand_and_resolve_path(self.runner))
-            print(use_runner)
+            
+            # Get runner from settings (automatically loads settings)
+            runner_path = self.get_runner()
+            print(f"Using runner from settings: {runner_path}")
+            
             # Perform the heavy processing here
-            self.create_yaml_file(abs_file_path, None, runner_override=self.runner)
-
-            # Schedule GUI updates in the main thread
-            #GLib.idle_add(self.update_gui_after_file_processing, abs_file_path)
+            self.create_yaml_file(abs_file_path, None, runner_override=str(runner_path))
 
         except Exception as e:
             print(f"Error processing file in background: {e}")

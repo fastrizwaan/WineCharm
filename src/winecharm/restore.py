@@ -156,6 +156,10 @@ def restore_prefix_bottle_wzt_tar_zst(self, file_path):
     Restore from a .prefix or .bottle which is a .tar.zst compressed file.
     """
     self.stop_processing = False
+
+    # Clear the flowbox and show progress spinner
+    GLib.idle_add(self.flowbox.remove_all)
+    self.show_processing_spinner(f"Restoring")
     
     try:
         # Extract prefix name before starting
@@ -173,9 +177,6 @@ def restore_prefix_bottle_wzt_tar_zst(self, file_path):
             shutil.move(str(extracted_prefix), str(backup_dir))
             print(f"Backed up existing directory to: {backup_dir}")
 
-        # Clear the flowbox and show progress spinner
-        GLib.idle_add(self.flowbox.remove_all)
-        self.show_processing_spinner(f"Restoring")
         #self.disconnect_open_button()
         #self.connect_open_button_with_import_wine_directory_cancel()
         self.connect_open_button_with_restore_backup_cancel()
@@ -454,8 +455,8 @@ def process_sh_files(self, directory):
                     info_data = self.parse_info_file(info_file_path)
                     runner = info_data.get('Runner', '')
                     
-                    # Set runner to empty string if it's '/app/bin/wine'
-                    if runner == '/app/bin/wine':
+                    # Set runner to empty string if it's '/app/bin/wine' or system wine from
+                    if runner == '/app/bin/wine' or runner == '/usr/bin/wine' or runner == '/usr/sbin/wine' or runner == '/usr/local/bin/wine':
                         runner = ''
                         
                     # Locate environment-variable.yml and cmdline.yml
@@ -962,6 +963,7 @@ def on_cancel_restore_backup_dialog_response(self, dialog, response):
                 GLib.idle_add(self.on_restore_completed)
                 GLib.idle_add(self.show_info_dialog, "Cancelled", 
                             "Restore process was cancelled and cleaned up successfully")
+                GLib.idle_add(self.create_script_list)
             except Exception as e:
                 print(f"Error during cleanup: {e}")
                 GLib.idle_add(self.show_info_dialog, "Error", 

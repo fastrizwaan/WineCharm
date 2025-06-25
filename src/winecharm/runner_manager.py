@@ -19,30 +19,62 @@ gi.require_version('Adw', '1')
 
 from gi.repository import GLib, Gio, Gtk, Adw
 
-def get_runner(self, script_data):
-    self.print_method_name()
+def get_runner(self, script_data=None):
     """
-    Extracts and resolves the runner from the script data.
+    Extracts and resolves the runner from settings or script data.
 
     Args:
-        script_data (dict): The script data containing runner information.
+        script_data (dict, optional): Script data containing runner information.
+                                    If not provided, will load settings automatically.
 
     Returns:
-        Path or str: The resolved runner path or command.
+        Path or str: The resolved runner path or command
+
+    Priority order:
+        1. script_data['runner'] (if script_data provided and contains runner)
+        2. self.runner (from settings - auto-loaded if no script_data)
+        3. Default fallback to 'wine'
     """
+    self.print_method_name()
     self.debug = True  # Enable debugging
 
-    # Get the runner from the script data, fallback to 'wine' if not provided
-    runner = script_data.get('runner', '').strip()
-    if not runner:
+    # If no script_data provided, load settings to get self.runner
+    if script_data is None:
         if self.debug:
-            print("Runner not specified in script data, falling back to 'wine'.")
+            print("No script_data provided, loading settings...")
+        self.load_settings()
+
+    # Determine runner source with priority order
+    runner = None
+    source_info = ""
+
+    # Priority 1: script_data runner (script-specific runner takes precedence)
+    if script_data and 'runner' in script_data:
+        runner = script_data.get('runner', '').strip()
+        source_info = "from script_data"
+
+    # Priority 2: self.runner from settings
+    elif hasattr(self, 'runner') and self.runner:
+        runner = str(self.runner).strip()
+        source_info = "from self.runner (settings)"
+
+    # Priority 3: Default fallback
+    if not runner:
         runner = "wine"
+        source_info = "default fallback"
+        if self.debug:
+            print("No runner specified, falling back to 'wine'.")
 
     if self.debug:
-        print(f"Using runner: {runner}")
+        print(f"Using runner: {runner} ({source_info})")
 
-    # If the runner is a path (e.g., /usr/bin/wine), resolve it
+    # Expand path if it contains ~ or other path shortcuts
+    if runner != "wine" and ('~' in runner or runner.startswith('.')):
+        runner = self.expand_and_resolve_path(runner)
+        if self.debug:
+            print(f"Runner path expanded: {runner}")
+
+    # If the runner is a path (not just 'wine'), resolve it
     try:
         if runner != "wine":
             runner = Path(runner).expanduser().resolve()
@@ -77,12 +109,13 @@ def get_runner(self, script_data):
         )
         if result.returncode != 0:
             raise Exception(result.stderr.strip())
+
         if self.debug:
             print(f"Runner version: {result.stdout.strip()}")
     except Exception as e:
         raise RuntimeError(f"Failed to run '{runner_path} --version'. Error: {e}")
 
-    return runner_path    
+    return runner_path
     
 def update_runner_path_in_script(self, script_path, new_runner):
     self.print_method_name()

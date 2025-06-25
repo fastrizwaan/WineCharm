@@ -314,7 +314,7 @@ def on_cancel_backup_dialog_response(self, dialog, response, script_key):
     if response == "cancel":
         self.stop_processing = True
     dialog.close()
-
+    GLib.idle_add(self.create_script_list)
 ######################### CREATE BOTTLE
 # Get directory size method
 def get_directory_size(self, path):
@@ -369,8 +369,15 @@ def create_bottle(self, script, script_key, backup_path):
     exe_file = Path(str(exe_file).replace("%USERNAME%", user))
     exe_path = exe_file.parent
     exe_name = exe_file.name
-
-    runner = self.expand_and_resolve_path(str(script_data['runner']))
+    
+    try:
+        # Get the runner from the script data
+        runner = self.get_runner(script_data)
+        runner_dir = runner.parent.resolve()
+    except Exception as e:
+        print(f"Error getting runner: {e}")
+        return
+    
 
     # If runner is inside the script
     if runner:
@@ -655,7 +662,13 @@ def create_bottle_archive(self, script_key, wineprefix, backup_path):
     tar_game_dir_name = exe_path.name
     tar_game_dir_path = exe_path.parent
 
-    runner = self.expand_and_resolve_path(script_data['runner'])
+    try:
+        # Get the runner from the script data
+        runner = self.get_runner(script_data)
+        runner_dir = runner.parent.resolve()
+    except Exception as e:
+        print(f"Error getting runner: {e}")
+        return
 
     # Build tar command with transforms
     tar_command = [
@@ -730,7 +743,13 @@ def create_bottle_archive(self, script_key, wineprefix, backup_path):
     tar_game_dir_name = exe_path.name
     tar_game_dir_path = exe_path.parent
 
-    runner = self.expand_and_resolve_path(script_data['runner'])
+    try:
+        # Get the runner from the script data
+        runner = self.get_runner(script_data)
+        runner_dir = runner.parent.resolve()
+    except Exception as e:
+        print(f"Error getting runner: {e}")
+        return
 
     # Start building the tar command with common options
     tar_command = [
