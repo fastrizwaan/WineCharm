@@ -20,11 +20,9 @@ Refactoring winecharm
     - [ ] restore_from_backup
     - [ ] perform_restore
     
-- [x] Add all info from .charm and buttons, row, label in self.all_scripts, use script_key (sha256sum)
-- [x] play/stop button, row highlight should be manageed.
 
-
-0.99.4
+0.99.5
+- [ ] Add Show Settings dialog, with all the settings.
 - [x] use get_runner to get runner from script
     try:
         # Get the runner from the script data
@@ -34,9 +32,12 @@ Refactoring winecharm
         print(f"Error getting runner: {e}")
         return
 - [x] for non script runner, use get_runner() method without argument
-
 - [x] Restore wzt properly show steps
 - [x] Restore cancel show the list after dialog
+
+0.99.4
+- [x] Add all info from .charm and buttons, row, label in self.all_scripts, use script_key (sha256sum)
+- [x] play/stop button, row highlight should be manageed.
 - [x] Settings default Runner in settings, then creating new script like AOCSETUP
 - [x] Default Runner is not respected by newly created .charm script, fix it.
 - [x] do not show not found dialog for winezgui
