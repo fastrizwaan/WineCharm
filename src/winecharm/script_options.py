@@ -709,7 +709,7 @@ def show_script_about(self, script_path, script_key, button):
     if script_key not in self.script_list:
         self.show_info_dialog("Error", "Script not found.")
         return
-
+    
     script_data = self.script_list[script_key]
     progname = script_data.get('progname', Path(script_key).stem)
     wineprefix = Path(script_data.get('wineprefix', self.prefixes_dir / progname)).expanduser().resolve()
@@ -720,49 +720,239 @@ def show_script_about(self, script_path, script_key, button):
         system_wine_display, _ = self.get_system_wine()
     args = script_data.get('args', '')
     env_vars = script_data.get('env_vars', '')
-
+    
     # Calculate wineprefix size
     wineprefix_size = self.get_directory_size_for_about(wineprefix)
-
+    
     # Gather additional info
     creation_time = datetime.fromtimestamp(script_path.stat().st_ctime).strftime('%Y-%m-%d %H:%M:%S') if script_path.exists() else "Unknown"
     arch = self.get_template_arch(wineprefix) if wineprefix.exists() else "Unknown"
-
-    # Build the info message with Pango markup
-    info = (
-        f"<b>Program Name:</b> {progname}\n"
-        f"<b>Wineprefix:</b> {wineprefix}\n"
-        f"<b>Wineprefix Size:</b> {wineprefix_size}\n"
-        f"<b>Executable:</b> {exe_file}\n"
-        f"<b>Script Path:</b> {script_path}\n"
-        f"<b>Runner:</b> {runner or f"{system_wine_display}"}\n"
-        f"<b>Architecture:</b> {arch}\n"
-        f"<b>Arguments:</b> {args or 'None'}\n"
-        f"<b>Environment Variables:</b> {env_vars or 'None'}\n"
-        f"<b>Creation Time:</b> {creation_time}"
-    )
-
-    # Create a custom dialog with a label that supports markup
+    
+    # Create the dialog
     dialog = Adw.AlertDialog(
-        heading=f"About {progname}",
+        heading="",  # Empty heading, we'll use custom header
         body=""
     )
+    
+    # Set dialog size
+    dialog.set_size_request(570, 800)
+    
+    # Create custom header with icon and title
+    header_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+    header_box.set_margin_top(4)
+    header_box.set_margin_bottom(0)
+    header_box.set_margin_start(4)
+    header_box.set_margin_end(0)
+    header_box.set_halign(Gtk.Align.CENTER)  # Center the entire header box
+    
+    # Create and add the icon title widget with "About" prefix
+    icon_title_widget = self.create_icon_title_widget(script_path)
+    icon_title_widget.add_css_class("heading")
+    
+    # Add "About" label as the first child of the icon_title_widget
+    about_label = Gtk.Label(label="About")
+    about_label.add_css_class("heading")
+    about_label.set_margin_end(8)  # Add some spacing after "About"
+    icon_title_widget.prepend(about_label)
+    
+    header_box.append(icon_title_widget)
+    
+    # Create main content box
+    main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+    
+    # Add the custom header at the top
+    main_box.append(header_box)
+    
 
-    # Create a label with markup
-    info_label = Gtk.Label(label=info)
-    info_label.set_use_markup(True)  # Enable Pango markup
-    info_label.set_wrap(True)       # Wrap long lines
-    info_label.set_max_width_chars(50)  # Limit width for readability
-
-    # Add the label to a box for better layout control
+    # Create content box for the rest of the content
     content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-    content_box.append(info_label)
-    dialog.set_extra_child(content_box)
+    content_box.set_margin_top(8)
+    content_box.set_margin_bottom(8)
+    content_box.set_margin_start(8)
+    content_box.set_margin_end(8)
+    
+    # Helper function to copy text to clipboard
+    def copy_to_clipboard(text):
+        """Copy text to clipboard"""
+        clipboard = dialog.get_clipboard()
+        clipboard.set(text)
+    def open_directory(path):
+        try:
+            subprocess.run(['xdg-open', str(path)], check=True)
+        except subprocess.CalledProcessError:
+            # Fallback to file manager
+            try:
+                subprocess.run(['nautilus', str(path)], check=True)
+            except subprocess.CalledProcessError:
+                try:
+                    subprocess.run(['thunar', str(path)], check=True)
+                except subprocess.CalledProcessError:
+                    print(f"Could not open directory: {path}")
+    
+    # Helper function to create a clickable directory row
+    def create_directory_row(title, path, subtitle=None):
+        # Create expandable row for paths
+        expander_row = Adw.ExpanderRow(title=title)
+        if subtitle:
+            expander_row.set_subtitle(subtitle)
+        
+        # Create a suffix box to control order
+        suffix_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        
+        # Show basename as a label beside the title (before buttons)
+        basename = path.name if path.name else "Unknown"
+        basename_label = Gtk.Label(label=basename)
+        basename_label.set_selectable(True)
+        basename_label.add_css_class("caption")
+        basename_label.add_css_class("dim-label")
+        basename_label.set_ellipsize(3)  # PANGO_ELLIPSIZE_END
+        basename_label.set_max_width_chars(25)
+        suffix_box.append(basename_label)
+        
+        # Create button box
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        
+        # Add open button
+        open_btn = Gtk.Button(icon_name="folder-open-symbolic")
+        open_btn.set_tooltip_text("Open in file manager")
+        open_btn.add_css_class("flat")
+        open_btn.add_css_class("circular")
+        open_btn.connect("clicked", lambda btn: open_directory(path.parent if path.is_file() else path))
+        button_box.append(open_btn)
+        
+        # Add copy button
+        copy_btn = Gtk.Button(icon_name="edit-copy-symbolic")
+        copy_btn.set_tooltip_text("Copy path to clipboard")
+        copy_btn.add_css_class("flat")
+        copy_btn.add_css_class("circular")
+        copy_btn.connect("clicked", lambda btn: copy_to_clipboard(str(path)))
+        button_box.append(copy_btn)
+        
+        suffix_box.append(button_box)
+        expander_row.add_suffix(suffix_box)
+        
+        # Add path as a child row that shows when expanded
+        path_row = Adw.ActionRow(title="Full Path")
+        path_label = Gtk.Label(label=str(path))
+        path_label.set_wrap(True)
+        path_label.set_wrap_mode(Gtk.WrapMode.CHAR)
+        path_label.set_selectable(True)
+        path_label.set_xalign(0.0)
+        path_label.add_css_class("caption")
+        path_label.add_css_class("dim-label")
+        path_label.set_margin_top(8)
+        path_label.set_margin_bottom(8)
+        path_row.set_child(path_label)
+        
+        expander_row.add_row(path_row)
+        
+        return expander_row
+    
+    # Helper function to create info row with better text wrapping
+    def create_info_row(title, value, subtitle=None):
+        # For long values, use ExpanderRow
+        if len(str(value)) > 60:
+            expander_row = Adw.ExpanderRow(title=title)
+            if subtitle:
+                expander_row.set_subtitle(subtitle)
+            
+            # Add truncated preview
+            preview = str(value)[:75] + "..." if len(str(value)) > 50 else str(value)
+            expander_row.set_subtitle(preview)
+            
+            # Add full value as child row
+            value_row = Adw.ActionRow(title="Full Value")
+            value_label = Gtk.Label(label=str(value))
+            value_label.set_wrap(True)
+            value_label.set_wrap_mode(Gtk.WrapMode.WORD)
+            value_label.set_selectable(True)
+            value_label.set_xalign(0.0)
+            value_label.add_css_class("caption")
+            value_label.set_margin_top(8)
+            value_label.set_margin_bottom(8)
+            value_row.set_child(value_label)
+            
+            expander_row.add_row(value_row)
+            return expander_row
+        else:
+            # Short values use regular ActionRow
+            row = Adw.ActionRow(title=title)
+            if subtitle:
+                row.set_subtitle(subtitle)
+            
+            value_label = Gtk.Label(label=str(value))
+            value_label.set_selectable(True)
+            value_label.add_css_class("caption")
+            row.add_suffix(value_label)
+            
+            return row
 
-    # Add a close button
+    # Get default runner from settings
+    settings = self.load_settings()
+    default_runner = os.path.abspath(os.path.expanduser(settings.get('runner', '')))
+        # Validate default runner
+    if default_runner:
+        if self.validate_runner(default_runner):
+            runner_name = Path(default_runner).parent.parent.name
+        else:
+            print(f"Invalid default runner: {default_runner}")
+            default_runner = ''
+
+
+    # Basic Information Group
+    basic_group = Adw.PreferencesGroup(title="Basic Information")
+    basic_group.add(create_info_row("Program Name", progname))
+    basic_group.add(create_info_row("Architecture", arch))
+    basic_group.add(create_info_row("Runner", runner_name))
+    basic_group.add(create_info_row("Creation Time", creation_time))
+    content_box.append(basic_group)
+    
+    # Paths Group
+    paths_group = Adw.PreferencesGroup(title="Paths")
+    
+    # Wineprefix row with size info
+    wineprefix_row = create_directory_row("Wineprefix", wineprefix, f"Size: {wineprefix_size}")
+    paths_group.add(wineprefix_row)
+    
+    # Executable row
+    if exe_file.exists():
+        exe_row = create_directory_row("Executable", exe_file)
+        paths_group.add(exe_row)
+    
+    # Script path row
+    if script_path.exists():
+        script_row = create_directory_row("Script Path", script_path)
+        paths_group.add(script_row)
+    
+    content_box.append(paths_group)
+    
+    # Configuration Group
+    config_group = Adw.PreferencesGroup(title="Configuration")
+    
+    # Arguments row
+    if args:
+        config_group.add(create_info_row("Arguments", args))
+    else:
+        config_group.add(create_info_row("Arguments", "None"))
+    
+    # Environment Variables row
+    if env_vars:
+        config_group.add(create_info_row("Environment Variables", env_vars))
+    else:
+        config_group.add(create_info_row("Environment Variables", "None"))
+    
+    content_box.append(config_group)
+    
+    # Add content to main box
+    main_box.append(content_box)
+    
+    # Add to dialog
+    dialog.set_extra_child(main_box)
+    
+    # Add response buttons
     dialog.add_response("close", "Close")
     dialog.set_default_response("close")
-
+    
     # Present the dialog
     dialog.present(self.window)
 
@@ -1804,236 +1994,4 @@ def run_winetricks_script(self, script_name, wineprefix):
         subprocess.run(command, shell=True, check=True)
         print(f"Successfully ran {script_name} in {wineprefix}")
     except subprocess.CalledProcessError as e:
-        print(f"Error running winetricks script {script_name}: {e}")
-
-# WIP 
-# Bugs:
-# fix runner name use set default runner logic
-# fix showing environment variables and arguments
-
-def show_script_about(self, script_path, script_key, button):
-    self.print_method_name()
-    """Display detailed information about the selected script and its wineprefix."""
-    if script_key not in self.script_list:
-        self.show_info_dialog("Error", "Script not found.")
-        return
-    
-    script_data = self.script_list[script_key]
-    progname = script_data.get('progname', Path(script_key).stem)
-    wineprefix = Path(script_data.get('wineprefix', self.prefixes_dir / progname)).expanduser().resolve()
-    exe_file = Path(script_data.get('exe_file', '')).expanduser().resolve()
-    script_path = Path(script_data.get('script_path', '')).expanduser().resolve()
-    runner = script_data.get('runner')
-    if not runner:
-        system_wine_display, *_ = self.get_system_wine()
-    args = script_data.get('args', '')
-    env_vars = script_data.get('env_vars', '')
-    
-    # Calculate wineprefix size
-    wineprefix_size = self.get_directory_size_for_about(wineprefix)
-    
-    # Gather additional info
-    creation_time = datetime.fromtimestamp(script_path.stat().st_ctime).strftime('%Y-%m-%d %H:%M:%S') if script_path.exists() else "Unknown"
-    arch = self.get_template_arch(wineprefix) if wineprefix.exists() else "Unknown"
-    
-    # Create the dialog
-    dialog = Adw.AlertDialog(
-        heading=f"About {progname}",
-        body=""
-    )
-    
-    # Set dialog size
-    dialog.set_size_request(570, 800)
-    
-    # Create main content box
-    main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
-    main_box.set_margin_top(4)
-    main_box.set_margin_bottom(4)
-    main_box.set_margin_start(4)
-    main_box.set_margin_end(4)
-    
-    # Helper function to copy text to clipboard
-    def copy_to_clipboard(text):
-        """Copy text to clipboard"""
-        clipboard = dialog.get_clipboard()
-        clipboard.set(text)
-    def open_directory(path):
-        try:
-            subprocess.run(['xdg-open', str(path)], check=True)
-        except subprocess.CalledProcessError:
-            # Fallback to file manager
-            try:
-                subprocess.run(['nautilus', str(path)], check=True)
-            except subprocess.CalledProcessError:
-                try:
-                    subprocess.run(['thunar', str(path)], check=True)
-                except subprocess.CalledProcessError:
-                    print(f"Could not open directory: {path}")
-    
-    # Helper function to create a clickable directory row
-    def create_directory_row(title, path, subtitle=None):
-        # Create expandable row for paths
-        expander_row = Adw.ExpanderRow(title=title)
-        if subtitle:
-            expander_row.set_subtitle(subtitle)
-        
-        # Create a suffix box to control order
-        suffix_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        
-        # Show basename as a label beside the title (before buttons)
-        basename = path.name if path.name else "Unknown"
-        basename_label = Gtk.Label(label=basename)
-        basename_label.set_selectable(True)
-        basename_label.add_css_class("caption")
-        basename_label.add_css_class("dim-label")
-        basename_label.set_ellipsize(3)  # PANGO_ELLIPSIZE_END
-        basename_label.set_max_width_chars(25)
-        suffix_box.append(basename_label)
-        
-        # Create button box
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-        
-        # Add open button
-        open_btn = Gtk.Button(icon_name="folder-open-symbolic")
-        open_btn.set_tooltip_text("Open in file manager")
-        open_btn.add_css_class("flat")
-        open_btn.add_css_class("circular")
-        open_btn.connect("clicked", lambda btn: open_directory(path.parent if path.is_file() else path))
-        button_box.append(open_btn)
-        
-        # Add copy button
-        copy_btn = Gtk.Button(icon_name="edit-copy-symbolic")
-        copy_btn.set_tooltip_text("Copy path to clipboard")
-        copy_btn.add_css_class("flat")
-        copy_btn.add_css_class("circular")
-        copy_btn.connect("clicked", lambda btn: copy_to_clipboard(str(path)))
-        button_box.append(copy_btn)
-        
-        suffix_box.append(button_box)
-        expander_row.add_suffix(suffix_box)
-        
-        # Add path as a child row that shows when expanded
-        path_row = Adw.ActionRow(title="Full Path")
-        path_label = Gtk.Label(label=str(path))
-        path_label.set_wrap(True)
-        path_label.set_wrap_mode(Gtk.WrapMode.CHAR)
-        path_label.set_selectable(True)
-        path_label.set_xalign(0.0)
-        path_label.add_css_class("caption")
-        path_label.add_css_class("dim-label")
-        path_label.set_margin_top(8)
-        path_label.set_margin_bottom(8)
-        path_row.set_child(path_label)
-        
-        expander_row.add_row(path_row)
-        
-        return expander_row
-    
-    # Helper function to create info row with better text wrapping
-    def create_info_row(title, value, subtitle=None):
-        # For long values, use ExpanderRow
-        if len(str(value)) > 50:
-            expander_row = Adw.ExpanderRow(title=title)
-            if subtitle:
-                expander_row.set_subtitle(subtitle)
-            
-            # Add truncated preview
-            preview = str(value)[:47] + "..." if len(str(value)) > 50 else str(value)
-            expander_row.set_subtitle(preview)
-            
-            # Add full value as child row
-            value_row = Adw.ActionRow(title="Full Value")
-            value_label = Gtk.Label(label=str(value))
-            value_label.set_wrap(True)
-            value_label.set_wrap_mode(Gtk.WrapMode.WORD)
-            value_label.set_selectable(True)
-            value_label.set_xalign(0.0)
-            value_label.add_css_class("caption")
-            value_label.set_margin_top(8)
-            value_label.set_margin_bottom(8)
-            value_row.set_child(value_label)
-            
-            expander_row.add_row(value_row)
-            return expander_row
-        else:
-            # Short values use regular ActionRow
-            row = Adw.ActionRow(title=title)
-            if subtitle:
-                row.set_subtitle(subtitle)
-            
-            value_label = Gtk.Label(label=str(value))
-            value_label.set_selectable(True)
-            value_label.add_css_class("caption")
-            row.add_suffix(value_label)
-            
-            return row
-    
-    # Basic Information Group
-    basic_group = Adw.PreferencesGroup(title="Basic Information")
-    basic_group.add(create_info_row("Program Name", progname))
-    basic_group.add(create_info_row("Architecture", arch))
-    basic_group.add(create_info_row("Runner", runner or system_wine_display))
-    basic_group.add(create_info_row("Creation Time", creation_time))
-    main_box.append(basic_group)
-    
-    # Paths Group
-    paths_group = Adw.PreferencesGroup(title="Paths")
-    
-    # Wineprefix row with size info
-    wineprefix_row = create_directory_row("Wineprefix", wineprefix, f"Size: {wineprefix_size}")
-    paths_group.add(wineprefix_row)
-    
-    # Executable row
-    if exe_file.exists():
-        exe_row = create_directory_row("Executable", exe_file)
-        paths_group.add(exe_row)
-    
-    # Script path row
-    if script_path.exists():
-        script_row = create_directory_row("Script Path", script_path)
-        paths_group.add(script_row)
-    
-    main_box.append(paths_group)
-    
-    # Configuration Group
-    config_group = Adw.PreferencesGroup(title="Configuration")
-    
-    # Arguments row
-    if args:
-        args_row = Adw.ActionRow(title="Arguments")
-        args_text = Gtk.TextView()
-        args_text.get_buffer().set_text(args)
-        args_text.set_editable(False)
-        args_text.set_wrap_mode(Gtk.WrapMode.WORD)
-        args_text.set_size_request(-1, 60)
-        args_text.add_css_class("card")
-        config_group.add(args_row)
-        config_group.add(args_text)
-    else:
-        config_group.add(create_info_row("Arguments", "None"))
-    
-    # Environment Variables row
-    if env_vars:
-        env_row = Adw.ActionRow(title="Environment Variables")
-        env_text = Gtk.TextView()
-        env_text.get_buffer().set_text(env_vars)
-        env_text.set_editable(False)
-        env_text.set_wrap_mode(Gtk.WrapMode.WORD)
-        env_text.set_size_request(-1, 80)
-        env_text.add_css_class("card")
-        config_group.add(env_row)
-        config_group.add(env_text)
-    else:
-        config_group.add(create_info_row("Environment Variables", "None"))
-    
-    main_box.append(config_group)
-    
-    # Add to dialog
-    dialog.set_extra_child(main_box)
-    
-    # Add response buttons
-    dialog.add_response("close", "Close")
-    dialog.set_default_response("close")
-    
-    # Present the dialog
-    dialog.present(self.window)
+        print(f"Error running winetricks script {script_name}: {e}")    
