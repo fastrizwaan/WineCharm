@@ -718,6 +718,16 @@ def show_script_about(self, script_path, script_key, button):
     runner = script_data.get('runner')
     if not runner:
         system_wine_display, _ = self.get_system_wine()
+        runner_name = system_wine_display
+    else:
+        runner_dir = Path(runner).parent.parent
+        print(runner_dir)
+        runner_name = Path(runner).parent.parent.name
+        print(wineprefix)
+        if runner_dir.is_relative_to(wineprefix):
+            print("Runner is bundled; i.e., it is inside wineprefix")  
+            runner_name += " (Bundled)" 
+
     args = script_data.get('args', '')
     env_vars = script_data.get('env_vars', '')
     
@@ -886,18 +896,6 @@ def show_script_about(self, script_path, script_key, button):
             row.add_suffix(value_label)
             
             return row
-
-    # Get default runner from settings
-    settings = self.load_settings()
-    default_runner = os.path.abspath(os.path.expanduser(settings.get('runner', '')))
-        # Validate default runner
-    if default_runner:
-        if self.validate_runner(default_runner):
-            runner_name = Path(default_runner).parent.parent.name
-        else:
-            print(f"Invalid default runner: {default_runner}")
-            default_runner = ''
-
 
     # Basic Information Group
     basic_group = Adw.PreferencesGroup(title="Basic Information")
