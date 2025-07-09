@@ -56,6 +56,7 @@
       <description>
         <p>Feature: Improved about dialog.</p>
       </description>
+    </release>
     <release version="0.99.5" date="2025-06-25">
       <description>
         <p>bug fix: runner related</p>
