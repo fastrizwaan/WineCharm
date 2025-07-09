@@ -42,8 +42,20 @@
       <image>https://github.com/fastrizwaan/WineCharm/releases/download/0.99.0/WineCharm_winword_options.png</image>
       <caption>Window showing script options</caption>
     </screenshot>
+    <screenshot>
+      <image>https://github.com/fastrizwaan/WineCharm/releases/download/0.99.0/About.Banjo.Tooie.png</image>
+      <caption>About dialog showing use of Nintendo 64 Emulator Project64.exe and Banjo-Tooie N64 ROM as argument</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://github.com/fastrizwaan/WineCharm/releases/download/0.99.0/About.Rayman.png</image>
+      <caption>About dialog showing use of Playstation Emulator ePSXe.exe and Rayman CDROM iso (.cue) as argument</caption>
+    </screenshot>
   </screenshots>
   <releases>
+    <release version="0.99.6" date="2025-07-09">
+      <description>
+        <p>Feature: Improved about dialog.</p>
+      </description>
     <release version="0.99.5" date="2025-06-25">
       <description>
         <p>bug fix: runner related</p>
