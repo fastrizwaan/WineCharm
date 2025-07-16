@@ -52,6 +52,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.99.7" date="2025-07-16">
+      <description>
+        <p>Feature: Fixed Install dxvk vkd3d dialog.</p>
+      </description>
+    </release>
     <release version="0.99.6" date="2025-07-09">
       <description>
         <p>Feature: Improved about dialog.</p>
