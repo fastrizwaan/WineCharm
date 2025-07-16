@@ -536,6 +536,9 @@ class WineCharmApp(Adw.Application):
                 'callback_wrapper',
                 'update_execute_button_icon',
                 'run_winetricks_script',
+                'install_dxvk_vkd3d',
+                'on_install_dxvk_vkd3d_response',
+                'run_winetricks_threaded',
             ],
             save_load_users_dir: [
                 'show_save_user_dirs_dialog',

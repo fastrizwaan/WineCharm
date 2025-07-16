@@ -71,7 +71,7 @@ def show_options_for_script(self, ui_state, row, script_key):
     self.script_options = [
         ("Show log", "mail-mark-junk-symbolic", self.show_log_file),
         ("Open Terminal", "utilities-terminal-symbolic", self.open_terminal),
-        #("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
+        ("Install dxvk vkd3d", "emblem-system-symbolic", self.install_dxvk_vkd3d),
         ("Open Filemanager", "system-file-manager-symbolic", self.open_filemanager),
         ("Edit Script File", "text-editor-symbolic", self.open_script_file),
         ("Delete Wineprefix", "user-trash-symbolic", self.show_delete_wineprefix_confirmation),
@@ -223,12 +223,6 @@ def open_terminal(self, script, script_key, *args):
     except Exception as e:
         print(f"Error opening terminal: {e}")
 
-
-#def install_dxvk_vkd3d(self, script, button):
-#    self.print_method_name()
-#    wineprefix = Path(script).parent
-#    self.run_winetricks_script("vkd3d dxvk", wineprefix)
-#    self.create_script_list()
 
 def open_filemanager(self, script, script_key, *args):
     self.count = 0
@@ -1993,3 +1987,158 @@ def run_winetricks_script(self, script_name, wineprefix):
         print(f"Successfully ran {script_name} in {wineprefix}")
     except subprocess.CalledProcessError as e:
         print(f"Error running winetricks script {script_name}: {e}")    
+
+def install_dxvk_vkd3d(self, script, script_key, *args):
+    self.print_method_name()
+    """
+    Show a dialog to select dxvk and/or vkd3d for installation.
+    Marks checkboxes based on winetricks.log content.
+    """
+    wineprefix = Path(script).parent
+    log_file = wineprefix / "winetricks.log"
+    
+    has_dxvk = False
+    has_vkd3d = False
+
+    if log_file.exists():
+        with open(log_file, 'r') as f:
+            log_content = f.read().splitlines()
+            has_dxvk = "dxvk" in log_content
+            has_vkd3d = "vkd3d" in log_content
+
+    dialog = Adw.AlertDialog(
+        heading="Install dxvk and vkd3d",
+        body="Select components to install:"
+    )
+
+    vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+
+    dxvk_label = "dxvk"
+    if has_dxvk:
+        dxvk_label += " [Found]"
+    dxvk_check = Gtk.CheckButton(label=dxvk_label)
+    dxvk_check.set_active(not has_dxvk)
+
+    vkd3d_label = "vkd3d"
+    if has_vkd3d:
+        vkd3d_label += " [Found]"
+    vkd3d_check = Gtk.CheckButton(label=vkd3d_label)
+    vkd3d_check.set_active(not has_vkd3d)
+
+    vbox.append(dxvk_check)
+    vbox.append(vkd3d_check)
+
+    dialog.set_extra_child(vbox)
+    dialog.add_response("cancel", "Cancel")
+    dialog.add_response("install", "Install")
+    dialog.set_response_appearance("install", Adw.ResponseAppearance.SUGGESTED)
+    dialog.set_default_response("cancel")
+
+    dialog.connect("response", self.on_install_dxvk_vkd3d_response, wineprefix, dxvk_check, vkd3d_check)
+    dialog.present(self.window)
+
+
+def on_install_dxvk_vkd3d_response(self, dialog, response_id, wineprefix, dxvk_check, vkd3d_check):
+    self.print_method_name()
+    """
+    Handle response from dxvk/vkd3d installation dialog and open a new dialog with progress bar.
+    """
+    if response_id == "install":
+        components = []
+        if dxvk_check.get_active():
+            components.append("dxvk")
+        if vkd3d_check.get_active():
+            components.append("vkd3d")
+
+        if components:
+            progress_dialog = Adw.AlertDialog(
+                heading="Installing Components",
+            )
+            progress_dialog.set_size_request(400, 200)
+
+            vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            progress_bar = Gtk.ProgressBar()
+            progress_bar.set_show_text(True)
+            progress_bar.set_text("Starting installation...")
+            vbox.append(progress_bar)
+
+            progress_dialog.set_extra_child(vbox)
+            progress_dialog.add_response("cancel", "Cancel")
+            progress_dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
+            progress_dialog.set_default_response("cancel")
+
+            self.install_cancelled = False
+
+            def on_progress_dialog_response(dialog, response_id):
+                if response_id == "cancel":
+                    self.install_cancelled = True
+                    print("Installation cancelled by user")
+                    dialog.close()
+
+            progress_dialog.connect("response", on_progress_dialog_response)
+
+            threading.Thread(
+                target=self.run_winetricks_threaded,
+                args=(components, wineprefix, progress_bar, progress_dialog),
+                daemon=True
+            ).start()
+
+            progress_dialog.present(self.window)
+        else:
+            print("No components selected for installation")
+            self.show_info_dialog("No Selection", "Please select at least one component to install.")
+            dialog.close()
+    else:
+        print("Installation canceled")
+        dialog.close()
+
+
+def run_winetricks_threaded(self, components, wineprefix, progress_bar, progress_dialog):
+    self.print_method_name()
+    """
+    Run winetricks commands in a threaded manner with progress updates.
+    """
+    total_steps = len(components)
+    current_step = 0
+    success = True
+
+    def update_progress(fraction, text):
+        if not self.install_cancelled:
+            GLib.idle_add(progress_bar.set_fraction, fraction)
+            GLib.idle_add(progress_dialog.set_body, text)
+
+    progress_bar.set_show_text(False)  # Disable text on progress bar
+
+    for component in components:
+        if self.install_cancelled:
+            success = False
+            break
+        current_step += 1
+        update_progress(current_step / total_steps, f"Installing {component}...")
+        command = f"WINEPREFIX={shlex.quote(str(wineprefix))} winetricks -q {component}"
+        try:
+            process = subprocess.Popen(command, shell=True)
+            process.wait()
+            if process.returncode != 0:
+                success = False
+                print(f"Installation of {component} failed with return code {process.returncode}")
+                GLib.idle_add(self.show_info_dialog, "Installation Error", f"Failed to install {component}: Return code {process.returncode}\n try Open Terminal then run \n \"winetricks -q dxvk vkd3d\"")
+        except subprocess.CalledProcessError as e:
+            if not self.install_cancelled:
+                success = False
+                print(f"Error installing {component}: {e}")
+                GLib.idle_add(self.show_info_dialog, "Installation Error", f"Failed to install {component}: {e}")
+        time.sleep(0.5)  # Brief pause for UI updates
+
+    if self.install_cancelled:
+        GLib.idle_add(progress_dialog.close)
+    else:
+        update_progress(1.0, "Installation complete")
+        if success:
+            GLib.idle_add(progress_dialog.remove_response, "cancel")
+            GLib.idle_add(progress_dialog.add_response, "close", "Close")
+            GLib.idle_add(progress_dialog.set_response_appearance, "close", Adw.ResponseAppearance.SUGGESTED)
+            GLib.idle_add(self.create_script_list)
+        time.sleep(1)  # Allow user to see completion
+        if not success:
+            progress_dialog.close()
