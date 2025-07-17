@@ -46,6 +46,9 @@ def show_save_user_dirs_dialog(self, script, script_key, button):
     self.dir_list = Gtk.ListBox()
     self.dir_list.set_selection_mode(Gtk.SelectionMode.NONE)
     self.dir_list.add_css_class("boxed-list") 
+
+    # Dictionary to track checkboxes for each row
+    self.dir_checkboxes = {}
     
     # Load saved directories from .charm file
     script_data = self.extract_yaml_info(script_key)
@@ -59,20 +62,30 @@ def show_save_user_dirs_dialog(self, script, script_key, button):
             # Validate saved directory
             valid, _unused = self.is_valid_directory(saved_path, wineprefix)
             if valid:
-                row = Gtk.ListBoxRow()
-                check = Gtk.CheckButton(label=str(saved_path))
+                row = Adw.ActionRow()
+                row.set_title(os.path.basename(str(saved_path)))
+                row.set_subtitle(str(saved_path))
+                check = Gtk.CheckButton()
                 check.set_active(True)
-                row.set_child(check)
+                row.add_suffix(check)
+                row.set_activatable_widget(check)
                 self.dir_list.append(row)
+                # Store checkbox reference
+                self.dir_checkboxes[row] = check
                 added_any = True
     
     # If no valid directories were added, add the default
     if not added_any:
-        default_row = Gtk.ListBoxRow()
-        default_check = Gtk.CheckButton(label=str(default_dir))
-        default_check.set_active(True)
-        default_row.set_child(default_check)
-        self.dir_list.append(default_row)
+        row = Adw.ActionRow()
+        row.set_title(os.path.basename(str(default_dir)))
+        row.set_subtitle(str(default_dir))
+        check = Gtk.CheckButton()
+        check.set_active(True)
+        row.add_suffix(check)
+        row.set_activatable_widget(check)
+        self.dir_list.append(row)
+        # Store checkbox reference
+        self.dir_checkboxes[row] = check
     
     scrolled.set_child(self.dir_list)
     content_box.append(scrolled)
@@ -90,8 +103,15 @@ def show_save_user_dirs_dialog(self, script, script_key, button):
 def on_directory_dialog_response(self, dialog, response_id, script, script_key):
     """Handle dialog response and save selected directories to .charm file."""
     if response_id == "ok":
-        selected_dirs = [row.get_child().get_label() for row in self.dir_list 
-                        if row.get_child().get_active()]
+        # Get all rows from ListBox
+        rows = []
+        child = self.dir_list.get_first_child()
+        while child is not None:
+            rows.append(child)
+            child = child.get_next_sibling()
+
+        # Get selected directories using the checkbox dictionary
+        selected_dirs = [row.get_subtitle() for row in rows if self.dir_checkboxes[row].get_active()]
         self.show_save_file_dialog(script, script_key, selected_dirs)
         
         # Update the .charm file with selected directories
@@ -133,15 +153,26 @@ def on_add_directory(self, button, parent_dialog, wineprefix):
                 return
             
             # Check for duplicates
-            if any(row.get_child().get_label() == path for row in self.dir_list):
+            existing_rows = []
+            child = self.dir_list.get_first_child()
+            while child is not None:
+                existing_rows.append(child)
+                child = child.get_next_sibling()
+
+            if any(row.get_subtitle() == path for row in existing_rows):
                 return  # Silently ignore duplicates
             
             # Add the directory to the list
-            row = Gtk.ListBoxRow()
-            check = Gtk.CheckButton(label=path)
+            row = Adw.ActionRow()
+            row.set_title(os.path.basename(path))
+            row.set_subtitle(path)
+            check = Gtk.CheckButton()
             check.set_active(True)
-            row.set_child(check)
+            row.add_suffix(check)
+            row.set_activatable_widget(check)
             self.dir_list.append(row)
+            # Store checkbox reference
+            self.dir_checkboxes[row] = check
         except GLib.Error as e:
             if e.code != Gtk.DialogError.DISMISSED:
                 print(f"Directory selection error: {e}")
