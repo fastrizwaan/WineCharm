@@ -256,6 +256,7 @@ def open_script_file(self, script, script_key, *args):
         subprocess.Popen(command)
     except Exception as e:
         print(f"Error opening file manager: {e}")
+
 def run_other_exe(self, script, script_key, *args):
     self.print_method_name()
     """copy_game_directory
@@ -300,18 +301,20 @@ def on_run_other_exe_response(self, dialog, result, script, script_key):
         if file:
             exe_path = Path(file.get_path()).expanduser().resolve()
             exe_parent = shlex.quote(str(exe_path.parent.resolve()))
-            runner = shlex.quote(str(runner_path))
-            exe_name = shlex.quote(str(exe_path.name))
+            #runner = shlex.quote(str(runner_path))
+            #exe_name = shlex.quote(str(exe_path.name))
 
             # Formulate the command to run the selected executable
             if path_env:
                 command = (f"{path_env}; cd {exe_parent} && "
                         f"{wine_debug} {env_vars} WINEPREFIX={shlex.quote(str(wineprefix))} "
-                        f"{runner} {exe_name} {script_args}")
+                        f"{shlex.quote(str(runner_path))} {shlex.quote(str(exe_path.name))} ")
             else:
                 command = (f"cd {exe_parent} && "
                         f"{wine_debug} {env_vars} WINEPREFIX={shlex.quote(str(wineprefix))} "
-                        f"{runner} {exe_name} {script_args}")
+                        f"{shlex.quote(str(runner_path))} {shlex.quote(str(exe_path.name))} ")
+
+            # {script_args} been removed since, other exe should not run the args
 
             print(f"Running command: {command}")
 
