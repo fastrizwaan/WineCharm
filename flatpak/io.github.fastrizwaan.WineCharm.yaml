@@ -128,8 +128,8 @@ modules:
       - make install 
     sources:
       - type: archive
-        url: https://exiftool.org/Image-ExifTool-13.30.tar.gz
-        sha256: 885afd06c4efcc60d1df703cc88ba7ddc3bb6fed854cfbaa9e6cd72adfbe8da9
+        url: https://sourceforge.net/projects/exiftool/files/Image-ExifTool-13.33.tar.gz
+        sha256: 0cc6ecb10d529969a7e7766f5160ad591efa9bba7513b9185c8a1e6c54421fed
         
 
   - name: psutil
