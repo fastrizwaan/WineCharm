@@ -1,31 +1,27 @@
 #!/bin/bash
-
 INSTALL_PATH="/usr/local"
+SRC_PATH="src/winecharm"
 FORCE_INSTALL=false
-
 # List of required Python modules
 REQUIRED_PYTHON_MODULES=(
     "gi"
     "PyYAML"
     "psutil"
-    "argparse"  # argparse is part of standard library (Python >= 2.7) but included for safety
+    "argparse"
 )
-
 show_help() {
     echo "Usage: ./setup.sh [OPTION]..."
     echo "Install or uninstall WineCharm."
     echo ""
     echo "Options:"
-    echo "  -i, --install         Install WineCharm"
-    echo "  -u, --uninstall       Uninstall WineCharm"
-    echo "  -p, --prefix=PATH     Specify installation prefix (default: /usr/local)"
-    echo "  -f, --force           Force installation even if dependencies are not met"
-    echo "  -h, --help            Display this help and exit"
+    echo " -i, --install Install WineCharm"
+    echo " -u, --uninstall Uninstall WineCharm"
+    echo " -p, --prefix=PATH Specify installation prefix (default: /usr/local)"
+    echo " -f, --force Force installation even if dependencies are not met"
+    echo " -h, --help Display this help and exit"
 }
-
 check_dependencies() {
     local missing_programs=()
-
     if ! command -v "flatpak-spawn" &> /dev/null; then
         local required_programs=(
             'exiftool'
@@ -37,126 +33,110 @@ check_dependencies() {
             'gnome-terminal'
             'xdg-open'
         )
-
         for prog in "${required_programs[@]}"; do
             if ! command -v "$prog" &> /dev/null; then
                 missing_programs+=("$prog")
             fi
         done
     fi
-
     if [ ${#missing_programs[@]} -ne 0 ]; then
         echo "The following required programs are missing:"
         for prog in "${missing_programs[@]}"; do
-            echo "  - $prog"
+            echo " - $prog"
         done
         echo ""
         echo "Please install them before proceeding or use the -f or --force option to install WineCharm anyway."
         echo ""
-        echo "on Debian:"
+        echo "On Debian:"
         echo "sudo dpkg --add-architecture i386 && sudo apt update -y"
         echo "sudo apt install zenity wine wine32 wine64 winetricks libimage-exiftool-perl icoutils gnome-terminal wget zstd winbind python3-yaml python3-psutil"
+        return 1
     fi
-
     return 0
 }
-
 check_python_dependencies() {
     local missing_modules=()
-
-    # Adjust the module name for PyYAML to 'yaml', as that's the correct import name.
     for module in "${REQUIRED_PYTHON_MODULES[@]}"; do
         if [ "$module" == "PyYAML" ]; then
             python3 -c "import yaml" &> /dev/null
         else
             python3 -c "import $module" &> /dev/null
         fi
-
         if [ $? -ne 0 ]; then
             missing_modules+=("$module")
         fi
     done
-
     if [ ${#missing_modules[@]} -ne 0 ]; then
         echo "The following required Python modules are missing:"
         for module in "${missing_modules[@]}"; do
-            echo "  - $module"
+            echo " - $module"
         done
         echo ""
         echo "You can install them using pip:"
-        echo "  pip3 install ${missing_modules[*]}"
+        echo "pip3 install ${missing_modules[*]}"
         return 1
     fi
-
     return 0
 }
-
 install_files() {
     echo "Installing WineCharm to $INSTALL_PATH..."
-
+    # Create Python package directory
+    mkdir -p "$INSTALL_PATH/winecharm"
+    # Install Python package files from src/winecharm/
+    install -Dm644 $SRC_PATH/*.py "$INSTALL_PATH/winecharm/"
+    chmod +rx "$INSTALL_PATH/winecharm/winecharm.py"
     # Install main script from src/
-    install -Dm755 src/winecharm.py "$INSTALL_PATH/bin/winecharm"
-
+    ln -sf  "$INSTALL_PATH/winecharm/winecharm.py" "$INSTALL_PATH/bin/winecharm"
     # Install app icon from data/icons/
     install -Dm644 data/icons/io.github.fastrizwaan.WineCharm.svg "$INSTALL_PATH/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg"
-
     # Install .desktop file from data/shortcut/
     install -Dm644 data/shortcut/io.github.fastrizwaan.WineCharm.desktop "$INSTALL_PATH/share/applications/io.github.fastrizwaan.WineCharm.desktop"
-
     # Install additional Wine icon from data/icons/
     install -Dm644 data/icons/org.winehq.Wine.png "$INSTALL_PATH/share/icons/hicolor/128x128/apps/org.winehq.Wine.png"
-
     # Install action icons from data/icons/
     for icon in data/icons/*-symbolic.svg; do
         install -Dm644 "$icon" "$INSTALL_PATH/share/icons/hicolor/scalable/actions/$(basename "$icon")"
     done
-
     # Install MIME type definition from data/mimetype/
     install -Dm644 data/mimetype/winecharm-backup-file.xml "$INSTALL_PATH/share/mime/packages/winecharm-backup-file.xml"
-
     # Install metainfo file from data/appdata/
     install -Dm644 data/appdata/io.github.fastrizwaan.WineCharm.metainfo.xml "$INSTALL_PATH/share/metainfo/io.github.fastrizwaan.WineCharm.metainfo.xml"
-
     # Update system databases
     echo "Updating MIME, icon, and appdata caches..."
     update-mime-database "$INSTALL_PATH/share/mime" &> /dev/null || echo "Failed to update MIME database."
     gtk-update-icon-cache "$INSTALL_PATH/share/icons/hicolor/" &> /dev/null || echo "Failed to update icon cache."
     update-desktop-database "$INSTALL_PATH/share/applications/" &> /dev/null || echo "Failed to update desktop database."
     update-appdata-cache "$INSTALL_PATH/share/metainfo/" &> /dev/null || echo "Failed to update appdata cache."
-
     echo "WineCharm installed successfully."
 }
-
 uninstall_files() {
     echo "Uninstalling WineCharm from $INSTALL_PATH..."
-
-    # Remove installed files
+    # Remove Python package directory
+    rm -rf "$INSTALL_PATH/winecharm/"
+    # Remove main script
     rm -f "$INSTALL_PATH/bin/winecharm"
+    # Remove app icon
     rm -f "$INSTALL_PATH/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg"
+    # Remove .desktop file
     rm -f "$INSTALL_PATH/share/applications/io.github.fastrizwaan.WineCharm.desktop"
+    # Remove additional Wine icon
     rm -f "$INSTALL_PATH/share/icons/hicolor/128x128/apps/org.winehq.Wine.png"
-
     # Remove action icons
     for icon in data/icons/*-symbolic.svg; do
         rm -f "$INSTALL_PATH/share/icons/hicolor/scalable/actions/$(basename "$icon")"
     done
-
     # Remove MIME type definition
     rm -f "$INSTALL_PATH/share/mime/packages/winecharm-backup-file.xml"
-
     # Remove metainfo file
     rm -f "$INSTALL_PATH/share/metainfo/io.github.fastrizwaan.WineCharm.metainfo.xml"
-
     # Update system databases
     echo "Updating MIME, icon, and appdata caches after uninstall..."
     update-mime-database "$INSTALL_PATH/share/mime" &> /dev/null || echo "Failed to update MIME database."
     gtk-update-icon-cache "$INSTALL_PATH/share/icons/hicolor/" &> /dev/null || echo "Failed to update icon cache."
     update-desktop-database "$INSTALL_PATH/share/applications/" &> /dev/null || echo "Failed to update desktop database."
     update-appdata-cache "$INSTALL_PATH/share/metainfo/" &> /dev/null || echo "Failed to update appdata cache."
-
     echo "WineCharm uninstalled successfully."
 }
-
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
     key="$1"
@@ -170,7 +150,6 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -p|--prefix=*)
-            # Extract the value after --prefix=
             INSTALL_PATH="${key#*=}"
             shift
             ;;
@@ -189,23 +168,19 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
 if [ -z "$ACTION" ]; then
     show_help
     exit 0
 fi
-
 if [ "$ACTION" == "install" ]; then
     if ! check_dependencies && [ "$FORCE_INSTALL" = false ]; then
         echo "Dependencies are not satisfied. Use -f or --force to force the installation."
         exit 1
     fi
-
     if ! check_python_dependencies && [ "$FORCE_INSTALL" = false ]; then
         echo "Python dependencies are not satisfied. Use -f or --force to force the installation."
         exit 1
     fi
-
     install_files
 elif [ "$ACTION" == "uninstall" ]; then
     uninstall_files
