@@ -91,7 +91,7 @@ class WineCharmApp(Adw.Application):
         
         # Move the global variables to instance attributes
         self.debug = False
-        self.version = "0.99.8"
+        self.version = "0.99.9"
         # Paths and directories
         self.winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
         self.prefixes_dir = self.winecharmdir / "Prefixes"

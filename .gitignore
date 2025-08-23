@@ -12,3 +12,4 @@ build
 src/winecharm.egg-info/
 src/winecharm/__pycache__
 src/winecharm.egg-info
+build
