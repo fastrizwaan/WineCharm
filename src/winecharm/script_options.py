@@ -93,6 +93,7 @@ def show_options_for_script(self, ui_state, row, script_key):
         ("Rename Prefix Directory", "rename-prefix-symbolic", self.rename_prefix_directory),
         ("Wine Config (winecfg)", "preferences-system-symbolic", self.wine_config),
         ("Registry Editor (regedit)", "dialog-password-symbolic", self.wine_registry_editor),
+        ("Winetricks GUI", "applications-system-symbolic", self.winetricks_gui),
         ("About", "dialog-information-symbolic", self.show_script_about),
     ]
 
@@ -2145,3 +2146,41 @@ def run_winetricks_threaded(self, components, wineprefix, progress_bar, progress
         time.sleep(1)  # Allow user to see completion
         if not success:
             progress_dialog.close()
+
+
+
+def winetricks_gui(self, script, script_key, *args):
+    self.print_method_name()
+    script_data = self.script_list.get(script_key)
+    if not script_data:
+        return None
+
+    wineprefix = Path(str(script_data.get('script_path', ''))).expanduser().resolve().parent
+    env_vars  = str(script_data.get('env_vars', ''))
+    wine_debug = str(script_data.get('wine_debug', ''))
+
+    try:
+        runner_path = self.get_runner(script_data)
+
+        if isinstance(runner_path, Path):
+            runner_dir = shlex.quote(str(runner_path.parent))
+            path_env = f'export PATH="{runner_dir}:$PATH"'
+            runner = shlex.quote(str(runner_path))
+        else:
+            runner_dir = ""
+            path_env = ""
+            runner = shlex.quote(str(runner_path))
+
+        # If we can export PATH (runner on PATH), plain `winetricks` works.
+        # Otherwise, run via runner explicitly.
+        if path_env:
+            command = f"{path_env}; WINEPREFIX={shlex.quote(str(wineprefix))} winetricks"
+        else:
+            command = f"{wine_debug} {env_vars} WINEPREFIX={shlex.quote(str(wineprefix))} {runner} winetricks"
+
+        print(f"Running command: {command}")
+        subprocess.Popen(command, shell=True)
+        print(f"Launching Winetricks GUI for Wine prefix {wineprefix}")
+
+    except Exception as e:
+        print(f"Error launching Winetricks GUI: {e}")

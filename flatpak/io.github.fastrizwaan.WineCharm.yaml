@@ -168,7 +168,14 @@ modules:
       - type: git
         url: https://gitlab.gnome.org/GNOME/vte.git/
         commit: 3f66edbf598129bafde3baa91ccfb345056418c3
-        
+
+  - name: zenity
+    buildsystem: meson
+    sources:
+      - type: archive
+        url: https://download.gnome.org/sources/zenity/3.44/zenity-3.44.5.tar.xz
+        sha256: 29ac447f4246b1da783a3c28ddc80b0ef7c80eccd5836ad9140abf89841d0eab
+                
   - name: WineCharm
     buildsystem: simple
     build-commands:
