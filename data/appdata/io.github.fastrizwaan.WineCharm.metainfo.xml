@@ -52,6 +52,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.99.9" date="2025-08-24">
+      <description>
+        <p>Feature: added Winetricks GUI in options.</p>
+      </description>
+    </release>
     <release version="0.99.8" date="2025-07-17">
       <description>
         <p>Feature: Improved save users directory dialog.</p>
