@@ -5,7 +5,7 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
+"Project-Id-Version: io.github.fastrizwaan.WineCharm\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2025-08-29 09:18+0530\n"
 "PO-Revision-Date: 2025-08-29 09:18+0530\n"
