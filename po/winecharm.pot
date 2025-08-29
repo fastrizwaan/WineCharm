@@ -1,0 +1,223 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-08-29 07:32+0530\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/winecharm/save_load_users_dir.py:28
+msgid "Select Directories to Backup"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:29
+msgid "Choose which directories to include in the backup."
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:31
+#: src/winecharm/save_load_users_dir.py:277
+msgid "Cancel"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:32
+#: src/winecharm/save_load_users_dir.py:364 src/winecharm/ui.py:1385
+msgid "OK"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:94
+msgid "Add Directory"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:132
+#: src/winecharm/save_load_users_dir.py:152
+msgid "Error"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:133
+msgid "Failed to save directories: {}"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:140
+msgid "Select Directory to Add"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:234
+msgid "Backup Complete"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:235
+msgid ""
+"User directories saved to:\n"
+"{}"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:238
+msgid "Backup Failed"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:274
+msgid "Confirm Restore"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:275
+msgid "Restoring from {} will overwrite existing user directories. Proceed?"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:278
+msgid "Restore"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:309
+msgid "Restore Complete"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:310
+msgid ""
+"User directories restored to:\n"
+"{}"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:313
+msgid "Restore Failed"
+msgstr ""
+
+#: src/winecharm/ui.py:63 src/winecharm/ui.py:64
+msgid "Wine Charm"
+msgstr ""
+
+#: src/winecharm/ui.py:74
+msgid "Back"
+msgstr ""
+
+#: src/winecharm/ui.py:87 src/winecharm/ui.py:155
+msgid "Search"
+msgstr ""
+
+#: src/winecharm/ui.py:96
+msgid "Toggle Icon/List View"
+msgstr ""
+
+#: src/winecharm/ui.py:107
+msgid "Menu"
+msgstr ""
+
+#: src/winecharm/ui.py:113
+msgid "Name (A-Z)"
+msgstr ""
+
+#: src/winecharm/ui.py:114
+msgid "Name (Z-A)"
+msgstr ""
+
+#: src/winecharm/ui.py:115
+msgid "Wineprefix (A-Z)"
+msgstr ""
+
+#: src/winecharm/ui.py:116
+msgid "Wineprefix (Z-A)"
+msgstr ""
+
+#: src/winecharm/ui.py:117
+msgid "Time (Newest First)"
+msgstr ""
+
+#: src/winecharm/ui.py:118
+msgid "Time (Oldest First)"
+msgstr ""
+
+#: src/winecharm/ui.py:119
+msgid "🔠 Sort"
+msgstr ""
+
+#: src/winecharm/ui.py:122
+msgid "Open Filemanager"
+msgstr ""
+
+#: src/winecharm/ui.py:123
+msgid "Open Terminal"
+msgstr ""
+
+#: src/winecharm/ui.py:124
+msgid "📂 Open"
+msgstr ""
+
+#: src/winecharm/ui.py:142 src/winecharm/ui.py:537 src/winecharm/ui.py:691
+#: src/winecharm/ui.py:1254
+msgid "Open"
+msgstr ""
+
+#: src/winecharm/ui.py:268
+#, python-brace-format
+msgid "Error in search button handling: {e}"
+msgstr ""
+
+#: src/winecharm/ui.py:431
+#, python-brace-format
+msgid "No matches found for search term: {term}"
+msgstr ""
+
+#: src/winecharm/ui.py:496 src/winecharm/ui.py:1003 src/winecharm/ui.py:1101
+#: src/winecharm/ui.py:1138 src/winecharm/ui.py:1174
+msgid "Stop"
+msgstr ""
+
+#: src/winecharm/ui.py:499 src/winecharm/ui.py:788 src/winecharm/ui.py:901
+#: src/winecharm/ui.py:1006 src/winecharm/ui.py:1104 src/winecharm/ui.py:1141
+#: src/winecharm/ui.py:1174
+msgid "Play"
+msgstr ""
+
+#: src/winecharm/ui.py:517
+msgid "EXE and MSI files"
+msgstr ""
+
+#: src/winecharm/ui.py:542
+msgid "Processing..."
+msgstr ""
+
+#: src/winecharm/ui.py:551
+#, python-brace-format
+msgid "An error occurred: {e}"
+msgstr ""
+
+#: src/winecharm/ui.py:602
+#, python-brace-format
+msgid "Error opening file manager: {e}"
+msgstr ""
+
+#: src/winecharm/ui.py:647
+msgid "No suitable terminal emulator found."
+msgstr ""
+
+#: src/winecharm/ui.py:666
+#, python-brace-format
+msgid "Error opening terminal: {e}"
+msgstr ""
+
+#: src/winecharm/ui.py:753 src/winecharm/ui.py:906
+msgid "Options"
+msgstr ""
+
+#: src/winecharm/ui.py:1276
+msgid "Open button disabled."
+msgstr ""
+
+#: src/winecharm/ui.py:1282
+msgid "Open button enabled."
+msgstr ""
+
+#: src/winecharm/ui.py:1330
+#, python-brace-format
+msgid "Step {current}/{total}"
+msgstr ""

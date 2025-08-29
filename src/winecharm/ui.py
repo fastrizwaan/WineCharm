@@ -8,6 +8,17 @@ import shlex
 import yaml
 from pathlib import Path
 
+# --- i18n (minimal additions) ---
+import locale, gettext
+APP_ID = "io.github.fastrizwaan.WineCharm"
+LOCALE_DIR = str(Path(__file__).with_name("locale"))
+locale.setlocale(locale.LC_ALL, "")
+gettext.bindtextdomain(APP_ID, LOCALE_DIR)
+gettext.textdomain(APP_ID)
+_ = gettext.gettext
+ngettext = gettext.ngettext
+# --- end i18n ---
+
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
@@ -49,8 +60,8 @@ def create_main_window(self):
     app_icon.set_pixel_size(18)
     self.title_box.append(app_icon)
     
-    title_label = Gtk.Label(label="Wine Charm")
-    title_label.set_markup("<b>Wine Charm</b>")
+    title_label = Gtk.Label(label=_("Wine Charm"))
+    title_label.set_markup(f"<b>{_('Wine Charm')}</b>")
     title_label.set_use_markup(True)
     self.title_box.append(title_label)
     
@@ -60,6 +71,7 @@ def create_main_window(self):
     self.back_button = Gtk.Button.new_from_icon_name("go-previous-symbolic")
     self.back_button.add_css_class("flat")
     self.back_button.set_visible(False)
+    self.back_button.set_tooltip_text(_("Back"))
     self.back_button.connect("clicked", self.on_back_button_clicked)
     self.headerbar.pack_start(self.back_button)
 
@@ -72,6 +84,7 @@ def create_main_window(self):
     self.search_button.set_child(search_icon)
     self.search_button.connect("toggled", self.on_search_button_clicked)
     self.search_button.add_css_class("flat")
+    self.search_button.set_tooltip_text(_("Search"))
     view_and_sort_box.append(self.search_button)
 
     # View toggle button
@@ -80,7 +93,7 @@ def create_main_window(self):
     list_view_icon = Gtk.Image.new_from_icon_name("view-list-symbolic")
     self.view_toggle_button.set_child(icon_view_icon if self.icon_view else list_view_icon)
     self.view_toggle_button.add_css_class("flat")
-    self.view_toggle_button.set_tooltip_text("Toggle Icon/List View")
+    self.view_toggle_button.set_tooltip_text(_("Toggle Icon/List View"))
     self.view_toggle_button.connect("toggled", self.on_view_toggle_button_clicked)
     view_and_sort_box.append(self.view_toggle_button)
 
@@ -91,30 +104,30 @@ def create_main_window(self):
     menu_icon = Gtk.Image.new_from_icon_name("open-menu-symbolic")
     self.menu_button.set_child(menu_icon)
     self.menu_button.add_css_class("flat")
-    self.menu_button.set_tooltip_text("Menu")
+    self.menu_button.set_tooltip_text(_("Menu"))
     self.headerbar.pack_end(self.menu_button)
 
     # Create main menu
     menu = Gio.Menu()
     sort_submenu = Gio.Menu()
-    sort_submenu.append("Name (A-Z)", "win.sort::progname::False")
-    sort_submenu.append("Name (Z-A)", "win.sort::progname::True")
-    sort_submenu.append("Wineprefix (A-Z)", "win.sort::wineprefix::False")
-    sort_submenu.append("Wineprefix (Z-A)", "win.sort::wineprefix::True")
-    sort_submenu.append("Time (Newest First)", "win.sort::mtime::True")
-    sort_submenu.append("Time (Oldest First)", "win.sort::mtime::False")
-    menu.append_submenu("🔠 Sort", sort_submenu)
+    sort_submenu.append(_("Name (A-Z)"), "win.sort::progname::False")
+    sort_submenu.append(_("Name (Z-A)"), "win.sort::progname::True")
+    sort_submenu.append(_("Wineprefix (A-Z)"), "win.sort::wineprefix::False")
+    sort_submenu.append(_("Wineprefix (Z-A)"), "win.sort::wineprefix::True")
+    sort_submenu.append(_("Time (Newest First)"), "win.sort::mtime::True")
+    sort_submenu.append(_("Time (Oldest First)"), "win.sort::mtime::False")
+    menu.append_submenu(_("🔠 Sort"), sort_submenu)
 
     open_submenu = Gio.Menu()
-    open_submenu.append("Open Filemanager", "win.open_filemanager_winecharm")
-    open_submenu.append("Open Terminal", "win.open_terminal_winecharm")
-    menu.append_submenu("📂 Open", open_submenu)
+    open_submenu.append(_("Open Filemanager"), "win.open_filemanager_winecharm")
+    open_submenu.append(_("Open Terminal"), "win.open_terminal_winecharm")
+    menu.append_submenu(_("📂 Open"), open_submenu)
     
     self.menu_button.set_menu_model(menu)
 
     # Add hamburger menu actions
     for label, action in self.hamburger_actions:
-        menu.append(label, f"win.{action.__name__}")
+        menu.append(_(label), f"win.{action.__name__}")
         action_item = Gio.SimpleAction.new(action.__name__, None)
         action_item.connect("activate", action)
         self.window.add_action(action_item)
@@ -126,7 +139,7 @@ def create_main_window(self):
     self.open_button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
     self.open_button_box.set_halign(Gtk.Align.CENTER)
     open_icon = Gtk.Image.new_from_icon_name("folder-open-symbolic")
-    open_label = Gtk.Label(label="Open")
+    open_label = Gtk.Label(label=_("Open"))
     self.open_button_box.append(open_icon)
     self.open_button_box.append(open_label)
 
@@ -139,7 +152,7 @@ def create_main_window(self):
     # Search entry
     self.search_entry = Gtk.Entry()
     self.search_entry.set_size_request(-1, 40)
-    self.search_entry.set_placeholder_text("Search")
+    self.search_entry.set_placeholder_text(_("Search"))
     self.search_entry.connect("activate", self.on_search_entry_activated)
     self.search_entry.connect("changed", self.on_search_entry_changed)
     self.search_entry_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -252,7 +265,7 @@ def on_search_button_clicked(self, button):
             self.search_entry.grab_focus()
             self.search_active = True
     except Exception as e:
-        print(f"Error in search button handling: {e}")
+        print(_("Error in search button handling: {e}").format(e=e))
 
 def populate_script_options(self, filter_text=""):
     self.print_method_name()
@@ -277,7 +290,7 @@ def populate_script_options(self, filter_text=""):
             option_button.set_child(option_hbox)
 
             option_icon = Gtk.Image.new_from_icon_name(icon_name)
-            option_label = Gtk.Label(label=label)
+            option_label = Gtk.Label(label=_(label))
             option_label.set_xalign(0)
             option_label.set_hexpand(True)
             option_label.set_ellipsize(Pango.EllipsizeMode.END)
@@ -415,7 +428,7 @@ def filter_script_list(self, search_term):
 
 
     if not found_match:
-        print(f"No matches found for search term: {search_term}")
+        print(_("No matches found for search term: {term}").format(term=search_term))
 
 def update_ui_for_running_process(self, current_running_processes):
 
@@ -480,10 +493,10 @@ def update_ui_for_running_process(self, current_running_processes):
         if self.launch_button and getattr(self, 'launch_button_exe_name', None) == script_key:
             if script_key in current_running_processes:
                 self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-stop-symbolic"))
-                self.launch_button.set_tooltip_text("Stop")
+                self.launch_button.set_tooltip_text(_("Stop"))
             else:
                 self.launch_button.set_child(Gtk.Image.new_from_icon_name("media-playback-start-symbolic"))
-                self.launch_button.set_tooltip_text("Play")
+                self.launch_button.set_tooltip_text(_("Play"))
             print(f"Updated launch button for script_key: {script_key}")
 
 def on_open_button_clicked(self, button):
@@ -501,8 +514,7 @@ def open_file_dialog(self):
 def create_file_filter(self):
     self.print_method_name()
     file_filter = Gtk.FileFilter()
-    file_filter.set_name("EXE and MSI files")
-    file_filter.add_mime_type("application/x-ms-dos-executable")
+    file_filter.set_name(_("EXE and MSI files"))
     # Add patterns for case-insensitive extensions
     for ext in ["*.exe", "*.EXE", "*.msi", "*.MSI"]:
         file_filter.add_pattern(ext)
@@ -522,12 +534,12 @@ def on_open_file_dialog_response(self, dialog, result):
                 self.stop_processing = True
                 self.processing_thread.join(timeout=0.5)  # Wait briefly for thread to stop
                 self.hide_processing_spinner()
-                self.set_open_button_label("Open")
+                self.set_open_button_label(_("Open"))
                 self.set_open_button_icon_visible(True)
                 return
 
             # Show processing spinner
-            self.show_processing_spinner("Processing...")
+            self.show_processing_spinner(_("Processing..."))
             
             # Start a new background thread to process the file
             self.stop_processing = False
@@ -536,7 +548,7 @@ def on_open_file_dialog_response(self, dialog, result):
 
     except GLib.Error as e:
         if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
-            print(f"An error occurred: {e}")
+            print(_("An error occurred: {e}").format(e=e))
     finally:
         self.window.set_visible(True)
         self.monitoring_active = True
@@ -587,7 +599,7 @@ def open_filemanager_winecharm(self, action, param):
     try:
         subprocess.Popen(command)
     except Exception as e:
-        print(f"Error opening file manager: {e}")
+        print(_("Error opening file manager: {e}").format(e=e))
 
 def open_terminal_winecharm(self, param=None, action=None):
     self.print_method_name()
@@ -632,7 +644,7 @@ def open_terminal_winecharm(self, param=None, action=None):
                 break
 
         if not terminal_command:
-            print("No suitable terminal emulator found.")
+            print(_("No suitable terminal emulator found."))
             return
 
         command = terminal_command + [
@@ -651,7 +663,7 @@ def open_terminal_winecharm(self, param=None, action=None):
     try:
         subprocess.Popen(command)
     except Exception as e:
-        print(f"Error opening terminal: {e}")
+        print(_("Error opening terminal: {e}").format(e=e))
 
     
 def remove_accelerator_context(self):
@@ -676,7 +688,7 @@ def restore_open_button(self):
     if hasattr(self, 'open_button_handler_id'):
         self.open_button.disconnect(self.open_button_handler_id)
     
-    self.set_open_button_label("Open")
+    self.set_open_button_label(_("Open"))
     self.set_open_button_icon_visible(True)
     # Reconnect original click handler
     self.open_button_handler_id = self.open_button.connect(
@@ -738,7 +750,7 @@ def create_script_row(self, script_key, script_data):
         #top_box.set_halign(Gtk.Align.FILL)
         top_box.set_size_request(50,50)
         # Options button (larger, consistent width, initially hidden)
-        options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text="Options")
+        options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text=_("Options"))
         options_button.add_css_class("flat")
         options_button.set_size_request(32, -1)  # Consistent width with play button
         options_button.set_hexpand(True)
@@ -773,7 +785,7 @@ def create_script_row(self, script_key, script_data):
         top_box.append(icon_container)
 
         # Play button (larger, consistent width, initially hidden)
-        play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play")
+        play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text=_("Play"))
         play_button.add_css_class("flat")
         #play_button.set_halign(Gtk.Align.FILL)
         play_button.set_size_request(36, -1)  # Consistent width with options button
@@ -886,12 +898,12 @@ def create_script_row(self, script_key, script_data):
         spacer = Gtk.Box()
         spacer.set_hexpand(True)
         
-        play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text="Play")
+        play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text=_("Play"))
         play_button.set_size_request(60, -1)
         play_button.set_opacity(1)
         play_button.set_sensitive(True)
         
-        options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text="Options")
+        options_button = Gtk.Button(icon_name="emblem-system-symbolic", tooltip_text=_("Options"))
         options_button.set_size_request(34, -1)
         options_button.set_opacity(1)
         options_button.set_sensitive(True)
@@ -988,10 +1000,10 @@ def toggle_overlay_buttons(self, script_key):
     pb = ui['play_button']
     if ui.get("is_running"):
         pb.set_icon_name("media-playback-stop-symbolic")
-        pb.set_tooltip_text("Stop")
+        pb.set_tooltip_text(_("Stop"))
     else:
         pb.set_icon_name("media-playback-start-symbolic")
-        pb.set_tooltip_text("Play")
+        pb.set_tooltip_text(_("Play"))
     
 def show_buttons(self, play_button, options_button):
     self.print_method_name()
@@ -1086,10 +1098,10 @@ def set_play_stop_button_state(self, button, is_playing):
     # Set the icon name and tooltip based on the state
     if is_playing:
         image.set_from_icon_name("media-playback-stop-symbolic")
-        button.set_tooltip_text("Stop")
+        button.set_tooltip_text(_("Stop"))
     else:
         image.set_from_icon_name("media-playback-start-symbolic")
-        button.set_tooltip_text("Play")
+        button.set_tooltip_text(_("Play"))
     
     # Explicitly set pixel size to ensure crisp rendering
     # image.set_pixel_size(24)
@@ -1123,10 +1135,10 @@ def replace_open_button_with_launch(self, script, row, script_key):
 
     if script_key in self.running_processes:
         launch_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
-        self.launch_button.set_tooltip_text("Stop")
+        self.launch_button.set_tooltip_text(_("Stop"))
     else:
         launch_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
-        self.launch_button.set_tooltip_text("Play")
+        self.launch_button.set_tooltip_text(_("Play"))
 
     self.launch_button.set_child(launch_icon)
     self.launch_button.connect("clicked", lambda btn: self.toggle_play_stop(script_key, self.launch_button, row))
@@ -1159,7 +1171,7 @@ def replace_launch_button(self, ui_state, row, script_key):
             "media-playback-stop-symbolic" if is_running
             else "media-playback-start-symbolic"
         )
-        self.launch_button.set_tooltip_text("Stop" if is_running else "Play")
+        self.launch_button.set_tooltip_text(_("Stop") if is_running else _("Play"))
         self.launch_button.set_child(launch_icon)
         
         # Connect click handler
@@ -1239,7 +1251,7 @@ def hide_processing_spinner(self):
             del self.progress_bar
 
         # Update button back to original state
-        self.set_open_button_label("Open")
+        self.set_open_button_label(_("Open"))
             
         # Safely re-enable UI elements
         if hasattr(self, 'search_button'):
@@ -1261,13 +1273,13 @@ def disable_open_button(self):
     self.print_method_name()
     if self.open_button:
         self.open_button.set_sensitive(False)
-    print("Open button disabled.")
+    print(_("Open button disabled."))
 
 def enable_open_button(self):
     self.print_method_name()
     if self.open_button:
         self.open_button.set_sensitive(True)
-    print("Open button enabled.")
+    print(_("Open button enabled."))
 
 
 def set_open_button_icon_visible(self, visible):
@@ -1315,7 +1327,7 @@ def show_initializing_step(self, step_text):
         
         # Update progress bar
         self.progress_bar.set_fraction(progress)
-        self.progress_bar.set_text(f"Step {current_step}/{total_steps}")
+        self.progress_bar.set_text(_("Step {current}/{total}").format(current=current_step, total=total_steps))
         
         # Create step box
         step_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -1365,12 +1377,12 @@ def on_cancel_button_clicked(self, button, parent, original_button):
 def show_info_dialog(self, title, message, callback=None):
     self.print_method_name()
     dialog = Adw.AlertDialog(
-        heading=title,
-        body=message
+        heading=_(title),
+        body=_(message)
     )
     
     # Add response using non-deprecated method
-    dialog.add_response("ok", "OK")
+    dialog.add_response("ok", _("OK"))
     
     # Configure dialog properties
     dialog.props.default_response = "ok"

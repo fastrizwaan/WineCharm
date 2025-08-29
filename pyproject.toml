@@ -49,7 +49,10 @@ packages = ["winecharm"]
 package-dir = {"" = "src"}
 
 [tool.setuptools.package-data]
-winecharm = ["data/**/*"]
+winecharm = [
+    "data/**/*",
+    "locale/*/LC_MESSAGES/*.mo",
+]
 
 [tool.setuptools.data-files]
 "share/applications" = ["data/shortcut/io.github.fastrizwaan.WineCharm.desktop"]

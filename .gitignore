@@ -13,3 +13,31 @@ src/winecharm.egg-info/
 src/winecharm/__pycache__
 src/winecharm.egg-info
 build
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Build artifacts
+*.egg-info/
+*.egg
+.eggs/
+build/
+dist/
+
+# Translation compiled files
+src/winecharm/locale/*/LC_MESSAGES/*.mo
+
+# Backup/swap files
+*~
+*.swp
+.DS_Store
+Thumbs.db
+

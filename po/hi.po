@@ -1,0 +1,227 @@
+# Hindi translations for WineCharm package.
+# Copyright (C) 2025 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# Asif Ali Rizvan <fast.rizwaan@gmail.com>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: WineCharm\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-08-29 07:18+0530\n"
+"PO-Revision-Date: 2025-08-29 07:18+0530\n"
+"Last-Translator: Asif Ali Rizvan <fast.rizwaan@gmail.com>\n"
+"Language-Team: Hindi\n"
+"Language: hi\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/winecharm/save_load_users_dir.py:28
+msgid "Select Directories to Backup"
+msgstr "बैकअप के लिए डिरेक्टरी चुनें"
+
+#: src/winecharm/save_load_users_dir.py:29
+msgid "Choose which directories to include in the backup."
+msgstr "चुनें कि किन डिरेक्टरी को बैकअप में शामिल करना है।"
+
+#: src/winecharm/save_load_users_dir.py:31
+#: src/winecharm/save_load_users_dir.py:277
+msgid "Cancel"
+msgstr "रद्द करें"
+
+#: src/winecharm/save_load_users_dir.py:32
+#: src/winecharm/save_load_users_dir.py:364 src/winecharm/ui.py:1385
+msgid "OK"
+msgstr "ठीक है"
+
+#: src/winecharm/save_load_users_dir.py:94
+msgid "Add Directory"
+msgstr "डिरेक्टरी जोड़ें"
+
+#: src/winecharm/save_load_users_dir.py:132
+#: src/winecharm/save_load_users_dir.py:152
+msgid "Error"
+msgstr "त्रुटि"
+
+#: src/winecharm/save_load_users_dir.py:133
+msgid "Failed to save directories: {}"
+msgstr "डिरेक्टरी सहेजने में विफल: {}"
+
+#: src/winecharm/save_load_users_dir.py:140
+msgid "Select Directory to Add"
+msgstr "जोड़ने के लिए डिरेक्टरी चुनें"
+
+#: src/winecharm/save_load_users_dir.py:234
+msgid "Backup Complete"
+msgstr "बैकअप पूरा हुआ"
+
+#: src/winecharm/save_load_users_dir.py:235
+msgid ""
+"User directories saved to:\n"
+"{}"
+msgstr ""
+"उपयोगकर्ता डिरेक्टरी यहाँ सहेजी गई:\n"
+"{}"
+
+#: src/winecharm/save_load_users_dir.py:238
+msgid "Backup Failed"
+msgstr "बैकअप विफल"
+
+#: src/winecharm/save_load_users_dir.py:274
+msgid "Confirm Restore"
+msgstr "पुनर्स्थापना की पुष्टि करें"
+
+#: src/winecharm/save_load_users_dir.py:275
+msgid "Restoring from {} will overwrite existing user directories. Proceed?"
+msgstr "{} से पुनर्स्थापना करने पर मौजूदा उपयोगकर्ता डिरेक्टरी पर लिखी जाएँगी। जारी रखें?"
+
+#: src/winecharm/save_load_users_dir.py:278
+msgid "Restore"
+msgstr "पुनर्स्थापित करें"
+
+#: src/winecharm/save_load_users_dir.py:309
+msgid "Restore Complete"
+msgstr "पुनर्स्थापना पूरी हुई"
+
+#: src/winecharm/save_load_users_dir.py:310
+msgid ""
+"User directories restored to:\n"
+"{}"
+msgstr ""
+"उपयोगकर्ता डिरेक्टरी यहाँ पुनर्स्थापित की गई:\n"
+"{}"
+
+#: src/winecharm/save_load_users_dir.py:313
+msgid "Restore Failed"
+msgstr "पुनर्स्थापना विफल"
+
+#: src/winecharm/ui.py:63 src/winecharm/ui.py:64
+msgid "Wine Charm"
+msgstr "वाइन चार्म"
+
+#: src/winecharm/ui.py:74
+msgid "Back"
+msgstr "पीछे"
+
+#: src/winecharm/ui.py:87 src/winecharm/ui.py:155
+msgid "Search"
+msgstr "खोजें"
+
+#: src/winecharm/ui.py:96
+msgid "Toggle Icon/List View"
+msgstr "आइकन/सूची दृश्य बदलें"
+
+#: src/winecharm/ui.py:107
+msgid "Menu"
+msgstr "मेन्यू"
+
+#: src/winecharm/ui.py:113
+msgid "Name (A-Z)"
+msgstr "नाम (A-ज़ेड)"
+
+#: src/winecharm/ui.py:114
+msgid "Name (Z-A)"
+msgstr "नाम (ज़ेड-ए)"
+
+#: src/winecharm/ui.py:115
+msgid "Wineprefix (A-Z)"
+msgstr "वाइनप्रिफ़िक्स (A-ज़ेड)"
+
+#: src/winecharm/ui.py:116
+msgid "Wineprefix (Z-A)"
+msgstr "वाइनप्रिफ़िक्स (ज़ेड-ए)"
+
+#: src/winecharm/ui.py:117
+msgid "Time (Newest First)"
+msgstr "समय (नवीनतम पहले)"
+
+#: src/winecharm/ui.py:118
+msgid "Time (Oldest First)"
+msgstr "समय (सबसे पुराना पहले)"
+
+#: src/winecharm/ui.py:119
+msgid "🔠 Sort"
+msgstr "🔠 क्रमबद्ध करें"
+
+#: src/winecharm/ui.py:122
+msgid "Open Filemanager"
+msgstr "फ़ाइल प्रबंधक खोलें"
+
+#: src/winecharm/ui.py:123
+msgid "Open Terminal"
+msgstr "टर्मिनल खोलें"
+
+#: src/winecharm/ui.py:124
+msgid "📂 Open"
+msgstr "📂 खोलें"
+
+#: src/winecharm/ui.py:142 src/winecharm/ui.py:537 src/winecharm/ui.py:691
+#: src/winecharm/ui.py:1254
+msgid "Open"
+msgstr "खोलें"
+
+#: src/winecharm/ui.py:268
+#, python-brace-format
+msgid "Error in search button handling: {e}"
+msgstr "खोज बटन संभालने में त्रुटि: {e}"
+
+#: src/winecharm/ui.py:431
+#, python-brace-format
+msgid "No matches found for search term: {term}"
+msgstr "खोज शब्द के लिए कोई मेल नहीं मिला: {term}"
+
+#: src/winecharm/ui.py:496 src/winecharm/ui.py:1003 src/winecharm/ui.py:1101
+#: src/winecharm/ui.py:1138 src/winecharm/ui.py:1174
+msgid "Stop"
+msgstr "रोकें"
+
+#: src/winecharm/ui.py:499 src/winecharm/ui.py:788 src/winecharm/ui.py:901
+#: src/winecharm/ui.py:1006 src/winecharm/ui.py:1104 src/winecharm/ui.py:1141
+#: src/winecharm/ui.py:1174
+msgid "Play"
+msgstr "चलाएँ"
+
+#: src/winecharm/ui.py:517
+msgid "EXE and MSI files"
+msgstr "EXE और MSI फ़ाइलें"
+
+#: src/winecharm/ui.py:542
+msgid "Processing..."
+msgstr "प्रक्रिया जारी है..."
+
+#: src/winecharm/ui.py:551
+#, python-brace-format
+msgid "An error occurred: {e}"
+msgstr "एक त्रुटि हुई: {e}"
+
+#: src/winecharm/ui.py:602
+#, python-brace-format
+msgid "Error opening file manager: {e}"
+msgstr "फ़ाइल प्रबंधक खोलने में त्रुटि: {e}"
+
+#: src/winecharm/ui.py:647
+msgid "No suitable terminal emulator found."
+msgstr "कोई उपयुक्त टर्मिनल एमुलेटर नहीं मिला।"
+
+#: src/winecharm/ui.py:666
+#, python-brace-format
+msgid "Error opening terminal: {e}"
+msgstr "टर्मिनल खोलने में त्रुटि: {e}"
+
+#: src/winecharm/ui.py:753 src/winecharm/ui.py:906
+msgid "Options"
+msgstr "विकल्प"
+
+#: src/winecharm/ui.py:1276
+msgid "Open button disabled."
+msgstr "खोलें बटन निष्क्रिय।"
+
+#: src/winecharm/ui.py:1282
+msgid "Open button enabled."
+msgstr "खोलें बटन सक्रिय।"
+
+#: src/winecharm/ui.py:1330
+#, python-brace-format
+msgid "Step {current}/{total}"
+msgstr "चरण {current}/{total}"
+
