@@ -1,0 +1,795 @@
+# French translations for PACKAGE package.
+# Copyright (C) 2025 THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: io.github.fastrizwaan.WineCharm\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-08-29 09:18+0530\n"
+"PO-Revision-Date: 2025-08-29 09:18+0530\n"
+"Last-Translator: FIRST AUTHOR <EMAIL@ADDRESS>\n"
+"Language-Team: French\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/winecharm/winecharm.py:580
+msgid "🛠️ Settings..."
+msgstr "🛠️ Paramètres..."
+
+#: src/winecharm/winecharm.py:581
+msgid "☠️ Kill all..."
+msgstr "☠️ Tout arrêter..."
+
+#: src/winecharm/winecharm.py:582
+msgid "🍾 Restore..."
+msgstr "🍾 Restaurer..."
+
+#: src/winecharm/winecharm.py:583
+msgid "📥 Import Wine Directory"
+msgstr "📥 Importer un répertoire Wine"
+
+#: src/winecharm/winecharm.py:584
+msgid "📥 Import WineZGUI Scripts..."
+msgstr "📥 Importer des scripts WineZGUI..."
+
+#: src/winecharm/winecharm.py:585
+msgid "❓ Help..."
+msgstr "❓ Aide..."
+
+#: src/winecharm/winecharm.py:586
+msgid "📖 About..."
+msgstr "📖 À propos..."
+
+#: src/winecharm/winecharm.py:587
+msgid "🚪 Quit..."
+msgstr "🚪 Quitter..."
+
+#: src/winecharm/winecharm.py:844
+msgid "Processing"
+msgstr "Traitement en cours"
+
+#: src/winecharm/winecharm.py:848
+msgid "Restoring"
+msgstr "Restauration en cours"
+
+#: src/winecharm/winecharm.py:855 src/winecharm/winecharm.py:2624
+msgid "Invalid File Type"
+msgstr "Type de fichier invalide"
+
+#: src/winecharm/winecharm.py:856
+msgid "Only .exe and .msi files are supported."
+msgstr "Seuls les fichiers .exe et .msi sont pris en charge."
+
+#: src/winecharm/winecharm.py:1186 src/winecharm/script_options.py:1663
+#: src/winecharm/ui.py:499 src/winecharm/ui.py:788 src/winecharm/ui.py:901
+#: src/winecharm/ui.py:1006 src/winecharm/ui.py:1104 src/winecharm/ui.py:1141
+#: src/winecharm/ui.py:1174
+msgid "Play"
+msgstr "Jouer"
+
+#: src/winecharm/winecharm.py:1218
+msgid "Script Error"
+msgstr "Erreur de script"
+
+#: src/winecharm/winecharm.py:1218
+msgid "Failed to reload script data."
+msgstr "Échec du rechargement des données du script."
+
+#: src/winecharm/winecharm.py:1237
+msgid "Runner Error"
+msgstr "Erreur du lanceur"
+
+#: src/winecharm/winecharm.py:1241
+msgid "Executable Not Found"
+msgstr "Exécutable introuvable"
+
+#: src/winecharm/winecharm.py:1241
+msgid "Exe Not Found"
+msgstr "Fichier .exe introuvable"
+
+#: src/winecharm/winecharm.py:1242
+#, python-format
+msgid "Failed to get runner. Error: %s"
+msgstr "Impossible d'obtenir le lanceur. Erreur : %s"
+
+#: src/winecharm/winecharm.py:1280
+msgid "Argument Error"
+msgstr "Erreur d'argument"
+
+#: src/winecharm/winecharm.py:1282 src/winecharm/winecharm.py:1340
+msgid "Launch Failed"
+msgstr "Échec du lancement"
+
+#: src/winecharm/winecharm.py:1340 src/winecharm/winecharm.py:1341
+msgid "Launch Error"
+msgstr "Erreur de lancement"
+
+#: src/winecharm/winecharm.py:1373 src/winecharm/winecharm.py:1377
+msgid "Wineboot Error"
+msgstr "Erreur de wineboot"
+
+#: src/winecharm/winecharm.py:1373 src/winecharm/winecharm.py:1377
+msgid "Prefix Update Failed"
+msgstr "Échec de la mise à jour du préfixe"
+
+#: src/winecharm/winecharm.py:2635
+msgid "Invalid file type:"
+msgstr "Type de fichier invalide :"
+
+#: src/winecharm/winecharm.py:2635
+msgid "Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed."
+msgstr "Seuls les fichiers .exe, .msi, .charm, .bottle, .prefix ou .wzt sont autorisés."
+
+#: src/winecharm/save_load_users_dir.py:28
+msgid "Select Directories to Backup"
+msgstr "Sélectionnez les répertoires à sauvegarder"
+
+#: src/winecharm/save_load_users_dir.py:29
+msgid "Choose which directories to include in the backup."
+msgstr "Choisissez quels répertoires inclure dans la sauvegarde."
+
+#: src/winecharm/save_load_users_dir.py:31
+#: src/winecharm/save_load_users_dir.py:277 src/winecharm/script_options.py:327
+#: src/winecharm/script_options.py:398 src/winecharm/script_options.py:416
+#: src/winecharm/script_options.py:888 src/winecharm/script_options.py:1001
+#: src/winecharm/script_options.py:1084 src/winecharm/script_options.py:1181
+#: src/winecharm/script_options.py:1284 src/winecharm/script_options.py:1361
+#: src/winecharm/script_options.py:1566 src/winecharm/script_options.py:1708
+#: src/winecharm/script_options.py:1737
+msgid "Cancel"
+msgstr "Annuler"
+
+#: src/winecharm/save_load_users_dir.py:32
+#: src/winecharm/save_load_users_dir.py:364 src/winecharm/script_options.py:325
+#: src/winecharm/script_options.py:1282 src/winecharm/script_options.py:1359
+#: src/winecharm/ui.py:1385
+msgid "OK"
+msgstr "OK"
+
+#: src/winecharm/save_load_users_dir.py:94
+msgid "Add Directory"
+msgstr "Ajouter un répertoire"
+
+#: src/winecharm/save_load_users_dir.py:132
+#: src/winecharm/save_load_users_dir.py:152 src/winecharm/script_options.py:607
+msgid "Error"
+msgstr "Erreur"
+
+#: src/winecharm/save_load_users_dir.py:133
+msgid "Failed to save directories: {}"
+msgstr "Échec de la sauvegarde des répertoires : {}"
+
+#: src/winecharm/save_load_users_dir.py:140
+msgid "Select Directory to Add"
+msgstr "Sélectionnez un répertoire à ajouter"
+
+#: src/winecharm/save_load_users_dir.py:234
+msgid "Backup Complete"
+msgstr "Sauvegarde terminée"
+
+#: src/winecharm/save_load_users_dir.py:235
+msgid ""
+"User directories saved to:\n"
+"{}"
+msgstr ""
+"Répertoires utilisateur enregistrés dans :\n"
+"{}"
+
+#: src/winecharm/save_load_users_dir.py:238
+msgid "Backup Failed"
+msgstr "Échec de la sauvegarde"
+
+#: src/winecharm/save_load_users_dir.py:274
+msgid "Confirm Restore"
+msgstr "Confirmer la restauration"
+
+#: src/winecharm/save_load_users_dir.py:275
+msgid "Restoring from {} will overwrite existing user directories. Proceed?"
+msgstr "Restaurer depuis {} écrasera les répertoires utilisateur existants. Continuer ?"
+
+#: src/winecharm/save_load_users_dir.py:278
+msgid "Restore"
+msgstr "Restaurer"
+
+#: src/winecharm/save_load_users_dir.py:309
+msgid "Restore Complete"
+msgstr "Restauration terminée"
+
+#: src/winecharm/save_load_users_dir.py:310
+msgid ""
+"User directories restored to:\n"
+"{}"
+msgstr ""
+"Répertoires utilisateur restaurés dans :\n"
+"{}"
+
+#: src/winecharm/save_load_users_dir.py:313
+msgid "Restore Failed"
+msgstr "Échec de la restauration"
+
+#: src/winecharm/script_options.py:75
+msgid "Show log"
+msgstr "Afficher le journal"
+
+#: src/winecharm/script_options.py:76 src/winecharm/ui.py:123
+msgid "Open Terminal"
+msgstr "Ouvrir le terminal"
+
+#: src/winecharm/script_options.py:77
+msgid "Install dxvk vkd3d"
+msgstr "Installer dxvk vkd3d"
+
+#: src/winecharm/script_options.py:78 src/winecharm/ui.py:122
+msgid "Open Filemanager"
+msgstr "Ouvrir le gestionnaire de fichiers"
+
+#: src/winecharm/script_options.py:79
+msgid "Edit Script File"
+msgstr "Modifier le fichier de script"
+
+#: src/winecharm/script_options.py:80
+msgid "Delete Wineprefix"
+msgstr "Supprimer le préfixe Wine"
+
+#: src/winecharm/script_options.py:81
+msgid "Delete Shortcut"
+msgstr "Supprimer le raccourci"
+
+#: src/winecharm/script_options.py:82
+msgid "Wine Arguments"
+msgstr "Arguments Wine"
+
+#: src/winecharm/script_options.py:83 src/winecharm/script_options.py:1350
+msgid "Rename Shortcut"
+msgstr "Renommer le raccourci"
+
+#: src/winecharm/script_options.py:84
+msgid "Change Icon"
+msgstr "Changer l'icône"
+
+#: src/winecharm/script_options.py:85
+msgid "Backup Prefix"
+msgstr "Sauvegarder le préfixe"
+
+#: src/winecharm/script_options.py:86
+msgid "Create Bottle"
+msgstr "Créer une bouteille"
+
+#: src/winecharm/script_options.py:87
+msgid "Save Wine User Dirs"
+msgstr "Enregistrer les répertoires utilisateur Wine"
+
+#: src/winecharm/script_options.py:88
+msgid "Load Wine User Dirs"
+msgstr "Charger les répertoires utilisateur Wine"
+
+#: src/winecharm/script_options.py:89 src/winecharm/script_options.py:1560
+msgid "Reset Shortcut"
+msgstr "Réinitialiser le raccourci"
+
+#: src/winecharm/script_options.py:90
+msgid "Add Desktop Shortcut"
+msgstr "Ajouter un raccourci sur le bureau"
+
+#: src/winecharm/script_options.py:91
+msgid "Remove Desktop Shortcut"
+msgstr "Supprimer un raccourci du bureau"
+
+#: src/winecharm/script_options.py:92
+msgid "Import Game Directory"
+msgstr "Importer un répertoire de jeu"
+
+#: src/winecharm/script_options.py:93
+msgid "Run Other Exe"
+msgstr "Exécuter un autre .exe"
+
+#: src/winecharm/script_options.py:94 src/winecharm/script_options.py:795
+#: src/winecharm/script_options.py:797
+msgid "Environment Variables"
+msgstr "Variables d'environnement"
+
+#: src/winecharm/script_options.py:95
+msgid "Change Runner"
+msgstr "Changer de lanceur"
+
+#: src/winecharm/script_options.py:96
+msgid "Rename Prefix Directory"
+msgstr "Renommer le répertoire du préfixe"
+
+#: src/winecharm/script_options.py:97
+msgid "Wine Config (winecfg)"
+msgstr "Configuration Wine (winecfg)"
+
+#: src/winecharm/script_options.py:98
+msgid "Registry Editor (regedit)"
+msgstr "Éditeur de registre (regedit)"
+
+#: src/winecharm/script_options.py:99
+msgid "Winetricks GUI"
+msgstr "Interface graphique Winetricks"
+
+#: src/winecharm/script_options.py:100 src/winecharm/script_options.py:651
+msgid "About"
+msgstr "À propos"
+
+#: src/winecharm/script_options.py:316
+msgid "Set Environment Variables"
+msgstr "Définir les variables d'environnement"
+
+#: src/winecharm/script_options.py:317
+msgid "Enter variables in X=Y;Z=W format:"
+msgstr "Entrez les variables au format X=Y;Z=W :"
+
+#: src/winecharm/script_options.py:355
+msgid "Invalid Environment Variables"
+msgstr "Variables d'environnement invalides"
+
+#: src/winecharm/script_options.py:355
+msgid "Please use the correct format: X=Y;Z=W."
+msgstr "Veuillez utiliser le bon format : X=Y;Z=W."
+
+#: src/winecharm/script_options.py:394
+msgid "Single Prefix Mode Warning"
+msgstr "Avertissement du mode préfixe unique"
+
+#: src/winecharm/script_options.py:395
+msgid ""
+"You're in Single Prefix mode! Renaming will affect ALL scripts using this "
+"prefix."
+msgstr ""
+"Vous êtes en mode préfixe unique ! Renommer affectera TOUS les scripts utilisant ce "
+"préfixe."
+
+#: src/winecharm/script_options.py:399
+msgid "Proceed Anyway"
+msgstr "Continuer quand même"
+
+#: src/winecharm/script_options.py:410
+msgid "Rename Wine Prefix"
+msgstr "Renommer le préfixe Wine"
+
+#: src/winecharm/script_options.py:411
+#, python-brace-format
+msgid ""
+"Enter new name for prefix directory:\n"
+"Current: {current_name}"
+msgstr ""
+"Entrez un nouveau nom pour le répertoire du préfixe :\n"
+"Actuel : {current_name}"
+
+#: src/winecharm/script_options.py:417
+msgid "Rename"
+msgstr "Renommer"
+
+#: src/winecharm/script_options.py:607
+msgid "Script not found."
+msgstr "Script introuvable."
+
+#: src/winecharm/script_options.py:704
+msgid "Open in file manager"
+msgstr "Ouvrir dans le gestionnaire de fichiers"
+
+#: src/winecharm/script_options.py:711
+msgid "Copy path to clipboard"
+msgstr "Copier le chemin dans le presse-papiers"
+
+#: src/winecharm/script_options.py:719
+msgid "Full Path"
+msgstr "Chemin complet"
+
+#: src/winecharm/script_options.py:743
+msgid "Full Value"
+msgstr "Valeur complète"
+
+#: src/winecharm/script_options.py:766
+msgid "Basic Information"
+msgstr "Informations de base"
+
+#: src/winecharm/script_options.py:767
+msgid "Program Name"
+msgstr "Nom du programme"
+
+#: src/winecharm/script_options.py:768
+msgid "Architecture"
+msgstr "Architecture"
+
+#: src/winecharm/script_options.py:769
+msgid "Runner"
+msgstr "Lanceur"
+
+#: src/winecharm/script_options.py:770
+msgid "Creation Time"
+msgstr "Heure de création"
+
+#: src/winecharm/script_options.py:773
+msgid "Paths"
+msgstr "Chemins"
+
+#: src/winecharm/script_options.py:775
+msgid "Wineprefix"
+msgstr "Préfixe Wine"
+
+#: src/winecharm/script_options.py:775
+#, python-brace-format
+msgid "Size: {size}"
+msgstr "Taille : {size}"
+
+#: src/winecharm/script_options.py:779
+msgid "Executable"
+msgstr "Exécutable"
+
+#: src/winecharm/script_options.py:783
+msgid "Script Path"
+msgstr "Chemin du script"
+
+#: src/winecharm/script_options.py:787
+msgid "Configuration"
+msgstr "Configuration"
+
+#: src/winecharm/script_options.py:790 src/winecharm/script_options.py:792
+msgid "Arguments"
+msgstr "Arguments"
+
+#: src/winecharm/script_options.py:792 src/winecharm/script_options.py:797
+msgid "None"
+msgstr "Aucun"
+
+#: src/winecharm/script_options.py:804 src/winecharm/script_options.py:1800
+msgid "Close"
+msgstr "Fermer"
+
+#: src/winecharm/script_options.py:816
+msgid "Unknown (Directory not found)"
+msgstr "Inconnu (répertoire introuvable)"
+
+#: src/winecharm/script_options.py:830
+msgid "Unknown (Error occurred)"
+msgstr "Inconnu (une erreur s'est produite)"
+
+#: src/winecharm/script_options.py:848 src/winecharm/script_options.py:979
+#: src/winecharm/script_options.py:1150
+msgid "No Shortcuts"
+msgstr "Aucun raccourci"
+
+#: src/winecharm/script_options.py:848
+#, python-brace-format
+msgid "No shortcuts found in {prefix_name}"
+msgstr "Aucun raccourci trouvé dans {prefix_name}"
+
+#: src/winecharm/script_options.py:852
+msgid "Create Desktop Shortcuts"
+msgstr "Créer des raccourcis sur le bureau"
+
+#: src/winecharm/script_options.py:853
+#, python-brace-format
+msgid "Select shortcuts to create for {prefix_name}:"
+msgstr "Sélectionnez les raccourcis à créer pour {prefix_name} :"
+
+#: src/winecharm/script_options.py:870
+msgid "Application Category:"
+msgstr "Catégorie de l'application :"
+
+#: src/winecharm/script_options.py:889
+msgid "Create"
+msgstr "Créer"
+
+#: src/winecharm/script_options.py:947
+msgid "Creation Error"
+msgstr "Erreur de création"
+
+#: src/winecharm/script_options.py:948
+#, python-brace-format
+msgid ""
+"Failed to create shortcut for {filename}:\n"
+"{error}"
+msgstr ""
+"Échec de la création du raccourci pour {filename} :\n"
+"{error}"
+
+#: src/winecharm/script_options.py:953
+msgid "Shortcuts Created"
+msgstr "Raccourcis créés"
+
+#: src/winecharm/script_options.py:954
+#, python-brace-format
+msgid ""
+"Successfully created {count} desktop shortcut(s)\n"
+"Category: {category}"
+msgstr ""
+"{count} raccourci(s) sur le bureau créé(s) avec succès\n"
+"Catégorie : {category}"
+
+#: src/winecharm/script_options.py:958
+msgid "No Shortcuts Created"
+msgstr "Aucun raccourci créé"
+
+#: src/winecharm/script_options.py:959
+msgid "No shortcuts were selected for creation."
+msgstr "Aucun raccourci n'a été sélectionné pour la création."
+
+#: src/winecharm/script_options.py:979
+#, python-brace-format
+msgid "No desktop shortcuts found in {prefix_name}"
+msgstr "Aucun raccourci sur le bureau trouvé dans {prefix_name}"
+
+#: src/winecharm/script_options.py:983
+msgid "Delete Desktop Shortcuts"
+msgstr "Supprimer les raccourcis du bureau"
+
+#: src/winecharm/script_options.py:984
+#, python-brace-format
+msgid "Select shortcuts to remove from {prefix_name}:"
+msgstr "Sélectionnez les raccourcis à supprimer de {prefix_name} :"
+
+#: src/winecharm/script_options.py:1002 src/winecharm/script_options.py:1082
+#: src/winecharm/script_options.py:1179
+msgid "Delete"
+msgstr "Supprimer"
+
+#: src/winecharm/script_options.py:1031
+msgid "Deletion Error"
+msgstr "Erreur de suppression"
+
+#: src/winecharm/script_options.py:1032
+#, python-brace-format
+msgid ""
+"Failed to delete {filename}:\n"
+"{error}"
+msgstr ""
+"Échec de la suppression de {filename} :\n"
+"{error}"
+
+#: src/winecharm/script_options.py:1037
+msgid "Shortcuts Removed"
+msgstr "Raccourcis supprimés"
+
+#: src/winecharm/script_options.py:1038
+#, python-brace-format
+msgid "Successfully deleted {count} desktop shortcut(s)"
+msgstr "{count} raccourci(s) sur le bureau supprimé(s) avec succès"
+
+#: src/winecharm/script_options.py:1042
+msgid "Nothing Deleted"
+msgstr "Rien n'a été supprimé"
+
+#: src/winecharm/script_options.py:1043
+msgid "No shortcuts were selected for removal."
+msgstr "Aucun raccourci n'a été sélectionné pour la suppression."
+
+#: src/winecharm/script_options.py:1064
+msgid "Delete Wine Prefix"
+msgstr "Supprimer le préfixe Wine"
+
+#: src/winecharm/script_options.py:1065
+#, python-brace-format
+msgid "Deleting {prefix_name} will remove:"
+msgstr "Supprimer {prefix_name} supprimera :"
+
+#: src/winecharm/script_options.py:1071
+msgid "No programs found in this Wine prefix."
+msgstr "Aucun programme trouvé dans ce préfixe Wine."
+
+#: src/winecharm/script_options.py:1150
+#, python-brace-format
+msgid "No shortcuts are available for deletion in {prefix_dir}."
+msgstr "Aucun raccourci disponible pour la suppression dans {prefix_dir}."
+
+#: src/winecharm/script_options.py:1154
+msgid "Delete Shortcuts"
+msgstr "Supprimer les raccourcis"
+
+#: src/winecharm/script_options.py:1155
+#, python-brace-format
+msgid "Select the shortcuts you want to delete for {prefix_name}:"
+msgstr "Sélectionnez les raccourcis que vous souhaitez supprimer pour {prefix_name} :"
+
+#: src/winecharm/script_options.py:1273
+msgid "Edit Wine Arguments"
+msgstr "Modifier les arguments Wine"
+
+#: src/winecharm/script_options.py:1274
+msgid "Modify the Wine arguments for this script:"
+msgstr "Modifiez les arguments Wine pour ce script :"
+
+#: src/winecharm/script_options.py:1347
+msgid "New Shortcut"
+msgstr "Nouveau raccourci"
+
+#: src/winecharm/script_options.py:1351
+msgid "Enter the new name for the shortcut:"
+msgstr "Entrez le nouveau nom du raccourci :"
+
+#: src/winecharm/script_options.py:1496
+msgid "Image and Executable files"
+msgstr "Fichiers image et exécutables"
+
+#: src/winecharm/script_options.py:1561
+#, python-brace-format
+msgid ""
+"This will reset all changes and recreate the shortcut for {filename}. Do you "
+"want to proceed?"
+msgstr ""
+"Cela réinitialisera toutes les modifications et recréera le raccourci pour {filename}. Voulez-vous "
+"continuer ?"
+
+#: src/winecharm/script_options.py:1564
+msgid "Reset"
+msgstr "Réinitialiser"
+
+#: src/winecharm/script_options.py:1660 src/winecharm/ui.py:496
+#: src/winecharm/ui.py:1003 src/winecharm/ui.py:1101 src/winecharm/ui.py:1138
+#: src/winecharm/ui.py:1174
+msgid "Stop"
+msgstr "Arrêter"
+
+#: src/winecharm/script_options.py:1691
+msgid "Install dxvk and vkd3d"
+msgstr "Installer dxvk et vkd3d"
+
+#: src/winecharm/script_options.py:1692
+msgid "Select components to install:"
+msgstr "Sélectionnez les composants à installer :"
+
+#: src/winecharm/script_options.py:1709
+msgid "Install"
+msgstr "Installer"
+
+#: src/winecharm/script_options.py:1728
+msgid "Installing Components"
+msgstr "Installation des composants en cours"
+
+#: src/winecharm/script_options.py:1734
+msgid "Starting installation..."
+msgstr "Démarrage de l'installation..."
+
+#: src/winecharm/script_options.py:1755
+msgid "No Selection"
+msgstr "Aucune sélection"
+
+#: src/winecharm/script_options.py:1755
+msgid "Please select at least one component to install."
+msgstr "Veuillez sélectionner au moins un composant à installer."
+
+#: src/winecharm/script_options.py:1779
+#, python-brace-format
+msgid "Installing {component}..."
+msgstr "Installation de {component} en cours..."
+
+#: src/winecharm/script_options.py:1787 src/winecharm/script_options.py:1792
+msgid "Installation Error"
+msgstr "Erreur d'installation"
+
+#: src/winecharm/script_options.py:1787
+#, python-brace-format
+msgid ""
+"Failed to install {component}: Return code {code}\n"
+" try Open Terminal then run \n"
+" \"winetricks -q dxvk vkd3d\""
+msgstr ""
+"Échec de l'installation de {component} : Code de retour {code}\n"
+" essayez d'ouvrir le terminal puis exécutez \n"
+" \"winetricks -q dxvk vkd3d\""
+
+#: src/winecharm/script_options.py:1792
+#, python-brace-format
+msgid "Failed to install {component}: {error}"
+msgstr "Échec de l'installation de {component} : {error}"
+
+#: src/winecharm/script_options.py:1797
+msgid "Installation complete"
+msgstr "Installation terminée"
+
+#: src/winecharm/ui.py:63 src/winecharm/ui.py:64
+msgid "Wine Charm"
+msgstr "Wine Charm"
+
+#: src/winecharm/ui.py:74
+msgid "Back"
+msgstr "Retour"
+
+#: src/winecharm/ui.py:87 src/winecharm/ui.py:155
+msgid "Search"
+msgstr "Rechercher"
+
+#: src/winecharm/ui.py:96
+msgid "Toggle Icon/List View"
+msgstr "Basculer entre vue icônes/liste"
+
+#: src/winecharm/ui.py:107
+msgid "Menu"
+msgstr "Menu"
+
+#: src/winecharm/ui.py:113
+msgid "Name (A-Z)"
+msgstr "Nom (A-Z)"
+
+#: src/winecharm/ui.py:114
+msgid "Name (Z-A)"
+msgstr "Nom (Z-A)"
+
+#: src/winecharm/ui.py:115
+msgid "Wineprefix (A-Z)"
+msgstr "Préfixe Wine (A-Z)"
+
+#: src/winecharm/ui.py:116
+msgid "Wineprefix (Z-A)"
+msgstr "Préfixe Wine (Z-A)"
+
+#: src/winecharm/ui.py:117
+msgid "Time (Newest First)"
+msgstr "Heure (les plus récents en premier)"
+
+#: src/winecharm/ui.py:118
+msgid "Time (Oldest First)"
+msgstr "Heure (les plus anciens en premier)"
+
+#: src/winecharm/ui.py:119
+msgid "🔠 Sort"
+msgstr "🔠 Trier"
+
+#: src/winecharm/ui.py:124
+msgid "📂 Open"
+msgstr "📂 Ouvrir"
+
+#: src/winecharm/ui.py:142 src/winecharm/ui.py:537 src/winecharm/ui.py:691
+#: src/winecharm/ui.py:1254
+msgid "Open"
+msgstr "Ouvrir"
+
+#: src/winecharm/ui.py:268
+#, python-brace-format
+msgid "Error in search button handling: {e}"
+msgstr "Erreur dans la gestion du bouton de recherche : {e}"
+
+#: src/winecharm/ui.py:431
+#, python-brace-format
+msgid "No matches found for search term: {term}"
+msgstr "Aucun résultat trouvé pour le terme de recherche : {term}"
+
+#: src/winecharm/ui.py:517
+msgid "EXE and MSI files"
+msgstr "Fichiers EXE et MSI"
+
+#: src/winecharm/ui.py:542
+msgid "Processing..."
+msgstr "Traitement en cours..."
+
+#: src/winecharm/ui.py:551
+#, python-brace-format
+msgid "An error occurred: {e}"
+msgstr "Une erreur s'est produite : {e}"
+
+#: src/winecharm/ui.py:602
+#, python-brace-format
+msgid "Error opening file manager: {e}"
+msgstr "Erreur lors de l'ouverture du gestionnaire de fichiers : {e}"
+
+#: src/winecharm/ui.py:647
+msgid "No suitable terminal emulator found."
+msgstr "Aucun émulateur de terminal approprié trouvé."
+
+#: src/winecharm/ui.py:666
+#, python-brace-format
+msgid "Error opening terminal: {e}"
+msgstr "Erreur lors de l'ouverture du terminal : {e}"
+
+#: src/winecharm/ui.py:753 src/winecharm/ui.py:906
+msgid "Options"
+msgstr "Options"
+
+#: src/winecharm/ui.py:1276
+msgid "Open button disabled."
+msgstr "Bouton Ouvrir désactivé."
+
+#: src/winecharm/ui.py:1282
+msgid "Open button enabled."
+msgstr "Bouton Ouvrir activé."
+
+#: src/winecharm/ui.py:1330
+#, python-brace-format
+msgid "Step {current}/{total}"
+msgstr "Étape {current}/{total}"
