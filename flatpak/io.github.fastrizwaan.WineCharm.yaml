@@ -176,46 +176,18 @@ modules:
         url: https://download.gnome.org/sources/zenity/3.44/zenity-3.44.5.tar.xz
         sha256: 29ac447f4246b1da783a3c28ddc80b0ef7c80eccd5836ad9140abf89841d0eab
                 
-#  - name: WineCharm
-#    buildsystem: simple
-#    build-commands:
-#      - pip3 install --no-deps --no-build-isolation --ignore-installed --prefix=${FLATPAK_DEST} .
-#    sources:
-#      - type: git
-#        #tag: 0.99.8
-#        commit: e689063b130044b1d63c9a2f97e17206374fc10b
-#        url: https://github.com/fastrizwaan/WineCharm.git
-
-
-        
-
   - name: WineCharm
     buildsystem: simple
     build-commands:
-      # Debug: Show current directory structure
-      - ls -la
-      - find . -name "*.po" -o -name "locale" -type d
-      
-      # Create locale directories and compile .po files to .mo files
-      - mkdir -p src/winecharm/locale/hi/LC_MESSAGES/
-      - msgfmt po/hi.po -o src/winecharm/locale/hi/LC_MESSAGES/io.github.fastrizwaan.WineCharm.mo
-      
-      # Verify the .mo file was created
-      - ls -la src/winecharm/locale/hi/LC_MESSAGES/
-      
-      # Also create system-wide locale directory (fallback)
-      - mkdir -p /app/share/locale/hi/LC_MESSAGES/
-      - cp src/winecharm/locale/hi/LC_MESSAGES/io.github.fastrizwaan.WineCharm.mo /app/share/locale/hi/LC_MESSAGES/
-      
-      # Install the package with pip
       - pip3 install --no-deps --no-build-isolation --ignore-installed --prefix=${FLATPAK_DEST} .
-      
-      # Verify installation
-      - find ${FLATPAK_DEST} -name "*.mo" -o -name "locale" -type d
     sources:
       - type: git
         #tag: 0.99.8
         commit: e689063b130044b1d63c9a2f97e17206374fc10b
-        url: https://github.com/fastrizwaan/WineCharm.git      
+        url: https://github.com/fastrizwaan/WineCharm.git
+
+
+        
+
 
 
