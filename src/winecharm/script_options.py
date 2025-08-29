@@ -23,7 +23,6 @@ import json
 import cairo
 import math
 from pathlib import Path
-from gettext import gettext as _
 from threading import Lock
 from datetime import datetime, timedelta
 gi.require_version('Gtk', '4.0')
