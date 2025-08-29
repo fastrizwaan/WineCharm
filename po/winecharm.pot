@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-08-29 09:18+0530\n"
+"POT-Creation-Date: 2025-08-29 14:25+0530\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -16,6 +16,114 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+
+#: src/winecharm/winecharm.py:580
+msgid "🛠️ Settings..."
+msgstr ""
+
+#: src/winecharm/winecharm.py:581
+msgid "☠️ Kill all..."
+msgstr ""
+
+#: src/winecharm/winecharm.py:582
+msgid "🍾 Restore..."
+msgstr ""
+
+#: src/winecharm/winecharm.py:583
+msgid "📥 Import Wine Directory"
+msgstr ""
+
+#: src/winecharm/winecharm.py:584
+msgid "📥 Import WineZGUI Scripts..."
+msgstr ""
+
+#: src/winecharm/winecharm.py:585
+msgid "❓ Help..."
+msgstr ""
+
+#: src/winecharm/winecharm.py:586
+msgid "📖 About..."
+msgstr ""
+
+#: src/winecharm/winecharm.py:587
+msgid "🚪 Quit..."
+msgstr ""
+
+#: src/winecharm/winecharm.py:844
+msgid "Processing"
+msgstr ""
+
+#: src/winecharm/winecharm.py:848
+msgid "Restoring"
+msgstr ""
+
+#: src/winecharm/winecharm.py:855 src/winecharm/winecharm.py:2631
+msgid "Invalid File Type"
+msgstr ""
+
+#: src/winecharm/winecharm.py:856
+msgid "Only .exe and .msi files are supported."
+msgstr ""
+
+#: src/winecharm/winecharm.py:1187 src/winecharm/script_options.py:1663
+#: src/winecharm/ui.py:499 src/winecharm/ui.py:788 src/winecharm/ui.py:901
+#: src/winecharm/ui.py:1006 src/winecharm/ui.py:1104 src/winecharm/ui.py:1141
+#: src/winecharm/ui.py:1174
+msgid "Play"
+msgstr ""
+
+#: src/winecharm/winecharm.py:1219
+msgid "Script Error"
+msgstr ""
+
+#: src/winecharm/winecharm.py:1219
+msgid "Failed to reload script data."
+msgstr ""
+
+#: src/winecharm/winecharm.py:1241 src/winecharm/winecharm.py:1243
+msgid "Runner Error"
+msgstr ""
+
+#: src/winecharm/winecharm.py:1242
+#, python-format
+msgid "Failed to get runner. Error: %s"
+msgstr ""
+
+#: src/winecharm/winecharm.py:1248
+msgid "Executable Not Found"
+msgstr ""
+
+#: src/winecharm/winecharm.py:1248
+msgid "Exe Not Found"
+msgstr ""
+
+#: src/winecharm/winecharm.py:1287
+msgid "Argument Error"
+msgstr ""
+
+#: src/winecharm/winecharm.py:1289 src/winecharm/winecharm.py:1347
+msgid "Launch Failed"
+msgstr ""
+
+#: src/winecharm/winecharm.py:1347 src/winecharm/winecharm.py:1348
+msgid "Launch Error"
+msgstr ""
+
+#: src/winecharm/winecharm.py:1380 src/winecharm/winecharm.py:1384
+msgid "Wineboot Error"
+msgstr ""
+
+#: src/winecharm/winecharm.py:1380 src/winecharm/winecharm.py:1384
+msgid "Prefix Update Failed"
+msgstr ""
+
+#: src/winecharm/winecharm.py:2642
+msgid "Invalid file type:"
+msgstr ""
+
+#: src/winecharm/winecharm.py:2642
+msgid "Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed."
+msgstr ""
 
 #: src/winecharm/save_load_users_dir.py:28
 msgid "Select Directories to Backup"
@@ -501,12 +609,6 @@ msgstr ""
 #: src/winecharm/ui.py:1003 src/winecharm/ui.py:1101 src/winecharm/ui.py:1138
 #: src/winecharm/ui.py:1174
 msgid "Stop"
-msgstr ""
-
-#: src/winecharm/script_options.py:1663 src/winecharm/ui.py:499
-#: src/winecharm/ui.py:788 src/winecharm/ui.py:901 src/winecharm/ui.py:1006
-#: src/winecharm/ui.py:1104 src/winecharm/ui.py:1141 src/winecharm/ui.py:1174
-msgid "Play"
 msgstr ""
 
 #: src/winecharm/script_options.py:1691

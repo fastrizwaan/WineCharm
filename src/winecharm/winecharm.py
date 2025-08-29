@@ -34,6 +34,17 @@ gi.require_version('Adw', '1')
 
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 
+# --- i18n (minimal additions) ---
+import locale, gettext
+APP_ID = "io.github.fastrizwaan.WineCharm"
+LOCALE_DIR = str(Path(__file__).with_name("locale"))
+locale.setlocale(locale.LC_ALL, "")
+gettext.bindtextdomain(APP_ID, LOCALE_DIR)
+gettext.textdomain(APP_ID)
+_ = gettext.gettext
+ngettext = gettext.ngettext
+# --- end i18n ---
+
 # Import file operation functions directly
 # Add current directory to sys.path for local development
 if os.path.dirname(__file__) not in sys.path:
@@ -566,14 +577,14 @@ class WineCharmApp(Adw.Application):
                 
 ##################### / Import Methods from files #####################                
         self.hamburger_actions = [
-            ("🛠️ Settings...", self.show_options_for_settings),
-            ("☠️ Kill all...", self.on_kill_all_clicked),
-            ("🍾 Restore...", self.restore_from_backup),
-            ("📥 Import Wine Directory", self.on_import_wine_directory_clicked),
-            ("📥 Import WineZGUI Scripts...", self.process_winezgui_sh_files),
-            ("❓ Help...", self.on_help_clicked),
-            ("📖 About...", self.on_about_clicked),
-            ("🚪 Quit...", self.quit_app)
+            (_("🛠️ Settings..."), self.show_options_for_settings),
+            (_("☠️ Kill all..."), self.on_kill_all_clicked),
+            (_("🍾 Restore..."), self.restore_from_backup),
+            (_("📥 Import Wine Directory"), self.on_import_wine_directory_clicked),
+            (_("📥 Import WineZGUI Scripts..."), self.process_winezgui_sh_files),
+            (_("❓ Help..."), self.on_help_clicked),
+            (_("📖 About..."), self.on_about_clicked),
+            (_("🚪 Quit..."), self.quit_app),
         ]
 
         self.settings = self.load_settings()  # Add this line
@@ -830,15 +841,20 @@ class WineCharmApp(Adw.Application):
             file_extension = Path(file_path).suffix.lower()
             if file_extension in ['.exe', '.msi']:
                 print("Valid executable file detected: {}".format(file_path))
-                GLib.idle_add(self.show_processing_spinner, "Processing")
+                GLib.idle_add(self.show_processing_spinner, _("Processing"))
                 self.process_cli_file_in_thread(file_path)
             elif file_extension in ['.wzt', '.bottle', '.prefix']:
                 print("Valid backup file detected: {}".format(file_path))
-                GLib.idle_add(self.show_processing_spinner, "Restoring")
+                GLib.idle_add(self.show_processing_spinner, _("Restoring"))
                 self.restore_prefix_bottle_wzt_tar_zst(file_path)
             else:
                 print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
-                GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
+                GLib.timeout_add_seconds(
+                    0.5,
+                    self.show_info_dialog,
+                    _("Invalid File Type"),
+                    _("Only .exe and .msi files are supported."),
+                )    
                 self.command_line_file = None
                 return False
 
@@ -1168,7 +1184,8 @@ class WineCharmApp(Adw.Application):
         if play_button:
             self.set_play_stop_button_state(play_button, False)
             play_button.set_icon_name("media-playback-start-symbolic")
-            play_button.set_tooltip_text("Play")
+            play_button.set_tooltip_text(_("Play"))
+
 
         # Handle button visibility based on view type
         if ui_state.get('showing_buttons', False):
@@ -1199,7 +1216,7 @@ class WineCharmApp(Adw.Application):
         script_data = self.reload_script_data_from_charm(script_key)
         if not script_data:
             print("Error: Script data could not be reloaded.")
-            self.handle_ui_error(play_stop_button, row, "Script Error", "Failed to reload script data.", "Script Error")
+            self.handle_ui_error(play_stop_button, row, _("Script Error"), _("Failed to reload script data."), _("Script Error"))
             return
 
         self.debug = True
@@ -1218,11 +1235,17 @@ class WineCharmApp(Adw.Application):
             runner_path = self.get_runner(script_data)
         except Exception as e:
             print(f"Error getting runner: {e}")
-            self.handle_ui_error(play_stop_button, row, "Runner Error", f"Failed to get runner. Error: {e}", "Runner Error")
+            self.handle_ui_error(
+                play_stop_button,
+                row,
+                _("Runner Error"),
+                _("Failed to get runner. Error: %s") % e,
+                _("Runner Error")
+            )
             return
 
         if not exe_file.exists():
-            self.handle_ui_error(play_stop_button, row, "Executable Not Found", str(exe_file), "Exe Not Found")
+            self.handle_ui_error(play_stop_button, row, _("Executable Not Found"), str(exe_file), _("Exe Not Found"))
             return
 
         log_file_path = Path(wineprefix) / f"{exe_file.stem}.log"
@@ -1261,8 +1284,9 @@ class WineCharmApp(Adw.Application):
         except Exception as e:
             print(f"Error processing arguments: {e}")
             self.handle_ui_error(play_stop_button, row, 
-                            "Argument Error", f"Invalid arguments: {e}", 
-                            "Launch Failed")
+                            _("Argument Error"), 
+                            _(f"Invalid arguments: {e}"),
+                            _("Launch Failed"))
             return
 
         # Prepare command components
@@ -1320,9 +1344,8 @@ class WineCharmApp(Adw.Application):
                 with open(log_file_path, 'a') as log_file:
                     log_file.write(f"\n{error_message}\n{traceback_str}\n")
 
-                GLib.idle_add(self.handle_ui_error, play_stop_button, row,
-                            "Launch Error", f"Failed to launch: {e}", "Launch Failed")
-                GLib.idle_add(self.show_info_dialog, "Launch Error", f"Failed to launch: {e}")
+                GLib.idle_add(self.handle_ui_error, play_stop_button, row, _("Launch Error"), _(f"Failed to launch: {e}"), _("Launch Failed"))
+                GLib.idle_add(self.show_info_dialog, _("Launch Error"), _(f"Failed to launch: {e}"))
 
         if wineboot_file_path.exists():
             runner_dir = runner_path.parent.resolve()
@@ -1353,12 +1376,12 @@ class WineCharmApp(Adw.Application):
 
                 except subprocess.CalledProcessError as e:
                     error_msg = f"Wineboot failed (code {e.returncode}): {e.stderr}"
-                    GLib.idle_add(self.handle_ui_error, play_stop_button, row,
-                                "Wineboot Error", error_msg, "Prefix Update Failed")
+                    GLib.idle_add(self.handle_ui_error, play_stop_button, row, 
+                                _("Wineboot Error"), error_msg, _("Prefix Update Failed"))
                 except Exception as e:
                     error_msg = f"Wineboot error: {str(e)}"
                     GLib.idle_add(self.handle_ui_error, play_stop_button, row,
-                                "Wineboot Error", error_msg, "Prefix Update Failed")
+                                _("Wineboot Error"), error_msg, _("Prefix Update Failed"))
                 finally:
                     GLib.idle_add(play_stop_button.set_sensitive, True)
 
@@ -2605,7 +2628,7 @@ def main():
                 # If no instance is running, start WineCharmApp and show the error dialog directly
                 if not app.SOCKET_FILE.exists():
                     app.start_socket_server()
-                    GLib.timeout_add_seconds(1.5, app.show_info_dialog, "Invalid File Type", f"Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You provided: {file_extension}")
+                    GLib.timeout_add_seconds(1.5, app.show_info_dialog, _("Invalid File Type"), _(f"Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You provided: {file_extension}"))
                     app.run(sys.argv)
 
                     # Clean up the socket file
@@ -2616,7 +2639,7 @@ def main():
                     try:
                         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
                             client.connect(str(app.SOCKET_FILE))
-                            message = f"show_dialog||Invalid file type: {file_extension}||Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed."
+                            message = f"show_dialog||{_('Invalid file type:')} {file_extension}||{_('Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed.')}"
                             client.sendall(message.encode())
                         return
                     except ConnectionRefusedError:
