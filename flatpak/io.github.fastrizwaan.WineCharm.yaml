@@ -175,6 +175,19 @@ modules:
       - type: archive
         url: https://download.gnome.org/sources/zenity/3.44/zenity-3.44.5.tar.xz
         sha256: 29ac447f4246b1da783a3c28ddc80b0ef7c80eccd5836ad9140abf89841d0eab
+
+  - name: polib
+    buildsystem: simple
+    build-commands: 
+    - pip3 install --prefix=/app polib*.whl
+    sources:
+    - type: file
+      url: https://files.pythonhosted.org/packages/6b/99/45bb1f9926efe370c6dbe324741c749658e44cb060124f28dad201202274/polib-1.2.0-py2.py3-none-any.whl
+      sha256: 1c77ee1b81feb31df9bca258cbc58db1bbb32d10214b173882452c73af06d62d
+      x-checker-data:
+        type: pypi
+        name: polib
+        packagetype: bdist_wheel
                 
   - name: WineCharm
     buildsystem: simple
@@ -183,7 +196,7 @@ modules:
     sources:
       - type: git
         #tag: 0.99.8
-        commit: e689063b130044b1d63c9a2f97e17206374fc10b
+        commit: 811ced6d3a7beff43489e33918491d7ff5127ea5
         url: https://github.com/fastrizwaan/WineCharm.git
 
 
