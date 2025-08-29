@@ -31,16 +31,26 @@ gi.require_version('Adw', '1')
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 
 # --- i18n (minimal additions) ---
-import locale
-import gettext
+import locale, gettext
+from pathlib import Path
+import importlib.resources as r
+
 APP_ID = "io.github.fastrizwaan.WineCharm"
-LOCALE_DIR = str(Path(__file__).parent / "locale") # Assuming locale dir is next to the script
-locale.setlocale(locale.LC_ALL, '')
+
+# Prefer package-local locale dir
+try:
+    LOCALE_DIR = str((r.files("winecharm") / "locale"))
+except Exception:
+    LOCALE_DIR = str(Path(__file__).with_name("locale"))
+
+locale.setlocale(locale.LC_ALL, "")
 gettext.bindtextdomain(APP_ID, LOCALE_DIR)
 gettext.textdomain(APP_ID)
+
 _ = gettext.gettext
-# ngettext = gettext.ngettext # Uncomment if you need plural forms
+ngettext = gettext.ngettext
 # --- end i18n ---
+
 
 def show_options_for_script(self, ui_state, row, script_key):
     self.print_method_name()

@@ -10,14 +10,25 @@ from pathlib import Path
 
 # --- i18n (minimal additions) ---
 import locale, gettext
+from pathlib import Path
+import importlib.resources as r
+
 APP_ID = "io.github.fastrizwaan.WineCharm"
-LOCALE_DIR = str(Path(__file__).with_name("locale"))
+
+# Prefer package-local locale dir
+try:
+    LOCALE_DIR = str((r.files("winecharm") / "locale"))
+except Exception:
+    LOCALE_DIR = str(Path(__file__).with_name("locale"))
+
 locale.setlocale(locale.LC_ALL, "")
 gettext.bindtextdomain(APP_ID, LOCALE_DIR)
 gettext.textdomain(APP_ID)
+
 _ = gettext.gettext
 ngettext = gettext.ngettext
 # --- end i18n ---
+
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
