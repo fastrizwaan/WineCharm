@@ -51,10 +51,6 @@ lang_to_use = best_lang(raw_env_lang)
 try:
     locale.setlocale(locale.LC_ALL, raw_env_lang or "")
 except locale.Error:
-    sys.stderr.write(
-        f"[WineCharm] Warning: Locale '{raw_env_lang}' not supported by C library, "
-        "falling back to 'C'.\n"
-    )
     locale.setlocale(locale.LC_ALL, "C")
 
 gettext.bindtextdomain(APP_ID, LOCALE_DIR)
@@ -63,9 +59,7 @@ gettext.textdomain(APP_ID)
 _ = gettext.gettext
 ngettext = gettext.ngettext
 
-sys.stderr.write(
-    f"[WineCharm] Using translations from '{lang_to_use}' (domain: {APP_ID}).\n"
-)
+
 # --- end i18n ---
 
 

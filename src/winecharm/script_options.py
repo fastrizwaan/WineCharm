@@ -30,6 +30,13 @@ gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 
+# --- i18n (minimal additions) ---
+import locale, gettext
+from pathlib import Path
+import importlib.resources as r
+
+APP_ID = "io.github.fastrizwaan.WineCharm"
+
 # --- i18n (robust with warning + fallback detection) ---
 import locale, gettext, os, sys
 from pathlib import Path
@@ -66,10 +73,6 @@ lang_to_use = best_lang(raw_env_lang)
 try:
     locale.setlocale(locale.LC_ALL, raw_env_lang or "")
 except locale.Error:
-    sys.stderr.write(
-        f"[WineCharm] Warning: Locale '{raw_env_lang}' not supported by C library, "
-        "falling back to 'C'.\n"
-    )
     locale.setlocale(locale.LC_ALL, "C")
 
 gettext.bindtextdomain(APP_ID, LOCALE_DIR)
@@ -78,10 +81,6 @@ gettext.textdomain(APP_ID)
 _ = gettext.gettext
 ngettext = gettext.ngettext
 
-sys.stderr.write(
-    f"[WineCharm] Using translations from '{lang_to_use}' (domain: {APP_ID}).\n"
-)
-# --- end i18n ---
 
 
 
