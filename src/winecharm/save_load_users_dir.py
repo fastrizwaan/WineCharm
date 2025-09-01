@@ -15,6 +15,59 @@ gi.require_version('Adw', '1')
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 from datetime import datetime, timedelta
 
+# --- i18n (minimal additions) ---
+import locale, gettext
+from pathlib import Path
+import importlib.resources as r
+
+APP_ID = "io.github.fastrizwaan.WineCharm"
+
+# --- i18n (robust with warning + fallback detection) ---
+import locale, gettext, os, sys
+from pathlib import Path
+import importlib.resources as r
+
+APP_ID = "io.github.fastrizwaan.WineCharm"
+
+# Prefer package-local locale dir
+try:
+    LOCALE_DIR = str(r.files("winecharm") / "locale")
+except Exception:
+    LOCALE_DIR = str(Path(__file__).parent / "locale")
+
+def best_lang(env_lang: str | None) -> str:
+    """Return best available language (exact or base fallback)."""
+    if not env_lang:
+        return "C"
+    lang = env_lang.split(".")[0]  # drop encoding
+    cand = Path(LOCALE_DIR) / lang / "LC_MESSAGES" / f"{APP_ID}.mo"
+    if cand.exists():
+        return lang
+    # try base language (fr_FR → fr)
+    if "_" in lang:
+        base = lang.split("_")[0]
+        cand = Path(LOCALE_DIR) / base / "LC_MESSAGES" / f"{APP_ID}.mo"
+        if cand.exists():
+            return base
+    return "C"
+
+# Pick LANGUAGE first, then LANG
+raw_env_lang = os.environ.get("LANGUAGE") or os.environ.get("LANG")
+lang_to_use = best_lang(raw_env_lang)
+
+try:
+    locale.setlocale(locale.LC_ALL, raw_env_lang or "")
+except locale.Error:
+    locale.setlocale(locale.LC_ALL, "C")
+
+gettext.bindtextdomain(APP_ID, LOCALE_DIR)
+gettext.textdomain(APP_ID)
+
+_ = gettext.gettext
+ngettext = gettext.ngettext
+
+
+# --- end i18n ---
 
 def show_save_user_dirs_dialog(self, script, script_key, button):
     """Show dialog to select directories for backup."""
@@ -242,7 +295,7 @@ def show_load_user_dirs_dialog(self, script, script_key, button):
     print("Method: show_load_user_dirs_dialog")
     file_dialog = Gtk.FileDialog()
     file_filter = Gtk.FileFilter()
-    file_filter.set_name("Saved Files (*.sav.tar.zst, *.saved)")
+    file_filter.set_name(_("Saved Files (*.sav.tar.zst, *.saved)"))
     file_filter.add_pattern("*.sav.tar.zst")
     file_filter.add_pattern("*.saved")
     filter_list_store = Gio.ListStore.new(Gtk.FileFilter)
@@ -325,7 +378,7 @@ def is_valid_directory(self, path_obj, wineprefix):
     """
     # Ensure the directory is within the wineprefix
     if not path_obj.is_relative_to(wineprefix):
-        return False, "Directory must be within Wine prefix"
+        return False, _("Directory must be within Wine prefix")
     
     # Define directories to exclude exactly (not their subdirectories)
     exact_exclusions = [
@@ -335,16 +388,16 @@ def is_valid_directory(self, path_obj, wineprefix):
     
     # Define directories to exclude including their subdirectories
     subtree_exclusions = {
-        wineprefix / "dosdevices": "Cannot select dosdevices or its subdirectories",
-        wineprefix / "drive_c" / "windows": "Cannot select drive_c/windows or its subdirectories"
+        wineprefix / "dosdevices": _("Cannot select dosdevices or its subdirectories"),
+        wineprefix / "drive_c" / "windows": _("Cannot select drive_c/windows or its subdirectories")
     }
     
     # Check exact exclusions
     if path_obj in exact_exclusions:
         if path_obj == wineprefix:
-            return False, "Cannot select the wineprefix directory"
+            return False, _("Cannot select the wineprefix directory")
         elif path_obj == wineprefix / "drive_c":
-            return False, "Cannot select the drive_c directory"
+            return False, _("Cannot select the drive_c directory")
     
     # Check subtree exclusions
     for excl, msg in subtree_exclusions.items():
