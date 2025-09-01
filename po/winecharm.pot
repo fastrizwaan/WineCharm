@@ -775,3 +775,111 @@ msgstr ""
 #, python-brace-format
 msgid "Step {current}/{total}"
 msgstr ""
+
+translate to hindi:
+#: src/winecharm/save_load_users_dir.py:81
+msgid "Select Directories to Backup"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:82
+msgid "Choose which directories to include in the backup."
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:84
+#: src/winecharm/save_load_users_dir.py:330 src/winecharm/script_options.py:368
+#: src/winecharm/script_options.py:439 src/winecharm/script_options.py:457
+#: src/winecharm/script_options.py:929 src/winecharm/script_options.py:1042
+#: src/winecharm/script_options.py:1125 src/winecharm/script_options.py:1222
+#: src/winecharm/script_options.py:1325 src/winecharm/script_options.py:1402
+#: src/winecharm/script_options.py:1607 src/winecharm/script_options.py:1749
+#: src/winecharm/script_options.py:1778
+msgid "Cancel"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:85
+#: src/winecharm/save_load_users_dir.py:417 src/winecharm/script_options.py:366
+#: src/winecharm/script_options.py:1323 src/winecharm/script_options.py:1400
+#: src/winecharm/ui.py:1430
+msgid "OK"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:147
+msgid "Add Directory"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:185
+#: src/winecharm/save_load_users_dir.py:205 src/winecharm/script_options.py:648
+msgid "Error"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:186
+msgid "Failed to save directories: {}"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:193
+msgid "Select Directory to Add"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:287
+msgid "Backup Complete"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:288
+msgid ""
+"User directories saved to:\n"
+"{}"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:291
+msgid "Backup Failed"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:298
+msgid "Saved Files (*.sav.tar.zst, *.saved)"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:327
+msgid "Confirm Restore"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:328
+msgid "Restoring from {} will overwrite existing user directories. Proceed?"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:331
+msgid "Restore"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:362
+msgid "Restore Complete"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:363
+msgid ""
+"User directories restored to:\n"
+"{}"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:366
+msgid "Restore Failed"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:381
+msgid "Directory must be within Wine prefix"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:391
+msgid "Cannot select dosdevices or its subdirectories"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:392
+msgid "Cannot select drive_c/windows or its subdirectories"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:398
+msgid "Cannot select the wineprefix directory"
+msgstr ""
+
+#: src/winecharm/save_load_users_dir.py:400
+msgid "Cannot select the drive_c directory"
+msgstr ""

@@ -794,3 +794,114 @@ msgstr "खोलें बटन सक्षम किया गया।"
 #, python-brace-format
 msgid "Step {current}/{total}"
 msgstr "चरण {current}/{total}"
+
+#: src/winecharm/save_load_users_dir.py:81
+msgid "Select Directories to Backup"
+msgstr "बैकअप के लिए निर्देशिकाएँ चुनें"
+
+#: src/winecharm/save_load_users_dir.py:82
+msgid "Choose which directories to include in the backup."
+msgstr "बैकअप में शामिल करने के लिए निर्देशिकाएँ चुनें।"
+
+#: src/winecharm/save_load_users_dir.py:84
+#: src/winecharm/save_load_users_dir.py:330 src/winecharm/script_options.py:368
+#: src/winecharm/script_options.py:439 src/winecharm/script_options.py:457
+#: src/winecharm/script_options.py:929 src/winecharm/script_options.py:1042
+#: src/winecharm/script_options.py:1125 src/winecharm/script_options.py:1222
+#: src/winecharm/script_options.py:1325 src/winecharm/script_options.py:1402
+#: src/winecharm/script_options.py:1607 src/winecharm/script_options.py:1749
+#: src/winecharm/script_options.py:1778
+msgid "Cancel"
+msgstr "रद्द करें"
+
+#: src/winecharm/save_load_users_dir.py:85
+#: src/winecharm/save_load_users_dir.py:417 src/winecharm/script_options.py:366
+#: src/winecharm/script_options.py:1323 src/winecharm/script_options.py:1400
+#: src/winecharm/ui.py:1430
+msgid "OK"
+msgstr "ठीक है"
+
+#: src/winecharm/save_load_users_dir.py:147
+msgid "Add Directory"
+msgstr "निर्देशिका जोड़ें"
+
+#: src/winecharm/save_load_users_dir.py:185
+#: src/winecharm/save_load_users_dir.py:205 src/winecharm/script_options.py:648
+msgid "Error"
+msgstr "त्रुटि"
+
+#: src/winecharm/save_load_users_dir.py:186
+msgid "Failed to save directories: {}"
+msgstr "निर्देशिकाएँ सहेजने में विफल: {}"
+
+#: src/winecharm/save_load_users_dir.py:193
+msgid "Select Directory to Add"
+msgstr "जोड़ने के लिए निर्देशिका चुनें"
+
+#: src/winecharm/save_load_users_dir.py:287
+msgid "Backup Complete"
+msgstr "बैकअप पूर्ण"
+
+#: src/winecharm/save_load_users_dir.py:288
+msgid ""
+"User directories saved to:\n"
+"{}"
+msgstr ""
+"उपयोगकर्ता निर्देशिकाएँ यहाँ सहेजी गईं:\n"
+"{}"
+
+#: src/winecharm/save_load_users_dir.py:291
+msgid "Backup Failed"
+msgstr "बैकअप विफल"
+
+#: src/winecharm/save_load_users_dir.py:298
+msgid "Saved Files (*.sav.tar.zst, *.saved)"
+msgstr "सहेजी गई फ़ाइलें (*.sav.tar.zst, *.saved)"
+
+#: src/winecharm/save_load_users_dir.py:327
+msgid "Confirm Restore"
+msgstr "पुनर्स्थापन की पुष्टि करें"
+
+#: src/winecharm/save_load_users_dir.py:328
+msgid "Restoring from {} will overwrite existing user directories. Proceed?"
+msgstr "{} से पुनर्स्थापित करने से मौजूदा उपयोगकर्ता निर्देशिकाएँ अधिलिखित हो जाएंगी। आगे बढ़ें?"
+
+#: src/winecharm/save_load_users_dir.py:331
+msgid "Restore"
+msgstr "पुनर्स्थापित करें"
+
+#: src/winecharm/save_load_users_dir.py:362
+msgid "Restore Complete"
+msgstr "पुनर्स्थापन पूर्ण"
+
+#: src/winecharm/save_load_users_dir.py:363
+msgid ""
+"User directories restored to:\n"
+"{}"
+msgstr ""
+"उपयोगकर्ता निर्देशिकाएँ यहाँ पुनर्स्थापित की गईं:\n"
+"{}"
+
+#: src/winecharm/save_load_users_dir.py:366
+msgid "Restore Failed"
+msgstr "पुनर्स्थापन विफल"
+
+#: src/winecharm/save_load_users_dir.py:381
+msgid "Directory must be within Wine prefix"
+msgstr "निर्देशिका Wine prefix के भीतर होनी चाहिए"
+
+#: src/winecharm/save_load_users_dir.py:391
+msgid "Cannot select dosdevices or its subdirectories"
+msgstr "dosdevices या उसके उपनिर्देशिकाएँ चुनी नहीं जा सकतीं"
+
+#: src/winecharm/save_load_users_dir.py:392
+msgid "Cannot select drive_c/windows or its subdirectories"
+msgstr "drive_c/windows या उसके उपनिर्देशिकाएँ चुनी नहीं जा सकतीं"
+
+#: src/winecharm/save_load_users_dir.py:398
+msgid "Cannot select the wineprefix directory"
+msgstr "wineprefix निर्देशिका को चुना नहीं जा सकता"
+
+#: src/winecharm/save_load_users_dir.py:400
+msgid "Cannot select the drive_c directory"
+msgstr "drive_c निर्देशिका को चुना नहीं जा सकता"    
