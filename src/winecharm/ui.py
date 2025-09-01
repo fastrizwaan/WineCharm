@@ -15,19 +15,59 @@ import importlib.resources as r
 
 APP_ID = "io.github.fastrizwaan.WineCharm"
 
+# --- i18n (robust with warning + fallback detection) ---
+import locale, gettext, os, sys
+from pathlib import Path
+import importlib.resources as r
+
+APP_ID = "io.github.fastrizwaan.WineCharm"
+
 # Prefer package-local locale dir
 try:
-    LOCALE_DIR = str((r.files("winecharm") / "locale"))
+    LOCALE_DIR = str(r.files("winecharm") / "locale")
 except Exception:
-    LOCALE_DIR = str(Path(__file__).with_name("locale"))
+    LOCALE_DIR = str(Path(__file__).parent / "locale")
 
-locale.setlocale(locale.LC_ALL, "")
+def best_lang(env_lang: str | None) -> str:
+    """Return best available language (exact or base fallback)."""
+    if not env_lang:
+        return "C"
+    lang = env_lang.split(".")[0]  # drop encoding
+    cand = Path(LOCALE_DIR) / lang / "LC_MESSAGES" / f"{APP_ID}.mo"
+    if cand.exists():
+        return lang
+    # try base language (fr_FR → fr)
+    if "_" in lang:
+        base = lang.split("_")[0]
+        cand = Path(LOCALE_DIR) / base / "LC_MESSAGES" / f"{APP_ID}.mo"
+        if cand.exists():
+            return base
+    return "C"
+
+# Pick LANGUAGE first, then LANG
+raw_env_lang = os.environ.get("LANGUAGE") or os.environ.get("LANG")
+lang_to_use = best_lang(raw_env_lang)
+
+try:
+    locale.setlocale(locale.LC_ALL, raw_env_lang or "")
+except locale.Error:
+    sys.stderr.write(
+        f"[WineCharm] Warning: Locale '{raw_env_lang}' not supported by C library, "
+        "falling back to 'C'.\n"
+    )
+    locale.setlocale(locale.LC_ALL, "C")
+
 gettext.bindtextdomain(APP_ID, LOCALE_DIR)
 gettext.textdomain(APP_ID)
 
 _ = gettext.gettext
 ngettext = gettext.ngettext
+
+sys.stderr.write(
+    f"[WineCharm] Using translations from '{lang_to_use}' (domain: {APP_ID}).\n"
+)
 # --- end i18n ---
+
 
 
 gi.require_version('Gtk', '4.0')
