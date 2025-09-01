@@ -41,19 +41,26 @@ import importlib.resources as r
 
 APP_ID = "io.github.fastrizwaan.WineCharm"
 
-# Prefer package-local locale dir
+# Prefer package-local locale dir (works in Flatpak + normal install)
 try:
-    LOCALE_DIR = str((r.files("winecharm") / "locale"))
+    LOCALE_DIR = str(r.files("winecharm") / "locale")
 except Exception:
-    LOCALE_DIR = str(Path(__file__).with_name("locale"))
+    # fallback: sibling "locale" dir (for dev tree)
+    LOCALE_DIR = str(Path(__file__).parent / "locale")
 
-locale.setlocale(locale.LC_ALL, "")
+try:
+    locale.setlocale(locale.LC_ALL, "")
+except locale.Error:
+    # fallback to C if requested locale not installed
+    locale.setlocale(locale.LC_ALL, "C")
+
 gettext.bindtextdomain(APP_ID, LOCALE_DIR)
 gettext.textdomain(APP_ID)
 
 _ = gettext.gettext
 ngettext = gettext.ngettext
 # --- end i18n ---
+
 
 
 # Import file operation functions directly

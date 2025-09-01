@@ -12,7 +12,7 @@ finish-args:
   - --socket=pulseaudio
   - --socket=x11
   - --system-talk-name=org.freedesktop.UDisks2
-  - --allow=devel # For Wine crash handling
+  - --allow=devel
   - --allow=multiarch
   - --device=all
   - --env=GST_PLUGIN_SYSTEM_PATH=/app/lib32/gstreamer-1.0:/app/lib/gstreamer-1.0:/usr/lib/i386-linux-gnu/gstreamer-1.0:/usr/lib/x86_64-linux-gnu/gstreamer-1.0
@@ -27,17 +27,17 @@ finish-args:
   - --filesystem=xdg-videos
   - --filesystem=xdg-download
 
-  # Need to symlink .desktop files from WineCharm/data/Prefix, if user needs them
+  # Symlink .desktop files if needed
   - --filesystem=~/.local/share/applications
-  
-  # If the user wants to copy a wine prefix or a runner from these dirs; permissions same as io.github.fastrizwaan.WineZGUI
+
+  # Wine prefix imports
   - --filesystem=~/.wine
   - --filesystem=~/.var/app/org.winehq.Wine/data/wine:ro
   - --filesystem=~/.var/app/com.usebottles.bottles/data/bottles:ro
   - --filesystem=~/.var/app/com.playonlinux.PlayOnLinux4/data/PlayOnLinux/wineprefix:ro
   - --filesystem=~/.var/app/org.phoenicis.playonlinux/.Phoenicis/containers/wineprefix:ro
-  
-  # I'm the author of WineZGUI. So WineCharm will create simple text files there, imports existing .sh scripts to WineCharm .yaml (.charm) files.
+
+  # WineZGUI compatibility
   - --filesystem=~/.var/app/io.github.fastrizwaan.WineZGUI/data/winezgui
 
 cleanup:
@@ -71,8 +71,15 @@ add-extensions:
     no-autodownload: true
     autodelete: false
 
+  # Add GNOME locale extension
+  org.gnome.Platform.Locale:
+    directory: share/runtime/locale
+    version: *runtime-version
+    subdirectories: true
+    no-autodownload: false
+    autodelete: false
+
 modules:
-  # Create 32-bit directories
   - name: compat
     buildsystem: simple
     build-commands:
@@ -104,19 +111,19 @@ modules:
   - name: perl
     no-autogen: true
     config-opts:
-    - "-des"
-    - "-Duseshrplib"
+      - "-des"
+      - "-Duseshrplib"
     build-options:
       cflags: "-fPIC"
       ldflags: "-fpic"
     sources:
-    - type: archive
-      url: https://www.cpan.org/src/5.0/perl-5.40.2.tar.xz
-      sha256: 0551c717458e703ef7972307ab19385edfa231198d88998df74e12226abf563b
-    - type: script
-      dest-filename: configure
-      commands:
-      - exec ./configure.gnu $@
+      - type: archive
+        url: https://www.cpan.org/src/5.0/perl-5.40.2.tar.xz
+        sha256: 0551c717458e703ef7972307ab19385edfa231198d88998df74e12226abf563b
+      - type: script
+        dest-filename: configure
+        commands:
+          - exec ./configure.gnu $@
     post-install:
       - find /app/lib/perl5 -type f -exec chmod u+w {} \;
   
@@ -179,15 +186,15 @@ modules:
   - name: polib
     buildsystem: simple
     build-commands: 
-    - pip3 install --prefix=/app polib*.whl
+      - pip3 install --prefix=/app polib*.whl
     sources:
-    - type: file
-      url: https://files.pythonhosted.org/packages/6b/99/45bb1f9926efe370c6dbe324741c749658e44cb060124f28dad201202274/polib-1.2.0-py2.py3-none-any.whl
-      sha256: 1c77ee1b81feb31df9bca258cbc58db1bbb32d10214b173882452c73af06d62d
-      x-checker-data:
-        type: pypi
-        name: polib
-        packagetype: bdist_wheel
+      - type: file
+        url: https://files.pythonhosted.org/packages/6b/99/45bb1f9926efe370c6dbe324741c749658e44cb060124f28dad201202274/polib-1.2.0-py2.py3-none-any.whl
+        sha256: 1c77ee1b81feb31df9bca258cbc58db1bbb32d10214b173882452c73af06d62d
+        x-checker-data:
+          type: pypi
+          name: polib
+          packagetype: bdist_wheel
                 
   - name: WineCharm
     buildsystem: simple
@@ -195,12 +202,6 @@ modules:
       - pip3 install --no-deps --no-build-isolation --ignore-installed --prefix=${FLATPAK_DEST} .
     sources:
       - type: git
-        #tag: 0.99.8
         commit: 811ced6d3a7beff43489e33918491d7ff5127ea5
         url: https://github.com/fastrizwaan/WineCharm.git
-
-
-        
-
-
 
