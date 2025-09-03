@@ -71,7 +71,6 @@ ngettext = gettext.ngettext
 
 def show_save_user_dirs_dialog(self, script, script_key, button):
     """Show dialog to select directories for backup."""
-    global _  # Explicitly declare _ as global to prevent shadowing
     print("Method: show_save_user_dirs_dialog")
     wineprefix = Path(script).parent
     default_dir = wineprefix / "drive_c" / "users"
@@ -113,7 +112,7 @@ def show_save_user_dirs_dialog(self, script, script_key, button):
         for saved_dir in saved_dirs:
             saved_path = Path(saved_dir).expanduser().resolve()
             # Validate saved directory
-            valid, _unused = self.is_valid_directory(saved_path, wineprefix)
+            valid, error = self.is_valid_directory(saved_path, wineprefix)
             if valid:
                 row = Adw.ActionRow()
                 row.set_title(os.path.basename(str(saved_path)))
