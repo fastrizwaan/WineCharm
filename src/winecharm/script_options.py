@@ -654,7 +654,7 @@ def show_script_about(self, script_path, script_key, button):
     script_path = Path(script_data.get('script_path', '')).expanduser().resolve()
     runner = script_data.get('runner')
     if not runner:
-        system_wine_display, _ = self.get_system_wine()
+        system_wine_display, *dummy = self.get_system_wine()
         runner_name = system_wine_display
     else:
         runner_dir = Path(runner).parent.parent
