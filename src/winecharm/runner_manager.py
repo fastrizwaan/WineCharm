@@ -174,7 +174,7 @@ def change_runner(self, script, script_key, *args):
     )
 
     # Create DropDown with StringList model
-    display_names = [display for display, _ in all_runners]
+    display_names = [display for display, path in all_runners]
     model = Gtk.StringList.new(display_names)
     dropdown = Gtk.DropDown(model=model)
     
@@ -979,13 +979,13 @@ def delete_runner(self, action=None):
     )
 
     # Create DropDown with StringList model
-    display_names = [display_name for display_name, _ in all_runners]
+    display_names = [display_name for display_name, path in all_runners]
     model = Gtk.StringList.new(display_names)
     dropdown = Gtk.DropDown(model=model)
     dropdown.set_selected(0)
 
     # Build directory paths list
-    runner_dirs = [os.path.join(self.runners_dir, name) for name, _ in all_runners]
+    runner_dirs = [os.path.join(self.runners_dir, name) for name, path in all_runners]
 
     # Add dropdown to dialog content
     content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -1048,7 +1048,7 @@ def backup_runner(self, action=None):
     )
 
     # Create the DropDown for runners
-    display_names = [display_name for display_name, _ in all_runners]
+    display_names = [display_name for display_name, path in all_runners]
     model = Gtk.StringList.new(display_names)
     dropdown = Gtk.DropDown(model=model)
     dropdown.set_selected(0)
