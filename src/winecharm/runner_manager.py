@@ -159,7 +159,7 @@ def change_runner(self, script, script_key, *args):
     all_runners.extend(self.get_valid_runners(prefix_runners_dir, is_bundled=True))
     
     # Add System Wine (existing logic remains the same)
-    system_wine_display, _ = self.get_system_wine()
+    system_wine_display, *dummy = self.get_system_wine()
     if system_wine_display:
         all_runners.insert(0, (system_wine_display, ""))
 
@@ -346,7 +346,7 @@ def set_default_runner(self, action=None):
     all_runners = self.get_valid_runners(self.runners_dir, is_bundled=False)
 
     # Add System Wine to the list if available
-    system_wine_display, _ = self.get_system_wine()
+    system_wine_display, *dummy = self.get_system_wine()
     if system_wine_display:
         all_runners.insert(0, (system_wine_display, ""))
 

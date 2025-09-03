@@ -320,8 +320,8 @@ def replace_strings_in_files(self, directory, find_replace_pairs):
     """
     try:
         # Count total files for progress tracking
-        total_files = sum(1 for _, _, files in os.walk(directory) 
-                        for _ in files)
+        total_files = sum(1 for root, dirs, files in os.walk(directory) 
+                  for filename in files)
         processed_files = 0
 
         for root, dirs, files in os.walk(directory):
