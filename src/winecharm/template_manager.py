@@ -939,7 +939,7 @@ def extract_template_backup(self, file_path):
             self._kill_current_process()
             raise Exception("Operation cancelled by user")
             
-        output, _ = list_process.communicate()
+        output, stderr = list_process.communicate()
         extracted_template_name = output.splitlines()[0].split('/')[0]
         extracted_template_dir = Path(self.templates_dir) / extracted_template_name
 
