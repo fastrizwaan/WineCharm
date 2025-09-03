@@ -2317,7 +2317,7 @@ class WineCharmApp(Adw.Application):
                 server.listen()
 
                 while True:
-                    conn, _ = server.accept()
+                    conn, address = server.accept()
                     with conn:
                         message = conn.recv(1024).decode()
                         if message:
