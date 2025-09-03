@@ -30,13 +30,6 @@ gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
 
-# --- i18n (minimal additions) ---
-import locale, gettext
-from pathlib import Path
-import importlib.resources as r
-
-APP_ID = "io.github.fastrizwaan.WineCharm"
-
 # --- i18n (robust with warning + fallback detection) ---
 import locale, gettext, os, sys
 from pathlib import Path
@@ -80,7 +73,7 @@ gettext.textdomain(APP_ID)
 
 _ = gettext.gettext
 ngettext = gettext.ngettext
-
+# --- end i18n ---
 
 
 
