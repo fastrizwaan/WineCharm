@@ -404,7 +404,7 @@ def delete_template(self, action=None):
     )
 
     # Create dropdown with template names
-    model = Gtk.StringList.new([name for name, _, _, _ in templates])
+    model = Gtk.StringList.new([name for name, path, arch, is_default in templates])
     dropdown = Gtk.DropDown(model=model)
     dropdown.set_selected(0)
 
