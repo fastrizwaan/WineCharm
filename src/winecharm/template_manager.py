@@ -361,10 +361,12 @@ def set_default_template(self, action=None):
                 self.save_settings()
                 
                 self.show_info_dialog(
-                _("Template Updated"),
-                _("Set default template to:\n%s\nArchitecture: %s") % (display_name, arch.upper())
+                    _("Template Updated"),
+                    _("Set default template to:\n%(template)s\nArchitecture: %(arch)s") % {
+                        "template": display_name,
+                        "arch": arch.upper(),
+                    }
                 )
-
     dialog.connect("response", on_response)
     dialog.present(self.window)
 
@@ -691,8 +693,15 @@ def create_template_backup(self, template_path, dest_path):
                     GLib.idle_add(self.mark_step_as_done, step_text)
                 except Exception as e:
                     if not self.stop_processing:
-                        GLib.idle_add( self.show_info_dialog, _("Backup Failed"),
-                            _("Error during '%s': %s") % (step_text, e))
+                        GLib.idle_add(
+                            self.show_info_dialog,
+                            _("Backup Failed"),
+                            _("Error during '%(step)s': %(error)s") % {
+                                "step": step_text,
+                                "error": e,
+                            }
+                        )
+
                     GLib.idle_add(self.cleanup_cancelled_template_backup)
                     return
 
@@ -885,7 +894,15 @@ def restore_template_tar_zst(self, file_path):
                             if extracted_template.exists():
                                 shutil.rmtree(extracted_template)
                             shutil.move(str(backup_dir), str(extracted_template))
-                        GLib.idle_add(self.show_info_dialog, _("Error"), _("Failed during step '%s': %s") % (step_text, e))
+                        GLib.idle_add(
+                            self.show_info_dialog,
+                            _("Error"),
+                            _("Failed during step '%(step)s': %(error)s") % {
+                                "step": step_text,
+                                "error": e,
+                            }
+                        )
+
                         return
 
                 # Cleanup backup after successful restore
@@ -1044,8 +1061,12 @@ def check_template_disk_space(self, file_path):
         GLib.idle_add(
             self.show_info_dialog,
             _("Insufficient Space"),
-            _("Need %.1fMB, only %.1fMB available.") % (uncompressed_size / (1024 * 1024), available_space / (1024 * 1024))
+            _("Need %(need).1fMB, only %(avail).1fMB available.") % {
+                "need": uncompressed_size / (1024 * 1024),
+                "avail": available_space / (1024 * 1024),
+            }
         )
+
 
         return False
 

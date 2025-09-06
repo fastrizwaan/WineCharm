@@ -206,7 +206,15 @@ def restore_prefix_bottle_wzt_tar_zst(self, file_path):
                             if extracted_prefix.exists():
                                 shutil.rmtree(extracted_prefix)
                             shutil.move(str(backup_dir), str(extracted_prefix))
-                        GLib.idle_add(self.show_info_dialog, _("Error"), _("Failed during step '%s': %s") % (step_text, e))
+                        GLib.idle_add(
+                            self.show_info_dialog,
+                            _("Error"),
+                            _("Failed during step '%(step)s': %(error)s") % {
+                                "step": step_text,
+                                "error": e,
+                            }
+                        )
+
                         return  # Finally block will handle UI reset
 
                 # Success case
@@ -876,9 +884,12 @@ def check_disk_space_and_show_step(self, file_path):
         GLib.idle_add(
             self.show_info_dialog,
             _("Insufficient Disk Space"),
-            _("The estimated required space is %.2f MB, but only %.2f MB is available. Please free up space.") 
-            % (size_to_check / (1024 * 1024), available_space / (1024 * 1024))
+            _("The estimated required space is %(need).2f MB, but only %(avail).2f MB is available. Please free up space.") % {
+                "need": size_to_check / (1024 * 1024),
+                "avail": available_space / (1024 * 1024),
+            }
         )
+
         return False
 
     # If enough space, update the UI and log the success

@@ -180,8 +180,15 @@ def backup_prefix(self, script, script_key, backup_path):
                     except Exception as e:
                         print(f"Error during step '{step_text}': {e}")
                         if not self.stop_processing:
-                            GLib.idle_add(self.show_info_dialog, _("Backup Failed"),
-                            _("Error during '%s': %s") % (step_text, str(e)))
+                            GLib.idle_add(
+                                self.show_info_dialog,
+                                _("Backup Failed"),
+                                _("Error during '%(step)s': %(error)s") % {
+                                    "step": step_text,
+                                    "error": str(e),
+                                }
+                            )
+
                         GLib.idle_add(self.cleanup_cancelled_backup, script, script_key)
                         return
 
@@ -471,8 +478,15 @@ def create_bottle(self, script, script_key, backup_path):
                 except Exception as e:
                     print(f"Error during step '{step_text}': {e}")
                     if not self.stop_processing:
-                        GLib.idle_add(self.show_info_dialog, _("Backup Failed"),
-                        _("Error during '%s': %s") % (step_text, str(e)))
+                        GLib.idle_add(
+                            self.show_info_dialog,
+                            _("Backup Failed"),
+                            _("Error during '%(step)s': %(error)s") % {
+                                "step": step_text,
+                                "error": str(e),
+                            }
+                        )
+
 
                     GLib.idle_add(self.cleanup_cancelled_bottle, script, script_key)
                     return

@@ -94,7 +94,10 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
                 GLib.idle_add(
                     self.show_info_dialog,
                     _("Template Deleted"),
-                    _("%s.name has been deleted, using %s.name") % (self.template, template_to_use)
+                    _("Template '%(old)s' has been deleted, using '%(new)s'.") % {
+                        "old": self.template.name,
+                        "new": template_to_use.name,
+                        }
                 )
                 self.template = template_to_use
 

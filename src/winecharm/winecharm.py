@@ -1367,7 +1367,7 @@ class WineCharmApp(Adw.Application):
 
 
                 except subprocess.CalledProcessError as e:
-                    error_msg = _("Wineboot failed (code %d): %s") % (e.returncode, e.stderr)
+                    error_msg = _("Wineboot failed (code %(code)d): %(stderr)s") % { "code": e.returncode, "stderr": e.stderr, }
                     GLib.idle_add(self.handle_ui_error, play_stop_button, row, 
                                 _("Wineboot Error"), error_msg, _("Prefix Update Failed"))
                 except Exception as e:

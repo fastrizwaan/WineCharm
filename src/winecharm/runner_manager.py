@@ -484,8 +484,13 @@ def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, a
                 self.show_info_dialog(
                     _("Architecture Mismatch"),
                     _("Cannot use 32-bit runner with 64-bit template.\n\n"
-                    "Template: %s (%s)\n"
-                    "Runner: %s (%s)") % (self.template, template_arch, new_runner_path, runner_arch)
+                    "Template: %(template)s (%(tarch)s)\n"
+                    "Runner: %(runner)s (%(rarch)s)") % {
+                        "template": self.template,
+                        "tarch": template_arch,
+                        "runner": new_runner_path,
+                        "rarch": runner_arch,
+                    }
                 )
                 return
 
@@ -531,15 +536,24 @@ def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, a
                         GLib.idle_add(
                             self.show_info_dialog,
                             _("Wineboot Completed"),
-                            _("Updated Wine prefix for %s at %s") % (new_runner_display, wineprefix)
+                            _("Updated Wine prefix for %(runner)s at %(prefix)s") % {
+                                "runner": new_runner_display,
+                                "prefix": wineprefix,
+                            }
                         )
 
+
                     except subprocess.CalledProcessError as e:
-                        error_msg = _("Wineboot failed (code %d): %s") % (e.returncode, e.stderr)
+                        error_msg = _("Wineboot failed (code %(code)d): %(stderr)s") % {
+                            "code": e.returncode,
+                            "stderr": e.stderr,
+                        }
                         GLib.idle_add(self.show_info_dialog, _("Wineboot Error"), error_msg)
+
                     except Exception as e:
-                        error_msg = _("Wineboot error: %s") % str(e)
+                        error_msg = _("Wineboot error: %(error)s") % {"error": str(e)}
                         GLib.idle_add(self.show_info_dialog, _("Wineboot Error"), error_msg)
+
 
                 # Start wineboot in a separate thread
                 threading.Thread(target=wineboot_operation, daemon=True).start()
@@ -547,7 +561,10 @@ def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, a
         # Show confirmation dialog for running wineboot
         self.show_confirm_dialog(
             _("Run Wineboot?"),
-            _("Do you want to run wineboot to update the Wine prefix for %s at %s?") % (new_runner_display, wineprefix),
+            _("Do you want to run wineboot to update the Wine prefix for %(runner)s at %(prefix)s?") % {
+                "runner": new_runner_display,
+                "prefix": wineprefix,
+            },
             callback=on_wineboot_confirm_response
         )
     else:
@@ -874,7 +891,10 @@ def download_runners_thread(self, selected_runners, progress_dialog, total_progr
                     GLib.idle_add(
                         lambda: self.show_info_dialog(
                             _("Download Error"),
-                            _("Failed to download %s: %s") % (runner['name'], e)
+                            _("Failed to download %(runner)s: %(error)s") % {
+                                "runner": runner['name'],
+                                "error": e,
+                            }
                         )
                     )
 
@@ -906,11 +926,13 @@ def download_runners_thread(self, selected_runners, progress_dialog, total_progr
         elif download_success:
             finalize_ui(
                 _("Download Complete"),
-                _("Successfully downloaded %d runner%s.") % (
-                    total_runners,
-                    _("s") if total_runners > 1 else ""
-                )
+                ngettext(
+                    "Successfully downloaded %(count)d runner.",
+                    "Successfully downloaded %(count)d runners.",
+                    total_runners
+                ) % {"count": total_runners}
             )
+
         else:
             finalize_ui(
                 _("Download Incomplete"),

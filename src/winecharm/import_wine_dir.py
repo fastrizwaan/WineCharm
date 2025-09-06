@@ -188,9 +188,13 @@ def import_wine_directory(self, src, dst):
                             lambda error=step_error, text=step_text: self.handle_import_error(
                                 dst,
                                 backup_dir,
-                                _("An error occurred during '%s': %s") % (text, error)
+                                _("An error occurred during '%(step)s': %(error)s") % {
+                                    "step": text,
+                                    "error": error,
+                                }
                             )
                         )
+
                     return
 
             if not self.stop_processing:
@@ -370,10 +374,14 @@ def handle_import_cancellation(self, dst, backup_dir):
         GLib.idle_add(
             self.show_info_dialog,
             _("Error"),
-            _("Wine directory import was cancelled but encountered errors during cleanup: %s\n"
-            "Backup directory may still exist at: %s") % (e, backup_dir)
+            _("Wine directory import was cancelled but encountered errors during cleanup: %(error)s\n"
+            "Backup directory may still exist at: %(backup)s") % {
+                "error": e,
+                "backup": backup_dir,
+            }
         )
         return
+
     
     self.stop_processing = False
     GLib.idle_add(self.on_import_wine_directory_completed)
