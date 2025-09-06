@@ -80,7 +80,7 @@ def on_backup_prefix_completed(self, script_key, backup_path):
         GLib.idle_add(self._complete_backup_ui_update, script_key, backup_path)
     except Exception as e:
         print(f"Error scheduling backup completion UI update: {e}")
-        self.show_info_dialog("Warning", "Backup completed but there was an error updating the UI")
+        self.show_info_dialog(_("Warning"), _("Backup completed but there was an error updating the UI"))
 
 def _complete_backup_ui_update(self, script_key, backup_path):
     self.print_method_name()
@@ -112,7 +112,7 @@ def _complete_backup_ui_update(self, script_key, backup_path):
         self.set_open_button_icon_visible(True)
         
         # Show completion dialog
-        self.show_info_dialog("Backup Complete", f"Backup saved to {backup_path}")
+        self.show_info_dialog(_("Backup Complete"), _("Backup saved to %s") % backup_path)
         print("Backup process completed successfully.")
 
         # Update script options if available
@@ -127,7 +127,7 @@ def _complete_backup_ui_update(self, script_key, backup_path):
         
     except Exception as e:
         print(f"Error during backup completion UI update: {e}")
-        self.show_info_dialog("Warning", "Backup completed but there was an error updating the UI")
+        self.show_info_dialog(_("Warning"), _("Backup completed but there was an error updating the UI"))
         return False
 
 
@@ -157,16 +157,12 @@ def backup_prefix(self, script, script_key, backup_path):
             self.print_method_name()
             try:
                 steps = [
-                    (f"Replace \"{usershome}\" with '~' in script files", 
-                    lambda: self.replace_strings_in_files(wineprefix, find_replace_pairs)),
-                    ("Reverting user-specific .reg changes", 
-                    lambda: self.reverse_process_reg_files(wineprefix)),
-                    ("Creating backup archive", 
-                    lambda: self.create_backup_archive(wineprefix, backup_path)),
-                    ("Re-applying user-specific .reg changes", 
-                    lambda: self.process_reg_files(wineprefix))
+                    (_("Replace \"%s\" with '~' in script files") % usershome, lambda: self.replace_strings_in_files(wineprefix, find_replace_pairs)),
+                    (_("Reverting user-specific .reg changes"), lambda: self.reverse_process_reg_files(wineprefix)),
+                    (_("Creating backup archive"), lambda: self.create_backup_archive(wineprefix, backup_path)),
+                    (_("Re-applying user-specific .reg changes"), lambda: self.process_reg_files(wineprefix)),
                 ]
-                
+
                 self.total_steps = len(steps)
                 
                 for step_text, step_func in steps:
@@ -184,8 +180,8 @@ def backup_prefix(self, script, script_key, backup_path):
                     except Exception as e:
                         print(f"Error during step '{step_text}': {e}")
                         if not self.stop_processing:
-                            GLib.idle_add(self.show_info_dialog, "Backup Failed", 
-                                        f"Error during '{step_text}': {str(e)}")
+                            GLib.idle_add(self.show_info_dialog, _("Backup Failed"),
+                            _("Error during '%s': %s") % (step_text, str(e)))
                         GLib.idle_add(self.cleanup_cancelled_backup, script, script_key)
                         return
 
@@ -279,7 +275,7 @@ def cleanup_cancelled_backup(self, script, script_key):
             self.hide_processing_spinner()
             
             if self.stop_processing:
-                self.show_info_dialog("Cancelled", "Backup was cancelled")
+                self.show_info_dialog(_("Cancelled"), _("Backup was cancelled"))
             
             # Safely update UI elements
             if hasattr(self, 'script_ui_data') and script_key in self.script_ui_data:
@@ -288,7 +284,7 @@ def cleanup_cancelled_backup(self, script, script_key):
                                         script_key)
         except Exception as e:
             print(f"Error during UI cleanup: {e}")
-            self.show_info_dialog("Warning", "There was an error updating the UI")
+            self.show_info_dialog(_("Warning"), _("There was an error updating the UI"))
 
 def on_cancel_backup_clicked(self, button, script_key):
     self.print_method_name()
@@ -296,12 +292,12 @@ def on_cancel_backup_clicked(self, button, script_key):
     Handle cancel button click during backup
     """
     dialog = Adw.AlertDialog(
-        heading="Cancel Backup",
-        body="Do you want to cancel the backup process?"
+        heading=_("Cancel Backup"),
+        body=_("Do you want to cancel the backup process?")
     )
 
-    dialog.add_response("continue", "Continue")
-    dialog.add_response("cancel", "Cancel Backup")
+    dialog.add_response("continue", _("Continue"))
+    dialog.add_response("cancel", _("Cancel Backup"))
     dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
     dialog.connect("response", self.on_cancel_backup_dialog_response, script_key)
     dialog.present(self.window)
@@ -424,15 +420,16 @@ def create_bottle(self, script, script_key, backup_path):
         try:
             # Basic steps that are always needed
             basic_steps = [
-                (f"Replace \"{usershome}\" with '~' in files", lambda: self.replace_strings_in_files(wineprefix, find_replace_pairs)),
-                ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(wineprefix)),
-                (f"Replace \"/media/{user}\" with '/media/%USERNAME%' in files", lambda: self.replace_strings_in_files(wineprefix, find_replace_media_username)),
-                ("Updating exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
-                ("Creating Bottle archive", lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
-                ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(wineprefix)),
-                (f"Revert %USERNAME% with \"{user}\" in script files", lambda: self.replace_strings_in_files(wineprefix, restore_media_username)),
-                ("Reverting exe_file Path in Script", lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(exe_file))))
+                (_("Replace \"%s\" with '~' in files") % usershome, lambda: self.replace_strings_in_files(wineprefix, find_replace_pairs)),
+                (_("Reverting user-specific .reg changes"), lambda: self.reverse_process_reg_files(wineprefix)),
+                (_("Replace \"/media/%s\" with '/media/%%USERNAME%%' in files") % user, lambda: self.replace_strings_in_files(wineprefix, find_replace_media_username)),
+                (_("Updating exe_file Path in Script"), lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
+                (_("Creating Bottle archive"), lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
+                (_("Re-applying user-specific .reg changes"), lambda: self.process_reg_files(wineprefix)),
+                (_("Revert %%USERNAME%% with \"%s\" in script files") % user, lambda: self.replace_strings_in_files(wineprefix, restore_media_username)),
+                (_("Reverting exe_file Path in Script"), lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(exe_file))))
             ]
+
             
             # Set total steps and initialize progress UI
             self.total_steps = len(basic_steps)
@@ -443,11 +440,20 @@ def create_bottle(self, script, script_key, backup_path):
                 is_runner_inside_prefix = runner.is_relative_to(self.runners_dir)
                 if is_runner_inside_prefix:
                     runner_update_index = next(i for i, (text, _) in enumerate(steps) if text == "Creating Bottle archive")
-                    steps.insert(runner_update_index, 
-                        ("Updating runner Path in Script", lambda: self.update_runner_path_in_script(script, self.replace_home_with_tilde_in_path(str(target_runner_exe))))
+                    steps.insert(
+                        runner_update_index,
+                        (_("Updating runner Path in Script"),
+                        lambda: self.update_runner_path_in_script(
+                            script,
+                            self.replace_home_with_tilde_in_path(str(target_runner_exe))
+                        ))
                     )
                     steps.append(
-                        ("Reverting runner Path in Script", lambda: self.update_runner_path_in_script(script, self.replace_home_with_tilde_in_path(str(runner))))
+                        (_("Reverting runner Path in Script"),
+                        lambda: self.update_runner_path_in_script(
+                            script,
+                            self.replace_home_with_tilde_in_path(str(runner))
+                        ))
                     )
 
             for step_text, step_func in steps:
@@ -465,7 +471,9 @@ def create_bottle(self, script, script_key, backup_path):
                 except Exception as e:
                     print(f"Error during step '{step_text}': {e}")
                     if not self.stop_processing:
-                        GLib.idle_add(self.show_info_dialog, "Backup Failed", f"Error during '{step_text}': {str(e)}")
+                        GLib.idle_add(self.show_info_dialog, _("Backup Failed"),
+                        _("Error during '%s': %s") % (step_text, str(e)))
+
                     GLib.idle_add(self.cleanup_cancelled_bottle, script, script_key)
                     return
 
@@ -489,7 +497,7 @@ def on_create_bottle_completed(self, script_key, backup_path):
         GLib.idle_add(self._complete_bottle_creation_ui_update, script_key, backup_path)
     except Exception as e:
         print(f"Error scheduling bottle creation UI update: {e}")
-        self.show_info_dialog("Warning", "Bottle created but there was an error updating the UI")
+        self.show_info_dialog(_("Warning"), _("Bottle created but there was an error updating the UI"))
 
 def _complete_bottle_creation_ui_update(self, script_key, backup_path):
     self.print_method_name()
@@ -521,7 +529,7 @@ def _complete_bottle_creation_ui_update(self, script_key, backup_path):
         self.set_open_button_icon_visible(True)
         
         # Show completion dialog
-        self.show_info_dialog("Bottle Created", f"{backup_path}")
+        self.show_info_dialog(_("Bottle Created"), _("%s") % backup_path)
         print("Bottle creating process completed successfully.")
 
         # Safely update UI elements
@@ -534,7 +542,7 @@ def _complete_bottle_creation_ui_update(self, script_key, backup_path):
         
     except Exception as e:
         print(f"Error during bottle creation UI update: {e}")
-        self.show_info_dialog("Warning", "Bottle created but there was an error updating the UI")
+        self.show_info_dialog(_("Warning"), _("Bottle created but there was an error updating the UI"))
         return False
 
 
@@ -565,14 +573,16 @@ def create_bottle_selected(self, script, script_key, button):
 
     # Check if the game directory is in DO_NOT_BUNDLE_FROM directories
     if str(exe_path) in self.get_do_not_bundle_directories():
-        msg1 = "Cannot copy the selected game directory"
-        msg2 = "Please move the files to a different directory to create a bundle."
+        msg1 = _("Cannot copy the selected game directory")
+        msg2 = _("Please move the files to a different directory to create a bundle.")
         self.show_info_dialog(msg1, msg2)
         return
 
     # If exe_not found i.e., game_dir is not accessble due to unmounted directory
     if not exe_file.exists():
-        GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Exe Not Found", f"Not Mounted or Deleted?\n{exe_file}")
+        GLib.timeout_add_seconds(1, self.show_info_dialog,
+                         _("Exe Not Found"),
+                         _("Not Mounted or Deleted?\n%s") % exe_file)
         return
 
     # Step 2: Check for size if > 3GB ask the user:
@@ -591,11 +601,11 @@ def create_bottle_selected(self, script, script_key, button):
         print("Size Greater than 3GB")
         # Show confirmation dialog
         dialog = Adw.AlertDialog(
-            heading="Large Game Directory",
+            heading=_("Large Game Directory"),
             body=f"The game directory size is {directory_size_gb}GB. Do you want to continue?"
         )
-        dialog.add_response("cancel", "Cancel")
-        dialog.add_response("continue", "Continue")
+        dialog.add_response("cancel", _("Cancel"))
+        dialog.add_response("continue", _("Continue"))
         dialog.set_response_appearance("continue", Adw.ResponseAppearance.SUGGESTED)
         dialog.connect("response", self.on_backup_confirmation_response, script, script_key)
         dialog.present(self.window)
@@ -838,7 +848,7 @@ def cleanup_cancelled_bottle(self, script, script_key):
         #self.reconnect_open_button()
         self.hide_processing_spinner()
         if self.stop_processing:
-            self.show_info_dialog("Cancelled", "Bottle creation was cancelled")
+            self.show_info_dialog(_("Cancelled"), _("Bottle creation was cancelled"))
         # Iterate over all script buttons and update the UI based on `is_clicked_row`
             for key, data in self.script_ui_data.items():
                 row_button = data['row']
@@ -859,11 +869,12 @@ def on_cancel_bottle_clicked(self, button, script_key):
     Handle cancel button click
     """
     dialog = Adw.AlertDialog(
-        heading="Cancel Bottle Creation",
-        body="Do you want to cancel the bottle creation process?"
+    heading=_("Cancel Bottle Creation"),
+    body=_("Do you want to cancel the bottle creation process?")
     )
-    dialog.add_response("continue", "Continue")
-    dialog.add_response("cancel", "Cancel Creation")
+    dialog.add_response("continue", _("Continue"))
+    dialog.add_response("cancel", _("Cancel Creation"))
+
     dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
     dialog.connect("response", self.on_cancel_bottle_dialog_response, script_key)
     dialog.present(self.window)

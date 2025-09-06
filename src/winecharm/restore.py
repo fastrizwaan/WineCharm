@@ -206,7 +206,7 @@ def restore_prefix_bottle_wzt_tar_zst(self, file_path):
                             if extracted_prefix.exists():
                                 shutil.rmtree(extracted_prefix)
                             shutil.move(str(backup_dir), str(extracted_prefix))
-                        GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
+                        GLib.idle_add(self.show_info_dialog, _("Error"), _("Failed during step '%s': %s") % (step_text, e))
                         return  # Finally block will handle UI reset
 
                 # Success case
@@ -220,7 +220,7 @@ def restore_prefix_bottle_wzt_tar_zst(self, file_path):
                     if extracted_prefix.exists():
                         shutil.rmtree(extracted_prefix)
                     shutil.move(str(backup_dir), str(extracted_prefix))
-                GLib.idle_add(self.show_info_dialog, "Error", f"Restore failed: {str(e)}")
+                GLib.idle_add(self.show_info_dialog, _("Error"), _("Restore failed: %s") % e)
 
             finally:
                 GLib.idle_add(self.on_restore_completed)
@@ -229,7 +229,7 @@ def restore_prefix_bottle_wzt_tar_zst(self, file_path):
 
     except Exception as e:
         print(f"Error initiating restore process: {e}")
-        GLib.idle_add(self.show_info_dialog, "Error", f"Failed to start restore: {str(e)}")
+        GLib.idle_add(self.show_info_dialog, _("Error"), _("Failed to start restore: %s") % e)
 
 
 
@@ -873,9 +873,12 @@ def check_disk_space_and_show_step(self, file_path):
 
     if not enough_space:
         # Show warning about disk space
-        GLib.idle_add(self.show_info_dialog, "Insufficient Disk Space",
-                    f"The estimated required space is {size_to_check / (1024 * 1024):.2f} MB, "
-                    f"but only {available_space / (1024 * 1024):.2f} MB is available. Please free up space.")
+        GLib.idle_add(
+            self.show_info_dialog,
+            _("Insufficient Disk Space"),
+            _("The estimated required space is %.2f MB, but only %.2f MB is available. Please free up space.") 
+            % (size_to_check / (1024 * 1024), available_space / (1024 * 1024))
+        )
         return False
 
     # If enough space, update the UI and log the success
@@ -940,10 +943,10 @@ def on_cancel_restore_backup_clicked(self, button):
     """
     dialog = Adw.AlertDialog(
         title="Cancel Restoring Backup?",
-        body="This will immediately stop the extraction process. Any partially extracted files will be cleaned up."
+        body=_("This will immediately stop the extraction process. Any partially extracted files will be cleaned up.")
     )
-    dialog.add_response("continue", "Continue")
-    dialog.add_response("cancel", "Cancel Restore")
+    dialog.add_response("continue", _("Continue"))
+    dialog.add_response("cancel", _("Cancel Restore"))
     dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
     dialog.connect("response", self.on_cancel_restore_backup_dialog_response)
     dialog.present(self.window,)
@@ -961,13 +964,14 @@ def on_cancel_restore_backup_dialog_response(self, dialog, response):
             try:
                 self._kill_current_process()
                 GLib.idle_add(self.on_restore_completed)
-                GLib.idle_add(self.show_info_dialog, "Cancelled", 
-                            "Restore process was cancelled and cleaned up successfully")
+                GLib.idle_add(self.show_info_dialog, _("Cancelled"),
+                            _("Restore process was cancelled and cleaned up successfully"))
                 GLib.idle_add(self.create_script_list)
             except Exception as e:
-                print(f"Error during cleanup: {e}")
-                GLib.idle_add(self.show_info_dialog, "Error", 
-                            f"Error during cleanup: {str(e)}")
+                print(_("Error during cleanup: %s") % e)
+                GLib.idle_add(self.show_info_dialog, _("Error"),
+                            _("Error during cleanup: %s") % e)
+
         
         # Run cleanup in a separate thread to avoid blocking the UI
         threading.Thread(target=cleanup).start()

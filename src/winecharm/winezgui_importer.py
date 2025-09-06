@@ -26,7 +26,7 @@ def process_winezgui_sh_files(self, action=None, param=None, prompt=None, suppre
     def process_in_background():
         try:
             if not self.winezgui_prefixes_dir.exists():
-                GLib.idle_add(self.show_info_dialog, "Directory Not Found", f"WineZGUI prefixes directory not found: {self.winezgui_prefixes_dir}")
+                GLib.idle_add(self.show_info_dialog, _("Directory Not Found"), _("WineZGUI prefixes directory not found: %s") % self.winezgui_prefixes_dir)
                 return
 
             # Collect unique prefix directories containing .sh files
@@ -36,7 +36,7 @@ def process_winezgui_sh_files(self, action=None, param=None, prompt=None, suppre
                     prefix_dirs.add(subdir)
 
             if not prefix_dirs and not suppress_no_scripts_dialog:
-                GLib.idle_add(self.show_info_dialog, "No Scripts Found", "No .sh files found in WineZGUI prefixes directory.")
+                GLib.idle_add(self.show_info_dialog, _("No Scripts Found"), _("No .sh files found in WineZGUI prefixes directory."))
                 return
 
             created_count = 0
@@ -52,7 +52,7 @@ def process_winezgui_sh_files(self, action=None, param=None, prompt=None, suppre
                         created_count += 1
 
             if created_count > 0:  # Show dialog only if .charm files were created
-                GLib.idle_add(self.show_info_dialog, "Processing Complete", f"Created {created_count} .charm files from WineZGUI scripts.")
+                GLib.idle_add(self.show_info_dialog, _("Processing Complete"), _("Created %d .charm files from WineZGUI scripts.") % created_count)
 
         finally:
             GLib.idle_add(self.hide_processing_spinner)

@@ -36,11 +36,11 @@ def initialize_template(self, template_dir, callback, arch='win64', new=False):
 
     # Architecture-specific steps
     steps = [
-        ("Initializing wineprefix", 
+        (_("Initializing wineprefix"), 
         f"WINEARCH={arch} WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-        ("Replace symbolic links with directories", 
+        (_("Replace symbolic links with directories"), 
         lambda: self.remove_symlinks_and_create_directories(template_dir)),
-        ("Installing arial", 
+        (_("Installing arial font"), 
         f"WINEPREFIX='{template_dir}' winetricks -q arial"),
         # ("Installing tahoma", 
         # f"WINEPREFIX='{template_dir}' winetricks -q tahoma"),
@@ -50,7 +50,7 @@ def initialize_template(self, template_dir, callback, arch='win64', new=False):
         # f"WINEPREFIX='{template_dir}' winetricks -q courier"),
         # ("Installing webdings", 
         # f"WINEPREFIX='{template_dir}' winetricks -q webdings"),
-        ("Installing openal", 
+        (_("Installing openal"), 
         f"WINEPREFIX='{template_dir}' winetricks -q openal"),
         #("Installing vkd3d", 
         #f"WINEPREFIX='{template_dir}' winetricks -q vkd3d"),
@@ -139,7 +139,7 @@ def on_template_initialized(self, arch=None, new=False):
             self.restore_prefix_bottle_wzt_tar_zst(self.command_line_file)
         else:
             print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
-            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid File Type", "Only .exe and .msi files are supported.")
+            GLib.timeout_add_seconds(0.5, self.show_info_dialog, _("Invalid File Type"), _("Only .exe and .msi files are supported."))
             self.command_line_file = None
             return False
 
@@ -188,10 +188,10 @@ def on_cancel_template_init_clicked(self, button):
     """
     dialog = Adw.AlertDialog(
         title="Cancel Initialization",
-        body="Do you want to cancel the template initialization process?"
+        body=_("Do you want to cancel the template initialization process?")
     )
-    dialog.add_response("continue", "Continue")
-    dialog.add_response("cancel", "Cancel Initialization")
+    dialog.add_response("continue", _("Continue"))
+    dialog.add_response("cancel", _("Cancel Initialization"))
     dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
     dialog.connect("response", self.on_cancel_template_init_dialog_response)
     dialog.present(self.window)
@@ -223,8 +223,8 @@ def cleanup_cancelled_template_init(self, template_dir):
             
         # Initialize basic wineprefix with minimal setup
         basic_steps = [
-            ("Creating basic wineprefix", f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
-            ("Setting up directories", lambda: self.remove_symlinks_and_create_directories(template_dir))
+            (_("Creating basic wineprefix"), f"WINEPREFIX='{template_dir}' WINEDEBUG=-all wineboot -i"),
+            (_("Setting up directories"), lambda: self.remove_symlinks_and_create_directories(template_dir))
         ]
         
         for step_text, command in basic_steps:
@@ -252,8 +252,8 @@ def cleanup_cancelled_template_init(self, template_dir):
         self.initializing_template = False
         self.stop_processing = False
         GLib.idle_add(self.reset_ui_after_template_init)
-        self.show_info_dialog("Basic Template Created", 
-                    "A basic template was created and settings were updated. Some features may be limited.")
+        self.show_info_dialog(_("Basic Template Created"), 
+                    _("A basic template was created and settings were updated. Some features may be limited."))
 
 
 def reset_ui_after_template_init(self):
@@ -310,7 +310,7 @@ def set_default_template(self, action=None):
             templates.append((display_name, str(dt_path.resolve()), dt_arch))
 
     if not templates:
-        self.show_info_dialog("No Templates", "No valid templates found.")
+        self.show_info_dialog(_("No Templates"), _("No valid templates found."))
         return
 
     # Create dropdown list
@@ -334,12 +334,12 @@ def set_default_template(self, action=None):
     content.append(dropdown)
 
     dialog = Adw.AlertDialog(
-        heading="Set Default Template",
-        body="Template architecture will be set automatically",
+        heading=_("Set Default Template"),
+        body=_("Template architecture will be set automatically"),
         extra_child=content
     )
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("ok", "Save")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("ok", _("Save"))
     dialog.set_default_response("ok")
 
     def on_response(dialog, response_id):
@@ -361,10 +361,10 @@ def set_default_template(self, action=None):
                 self.save_settings()
                 
                 self.show_info_dialog(
-                    "Template Updated",
-                    f"Set default template to:\n{display_name}\n"
-                    f"Architecture: {arch.upper()}"
+                _("Template Updated"),
+                _("Set default template to:\n%s\nArchitecture: %s") % (display_name, arch.upper())
                 )
+
     dialog.connect("response", on_response)
     dialog.present(self.window)
 
@@ -394,13 +394,13 @@ def delete_template(self, action=None):
             templates.append((display_name, tpl_path, arch, is_current_default))
 
     if not templates:
-        self.show_info_dialog("No Templates", "No templates found to delete.")
+        self.show_info_dialog(_("No Templates"), _("No templates found to delete."))
         return
 
     # Create dialog components
     dialog = Adw.AlertDialog(
-        heading="Delete Template",
-        body="Select a template to permanently delete:"
+        heading=_("Delete Template"),
+        body=_("Select a template to permanently delete:")
     )
 
     # Create dropdown with template names
@@ -414,8 +414,8 @@ def delete_template(self, action=None):
     dialog.set_extra_child(content_box)
 
     # Configure dialog buttons
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("delete", "Delete")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("delete", _("Delete"))
     dialog.set_default_response("delete")
 
     def on_response(dialog, response_id, dropdown, templates):
@@ -428,9 +428,9 @@ def delete_template(self, action=None):
                 # Immediate prevention checks
                 if is_current_default:
                     self.show_info_dialog(
-                        "Protected Template",
-                        f"Cannot delete the active / default {current_arch} template!\n"
-                        "Switch architectures / template first to delete this template."
+                        _("Protected Template"),
+                        _("Cannot delete the active / default %s template!\n"
+                        "Switch architectures / template first to delete this template.") % current_arch
                     )
                     return
 
@@ -442,17 +442,17 @@ def delete_template(self, action=None):
                         if self.settings.get('template', '') == str(template_path):
                             self.settings['template'] = ''
                             self.save_settings()
-                        self.show_info_dialog("Deleted", f"Removed: {display_name}")
+                        self.show_info_dialog(_("Deleted"), _("Removed: %s") % display_name)
                     except Exception as e:
-                        self.show_info_dialog("Error", f"Deletion failed: {str(e)}")
+                        self.show_info_dialog(_("Error"), _("Deletion failed: %s") % str(e))
 
                 # Additional confirmation for non-default templates
                 confirm_dialog = Adw.AlertDialog(
-                    heading="Confirm Deletion",
+                    heading=_("Confirm Deletion"),
                     body=f"Permanently delete:\n{display_name}?"
                 )
-                confirm_dialog.add_response("cancel", "Keep")
-                confirm_dialog.add_response("delete", "Delete Forever")
+                confirm_dialog.add_response("cancel", _("Keep"))
+                confirm_dialog.add_response("delete", _("Delete Forever"))
                 confirm_dialog.connect("response", 
                     lambda d, r: perform_deletion() if r == "delete" else None
                 )
@@ -478,8 +478,8 @@ def on_import_template_response(self, dialog, result):
         if folder:
             src = Path(folder.get_path())
             if not (src / "system.reg").exists():
-                GLib.idle_add(self.show_info_dialog, "Invalid Template", 
-                            "Selected directory is not a valid Wine prefix")
+                GLib.idle_add(self.show_info_dialog, _("Invalid Template"), 
+                            _("Selected directory is not a valid Wine prefix"))
                 return
 
             template_name = src.name
@@ -487,15 +487,16 @@ def on_import_template_response(self, dialog, result):
             backup_dir = self.templates_dir / f"{template_name}_backup_{int(time.time())}"
 
             steps = [
-                ("Verifying template", lambda: self.verify_template_source(src)),
-                ("Backing up existing template", lambda: self.backup_existing_directory(dst, backup_dir)),
-                ("Copying template files", lambda: self.custom_copytree(src, dst)),
-                ("Processing registry files", lambda: self.process_reg_files(dst)),
-                ("Standardizing user directories", lambda: self.rename_and_merge_user_directories(dst)),
-                ("Cleaning template files", lambda: self.clean_template_files(dst)),
+                (_("Verifying template"), lambda: self.verify_template_source(src)),
+                (_("Backing up existing template"), lambda: self.backup_existing_directory(dst, backup_dir)),
+                (_("Copying template files"), lambda: self.custom_copytree(src, dst)),
+                (_("Processing registry files"), lambda: self.process_reg_files(dst)),
+                (_("Standardizing user directories"), lambda: self.rename_and_merge_user_directories(dst)),
+                (_("Cleaning template files"), lambda: self.clean_template_files(dst)),
             ]
 
-            self.show_processing_spinner(f"Importing {template_name}")
+
+            self.show_processing_spinner(_("Importing %s") % template_name)
             self.connect_open_button_with_import_wine_directory_cancel()
             threading.Thread(target=self.process_template_import, args=(steps, dst, backup_dir)).start()
 
@@ -519,8 +520,8 @@ def process_template_import(self, steps, dst, backup_dir):
             GLib.idle_add(self.mark_step_as_done, step_text)
             GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
 
-        GLib.idle_add(self.show_info_dialog, "Success", 
-                    f"Template '{dst.name}' imported successfully")
+        GLib.idle_add(self.show_info_dialog, _("Success"),
+                    _("Template '%s' imported successfully") % dst.name)
         self.cleanup_backup(backup_dir)
 
     except Exception as e:
@@ -561,7 +562,7 @@ def handle_template_import_error(self, dst, backup_dir, error_msg):
     except Exception as e:
         error_msg += f"\nCleanup error: {str(e)}"
     
-    self.show_info_dialog("Template Import Failed", error_msg)
+    self.show_info_dialog(_("Template Import Failed"), error_msg)
 
 def on_import_template_directory_completed(self):
     self.print_method_name()
@@ -590,12 +591,12 @@ def backup_template(self, action=None):
     """
     all_templates = [t.name for t in self.templates_dir.iterdir() if t.is_dir()]
     if not all_templates:
-        self.show_info_dialog("No Templates Available", "No templates found to backup.")
+        self.show_info_dialog(_("No Templates Available"), _("No templates found to backup."))
         return
 
     dialog = Adw.AlertDialog(
-        heading="Backup Template",
-        body="Select a template to backup:"
+        heading=_("Backup Template"),
+        body=_("Select a template to backup:")
     )
     model = Gtk.StringList.new(all_templates)
     dropdown = Gtk.DropDown(model=model)
@@ -603,8 +604,8 @@ def backup_template(self, action=None):
     content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
     content_box.append(dropdown)
 
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("ok", "OK")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("ok", _("OK"))
     dialog.set_default_response("ok")
     dialog.set_close_response("cancel")
     dialog.set_extra_child(content_box)
@@ -666,12 +667,11 @@ def create_template_backup(self, template_path, dest_path):
         self.print_method_name()
         try:
             steps = [
-                (f"Replace \"{usershome}\" with '~' in files", lambda: self.replace_strings_in_files(template_path, find_replace_pairs)),
-                ("Reverting user-specific .reg changes", lambda: self.reverse_process_reg_files(template_path)),
-                (f"Replace \"/media/{current_username}\" with '/media/%USERNAME%' in files", lambda: self.replace_strings_in_files(template_path, find_replace_media_username)),
-                ("Creating backup archive", lambda: run_backup()),
-                ("Re-applying user-specific .reg changes", lambda: self.process_reg_files(template_path)),
-                (f"Revert %USERNAME% with \"{current_username}\" in script files", lambda: self.replace_strings_in_files(template_path, restore_media_username)),
+                (_("Replace \"%s\" with '~' in files") % usershome, lambda: self.replace_strings_in_files(template_path, find_replace_pairs)),
+                (_("Reverting user-specific .reg changes"), lambda: self.reverse_process_reg_files(template_path)),
+                (_("Replace \"/media/%s\" with '/media/%%USERNAME%%' in files") % current_username,lambda: self.replace_strings_in_files(template_path, find_replace_media_username)),
+                (_("Creating backup archive"), lambda: run_backup()), (_("Re-applying user-specific .reg changes"), lambda: self.process_reg_files(template_path)),
+                (_("Revert %%USERNAME%% with \"%s\" in script files") % current_username, lambda: self.replace_strings_in_files(template_path, restore_media_username)),
             ]
 
             self.total_steps = len(steps)
@@ -691,13 +691,13 @@ def create_template_backup(self, template_path, dest_path):
                     GLib.idle_add(self.mark_step_as_done, step_text)
                 except Exception as e:
                     if not self.stop_processing:
-                        GLib.idle_add(self.show_info_dialog, "Backup Failed", 
-                                    f"Error during '{step_text}': {e}")
+                        GLib.idle_add( self.show_info_dialog, _("Backup Failed"),
+                            _("Error during '%s': %s") % (step_text, e))
                     GLib.idle_add(self.cleanup_cancelled_template_backup)
                     return
 
-            GLib.idle_add(self.show_info_dialog, "Backup Complete", 
-                        f"Template saved to {dest_path}")
+            GLib.idle_add(self.show_info_dialog, _("Backup Complete"),
+                        _("Template saved to %s") % dest_path)
         finally:
             GLib.idle_add(self.hide_processing_spinner)
             GLib.idle_add(self.revert_open_button)
@@ -770,11 +770,11 @@ def connect_cancel_button_for_template_backup(self):
 def on_cancel_template_backup_clicked(self, button):
     self.print_method_name()
     dialog = Adw.AlertDialog(
-        heading="Cancel Backup",
-        body="Do you want to cancel the template backup process?"
+        heading=_("Cancel Backup"),
+        body=_("Do you want to cancel the template backup process?")
     )
-    dialog.add_response("continue", "Continue")
-    dialog.add_response("cancel", "Cancel Backup")
+    dialog.add_response("continue", _("Continue"))
+    dialog.add_response("cancel", _("Cancel Backup"))
     dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
     dialog.connect("response", self.on_cancel_template_backup_dialog_response)
     dialog.present(self.window)
@@ -794,7 +794,7 @@ def cleanup_cancelled_template_backup(self):
         print(f"Error deleting partial backup file: {e}")
     finally:
         self.hide_processing_spinner()
-        self.show_info_dialog("Cancelled", "Template backup was cancelled")
+        self.show_info_dialog(_("Cancelled"), _("Template backup was cancelled"))
         self.revert_open_button()
 
 #################### NEW RESTORE template like restore wzt
@@ -885,7 +885,7 @@ def restore_template_tar_zst(self, file_path):
                             if extracted_template.exists():
                                 shutil.rmtree(extracted_template)
                             shutil.move(str(backup_dir), str(extracted_template))
-                        GLib.idle_add(self.show_info_dialog, "Error", f"Failed during step '{step_text}': {str(e)}")
+                        GLib.idle_add(self.show_info_dialog, _("Error"), _("Failed during step '%s': %s") % (step_text, e))
                         return
 
                 # Cleanup backup after successful restore
@@ -901,14 +901,14 @@ def restore_template_tar_zst(self, file_path):
                     if extracted_template.exists():
                         shutil.rmtree(extracted_template)
                     shutil.move(str(backup_dir), str(extracted_template))
-                GLib.idle_add(self.show_info_dialog, "Error", f"Template restore failed: {str(e)}")
+                GLib.idle_add(self.show_info_dialog, _("Error"), _("Template restore failed: %s") % e)
 
         # Start restore thread
         threading.Thread(target=restore_process).start()
 
     except Exception as e:
         print(f"Error initiating template restore: {e}")
-        GLib.idle_add(self.show_info_dialog, "Error", f"Failed to start template restore: {str(e)}")
+        GLib.idle_add(self.show_info_dialog, _("Error"), _("Failed to start template restore: %s") % e)
 
 def extract_template_backup(self, file_path):
     self.print_method_name()
@@ -1042,9 +1042,11 @@ def check_template_disk_space(self, file_path):
         
         # Show error if insufficient space
         GLib.idle_add(
-            self.show_info_dialog, "Insufficient Space",
-            f"Need {uncompressed_size/(1024*1024):.1f}MB, only {available_space/(1024*1024):.1f}MB available."
+            self.show_info_dialog,
+            _("Insufficient Space"),
+            _("Need %.1fMB, only %.1fMB available.") % (uncompressed_size / (1024 * 1024), available_space / (1024 * 1024))
         )
+
         return False
 
     except subprocess.CalledProcessError as e:
@@ -1070,12 +1072,12 @@ def clone_template(self, action=None):
     """
     all_templates = [t.name for t in self.templates_dir.iterdir() if t.is_dir()]
     if not all_templates:
-        self.show_info_dialog("No Templates Available", "No templates found to clone.")
+        self.show_info_dialog(_("No Templates Available"), _("No templates found to clone."))
         return
 
     dialog = Adw.AlertDialog(
-        heading="Clone Template",
-        body="Select a template to clone and enter a new name:"
+        heading=_("Clone Template"),
+        body=_("Select a template to clone and enter a new name:")
     )
 
     # Template selection dropdown
@@ -1085,7 +1087,7 @@ def clone_template(self, action=None):
 
     # Editable name entry with placeholder
     entry = Gtk.Entry()
-    entry.set_placeholder_text("Set Template Clone Name")
+    entry.set_placeholder_text(_("Set Template Clone Name"))
     entry.set_activates_default(True)
     
     # Connect signals
@@ -1097,8 +1099,8 @@ def clone_template(self, action=None):
     content_box.append(dropdown)
     content_box.append(entry)
 
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("ok", "OK")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("ok", _("OK"))
     dialog.set_default_response("ok")
     dialog.set_close_response("cancel")
     dialog.set_extra_child(content_box)
@@ -1144,10 +1146,10 @@ def on_clone_template_response(self, dialog, response_id, dropdown, entry, templ
 
             # Final validation
             if not new_name:
-                self.show_info_dialog("Invalid Name", "Please enter a name for the clone.")
+                self.show_info_dialog(_("Invalid Name"), _("Please enter a name for the clone."))
                 return
             if dest_path.exists():
-                self.show_info_dialog("Error", "A template with this name already exists.")
+                self.show_info_dialog(_("Error"), _("A template with this name already exists."))
                 return
 
             # Start cloning process
@@ -1165,14 +1167,16 @@ def perform_template_clone(self, source_path, dest_path):
     """Perform the actual directory copy with error handling"""
     try:
         self.custom_copytree(source_path, dest_path)
-        GLib.idle_add(self.show_info_dialog, 
-            "Clone Successful", 
-            f"Successfully cloned to {dest_path.name}"
+        GLib.idle_add(
+            self.show_info_dialog,
+            _("Clone Successful"),
+            _("Successfully cloned to %s") % dest_path.name
         )
     except Exception as e:
-        GLib.idle_add(self.show_info_dialog,
-            "Clone Error",
-            f"An error occurred: {str(e)}"
+        GLib.idle_add(
+            self.show_info_dialog,
+            _("Clone Error"),
+            _("An error occurred: %s") % str(e)
         )
     finally:
         GLib.idle_add(self.on_template_restore_completed)
@@ -1181,13 +1185,13 @@ def perform_template_clone(self, source_path, dest_path):
 def create_template(self, action=None):
     self.print_method_name()
     dialog = Adw.AlertDialog(
-        heading="Create Template",
-        body="Enter a name and select architecture:"
+        heading=_("Create Template"),
+        body=_("Enter a name and select architecture:")
     )
     content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
     
     entry = Gtk.Entry()
-    entry.set_placeholder_text("Template Name")
+    entry.set_placeholder_text(_("Template Name"))
     content_box.append(entry)
     
     radio_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
@@ -1200,8 +1204,8 @@ def create_template(self, action=None):
     content_box.append(radio_box)
     
     dialog.set_extra_child(content_box)
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("ok", "OK")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("ok", _("OK"))
     dialog.set_default_response("ok")
     
     def on_response(dialog, response):
@@ -1209,7 +1213,7 @@ def create_template(self, action=None):
         if response == "ok":
             name = entry.get_text().strip()
             if not name:
-                self.show_info_dialog("Invalid Name", "Please enter a valid name.")
+                self.show_info_dialog(_("Invalid Name"), _("Please enter a valid name."))
             else:
                 arch = "win32" if win32_radio.get_active() else "win64"
                 prefix_dir = self.templates_dir / name

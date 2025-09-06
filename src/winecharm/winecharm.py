@@ -1336,8 +1336,8 @@ class WineCharmApp(Adw.Application):
                 with open(log_file_path, 'a') as log_file:
                     log_file.write(f"\n{error_message}\n{traceback_str}\n")
 
-                GLib.idle_add(self.handle_ui_error, play_stop_button, row, _("Launch Error"), _(f"Failed to launch: {e}"), _("Launch Failed"))
-                GLib.idle_add(self.show_info_dialog, _("Launch Error"), _(f"Failed to launch: {e}"))
+                GLib.idle_add(self.handle_ui_error, play_stop_button, row, _("Launch Error"), _("Failed to launch: %s") % e, _("Launch Failed"))
+                GLib.idle_add(self.show_info_dialog, _("Launch Error"), _("Failed to launch: %s") % e)
 
         if wineboot_file_path.exists():
             runner_dir = runner_path.parent.resolve()
@@ -1367,7 +1367,7 @@ class WineCharmApp(Adw.Application):
 
 
                 except subprocess.CalledProcessError as e:
-                    error_msg = f"Wineboot failed (code {e.returncode}): {e.stderr}"
+                    error_msg = _("Wineboot failed (code %d): %s") % (e.returncode, e.stderr)
                     GLib.idle_add(self.handle_ui_error, play_stop_button, row, 
                                 _("Wineboot Error"), error_msg, _("Prefix Update Failed"))
                 except Exception as e:
@@ -1478,8 +1478,8 @@ class WineCharmApp(Adw.Application):
         )
 
         # Add buttons to the dialog
-        dialog.add_response("close", "Close")
-        dialog.add_response("show_log", "Show Log")
+        dialog.add_response("close", _("Close"))
+        dialog.add_response("show_log", _("Show Log"))
         dialog.set_default_response("close")
         dialog.set_close_response("close")
 
@@ -1502,7 +1502,7 @@ class WineCharmApp(Adw.Application):
         def show_log_dialog():
             self.print_method_name()
             log_dialog = Adw.AlertDialog(
-                heading="Log Content",
+                heading=_("Log Content"),
                 body=""
             )
 
@@ -1524,8 +1524,8 @@ class WineCharmApp(Adw.Application):
             log_dialog.set_extra_child(scrolled_window)
 
             # Configure dialog buttons
-            log_dialog.add_response("close", "Close")
-            log_dialog.add_response("copy", "Copy to Clipboard")
+            log_dialog.add_response("close", _("Close"))
+            log_dialog.add_response("copy", _("Copy to Clipboard"))
             log_dialog.set_default_response("close")
             log_dialog.set_close_response("close")
 

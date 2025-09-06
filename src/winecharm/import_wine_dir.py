@@ -131,7 +131,7 @@ def on_import_directory_response(self, dialog, result):
                     threading.Thread(target=self.import_wine_directory, args=(directory, dest_dir)).start()
             else:
                 print(f"Invalid directory selected: {directory}")
-                GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Invalid Directory", "The selected directory does not appear to be a valid Wine directory.")
+                GLib.timeout_add_seconds(0.5, self.show_info_dialog, _("Invalid Directory"), _("The selected directory does not appear to be a valid Wine directory."))
 
     except GLib.Error as e:
         if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
@@ -151,15 +151,16 @@ def import_wine_directory(self, src, dst):
     GLib.idle_add(self.flowbox.remove_all)
     
     steps = [
-        ("Backing up existing directory", lambda: self.backup_existing_directory(dst, backup_dir)),
-        ("Copying Wine directory", lambda: self.custom_copytree(src, dst)),
-        ("Processing registry files", lambda: self.process_reg_files(dst)),
-        ("Performing Replacements", lambda: self.perform_replacements(dst)),
-        ("Renaming and Merging User Directories", lambda: self.rename_and_merge_user_directories(dst)),
-        ("Creating scripts for .exe files", lambda: self.create_scripts_for_exe_files(dst)),
-        ("Replace symbolic links with directories", lambda: self.remove_symlinks_and_create_directories(dst)),
-        ("Create Wineboot Required file", lambda: self.create_wineboot_required_file(dst)),
+        (_("Backing up existing directory"), lambda: self.backup_existing_directory(dst, backup_dir)),
+        (_("Copying Wine directory"), lambda: self.custom_copytree(src, dst)),
+        (_("Processing registry files"), lambda: self.process_reg_files(dst)),
+        (_("Performing Replacements"), lambda: self.perform_replacements(dst)),
+        (_("Renaming and Merging User Directories"), lambda: self.rename_and_merge_user_directories(dst)),
+        (_("Creating scripts for .exe files"), lambda: self.create_scripts_for_exe_files(dst)),
+        (_("Replace symbolic links with directories"), lambda: self.remove_symlinks_and_create_directories(dst)),
+        (_("Create Wineboot Required file"), lambda: self.create_wineboot_required_file(dst)),
     ]
+
     
     self.total_steps = len(steps)
     self.show_processing_spinner("Importing Wine Directory...")
@@ -185,9 +186,9 @@ def import_wine_directory(self, src, dst):
                         print(f"Error during step '{step_text}': {step_error}")
                         GLib.idle_add(
                             lambda error=step_error, text=step_text: self.handle_import_error(
-                                dst, 
-                                backup_dir, 
-                                f"An error occurred during '{text}': {error}"
+                                dst,
+                                backup_dir,
+                                _("An error occurred during '%s': %s") % (text, error)
                             )
                         )
                     return
@@ -200,11 +201,12 @@ def import_wine_directory(self, src, dst):
             print(f"Error during import process: {import_error}")
             GLib.idle_add(
                 lambda error=import_error: self.handle_import_error(
-                    dst, 
-                    backup_dir, 
-                    f"Import failed: {error}"
+                    dst,
+                    backup_dir,
+                    _("Import failed: %s") % error
                 )
             )
+
 
     threading.Thread(target=perform_import_steps).start()
 
@@ -263,9 +265,9 @@ def show_import_wine_directory_overwrite_confirmation_dialog(self, src, dest_dir
     )
 
     # Add overwrite and cancel buttons
-    dialog.add_response("overwrite", "Overwrite")
+    dialog.add_response("overwrite", _("Overwrite"))
     dialog.set_response_appearance("overwrite", Adw.ResponseAppearance.DESTRUCTIVE)
-    dialog.add_response("cancel", "Cancel")
+    dialog.add_response("cancel", _("Cancel"))
     dialog.set_default_response("cancel")
 
     # Connect the dialog response to the overwrite handler
@@ -294,7 +296,7 @@ def on_import_wine_directory_overwrite_response(self, dialog, response_id, src, 
             threading.Thread(target=self.import_wine_directory, args=(src, dest_dir)).start()
         except Exception as e:
             print(f"Error deleting directory: {e}")
-            GLib.timeout_add_seconds(0.5, self.show_info_dialog, "Error", f"Could not delete directory: {e}")
+            GLib.timeout_add_seconds(1, self.show_info_dialog, _("Error"), _("Could not delete directory: %s") % e)
     else:
         print("User canceled the overwrite.")
         # If canceled, restore the UI to its original state
@@ -323,10 +325,10 @@ def on_cancel_import_wine_directory_clicked(self, button):
     """
     dialog = Adw.AlertDialog(
         title="Cancel Import",
-        body="Do you want to cancel the wine directory import process?"
+        body=_("Do you want to cancel the wine directory import process?")
     )
-    dialog.add_response("continue", "Continue")
-    dialog.add_response("cancel", "Cancel Creation")
+    dialog.add_response("continue", _("Continue"))
+    dialog.add_response("cancel", _("Cancel Creation"))
     dialog.set_response_appearance("cancel", Adw.ResponseAppearance.DESTRUCTIVE)
     dialog.connect("response", self.on_cancel_import_wine_direcotory_dialog_response)
     dialog.present(self.window)
@@ -365,14 +367,17 @@ def handle_import_cancellation(self, dst, backup_dir):
     except Exception as e:
         print(f"Error during cancellation cleanup: {e}")
         # Still show cancelled message but also show error
-        GLib.idle_add(self.show_info_dialog, "Error", 
-                    f"Wine directory import was cancelled but encountered errors during cleanup: {e}\n"
-                    f"Backup directory may still exist at: {backup_dir}")
+        GLib.idle_add(
+            self.show_info_dialog,
+            _("Error"),
+            _("Wine directory import was cancelled but encountered errors during cleanup: %s\n"
+            "Backup directory may still exist at: %s") % (e, backup_dir)
+        )
         return
     
     self.stop_processing = False
     GLib.idle_add(self.on_import_wine_directory_completed)
-    GLib.idle_add(self.show_info_dialog, "Cancelled", "Wine directory import was cancelled")
+    GLib.idle_add(self.show_info_dialog, _("Cancelled"), _("Wine directory import was cancelled"))
 
 def handle_import_error(self, dst, backup_dir, error_message):
     self.print_method_name()
@@ -389,14 +394,17 @@ def handle_import_error(self, dst, backup_dir, error_message):
             print(f"Restored original directory after error")
             
     except Exception as e:
-        print(f"Error during error cleanup: {e}")
-        error_message += f"\nAdditional error during cleanup: {e}"
+        print(_("Error during error cleanup: %s") % e)
+        error_message += "\n"
+        error_message += _("Additional error during cleanup: %s") % e
+
         if backup_dir.exists():
-            error_message += f"\nBackup directory may still exist at: {backup_dir}"
-    
+            error_message += "\n"
+            error_message += _("Backup directory may still exist at: %s") % backup_dir
+
     self.stop_processing = False
     GLib.idle_add(self.on_import_wine_directory_completed)
-    GLib.idle_add(self.show_info_dialog, "Error", error_message)
+    GLib.idle_add(self.show_info_dialog, _("Error"), error_message)
 
 def cleanup_backup(self, backup_dir):
     self.print_method_name()
@@ -427,7 +435,7 @@ def cleanup_cancelled_import(self, temp_dir):
         self.stop_processing = False
         GLib.idle_add(self.on_import_wine_directory_completed)
         if not self.stop_processing:
-            GLib.idle_add(self.show_info_dialog, "Cancelled", "Wine directory import was cancelled")
+            GLib.idle_add(self.show_info_dialog, _("Cancelled"), _("Wine directory import was cancelled"))
 
         #self.open_button.disconnect(self.open_button_handler_id)
 

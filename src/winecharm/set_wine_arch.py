@@ -22,8 +22,8 @@ def set_wine_arch(self):
     """
     # Create AlertDialog
     dialog = Adw.AlertDialog(
-        heading="Set Wine Architecture",
-        body="Select the default architecture for new prefixes:"
+        heading=_("Set Wine Architecture"),
+        body=_("Select the default architecture for new prefixes:")
     )
 
     # Create radio buttons for architecture selection
@@ -43,8 +43,8 @@ def set_wine_arch(self):
     dialog.set_extra_child(vbox)
 
     # Configure dialog buttons
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("ok", "OK")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("ok", _("OK"))
     dialog.set_default_response("ok")
     dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
 

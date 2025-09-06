@@ -11,8 +11,8 @@ from pathlib import Path
 def single_prefix_mode(self):
     self.print_method_name()
     dialog = Adw.AlertDialog(
-        heading="Single Prefix Mode",
-        body="Choose prefix mode for new games:\nSingle prefix saves space but makes it harder to backup individual games."
+        heading=_("Single Prefix Mode"),
+        body=_("Choose prefix mode for new games:\nSingle prefix saves space but makes it harder to backup individual games.")
     )
 
     vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
@@ -32,8 +32,8 @@ def single_prefix_mode(self):
     vbox.append(multiple_prefix_radio)
     dialog.set_extra_child(vbox)
 
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("apply", "Apply")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("apply", _("Apply"))
     dialog.set_response_appearance("apply", Adw.ResponseAppearance.SUGGESTED)
     dialog.set_default_response("cancel")
 

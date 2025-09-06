@@ -169,8 +169,8 @@ def change_runner(self, script, script_key, *args):
 
     # Create AlertDialog
     dialog = Adw.AlertDialog(
-        heading="Change Runner",
-        body="Select a runner for the script:"
+        heading=_("Change Runner"),
+        body=_("Select a runner for the script:")
     )
 
     # Create DropDown with StringList model
@@ -209,8 +209,8 @@ def change_runner(self, script, script_key, *args):
     dialog.set_extra_child(content_box)
 
     # Configure dialog buttons
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("ok", "OK")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("ok", _("OK"))
     dialog.set_default_response("ok")
     dialog.set_response_appearance("ok", Adw.ResponseAppearance.SUGGESTED)
 
@@ -236,7 +236,7 @@ def on_change_runner_response(self, dialog, response_id, dropdown, all_runners, 
                 print(f"Updated runner to {new_display}")
             except Exception as e:
                 print(f"Update error: {e}")
-                self.show_info_dialog("Update Failed", str(e))
+                self.show_info_dialog(_("Update Failed"), _("%s") % str(e))
     dialog.close()
 
 
@@ -321,13 +321,13 @@ def show_no_runners_available_dialog(self):
     Show a dialog when no runners are available, prompting the user to download one.
     """
     dialog = Adw.AlertDialog(
-        heading="No Runners Available",
-        body="No Wine runners were found. Please download a runner to proceed."
+        heading=_("No Runners Available"),
+        body=_("No Wine runners were found. Please download a runner to proceed.")
     )
 
     # Add dialog responses (buttons)
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("download", "Download Runner")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("download", _("Download Runner"))
     dialog.set_response_appearance("download", Adw.ResponseAppearance.SUGGESTED)
     dialog.set_default_response("download")
 
@@ -414,12 +414,12 @@ def set_default_runner(self, action=None):
 
     # Create and configure dialog
     dialog = Adw.AlertDialog(
-        heading="Set Default Runner",
-        body="Select the default runner for the application:",
+        heading=_("Set Default Runner"),
+        body=_("Select the default runner for the application:"),
         extra_child=content_box
     )
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("ok", "OK")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("ok", _("OK"))
     dialog.props.default_response = "ok"
     dialog.props.close_response = "cancel"
 
@@ -471,8 +471,8 @@ def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, a
                 runner_arch = "win32"
             else:
                 self.show_info_dialog(
-                    "Invalid Runner",
-                    "Selected runner is missing Wine binaries (bin/wine or bin/wine64)"
+                    _("Invalid Runner"),
+                    _("Selected runner is missing Wine binaries (bin/wine or bin/wine64)")
                 )
                 return
 
@@ -482,12 +482,13 @@ def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, a
             # Check for 32-bit runner with 64-bit template
             if template_arch == "win64" and runner_arch == "win32":
                 self.show_info_dialog(
-                    "Architecture Mismatch",
-                    "Cannot use 32-bit runner with 64-bit template.\n\n"
-                    f"Template: {self.template} ({template_arch})\n"
-                    f"Runner: {new_runner_path} ({runner_arch})"
+                    _("Architecture Mismatch"),
+                    _("Cannot use 32-bit runner with 64-bit template.\n\n"
+                    "Template: %s (%s)\n"
+                    "Runner: %s (%s)") % (self.template, template_arch, new_runner_path, runner_arch)
                 )
                 return
+
 
         # Update settings
         new_runner_value = "" if new_runner_display.startswith("System Wine") else new_runner_path
@@ -498,10 +499,11 @@ def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, a
         wineprefix = Path(self.template).expanduser().resolve()
 
         # Show confirmation dialog for runner update
-        confirmation_message = f"The default runner has been set to {new_runner_display}"
+        confirmation_message = _("The default runner has been set to %s") % new_runner_display
         if new_runner_path:
-            confirmation_message += f" ({runner_arch})"
-        self.show_info_dialog("Default Runner Updated", confirmation_message)
+            confirmation_message += " (%s)" % runner_arch
+        self.show_info_dialog(_("Default Runner Updated"), confirmation_message)
+
 
         # Ask user if they want to run wineboot -u for non-system runners
         print("* * * * * *")
@@ -526,22 +528,26 @@ def on_set_default_runner_response(self, dialog, response_id, runner_dropdown, a
                         subprocess.run(prerun_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                         
                         # Provide feedback in the main thread
-                        GLib.idle_add(self.show_info_dialog, "Wineboot Completed", f"Updated Wine prefix for {new_runner_display} at {wineprefix}")
+                        GLib.idle_add(
+                            self.show_info_dialog,
+                            _("Wineboot Completed"),
+                            _("Updated Wine prefix for %s at %s") % (new_runner_display, wineprefix)
+                        )
 
                     except subprocess.CalledProcessError as e:
-                        error_msg = f"Wineboot failed (code {e.returncode}): {e.stderr}"
-                        GLib.idle_add(self.show_info_dialog, "Wineboot Error", error_msg)
+                        error_msg = _("Wineboot failed (code %d): %s") % (e.returncode, e.stderr)
+                        GLib.idle_add(self.show_info_dialog, _("Wineboot Error"), error_msg)
                     except Exception as e:
-                        error_msg = f"Wineboot error: {str(e)}"
-                        GLib.idle_add(self.show_info_dialog, "Wineboot Error", error_msg)
+                        error_msg = _("Wineboot error: %s") % str(e)
+                        GLib.idle_add(self.show_info_dialog, _("Wineboot Error"), error_msg)
 
                 # Start wineboot in a separate thread
                 threading.Thread(target=wineboot_operation, daemon=True).start()
 
         # Show confirmation dialog for running wineboot
         self.show_confirm_dialog(
-            "Run Wineboot?",
-            f"Do you want to run wineboot to update the Wine prefix for {new_runner_display} at {wineprefix}?",
+            _("Run Wineboot?"),
+            _("Do you want to run wineboot to update the Wine prefix for %s at %s?") % (new_runner_display, wineprefix),
             callback=on_wineboot_confirm_response
         )
     else:
@@ -699,8 +705,8 @@ def on_settings_download_runner_clicked(self, callback=None):
     """
     if not self.runner_data:
         self.show_info_dialog(
-            "Runner data not available",
-            "Please try again in a moment or restart the application."
+            _("Runner data not available"),
+            _("Please try again in a moment or restart the application.")
         )
         if callback:
             GLib.idle_add(callback)
@@ -708,8 +714,8 @@ def on_settings_download_runner_clicked(self, callback=None):
 
     # Create selection dialog using Adw.AlertDialog
     dialog = Adw.AlertDialog(
-        heading="Download Wine Runner",
-        body="Select the runners you wish to download."
+        heading=_("Download Wine Runner"),
+        body=_("Select the runners you wish to download.")
     )
 
     # Dialog content setup
@@ -742,8 +748,8 @@ def on_settings_download_runner_clicked(self, callback=None):
         content_box.append(hbox)
 
     # Configure dialog buttons
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("download", "Download")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("download", _("Download"))
     dialog.set_default_response("download")
     dialog.set_close_response("cancel")
 
@@ -770,7 +776,7 @@ def on_download_runner_response(self, dialog, response_id, combo_boxes, callback
         if selected_runners:
             # Create progress dialog
             progress_dialog = Adw.AlertDialog(
-                heading="Downloading Runners",
+                heading=_("Downloading Runners"),
                 body=""
             )
             
@@ -792,7 +798,7 @@ def on_download_runner_response(self, dialog, response_id, combo_boxes, callback
                 total_progress_bar.set_visible(False)
 
             # Add cancel button
-            progress_dialog.add_response("cancel", "Cancel")
+            progress_dialog.add_response("cancel", _("Cancel"))
             progress_dialog.set_close_response("cancel")
             
             cancel_event = threading.Event()
@@ -867,8 +873,8 @@ def download_runners_thread(self, selected_runners, progress_dialog, total_progr
                 else:
                     GLib.idle_add(
                         lambda: self.show_info_dialog(
-                            "Download Error",
-                            f"Failed to download {runner['name']}: {e}"
+                            _("Download Error"),
+                            _("Failed to download %s: %s") % (runner['name'], e)
                         )
                     )
 
@@ -894,18 +900,21 @@ def download_runners_thread(self, selected_runners, progress_dialog, total_progr
 
         if was_cancelled:
             finalize_ui(
-                "Download Cancelled",
-                "The download was cancelled. Partially downloaded files have been deleted."
+                _("Download Cancelled"),
+                _("The download was cancelled. Partially downloaded files have been deleted.")
             )
         elif download_success:
             finalize_ui(
-                "Download Complete",
-                f"Successfully downloaded {total_runners} runner{'s' if total_runners > 1 else ''}."
+                _("Download Complete"),
+                _("Successfully downloaded %d runner%s.") % (
+                    total_runners,
+                    _("s") if total_runners > 1 else ""
+                )
             )
         else:
             finalize_ui(
-                "Download Incomplete",
-                "Some runners failed to download."
+                _("Download Incomplete"),
+                _("Some runners failed to download.")
             )
 
 def download_and_extract_runner(self, runner_name, download_url, progress_callback, cancel_event):
@@ -969,13 +978,13 @@ def delete_runner(self, action=None):
     # Get valid runners
     all_runners = self.get_valid_runners(self.runners_dir, is_bundled=False)
     if not all_runners:
-        self.show_info_dialog("No Runners Available", "No runners found to delete.")
+        self.show_info_dialog(_("No Runners Available"), _("No runners found to delete."))
         return
 
     # Create AlertDialog
     dialog = Adw.AlertDialog(
-        heading="Delete Runner",
-        body="Select a runner to delete:"
+        heading=_("Delete Runner"),
+        body=_("Select a runner to delete:")
     )
 
     # Create DropDown with StringList model
@@ -993,8 +1002,8 @@ def delete_runner(self, action=None):
     dialog.set_extra_child(content_box)
 
     # Configure dialog buttons
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("delete", "Delete")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("delete", _("Delete"))
     dialog.set_default_response("delete")
     dialog.set_close_response("cancel")
 
@@ -1013,18 +1022,18 @@ def on_delete_runner_response(self, dialog, response_id, dropdown, runner_dirs):
                 if os.path.isdir(target_dir):
                     shutil.rmtree(target_dir)
                     self.show_info_dialog(
-                        "Deletion Successful",
-                        f"Runner '{os.path.basename(target_dir)}' was successfully deleted."
+                        _("Deletion Successful"),
+                        _("Runner '%s' was successfully deleted.") % os.path.basename(target_dir)
                     )
                 else:
                     raise FileNotFoundError(f"Directory not found: {target_dir}")
             except Exception as e:
                 self.show_info_dialog(
-                    "Deletion Error",
-                    f"Failed to delete runner: {str(e)}"
+                    _("Deletion Error"),
+                    _("Failed to delete runner: %s") % str(e)
                 )
         else:
-            self.show_info_dialog("Invalid Selection", "No valid runner selected.")
+            self.show_info_dialog(_("Invalid Selection"), _("No valid runner selected."))
 
     dialog.close()
 
@@ -1038,13 +1047,13 @@ def backup_runner(self, action=None):
 
     # If no runners are available, show a message
     if not all_runners:
-        self.show_info_dialog("No Runners Available", "No runners found to backup.")
+        self.show_info_dialog(_("No Runners Available"), _("No runners found to backup."))
         return
 
     # Create the AlertDialog
     dialog = Adw.AlertDialog(
-        heading="Backup Runner",
-        body="Select a runner to backup:"
+        heading=_("Backup Runner"),
+        body=_("Select a runner to backup:")
     )
 
     # Create the DropDown for runners
@@ -1059,8 +1068,8 @@ def backup_runner(self, action=None):
     content_box.append(dropdown)
 
     # Configure dialog buttons
-    dialog.add_response("cancel", "Cancel")
-    dialog.add_response("ok", "OK")
+    dialog.add_response("cancel", _("Cancel"))
+    dialog.add_response("ok", _("OK"))
     dialog.set_default_response("ok")
     dialog.set_close_response("cancel")
     dialog.set_extra_child(content_box)
@@ -1074,7 +1083,7 @@ def on_backup_runner_response(self, dialog, response_id, dropdown, combo_runner_
         selected_index = dropdown.get_selected()
         if selected_index < 0 or selected_index >= len(combo_runner_paths):
             print("No runner selected.")
-            self.show_info_dialog("No Runner Selected", "Please select a runner to backup.")
+            self.show_info_dialog(_("No Runner Selected"), _("Please select a runner to backup."))
             dialog.close()
             return
         runner_path = combo_runner_paths[selected_index]
@@ -1110,7 +1119,7 @@ def on_backup_runner_response(self, dialog, response_id, dropdown, combo_runner_
                     print(f"Backup destination selected: {destination_path}")
                     # Start the backup process in a separate thread
                     threading.Thread(target=self.create_runner_backup, args=(runner_path, destination_path)).start()
-                    self.show_info_dialog("Backup Complete", f"Runner backup saved to {destination_path}.")
+                    self.show_info_dialog(_("Backup Complete"), _("Runner backup saved to %s.") % destination_path)
             except GLib.Error as e:
                 if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                     print(f"An error occurred: {e}")
@@ -1160,7 +1169,7 @@ def create_runner_backup(self, runner_path, destination_path):
     except Exception as e:
         print(f"Error creating runner backup: {e}")
         # Show error dialog from the main thread
-        GLib.idle_add(self.show_info_dialog, "Backup Error", f"Failed to create runner backup: {e}")
+        GLib.idle_add(self.show_info_dialog, _("Backup Error"), _("Failed to create runner backup: %s") % e)
 ########### Restore RUnner
 def restore_runner(self, action=None):
     self.print_method_name()
@@ -1197,10 +1206,10 @@ def restore_runner(self, action=None):
                 if self.archive_contains_wine(archive_path):
                     # Start the extraction in a separate thread
                     threading.Thread(target=self.extract_runner_archive, args=(archive_path,)).start()
-                    self.show_info_dialog("Restore Complete", "Runner restored successfully.")
+                    self.show_info_dialog(_("Restore Complete"), _("Runner restored successfully."))
                 else:
                     print("Selected archive does not contain a valid runner.")
-                    self.show_info_dialog("Invalid Archive", "The selected archive does not contain a valid runner.")
+                    self.show_info_dialog(_("Invalid Archive"), _("The selected archive does not contain a valid runner."))
         except GLib.Error as e:
             if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
                 print(f"An error occurred: {e}")
@@ -1226,7 +1235,7 @@ def extract_runner_archive(self, archive_path):
     except Exception as e:
         print(f"Error extracting runner archive: {e}")
         # Show error dialog from the main thread
-        GLib.idle_add(self.show_info_dialog, "Restore Error", f"Failed to restore runner: {e}")
+        GLib.idle_add(self.show_info_dialog, _("Restore Error"), _("Failed to restore runner: %s") % e)
 
 
 def archive_contains_wine(self, archive_path):
@@ -1262,8 +1271,8 @@ def on_import_runner_response(self, dialog, result):
         if folder:
             src = Path(folder.get_path())
             if not self.verify_runner_source(src):
-                GLib.idle_add(self.show_info_dialog, "Invalid Runner", 
-                            "Selected directory is not a valid Wine runner")
+                GLib.idle_add(self.show_info_dialog, _("Invalid Runner"), 
+                            _("Selected directory is not a valid Wine runner"))
                 return
 
             runner_name = src.name
@@ -1271,11 +1280,11 @@ def on_import_runner_response(self, dialog, result):
             backup_dir = self.runners_dir / f"{runner_name}_backup_{int(time.time())}"
 
             steps = [
-                ("Verifying runner", lambda: self.verify_runner_binary(src)),
-                ("Backing up existing runner", lambda: self.backup_existing_directory(dst, backup_dir)),
-                ("Copying runner files", lambda: self.custom_copytree(src, dst)),
-                ("Validating installation", lambda: self.validate_runner(dst / "bin/wine")),
-                ("Setting permissions", lambda: self.set_runner_permissions(dst)),
+                (_("Verifying runner"), lambda: self.verify_runner_binary(src)),
+                (_("Backing up existing runner"), lambda: self.backup_existing_directory(dst, backup_dir)),
+                (_("Copying runner files"), lambda: self.custom_copytree(src, dst)),
+                (_("Validating installation"), lambda: self.validate_runner(dst / "bin/wine")),
+                (_("Setting permissions"), lambda: self.set_runner_permissions(dst)),
             ]
 
             self.show_processing_spinner(f"Importing {runner_name}")
@@ -1302,8 +1311,8 @@ def process_runner_import(self, steps, dst, backup_dir):
             GLib.idle_add(self.mark_step_as_done, step_text)
             GLib.idle_add(lambda: self.progress_bar.set_fraction(index / self.total_steps))
 
-        GLib.idle_add(self.show_info_dialog, "Success", 
-                    f"Runner '{dst.name}' imported successfully")
+        GLib.idle_add(self.show_info_dialog, _("Success"),
+                    _("Runner '%s' imported successfully") % dst.name)
         self.cleanup_backup(backup_dir)
         GLib.idle_add(self.refresh_runner_list)
 
@@ -1352,9 +1361,9 @@ def handle_runner_import_error(self, dst, backup_dir, error_msg):
         if backup_dir.exists():
             backup_dir.rename(dst)
     except Exception as e:
-        error_msg += f"\nCleanup error: {str(e)}"
-    
-    self.show_info_dialog("Runner Import Failed", error_msg)
+        error_msg += _("\nCleanup error: %s") % str(e)
+
+    self.show_info_dialog(_("Runner Import Failed"), error_msg)
 
 def on_import_runner_directory_completed(self):
     self.print_method_name()
@@ -1384,8 +1393,8 @@ def show_confirm_dialog(self, title, message, callback=None):
     )
     
     # Add Yes and No responses
-    dialog.add_response("yes", "Yes")
-    dialog.add_response("no", "No")
+    dialog.add_response("yes", _("Yes"))
+    dialog.add_response("no", _("No"))
     
     # Configure dialog properties
     dialog.props.default_response = "yes"

@@ -45,21 +45,21 @@ def import_game_directory(self, script, script_key, *args):
 
     if existing_exe_files:
         self.show_info_dialog(
-            "Game Directory Already Exists",
-            f"The game directory for '{exe_name}' is already in the Wine prefix. No action is needed."
-)
+            _("Game Directory Already Exists"),
+            _("The game directory for '%s' is already in the Wine prefix. No action is needed.") % exe_name
+        )
         return
 
     # Check if the game directory is in DO_NOT_BUNDLE_FROM directories
     if str(exe_path) in self.get_do_not_bundle_directories():
-        msg1 = "Cannot copy the selected game directory"
-        msg2 = "Please move the files to a different directory to create a bundle."
+        msg1 = _("Cannot copy the selected game directory")
+        msg2 = _("Please move the files to a different directory to create a bundle.")
         self.show_info_dialog(msg1, msg2)
         return
 
     # Check disk space in the source and destination directories
     if not self.has_enough_disk_space(exe_path, wineprefix):
-        self.show_info_dialog("Insufficient Disk Space", "There is not enough space to import the game directory.")
+        self.show_info_dialog(_("Insufficient Disk Space"), _("There is not enough space to import the game directory."))
         return
 
     # Proceed with copying if conditions are met
@@ -88,9 +88,10 @@ def copy_game_directory(self, src, exe_name, dst, script_path, script_key):
     print(new_exe_file)
     
     steps = [
-        ("Copying Game Directory", lambda: shutil.copytree(src, dst_path, dirs_exist_ok=True)),
-        ("Updating Script Path", lambda: self.update_exe_file_path_in_script(script_path, dst_path / exe_name))
+        (_("Copying Game Directory"), lambda: shutil.copytree(src, dst_path, dirs_exist_ok=True)),
+        (_("Updating Script Path"), lambda: self.update_exe_file_path_in_script(script_path, dst_path / exe_name)),
     ]
+
 
     def perform_import_steps():
         for step_text, step_func in steps:

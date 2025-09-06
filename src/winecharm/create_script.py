@@ -91,7 +91,11 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
                 else:
                     template_to_use = self.default_template_win64
                 print(f"Error: {self.template} has been deleted, using {template_to_use}")
-                GLib.idle_add(self.show_info_dialog, "Template Deleted", f"{self.template}.name has been deleted, using {template_to_use}.name")
+                GLib.idle_add(
+                    self.show_info_dialog,
+                    _("Template Deleted"),
+                    _("%s.name has been deleted, using %s.name") % (self.template, template_to_use)
+                )
                 self.template = template_to_use
 
             # Create new unique prefix per executable
