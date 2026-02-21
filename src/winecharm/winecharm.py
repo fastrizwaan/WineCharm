@@ -94,7 +94,7 @@ class WineCharmApp(Adw.Application):
         
         # Move the global variables to instance attributes
         self.debug = False
-        self.version = "0.99.9"
+        self.version = "1.0"
         self.app_icon_names = (
             "io.github.fastrizwaan.WineCharm",
             "io.github.fastrizwaan.winecharm",

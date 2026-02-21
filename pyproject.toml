@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "winecharm"
-version = "0.99.5"
+version = "1.0"
 description = "A Charming Wine GUI for managing Wine prefixes and applications"
 readme = "README.md"
 authors = [
