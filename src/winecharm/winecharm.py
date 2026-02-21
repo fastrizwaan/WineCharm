@@ -766,6 +766,15 @@ class WineCharmApp(Adw.Application):
         for icon_dir in icon_dirs:
             if icon_dir.exists():
                 icon_theme.add_search_path(str(icon_dir))
+                print(f"[DEBUG] Added icon search path: {icon_dir}")
+        
+        # Check if WineCharm icon is available
+        if icon_theme.has_icon("io.github.fastrizwaan.WineCharm"):
+            icon_info = icon_theme.lookup_icon("io.github.fastrizwaan.WineCharm", None, 48, 1, Gtk.TextDirection.NONE, Gtk.IconLookupFlags.NONE)
+            if icon_info:
+                print(f"[DEBUG] WineCharm icon loaded from: {icon_info.get_file().get_path()}")
+        else:
+            print("[DEBUG] WineCharm icon NOT found in icon theme")
 
         self.create_main_window()
         # Clear or initialize the script list
