@@ -18,8 +18,8 @@ def single_prefix_mode(self):
     vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
     
     # Create radio buttons with fresh state
-    single_prefix_radio = Gtk.CheckButton(label="Single Prefix Mode")
-    multiple_prefix_radio = Gtk.CheckButton(label="Multiple Prefix Mode")
+    single_prefix_radio = Gtk.CheckButton(label=_("Single Prefix Mode"))
+    multiple_prefix_radio = Gtk.CheckButton(label=_("Multiple Prefix Mode"))
     multiple_prefix_radio.set_group(single_prefix_radio)
     
     # Always refresh from settings before showing dialog

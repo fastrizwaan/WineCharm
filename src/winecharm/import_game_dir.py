@@ -66,7 +66,7 @@ def import_game_directory(self, script, script_key, *args):
     # Step 1: Disconnect the UI elements and initialize the spinner
     self.on_back_button_clicked(None)
     self.disconnect_open_button()
-    self.show_processing_spinner(f"Importing {exe_path.name}")
+    self.show_processing_spinner(_("Importing %(name)s") % {"name": exe_path.name})
 
     # Copy the game directory in a new thread and update script_path
     threading.Thread(target=self.copy_game_directory, args=(exe_path, exe_name, game_dir, script_path, script_key)).start()
@@ -113,7 +113,7 @@ def on_import_game_directory_completed(self, script_key):
     Called when the import process is complete. Updates UI, restores scripts, and resets the open button.
     """
     # Reconnect open button and reset its label
-    self.set_open_button_label("Open")
+    self.set_open_button_label(_("Open"))
     self.set_open_button_icon_visible(True)
     self.reconnect_open_button()
     self.hide_processing_spinner()
@@ -177,5 +177,3 @@ def has_enough_disk_space(self, source, destination):
     source_size = sum(f.stat().st_size for f in source.glob('**/*') if f.is_file())
     destination_free_space = shutil.disk_usage(destination.parent).free
     return destination_free_space > source_size
-
-

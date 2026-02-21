@@ -108,7 +108,7 @@ def _complete_backup_ui_update(self, script_key, backup_path):
             )
         
         # Update labels and icons
-        self.set_open_button_label("Open")
+        self.set_open_button_label(_("Open"))
         self.set_open_button_icon_visible(True)
         
         # Show completion dialog
@@ -146,7 +146,7 @@ def backup_prefix(self, script, script_key, backup_path):
 
     try:
         # Step 1: Initialize the UI for backup process
-        self.show_processing_spinner("Exporting...")
+        self.show_processing_spinner(_("Exporting..."))
         self.connect_open_button_with_backup_cancel(script_key)
 
         # Get the user's home directory to replace with `~`
@@ -277,7 +277,7 @@ def cleanup_cancelled_backup(self, script, script_key):
     finally:
         try:
             # Reset UI state
-            self.set_open_button_label("Open")
+            self.set_open_button_label(_("Open"))
             self.set_open_button_icon_visible(True)
             self.hide_processing_spinner()
             
@@ -348,7 +348,7 @@ def create_bottle(self, script, script_key, backup_path):
     self.hide_processing_spinner()
 
     # Step 1: Disconnect the UI elements and initialize the spinner
-    self.show_processing_spinner("Bottling...")
+    self.show_processing_spinner(_("Bottling..."))
     self.connect_open_button_with_bottling_cancel(script_key)
 
     # Get the user's home directory to replace with `~`
@@ -539,7 +539,7 @@ def _complete_bottle_creation_ui_update(self, script_key, backup_path):
             )
         
         # Update labels and icons
-        self.set_open_button_label("Open")
+        self.set_open_button_label(_("Open"))
         self.set_open_button_icon_visible(True)
         
         # Show completion dialog
@@ -616,7 +616,9 @@ def create_bottle_selected(self, script, script_key, button):
         # Show confirmation dialog
         dialog = Adw.AlertDialog(
             heading=_("Large Game Directory"),
-            body=f"The game directory size is {directory_size_gb}GB. Do you want to continue?"
+            body=_("The game directory size is %(size)sGB. Do you want to continue?") % {
+                "size": directory_size_gb
+            }
         )
         dialog.add_response("cancel", _("Cancel"))
         dialog.add_response("continue", _("Continue"))

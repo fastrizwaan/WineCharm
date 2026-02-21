@@ -1304,7 +1304,7 @@ class WineCharmApp(Adw.Application):
             print(f"Error processing arguments: {e}")
             self.handle_ui_error(play_stop_button, row, 
                             _("Argument Error"), 
-                            _(f"Invalid arguments: {e}"),
+                            _("Invalid arguments: %s") % e,
                             _("Launch Failed"))
             return
 
@@ -2647,7 +2647,13 @@ def main():
                 # If no instance is running, start WineCharmApp and show the error dialog directly
                 if not app.SOCKET_FILE.exists():
                     app.start_socket_server()
-                    GLib.timeout_add_seconds(1.5, app.show_info_dialog, _("Invalid File Type"), _(f"Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You provided: {file_extension}"))
+                    GLib.timeout_add_seconds(
+                        1.5,
+                        app.show_info_dialog,
+                        _("Invalid File Type"),
+                        _("Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You provided: %s")
+                        % file_extension,
+                    )
                     app.run(sys.argv)
 
                     # Clean up the socket file

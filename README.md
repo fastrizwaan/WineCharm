@@ -230,6 +230,20 @@ The Flatpak manifest provides:
 
 Fork the repository, make changes, and submit a pull request. Check issues for feature requests or bugs.
 
+### Translations
+
+Translation files are managed in `po/` with GNU gettext.
+
+Use:
+
+```sh
+./scripts/i18n.sh extract
+./scripts/i18n.sh update-all
+./scripts/i18n.sh compile-all
+```
+
+For full translator workflow, see `po/README.md`.
+
 ## License
 
 WineCharm is licensed under the GNU General Public License (GPLv3+). See the `LICENSE` file for details.

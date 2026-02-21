@@ -21,7 +21,7 @@ def process_winezgui_sh_files(self, action=None, param=None, prompt=None, suppre
     """
     Process WineZGUI .sh files to create corresponding .charm files in their prefix directories.
     """
-    self.show_processing_spinner("Processing WineZGUI Scripts...")
+    self.show_processing_spinner(_("Processing WineZGUI Scripts..."))
     
     def process_in_background():
         try:
@@ -58,4 +58,3 @@ def process_winezgui_sh_files(self, action=None, param=None, prompt=None, suppre
             GLib.idle_add(self.hide_processing_spinner)
             GLib.idle_add(self.load_script_list)
     threading.Thread(target=process_in_background, daemon=True).start()
-

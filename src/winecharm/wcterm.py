@@ -5,6 +5,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Vte', '2.91')
 from gi.repository import GObject, GLib, Vte, Gtk
+from gettext import gettext as _
 
 GObject.type_register(Vte.Terminal)
 
@@ -13,7 +14,7 @@ class WCTerm(object):
     def __init__(self, command=None):
         # Create the main window
         self._window = Gtk.Window()
-        self._window.set_title("WCTerm")
+        self._window.set_title(_("WCTerm"))
         self._window.set_default_size(800, 480)
         self._window.connect("delete-event", self.stop)
 
@@ -72,12 +73,12 @@ class WCTerm(object):
         menu = Gtk.Menu()
 
         # Create Copy option
-        copy_item = Gtk.MenuItem(label="Copy")
+        copy_item = Gtk.MenuItem(label=_("Copy"))
         copy_item.connect("activate", self._on_copy)
         menu.append(copy_item)
 
         # Create Paste option
-        paste_item = Gtk.MenuItem(label="Paste")
+        paste_item = Gtk.MenuItem(label=_("Paste"))
         paste_item.connect("activate", self._on_paste)
         menu.append(paste_item)
 

@@ -27,21 +27,21 @@ def restore_from_backup(self, action=None, param=None):
 
     # Step 3: Create file filters for .tar.zst and .wzt files
     file_filter_combined = Gtk.FileFilter()
-    file_filter_combined.set_name("Backup Files (*.prefix, *.bottle, *.wzt)")
+    file_filter_combined.set_name(_("Backup Files (*.prefix, *.bottle, *.wzt)"))
     file_filter_combined.add_pattern("*.prefix")
     file_filter_combined.add_pattern("*.bottle")
     file_filter_combined.add_pattern("*.wzt")
 
     file_filter_botle_tar = Gtk.FileFilter()
-    file_filter_botle_tar.set_name("WineCharm Bottle Files (*.bottle)")
+    file_filter_botle_tar.set_name(_("WineCharm Bottle Files (*.bottle)"))
     file_filter_botle_tar.add_pattern("*.bottle")
 
     file_filter_tar = Gtk.FileFilter()
-    file_filter_tar.set_name("WineCharm Prefix Backup (*.prefix)")
+    file_filter_tar.set_name(_("WineCharm Prefix Backup (*.prefix)"))
     file_filter_tar.add_pattern("*.prefix")
 
     file_filter_wzt = Gtk.FileFilter()
-    file_filter_wzt.set_name("Winezgui Backup Files (*.wzt)")
+    file_filter_wzt.set_name(_("Winezgui Backup Files (*.wzt)"))
     file_filter_wzt.add_pattern("*.wzt")
 
     # Step 4: Set the filters on the dialog
@@ -159,7 +159,7 @@ def restore_prefix_bottle_wzt_tar_zst(self, file_path):
 
     # Clear the flowbox and show progress spinner
     GLib.idle_add(self.flowbox.remove_all)
-    self.show_processing_spinner(f"Restoring")
+    self.show_processing_spinner(_("Restoring"))
     
     try:
         # Extract prefix name before starting
@@ -953,7 +953,7 @@ def on_cancel_restore_backup_clicked(self, button):
     Handle cancel button click with immediate process termination
     """
     dialog = Adw.AlertDialog(
-        title="Cancel Restoring Backup?",
+        title=_("Cancel Restoring Backup?"),
         body=_("This will immediately stop the extraction process. Any partially extracted files will be cleaned up.")
     )
     dialog.add_response("continue", _("Continue"))
@@ -989,5 +989,3 @@ def on_cancel_restore_backup_dialog_response(self, dialog, response):
     else:
         self.stop_processing = False
         dialog.close()
-
-

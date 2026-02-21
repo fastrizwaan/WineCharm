@@ -28,8 +28,8 @@ def set_wine_arch(self):
 
     # Create radio buttons for architecture selection
     vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-    win32_radio = Gtk.CheckButton(label="32-bit (win32)")
-    win64_radio = Gtk.CheckButton(label="64-bit (win64)")
+    win32_radio = Gtk.CheckButton(label=_("32-bit (win32)"))
+    win64_radio = Gtk.CheckButton(label=_("64-bit (win64)"))
     win64_radio.set_group(win32_radio)
 
     # Set current selection

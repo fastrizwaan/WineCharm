@@ -60,7 +60,7 @@ def initialize_template(self, template_dir, callback, arch='win64', new=False):
     
     # Set total steps and initialize progress UI
     self.total_steps = len(steps)
-    self.show_processing_spinner(f"Initializing {template_dir.name} Template...")
+    self.show_processing_spinner(_("Initializing %(name)s Template...") % {"name": template_dir.name})
 
     def initialize():
         for index, (step_text, command) in enumerate(steps, 1):
@@ -187,7 +187,7 @@ def on_cancel_template_init_clicked(self, button):
     Handle cancel button click during template initialization
     """
     dialog = Adw.AlertDialog(
-        title="Cancel Initialization",
+        title=_("Cancel Initialization"),
         body=_("Do you want to cancel the template initialization process?")
     )
     dialog.add_response("continue", _("Continue"))
@@ -261,7 +261,7 @@ def reset_ui_after_template_init(self):
     """
     Reset UI elements after template initialization and show confirmation
     """
-    self.set_open_button_label("Open")
+    self.set_open_button_label(_("Open"))
     self.set_open_button_icon_visible(True)
     self.hide_processing_spinner()
     
@@ -330,7 +330,7 @@ def set_default_template(self, action=None):
 
     # Dialog layout
     content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-    content.append(Gtk.Label(label="Select template:"))
+    content.append(Gtk.Label(label=_("Select template:")))
     content.append(dropdown)
 
     dialog = Adw.AlertDialog(
@@ -451,7 +451,7 @@ def delete_template(self, action=None):
                 # Additional confirmation for non-default templates
                 confirm_dialog = Adw.AlertDialog(
                     heading=_("Confirm Deletion"),
-                    body=f"Permanently delete:\n{display_name}?"
+                    body=_("Permanently delete:\n%(name)s?") % {"name": display_name}
                 )
                 confirm_dialog.add_response("cancel", _("Keep"))
                 confirm_dialog.add_response("delete", _("Delete Forever"))
@@ -572,7 +572,7 @@ def on_import_template_directory_completed(self):
     Called when the template import process is complete. Updates UI, restores scripts, and resets the open button.
     """
     # Reconnect open button and reset its label
-    self.set_open_button_label("Open")
+    self.set_open_button_label(_("Open"))
     self.set_open_button_icon_visible(True)
     
     self.hide_processing_spinner()
@@ -626,7 +626,7 @@ def on_backup_template_response(self, dialog, response_id, dropdown, templates):
             file_dialog = Gtk.FileDialog.new()
             file_dialog.set_initial_name(f"{template_name}.template")
             file_filter = Gtk.FileFilter()
-            file_filter.set_name("Template Archives")
+            file_filter.set_name(_("Template Archives"))
             file_filter.add_pattern("*.template")
             filters = Gio.ListStore.new(Gtk.FileFilter)
             filters.append(file_filter)
@@ -764,7 +764,7 @@ def create_template_backup(self, template_path, dest_path):
         if process.returncode != 0 and not self.stop_processing:
             raise Exception(f"Backup failed with code {process.returncode}")
 
-    self.show_processing_spinner("Exporting...")
+    self.show_processing_spinner(_("Exporting..."))
     self.connect_cancel_button_for_template_backup()
     threading.Thread(target=perform_backup_steps, daemon=True).start()
 
@@ -773,7 +773,7 @@ def connect_cancel_button_for_template_backup(self):
     if hasattr(self, 'open_button_handler_id') and self.open_button_handler_id is not None:
         self.open_button.disconnect(self.open_button_handler_id)
     self.open_button_handler_id = self.open_button.connect("clicked", self.on_cancel_template_backup_clicked)
-    self.set_open_button_label("Cancel")
+    self.set_open_button_label(_("Cancel"))
     self.set_open_button_icon_visible(False)
 
 def on_cancel_template_backup_clicked(self, button):
@@ -817,7 +817,7 @@ def restore_template_from_backup(self, action=None, param=None):
 
     # Step 3: Create file filter for .wzt files only
     file_filter_wzt = Gtk.FileFilter()
-    file_filter_wzt.set_name("WineCharm Template Files (*.template)")
+    file_filter_wzt.set_name(_("WineCharm Template Files (*.template)"))
     file_filter_wzt.add_pattern("*.template")
 
     # Step 4: Set the filter on the dialog
@@ -863,7 +863,7 @@ def restore_template_tar_zst(self, file_path):
 
         # UI setup
         GLib.idle_add(self.flowbox.remove_all)
-        self.show_processing_spinner("Restoring Template")
+        self.show_processing_spinner(_("Restoring Template"))
         self.connect_open_button_with_restore_backup_cancel()
 
         def restore_process():
@@ -1174,7 +1174,7 @@ def on_clone_template_response(self, dialog, response_id, dropdown, entry, templ
                 return
 
             # Start cloning process
-            self.show_processing_spinner("Cloning template...")
+            self.show_processing_spinner(_("Cloning template..."))
             threading.Thread(
                 target=self.perform_template_clone,
                 args=(source_path, dest_path),
@@ -1216,8 +1216,8 @@ def create_template(self, action=None):
     content_box.append(entry)
     
     radio_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-    win32_radio = Gtk.CheckButton(label="32-bit (win32)")
-    win64_radio = Gtk.CheckButton(label="64-bit (win64)")
+    win32_radio = Gtk.CheckButton(label=_("32-bit (win32)"))
+    win64_radio = Gtk.CheckButton(label=_("64-bit (win64)"))
     win64_radio.set_group(win32_radio)
     win64_radio.set_active(True)
     radio_box.append(win32_radio)
@@ -1260,6 +1260,3 @@ def revert_open_button(self):
     self.reconnect_open_button()
     self.show_options_for_settings()
     print("Template created successfully")
-
-
-

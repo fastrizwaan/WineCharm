@@ -80,7 +80,7 @@ def replace_open_button_with_settings(self):
     if hasattr(self, 'open_button_handler_id') and self.open_button_handler_id is not None:
         self.open_button.disconnect(self.open_button_handler_id)
     
-    self.set_open_button_label("Settings")
+    self.set_open_button_label(_("Settings"))
     self.set_open_button_icon_visible(False)
     
     # Connect new click handler

@@ -801,7 +801,7 @@ def on_download_runner_response(self, dialog, response_id, combo_boxes, callback
             content_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
             progress_dialog.set_extra_child(content_box)
             
-            progress_label = Gtk.Label(label="Starting download...")
+            progress_label = Gtk.Label(label=_("Starting download..."))
             runner_progress_bar = Gtk.ProgressBar()
             total_progress_bar = Gtk.ProgressBar()
             
@@ -1119,7 +1119,7 @@ def on_backup_runner_response(self, dialog, response_id, dropdown, combo_runner_
 
         # Create file filters
         file_filter = Gtk.FileFilter()
-        file_filter.set_name("Tarball archives (*.tar.gz, *.tar.xz, *.tar.zst)")
+        file_filter.set_name(_("Tarball archives (*.tar.gz, *.tar.xz, *.tar.zst)"))
         file_filter.add_pattern("*.tar.gz")
         file_filter.add_pattern("*.tar.xz")
         file_filter.add_pattern("*.tar.zst")
@@ -1203,7 +1203,7 @@ def restore_runner(self, action=None):
 
     # Create file filters
     file_filter = Gtk.FileFilter()
-    file_filter.set_name("Tarball archives (*.tar.gz, *.tar.xz, *.tar.zst)")
+    file_filter.set_name(_("Tarball archives (*.tar.gz, *.tar.xz, *.tar.zst)"))
     file_filter.add_pattern("*.tar.gz")
     file_filter.add_pattern("*.tar.xz")
     file_filter.add_pattern("*.tar.zst")
@@ -1309,7 +1309,7 @@ def on_import_runner_response(self, dialog, result):
                 (_("Setting permissions"), lambda: self.set_runner_permissions(dst)),
             ]
 
-            self.show_processing_spinner(f"Importing {runner_name}")
+            self.show_processing_spinner(_("Importing %(name)s") % {"name": runner_name})
             self.connect_open_button_with_import_wine_directory_cancel()
             threading.Thread(target=self.process_runner_import, args=(steps, dst, backup_dir)).start()
 
@@ -1390,7 +1390,7 @@ def handle_runner_import_error(self, dst, backup_dir, error_msg):
 def on_import_runner_directory_completed(self):
     self.print_method_name()
     """Finalize runner import UI updates"""
-    self.set_open_button_label("Open")
+    self.set_open_button_label(_("Open"))
     self.set_open_button_icon_visible(True)
     self.hide_processing_spinner()
     self.reconnect_open_button()

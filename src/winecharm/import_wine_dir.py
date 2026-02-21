@@ -116,7 +116,7 @@ def on_import_directory_response(self, dialog, result):
             if directory and (Path(directory) / "system.reg").exists():
                 print(f"Valid Wine directory selected: {directory}")
 
-                self.show_processing_spinner(f"Importing {Path(directory).name}")
+                self.show_processing_spinner(_("Importing %(name)s") % {"name": Path(directory).name})
 
                 # Destination directory
                 dest_dir = self.prefixes_dir / Path(directory).name
@@ -163,7 +163,7 @@ def import_wine_directory(self, src, dst):
 
     
     self.total_steps = len(steps)
-    self.show_processing_spinner("Importing Wine Directory...")
+    self.show_processing_spinner(_("Importing Wine Directory..."))
     self.connect_open_button_with_import_wine_directory_cancel()
 
     def perform_import_steps():
@@ -220,7 +220,7 @@ def on_import_wine_directory_completed(self):
     Called when the import process is complete. Updates UI, restores scripts, and resets the open button.
     """
     # Reconnect open button and reset its label
-    self.set_open_button_label("Open")
+    self.set_open_button_label(_("Open"))
     self.set_open_button_icon_visible(True)
     
     self.hide_processing_spinner()
@@ -264,8 +264,10 @@ def show_import_wine_directory_overwrite_confirmation_dialog(self, src, dest_dir
     Show a confirmation dialog asking the user whether to overwrite the existing directory.
     """
     dialog = Adw.AlertDialog(
-        title="Overwrite Existing Directory?",
-        body=f"The directory {dest_dir.name} already exists. Do you want to overwrite it?"
+        title=_("Overwrite Existing Directory?"),
+        body=_("The directory %(name)s already exists. Do you want to overwrite it?") % {
+            "name": dest_dir.name
+        }
     )
 
     # Add overwrite and cancel buttons
@@ -328,7 +330,7 @@ def on_cancel_import_wine_directory_clicked(self, button):
     Handle cancel button click
     """
     dialog = Adw.AlertDialog(
-        title="Cancel Import",
+        title=_("Cancel Import"),
         body=_("Do you want to cancel the wine directory import process?")
     )
     dialog.add_response("continue", _("Continue"))
@@ -462,7 +464,7 @@ def disconnect_open_button(self):
         self.open_button_handler_id = None  # Reset the handler ID after disconnecting
     
     # Update the label and hide the icon
-    self.set_open_button_label("Importing...")
+    self.set_open_button_label(_("Importing..."))
     self.set_open_button_icon_visible(False)  # Hide the open-folder icon
     print("Open button disconnected and spinner shown.")
 
@@ -478,7 +480,7 @@ def reconnect_open_button(self):
         self.open_button_handler_id = self.open_button.connect("clicked", self.on_open_button_clicked)
     
     # Reset the label and show the icon
-    self.set_open_button_label("Open")
+    self.set_open_button_label(_("Open"))
     self.set_open_button_icon_visible(True)
     print("Open button reconnected and UI reset.")
 
@@ -647,4 +649,3 @@ def custom_copytree(self, src, dst):
     finally:
         with self.process_lock:
             self.current_process = None
-
