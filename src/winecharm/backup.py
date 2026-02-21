@@ -9,6 +9,7 @@ import time
 import yaml
 from pathlib import Path
 from datetime import datetime
+from gettext import gettext as _
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
@@ -425,13 +426,14 @@ def create_bottle(self, script, script_key, backup_path):
     def perform_backup_steps():
         self.print_method_name()
         try:
+            create_bottle_archive_label = _("Creating Bottle archive")
             # Basic steps that are always needed
             basic_steps = [
                 (_("Replace \"%s\" with '~' in files") % usershome, lambda: self.replace_strings_in_files(wineprefix, find_replace_pairs)),
                 (_("Reverting user-specific .reg changes"), lambda: self.reverse_process_reg_files(wineprefix)),
                 (_("Replace \"/media/%s\" with '/media/%%USERNAME%%' in files") % user, lambda: self.replace_strings_in_files(wineprefix, find_replace_media_username)),
                 (_("Updating exe_file Path in Script"), lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(game_dir_exe)))),
-                (_("Creating Bottle archive"), lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
+                (create_bottle_archive_label, lambda: self.create_bottle_archive(script_key, wineprefix, backup_path)),
                 (_("Re-applying user-specific .reg changes"), lambda: self.process_reg_files(wineprefix)),
                 (_("Revert %%USERNAME%% with \"%s\" in script files") % user, lambda: self.replace_strings_in_files(wineprefix, restore_media_username)),
                 (_("Reverting exe_file Path in Script"), lambda: self.update_exe_file_path_in_script(script, self.replace_home_with_tilde_in_path(str(exe_file))))
@@ -446,7 +448,7 @@ def create_bottle(self, script, script_key, backup_path):
             if runner and str(runner).strip():
                 is_runner_inside_prefix = runner.is_relative_to(self.runners_dir)
                 if is_runner_inside_prefix:
-                    runner_update_index = next(i for i, (text, _) in enumerate(steps) if text == "Creating Bottle archive")
+                    runner_update_index = next(i for i, (text, _) in enumerate(steps) if text == create_bottle_archive_label)
                     steps.insert(
                         runner_update_index,
                         (_("Updating runner Path in Script"),

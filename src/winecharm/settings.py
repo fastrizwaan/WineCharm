@@ -4,6 +4,7 @@ import gi
 import yaml
 from pathlib import Path
 import subprocess
+from gettext import gettext as _
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
@@ -121,23 +122,23 @@ def show_options_for_settings(self, action=None, param=None):
 
     # Store settings options as instance variable for filtering
     self.settings_options = [
-        ("Runner Set Default", "runner-set-default-symbolic", self.set_default_runner),
-        ("Runner Download", "runner-download-symbolic", self.on_settings_download_runner_clicked),
-        ("Runner Import", "runner-import-symbolic", self.import_runner),
-        ("Runner Backup", "runner-backup-symbolic", self.backup_runner),
-        ("Runner Restore", "runner-restore-symbolic", self.restore_runner),
-        ("Runner Delete", "runner-delete-symbolic", self.delete_runner),
-        ("Template Set Default", "template-default-symbolic", self.set_default_template),
-        ("Template Configure", "template-configure-symbolic", self.configure_template),
-        ("Template Terminal", "template-terminal-symbolic", self.open_terminal_winecharm),
-        ("Template Import", "template-import-symbolic", self.import_template),
-        ("Template Create", "template-create-symbolic", self.create_template),
-        ("Template Clone", "template-clone-symbolic", self.clone_template),
-        ("Template Backup", "template-backup-symbolic", self.backup_template),
-        ("Template Restore", "template-restore-symbolic", self.restore_template_from_backup),
-        ("Template Delete", "template-delete-symbolic", self.delete_template),
-        ("Set Wine Arch", "set-wine-arch-symbolic", self.set_wine_arch),
-        ("Single Prefix Mode", "single-prefix-mode-symbolic", self.single_prefix_mode),
+        (_("Runner Set Default"), "runner-set-default-symbolic", self.set_default_runner),
+        (_("Runner Download"), "runner-download-symbolic", self.on_settings_download_runner_clicked),
+        (_("Runner Import"), "runner-import-symbolic", self.import_runner),
+        (_("Runner Backup"), "runner-backup-symbolic", self.backup_runner),
+        (_("Runner Restore"), "runner-restore-symbolic", self.restore_runner),
+        (_("Runner Delete"), "runner-delete-symbolic", self.delete_runner),
+        (_("Template Set Default"), "template-default-symbolic", self.set_default_template),
+        (_("Template Configure"), "template-configure-symbolic", self.configure_template),
+        (_("Template Terminal"), "template-terminal-symbolic", self.open_terminal_winecharm),
+        (_("Template Import"), "template-import-symbolic", self.import_template),
+        (_("Template Create"), "template-create-symbolic", self.create_template),
+        (_("Template Clone"), "template-clone-symbolic", self.clone_template),
+        (_("Template Backup"), "template-backup-symbolic", self.backup_template),
+        (_("Template Restore"), "template-restore-symbolic", self.restore_template_from_backup),
+        (_("Template Delete"), "template-delete-symbolic", self.delete_template),
+        (_("Set Wine Arch"), "set-wine-arch-symbolic", self.set_wine_arch),
+        (_("Single Prefix Mode"), "single-prefix-mode-symbolic", self.single_prefix_mode),
     ]
 
     # Initial population of options

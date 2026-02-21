@@ -9,6 +9,7 @@ import time
 import yaml
 from pathlib import Path
 from threading import Lock
+from gettext import gettext as _
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
@@ -247,14 +248,14 @@ def get_restore_steps(self, file_path):
     Return the list of steps for restoring a prefix/bottle backup.
     """
     return [
-        ("Checking Uncompressed Size", lambda: self.check_disk_space_and_show_step(file_path)),
-        ("Extracting Backup File", lambda: self.extract_backup(file_path)),
-        ("Processing Registry Files", lambda: self.process_reg_files(self.extract_prefix_dir(file_path))),
-        ("Performing Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(file_path))),
-        ("Replacing Symbolic Links with Directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
-        ("Renaming and merging user directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
-        ("Add Shortcuts to Script List", lambda: self.add_charm_files_to_script_list(self.extract_prefix_dir(file_path))),
-        ("Create Wineboot Required file", lambda: self.create_wineboot_required_file(self.extract_prefix_dir(file_path))),
+        (_("Checking Uncompressed Size"), lambda: self.check_disk_space_and_show_step(file_path)),
+        (_("Extracting Backup File"), lambda: self.extract_backup(file_path)),
+        (_("Processing Registry Files"), lambda: self.process_reg_files(self.extract_prefix_dir(file_path))),
+        (_("Performing Replacements"), lambda: self.perform_replacements(self.extract_prefix_dir(file_path))),
+        (_("Replacing Symbolic Links with Directories"), lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
+        (_("Renaming and merging user directories"), lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
+        (_("Add Shortcuts to Script List"), lambda: self.add_charm_files_to_script_list(self.extract_prefix_dir(file_path))),
+        (_("Create Wineboot Required file"), lambda: self.create_wineboot_required_file(self.extract_prefix_dir(file_path))),
     ]
 
 def get_wzt_restore_steps(self, file_path):
@@ -263,14 +264,14 @@ def get_wzt_restore_steps(self, file_path):
     Return the list of steps for restoring a WZT backup.
     """
     return [
-        ("Checking Disk Space", lambda: self.check_disk_space_and_show_step(file_path)),
-        ("Extracting WZT Backup File", lambda: self.extract_backup(file_path)),
-        ("Performing User Related Replacements", lambda: self.perform_replacements(self.extract_prefix_dir(file_path))),
-        ("Processing WineZGUI Script Files", lambda: self.process_sh_files(self.extract_prefix_dir(file_path))),
-        ("Replacing Symbolic Links with Directories", lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
-        ("Renaming and Merging User Directories", lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
-        ("Search LNK Files and Append to Found List", lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(file_path))),
-        ("Create Wineboot Required file", lambda: self.create_wineboot_required_file(self.extract_prefix_dir(file_path))),
+        (_("Checking Disk Space"), lambda: self.check_disk_space_and_show_step(file_path)),
+        (_("Extracting WZT Backup File"), lambda: self.extract_backup(file_path)),
+        (_("Performing User Related Replacements"), lambda: self.perform_replacements(self.extract_prefix_dir(file_path))),
+        (_("Processing WineZGUI Script Files"), lambda: self.process_sh_files(self.extract_prefix_dir(file_path))),
+        (_("Replacing Symbolic Links with Directories"), lambda: self.remove_symlinks_and_create_directories(self.extract_prefix_dir(file_path))),
+        (_("Renaming and Merging User Directories"), lambda: self.rename_and_merge_user_directories(self.extract_prefix_dir(file_path))),
+        (_("Search LNK Files and Append to Found List"), lambda: self.find_and_save_lnk_files(self.extract_prefix_dir(file_path))),
+        (_("Create Wineboot Required file"), lambda: self.create_wineboot_required_file(self.extract_prefix_dir(file_path))),
     ]
 
 def create_wineboot_required_file(self, wineprefix):
