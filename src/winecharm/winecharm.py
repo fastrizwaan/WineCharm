@@ -724,7 +724,17 @@ class WineCharmApp(Adw.Application):
 
     def on_about_clicked(self, action=None, param=None):
         self.print_method_name()
-        if getattr(self, "app_icon_available", False):
+        icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+        about_icon_info = icon_theme.lookup_icon(
+            "io.github.fastrizwaan.WineCharm",
+            None,
+            128,
+            1,
+            Gtk.TextDirection.NONE,
+            Gtk.IconLookupFlags.NONE
+        )
+
+        if about_icon_info:
             about_dialog = Adw.AboutWindow(
                 transient_for=self.window,
                 application_name="WineCharm",
@@ -811,6 +821,9 @@ class WineCharmApp(Adw.Application):
 
     def on_startup(self, app):
         icon_theme = self.setup_icon_theme_paths()
+        icon_file_path = self.get_app_icon_file_path("io.github.fastrizwaan.WineCharm")
+        self.app_icon_path = str(icon_file_path) if icon_file_path else None
+
         self.app_icon_available = icon_theme.has_icon("io.github.fastrizwaan.WineCharm")
 
         # Check if WineCharm icon is available by name.
@@ -818,15 +831,10 @@ class WineCharmApp(Adw.Application):
             icon_info = icon_theme.lookup_icon("io.github.fastrizwaan.WineCharm", None, 48, 1, Gtk.TextDirection.NONE, Gtk.IconLookupFlags.NONE)
             if icon_info:
                 print(f"[DEBUG] WineCharm icon loaded from: {icon_info.get_file().get_path()}")
-            self.app_icon_path = None
         else:
             print("[DEBUG] WineCharm icon NOT found in icon theme")
-            icon_file_path = self.get_app_icon_file_path("io.github.fastrizwaan.WineCharm")
-            if icon_file_path:
-                print(f"[DEBUG] Found app icon file at: {icon_file_path}")
-                self.app_icon_path = str(icon_file_path)
-            else:
-                self.app_icon_path = None
+            if self.app_icon_path:
+                print(f"[DEBUG] Found app icon file at: {self.app_icon_path}")
 
         self.create_main_window()
         # Clear or initialize the script list
