@@ -15,6 +15,8 @@ Usage:
   $0 update-all
   $0 mt-fill [lang]
   $0 mt-fill-all
+  $0 fix-placeholders [lang]
+  $0 fix-placeholders-all
   $0 qa [lang]
   $0 qa-all
   $0 compile <lang>
@@ -98,6 +100,17 @@ qa_all() {
     python3 scripts/i18n_qa.py --all
 }
 
+fix_placeholders_lang() {
+    require_cmd python3
+    lang="$1"
+    python3 scripts/i18n_fix_placeholders.py --lang "$lang"
+}
+
+fix_placeholders_all() {
+    require_cmd python3
+    python3 scripts/i18n_fix_placeholders.py --all
+}
+
 compile_lang() {
     require_cmd msgfmt
     lang="$1"
@@ -150,6 +163,13 @@ case "$cmd" in
         ;;
     qa-all)
         qa_all
+        ;;
+    fix-placeholders)
+        [ $# -eq 2 ] || { usage; exit 1; }
+        fix_placeholders_lang "$2"
+        ;;
+    fix-placeholders-all)
+        fix_placeholders_all
         ;;
     compile)
         [ $# -eq 2 ] || { usage; exit 1; }

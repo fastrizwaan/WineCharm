@@ -27,7 +27,7 @@ msgstr ""
 msgid ""
 "The game directory for '%s' is already in the Wine prefix. No action is "
 "needed."
-msgstr ""
+msgstr "The game directory for '%s' is already in the Wine prefix. No action is needed."
 
 #: src/winecharm/import_game_dir.py:55 src/winecharm/backup.py:592
 #, fuzzy
@@ -50,7 +50,7 @@ msgstr ""
 #: src/winecharm/import_wine_dir.py:119
 #, python-format
 msgid "Importing %(name)s"
-msgstr ""
+msgstr "Importing %(name)s"
 
 #: src/winecharm/import_game_dir.py:91
 #, fuzzy
@@ -159,7 +159,7 @@ msgstr "Argumentfout"
 #: src/winecharm/winecharm.py:1345
 #, fuzzy, python-format
 msgid "Invalid arguments: %s"
-msgstr "Ongeldige omgevingsvariabelen"
+msgstr "Invalid arguments: %s"
 
 #: src/winecharm/winecharm.py:1346 src/winecharm/winecharm.py:1404
 msgid "Launch Failed"
@@ -177,7 +177,7 @@ msgstr "Runner ophalen mislukt. Fout: %s"
 #: src/winecharm/winecharm.py:1435 src/winecharm/runner_manager.py:547
 #, python-format
 msgid "Wineboot failed (code %(code)d): %(stderr)s"
-msgstr ""
+msgstr "Wineboot failed (code %(code)d): %(stderr)s"
 
 #: src/winecharm/winecharm.py:1437 src/winecharm/winecharm.py:1441
 #: src/winecharm/runner_manager.py:551 src/winecharm/runner_manager.py:555
@@ -212,9 +212,7 @@ msgstr "Pad kopiëren naar klembord"
 msgid ""
 "Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You "
 "provided: %s"
-msgstr ""
-"Alleen .exe-, .msi-, .charm-, .bottle-, .prefix- of .wzt-bestanden zijn "
-"toegestaan."
+msgstr "Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You provided: %s"
 
 #: src/winecharm/winecharm.py:2705
 msgid "Invalid file type:"
@@ -280,7 +278,7 @@ msgstr ""
 #: src/winecharm/create_script.py:97
 #, python-format
 msgid "Template '%(old)s' has been deleted, using '%(new)s'."
-msgstr ""
+msgstr "Template '%(old)s' has been deleted, using '%(new)s'."
 
 #: src/winecharm/wcterm.py:17
 msgid "WCTerm"
@@ -416,7 +414,7 @@ msgstr "Onbekend (map niet gevonden)"
 #: src/winecharm/winezgui_importer.py:29
 #, python-format
 msgid "WineZGUI prefixes directory not found: %s"
-msgstr ""
+msgstr "WineZGUI prefixes directory not found: %s"
 
 #: src/winecharm/winezgui_importer.py:39
 #, fuzzy
@@ -435,7 +433,7 @@ msgstr "Verwerken"
 #: src/winecharm/winezgui_importer.py:55
 #, python-format
 msgid "Created %d .charm files from WineZGUI scripts."
-msgstr ""
+msgstr "Created %d .charm files from WineZGUI scripts."
 
 #: src/winecharm/template_manager.py:39
 msgid "Initializing wineprefix"
@@ -458,7 +456,7 @@ msgstr "Componenten installeren"
 #: src/winecharm/template_manager.py:63
 #, python-format
 msgid "Initializing %(name)s Template..."
-msgstr ""
+msgstr "Initializing %(name)s Template..."
 
 #: src/winecharm/template_manager.py:124 src/winecharm/template_manager.py:125
 #, fuzzy
@@ -537,12 +535,12 @@ msgid ""
 "Set default template to:\n"
 "%(template)s\n"
 "Architecture: %(arch)s"
-msgstr ""
+msgstr "Set default template to:\n%(template)s\nArchitecture: %(arch)s"
 
 #: src/winecharm/template_manager.py:399
 #, fuzzy
 msgid "No templates found to delete."
-msgstr "Geen resultaten gevonden voor zoekterm: {term}"
+msgstr "No templates found to delete."
 
 #: src/winecharm/template_manager.py:404
 #, fuzzy
@@ -568,7 +566,7 @@ msgstr ""
 msgid ""
 "Cannot delete the active / default %s template!\n"
 "Switch architectures / template first to delete this template."
-msgstr ""
+msgstr "Cannot delete the active / default %s template!\nSwitch architectures / template first to delete this template."
 
 #: src/winecharm/template_manager.py:447
 #, fuzzy
@@ -578,12 +576,12 @@ msgstr "Verwijderen"
 #: src/winecharm/template_manager.py:447
 #, python-format
 msgid "Removed: %s"
-msgstr ""
+msgstr "Removed: %s"
 
 #: src/winecharm/template_manager.py:449
 #, python-format
 msgid "Deletion failed: %s"
-msgstr ""
+msgstr "Deletion failed: %s"
 
 #: src/winecharm/template_manager.py:453
 #, fuzzy
@@ -595,7 +593,7 @@ msgstr "Herstellen bevestigen"
 msgid ""
 "Permanently delete:\n"
 "%(name)s?"
-msgstr ""
+msgstr "Permanently delete:\n%(name)s?"
 
 #: src/winecharm/template_manager.py:456
 msgid "Keep"
@@ -643,7 +641,7 @@ msgstr ""
 #: src/winecharm/template_manager.py:501
 #, python-format
 msgid "Importing %s"
-msgstr ""
+msgstr "Importing %s"
 
 #: src/winecharm/template_manager.py:525 src/winecharm/runner_manager.py:1336
 msgid "Success"
@@ -652,7 +650,7 @@ msgstr ""
 #: src/winecharm/template_manager.py:526
 #, python-format
 msgid "Template '%s' imported successfully"
-msgstr ""
+msgstr "Template '%s' imported successfully"
 
 #: src/winecharm/template_manager.py:567
 #, fuzzy
@@ -684,7 +682,7 @@ msgstr ""
 #: src/winecharm/template_manager.py:672 src/winecharm/backup.py:432
 #, python-format
 msgid "Replace \"%s\" with '~' in files"
-msgstr ""
+msgstr "Replace \"%s\" with '~' in files"
 
 #: src/winecharm/template_manager.py:673 src/winecharm/backup.py:162
 #: src/winecharm/backup.py:433
@@ -694,7 +692,7 @@ msgstr ""
 #: src/winecharm/template_manager.py:674 src/winecharm/backup.py:434
 #, python-format
 msgid "Replace \"/media/%s\" with '/media/%%USERNAME%%' in files"
-msgstr ""
+msgstr "Replace \"/media/%s\" with '/media/%%USERNAME%%' in files"
 
 #: src/winecharm/template_manager.py:675 src/winecharm/backup.py:163
 msgid "Creating backup archive"
@@ -708,18 +706,18 @@ msgstr ""
 #: src/winecharm/template_manager.py:676 src/winecharm/backup.py:438
 #, python-format
 msgid "Revert %%USERNAME%% with \"%s\" in script files"
-msgstr ""
+msgstr "Revert %%USERNAME%% with \"%s\" in script files"
 
 #: src/winecharm/template_manager.py:699 src/winecharm/backup.py:187
 #: src/winecharm/backup.py:486
 #, python-format
 msgid "Error during '%(step)s': %(error)s"
-msgstr ""
+msgstr "Error during '%(step)s': %(error)s"
 
 #: src/winecharm/template_manager.py:709
 #, python-format
 msgid "Template saved to %s"
-msgstr ""
+msgstr "Template saved to %s"
 
 #: src/winecharm/template_manager.py:767 src/winecharm/backup.py:150
 msgid "Exporting..."
@@ -758,17 +756,17 @@ msgstr "Herstellen voltooid"
 #: src/winecharm/template_manager.py:900 src/winecharm/restore.py:213
 #, python-format
 msgid "Failed during step '%(step)s': %(error)s"
-msgstr ""
+msgstr "Failed during step '%(step)s': %(error)s"
 
 #: src/winecharm/template_manager.py:921
 #, python-format
 msgid "Template restore failed: %s"
-msgstr ""
+msgstr "Template restore failed: %s"
 
 #: src/winecharm/template_manager.py:928
 #, fuzzy, python-format
 msgid "Failed to start template restore: %s"
-msgstr "Mappen opslaan mislukt: {}"
+msgstr "Failed to start template restore: %s"
 
 #: src/winecharm/template_manager.py:1063
 msgid "Insufficient Space"
@@ -777,7 +775,7 @@ msgstr ""
 #: src/winecharm/template_manager.py:1064
 #, python-format
 msgid "Need %(need).1fMB, only %(avail).1fMB available."
-msgstr ""
+msgstr "Need %(need).1fMB, only %(avail).1fMB available."
 
 #: src/winecharm/template_manager.py:1096
 msgid "No templates found to clone."
@@ -820,7 +818,7 @@ msgstr ""
 #: src/winecharm/template_manager.py:1194
 #, python-format
 msgid "Successfully cloned to %s"
-msgstr ""
+msgstr "Successfully cloned to %s"
 
 #: src/winecharm/template_manager.py:1199
 #, fuzzy
@@ -830,7 +828,7 @@ msgstr "Aanmaakfout"
 #: src/winecharm/template_manager.py:1200
 #, fuzzy, python-format
 msgid "An error occurred: %s"
-msgstr "Er is een fout opgetreden: {e}"
+msgstr "An error occurred: %s"
 
 #: src/winecharm/template_manager.py:1209
 #, fuzzy
@@ -1522,7 +1520,7 @@ msgstr "Prefix bijwerken mislukt"
 #: src/winecharm/runner_manager.py:239 src/winecharm/backup.py:548
 #, python-format
 msgid "%s"
-msgstr ""
+msgstr "%s"
 
 #: src/winecharm/runner_manager.py:324 src/winecharm/runner_manager.py:1003
 #: src/winecharm/runner_manager.py:1072
@@ -1562,12 +1560,12 @@ msgid ""
 "\n"
 "Template: %(template)s (%(tarch)s)\n"
 "Runner: %(runner)s (%(rarch)s)"
-msgstr ""
+msgstr "Cannot use 32-bit runner with 64-bit template.\n\nTemplate: %(template)s (%(tarch)s)\nRunner: %(runner)s (%(rarch)s)"
 
 #: src/winecharm/runner_manager.py:507
 #, python-format
 msgid "The default runner has been set to %s"
-msgstr ""
+msgstr "The default runner has been set to %s"
 
 #: src/winecharm/runner_manager.py:510
 msgid "Default Runner Updated"
@@ -1581,12 +1579,12 @@ msgstr "Herstellen voltooid"
 #: src/winecharm/runner_manager.py:539
 #, python-format
 msgid "Updated Wine prefix for %(runner)s at %(prefix)s"
-msgstr ""
+msgstr "Updated Wine prefix for %(runner)s at %(prefix)s"
 
 #: src/winecharm/runner_manager.py:554
 #, fuzzy, python-format
 msgid "Wineboot error: %(error)s"
-msgstr "Wineboot-fout"
+msgstr "Wineboot error: %(error)s"
 
 #: src/winecharm/runner_manager.py:563
 msgid "Run Wineboot?"
@@ -1597,7 +1595,7 @@ msgstr ""
 msgid ""
 "Do you want to run wineboot to update the Wine prefix for %(runner)s at "
 "%(prefix)s?"
-msgstr ""
+msgstr "Do you want to run wineboot to update the Wine prefix for %(runner)s at %(prefix)s?"
 
 #: src/winecharm/runner_manager.py:725
 msgid "Runner data not available"
@@ -1662,7 +1660,7 @@ msgstr "Verwijderingsfout"
 #: src/winecharm/runner_manager.py:894
 #, fuzzy, python-format
 msgid "Failed to download %(runner)s: %(error)s"
-msgstr "Runner ophalen mislukt. Fout: %s"
+msgstr "Failed to download %(runner)s: %(error)s"
 
 #: src/winecharm/runner_manager.py:923
 msgid "Download Cancelled"
@@ -1682,8 +1680,8 @@ msgstr "Back-up voltooid"
 #, fuzzy, python-format
 msgid "Successfully downloaded %(count)d runner."
 msgid_plural "Successfully downloaded %(count)d runners."
-msgstr[0] "{count} bureaubladsnelkoppeling(en) succesvol verwijderd"
-msgstr[1] "{count} bureaubladsnelkoppeling(en) succesvol verwijderd"
+msgstr[0] "Successfully downloaded %(count)d runner."
+msgstr[1] "Successfully downloaded %(count)d runners."
 
 #: src/winecharm/runner_manager.py:938
 #, fuzzy
@@ -1715,7 +1713,7 @@ msgstr ""
 #: src/winecharm/runner_manager.py:1048
 #, python-format
 msgid "Runner '%s' was successfully deleted."
-msgstr ""
+msgstr "Runner '%s' was successfully deleted."
 
 #: src/winecharm/runner_manager.py:1055
 #, fuzzy, python-format
@@ -1762,7 +1760,7 @@ msgstr ""
 #: src/winecharm/runner_manager.py:1144
 #, python-format
 msgid "Runner backup saved to %s."
-msgstr ""
+msgstr "Runner backup saved to %s."
 
 #: src/winecharm/runner_manager.py:1194
 #, fuzzy
@@ -1825,14 +1823,14 @@ msgstr ""
 #: src/winecharm/runner_manager.py:1337
 #, python-format
 msgid "Runner '%s' imported successfully"
-msgstr ""
+msgstr "Runner '%s' imported successfully"
 
 #: src/winecharm/runner_manager.py:1386
 #, python-format
 msgid ""
 "\n"
 "Cleanup error: %s"
-msgstr ""
+msgstr "\nCleanup error: %s"
 
 #: src/winecharm/runner_manager.py:1388
 #, fuzzy
@@ -1867,12 +1865,12 @@ msgstr ""
 #: src/winecharm/restore.py:232
 #, fuzzy, python-format
 msgid "Restore failed: %s"
-msgstr "Herstellen mislukt"
+msgstr "Restore failed: %s"
 
 #: src/winecharm/restore.py:241
 #, fuzzy, python-format
 msgid "Failed to start restore: %s"
-msgstr "Mappen opslaan mislukt: {}"
+msgstr "Failed to start restore: %s"
 
 #: src/winecharm/restore.py:251
 msgid "Checking Uncompressed Size"
@@ -1939,7 +1937,7 @@ msgstr ""
 msgid ""
 "The estimated required space is %(need).2f MB, but only %(avail).2f MB is "
 "available. Please free up space."
-msgstr ""
+msgstr "The estimated required space is %(need).2f MB, but only %(avail).2f MB is available. Please free up space."
 
 #: src/winecharm/restore.py:957
 msgid "Cancel Restoring Backup?"
@@ -1963,7 +1961,7 @@ msgstr ""
 #: src/winecharm/restore.py:983 src/winecharm/restore.py:985
 #, python-format
 msgid "Error during cleanup: %s"
-msgstr ""
+msgstr "Error during cleanup: %s"
 
 #: src/winecharm/import_wine_dir.py:134
 #, fuzzy
@@ -1995,12 +1993,12 @@ msgstr "📥 Wine-map importeren"
 #: src/winecharm/import_wine_dir.py:191
 #, python-format
 msgid "An error occurred during '%(step)s': %(error)s"
-msgstr ""
+msgstr "An error occurred during '%(step)s': %(error)s"
 
 #: src/winecharm/import_wine_dir.py:210
 #, python-format
 msgid "Import failed: %s"
-msgstr ""
+msgstr "Import failed: %s"
 
 #: src/winecharm/import_wine_dir.py:267
 msgid "Overwrite Existing Directory?"
@@ -2009,7 +2007,7 @@ msgstr ""
 #: src/winecharm/import_wine_dir.py:268
 #, python-format
 msgid "The directory %(name)s already exists. Do you want to overwrite it?"
-msgstr ""
+msgstr "The directory %(name)s already exists. Do you want to overwrite it?"
 
 #: src/winecharm/import_wine_dir.py:274
 msgid "Overwrite"
@@ -2018,7 +2016,7 @@ msgstr ""
 #: src/winecharm/import_wine_dir.py:305
 #, fuzzy, python-format
 msgid "Could not delete directory: %s"
-msgstr "Kan de drive_c-map niet selecteren"
+msgstr "Could not delete directory: %s"
 
 #: src/winecharm/import_wine_dir.py:333
 #, fuzzy
@@ -2039,7 +2037,7 @@ msgid ""
 "Wine directory import was cancelled but encountered errors during cleanup: "
 "%(error)s\n"
 "Backup directory may still exist at: %(backup)s"
-msgstr ""
+msgstr "Wine directory import was cancelled but encountered errors during cleanup: %(error)s\nBackup directory may still exist at: %(backup)s"
 
 #: src/winecharm/import_wine_dir.py:390 src/winecharm/import_wine_dir.py:448
 msgid "Wine directory import was cancelled"
@@ -2048,17 +2046,17 @@ msgstr ""
 #: src/winecharm/import_wine_dir.py:407
 #, python-format
 msgid "Error during error cleanup: %s"
-msgstr ""
+msgstr "Error during error cleanup: %s"
 
 #: src/winecharm/import_wine_dir.py:409
 #, python-format
 msgid "Additional error during cleanup: %s"
-msgstr ""
+msgstr "Additional error during cleanup: %s"
 
 #: src/winecharm/import_wine_dir.py:413
 #, python-format
 msgid "Backup directory may still exist at: %s"
-msgstr ""
+msgstr "Backup directory may still exist at: %s"
 
 #: src/winecharm/import_wine_dir.py:467
 msgid "Importing..."
@@ -2092,12 +2090,12 @@ msgstr ""
 #: src/winecharm/backup.py:116
 #, fuzzy, python-format
 msgid "Backup saved to %s"
-msgstr "Back-up mislukt"
+msgstr "Backup saved to %s"
 
 #: src/winecharm/backup.py:161
 #, python-format
 msgid "Replace \"%s\" with '~' in script files"
-msgstr ""
+msgstr "Replace \"%s\" with '~' in script files"
 
 #: src/winecharm/backup.py:286
 #, fuzzy
@@ -2151,7 +2149,7 @@ msgstr "Snelkoppelingen aangemaakt"
 msgid ""
 "Not Mounted or Deleted?\n"
 "%s"
-msgstr ""
+msgstr "Not Mounted or Deleted?\n%s"
 
 #: src/winecharm/backup.py:620
 #, fuzzy
@@ -2161,7 +2159,7 @@ msgstr "Spelmap importeren"
 #: src/winecharm/backup.py:621
 #, python-format
 msgid "The game directory size is %(size)sGB. Do you want to continue?"
-msgstr ""
+msgstr "The game directory size is %(size)sGB. Do you want to continue?"
 
 #: src/winecharm/backup.py:869
 msgid "Bottle creation was cancelled"

@@ -240,6 +240,7 @@ Use:
 ./scripts/i18n.sh extract
 ./scripts/i18n.sh update-all
 ./scripts/i18n.sh mt-fill-all
+./scripts/i18n.sh fix-placeholders-all
 ./scripts/i18n.sh qa-all
 ./scripts/i18n.sh compile-all
 ```

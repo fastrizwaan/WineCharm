@@ -15,7 +15,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\\n\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\\n"
 
 #: src/winecharm/import_game_dir.py:48
 msgid "Game Directory Already Exists"
@@ -50,7 +50,7 @@ msgstr "لا توجد مساحة كافية لاستيراد دليل اللعب
 #: src/winecharm/import_wine_dir.py:119
 #, fuzzy, python-format
 msgid "Importing %(name)s"
-msgstr "Importing %s"
+msgstr "جار استيراد %(name)s"
 
 #: src/winecharm/import_game_dir.py:91
 msgid "Copying Game Directory"
@@ -157,7 +157,7 @@ msgstr "خطأ في الوسائط"
 #: src/winecharm/winecharm.py:1345
 #, fuzzy, python-format
 msgid "Invalid arguments: %s"
-msgstr "اسم غير صالح"
+msgstr "Invalid arguments: %s"
 
 #: src/winecharm/winecharm.py:1346 src/winecharm/winecharm.py:1404
 msgid "Launch Failed"
@@ -208,7 +208,7 @@ msgstr "نسخ إلى الحافظة"
 msgid ""
 "Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You "
 "provided: %s"
-msgstr "يُسمح فقط بملفات ‎.exe و‎.msi و‎.charm و‎.bottle و‎.prefix و‎.wzt."
+msgstr "Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You provided: %s"
 
 #: src/winecharm/winecharm.py:2705
 msgid "Invalid file type:"
@@ -228,11 +228,11 @@ msgstr "حدد المعمارية الافتراضية للبوادئ الجدي
 
 #: src/winecharm/set_wine_arch.py:31 src/winecharm/template_manager.py:1219
 msgid "32-bit (win32)"
-msgstr ""
+msgstr "32 بت (win32)"
 
 #: src/winecharm/set_wine_arch.py:32 src/winecharm/template_manager.py:1220
 msgid "64-bit (win64)"
-msgstr ""
+msgstr "64 بت (win64)"
 
 #: src/winecharm/set_wine_arch.py:46 src/winecharm/save_load_users_dir.py:29
 #: src/winecharm/save_load_users_dir.py:275
@@ -275,15 +275,15 @@ msgstr "Template '%(old)s' has been deleted, using '%(new)s'."
 
 #: src/winecharm/wcterm.py:17
 msgid "WCTerm"
-msgstr ""
+msgstr "WCTerm"
 
 #: src/winecharm/wcterm.py:76
 msgid "Copy"
-msgstr ""
+msgstr "نسخ"
 
 #: src/winecharm/wcterm.py:81
 msgid "Paste"
-msgstr ""
+msgstr "لصق"
 
 #: src/winecharm/save_load_users_dir.py:26
 msgid "Select Directories to Backup"
@@ -444,12 +444,12 @@ msgstr "جار تثبيت OpenAL"
 #: src/winecharm/template_manager.py:63
 #, fuzzy, python-format
 msgid "Initializing %(name)s Template..."
-msgstr "جار تهيئة بادئة Wine"
+msgstr "Initializing %(name)s Template..."
 
 #: src/winecharm/template_manager.py:124 src/winecharm/template_manager.py:125
 #, fuzzy
 msgid "Initialization Complete!"
-msgstr "اكتمل التثبيت"
+msgstr "اكتملت التهيئة!"
 
 #: src/winecharm/template_manager.py:135 src/winecharm/ui.py:541
 msgid "Processing..."
@@ -584,7 +584,7 @@ msgstr "تأكيد الحذف"
 msgid ""
 "Permanently delete:\n"
 "%(name)s?"
-msgstr ""
+msgstr "Permanently delete:\n%(name)s?"
 
 #: src/winecharm/template_manager.py:456
 msgid "Keep"
@@ -707,7 +707,7 @@ msgstr "Template saved to %s"
 
 #: src/winecharm/template_manager.py:767 src/winecharm/backup.py:150
 msgid "Exporting..."
-msgstr ""
+msgstr "جار التصدير..."
 
 #: src/winecharm/template_manager.py:782 src/winecharm/template_manager.py:786
 #: src/winecharm/backup.py:303 src/winecharm/backup.py:308
@@ -1396,7 +1396,7 @@ msgstr "Step {current}/{total}"
 
 #: src/winecharm/settings.py:84
 msgid "Settings"
-msgstr ""
+msgstr "الإعدادات"
 
 #: src/winecharm/settings.py:125
 #, fuzzy
@@ -1490,7 +1490,7 @@ msgstr "Select a runner for the script:"
 #: src/winecharm/runner_manager.py:198 src/winecharm/runner_manager.py:330
 #: src/winecharm/runner_manager.py:404
 msgid "Download Runner"
-msgstr "Download Runner"
+msgstr "تنزيل المشغل"
 
 #: src/winecharm/runner_manager.py:239
 msgid "Update Failed"
@@ -1597,27 +1597,27 @@ msgstr "Select the runners you wish to download."
 
 #: src/winecharm/runner_manager.py:744
 msgid "Wine Proton"
-msgstr ""
+msgstr "Wine Proton"
 
 #: src/winecharm/runner_manager.py:745
 msgid "Wine Stable"
-msgstr ""
+msgstr "Wine Stable"
 
 #: src/winecharm/runner_manager.py:746
 msgid "Wine Devel"
-msgstr ""
+msgstr "Wine Devel"
 
 #: src/winecharm/runner_manager.py:747
 msgid "Wine-tkg"
-msgstr ""
+msgstr "Wine-tkg"
 
 #: src/winecharm/runner_manager.py:748
 msgid "Wine-WoW64"
-msgstr ""
+msgstr "Wine-WoW64"
 
 #: src/winecharm/runner_manager.py:757
 msgid "Choose..."
-msgstr ""
+msgstr "اختر..."
 
 #: src/winecharm/runner_manager.py:769
 msgid "Download"
@@ -1841,68 +1841,68 @@ msgstr "Failed to start restore: %s"
 
 #: src/winecharm/restore.py:251
 msgid "Checking Uncompressed Size"
-msgstr ""
+msgstr "جار التحقق من الحجم بعد فك الضغط"
 
 #: src/winecharm/restore.py:252
 #, fuzzy
 msgid "Extracting Backup File"
-msgstr "Creating backup archive"
+msgstr "جار استخراج ملف النسخ الاحتياطي"
 
 #: src/winecharm/restore.py:253
 #, fuzzy
 msgid "Processing Registry Files"
-msgstr "Processing registry files"
+msgstr "جار معالجة ملفات السجل"
 
 #: src/winecharm/restore.py:254 src/winecharm/import_wine_dir.py:157
 msgid "Performing Replacements"
-msgstr "Performing Replacements"
+msgstr "جار تنفيذ الاستبدالات"
 
 #: src/winecharm/restore.py:255 src/winecharm/restore.py:271
 #, fuzzy
 msgid "Replacing Symbolic Links with Directories"
-msgstr "Replace symbolic links with directories"
+msgstr "جار استبدال الروابط الرمزية بمجلدات"
 
 #: src/winecharm/restore.py:256
 #, fuzzy
 msgid "Renaming and merging user directories"
-msgstr "Renaming and Merging User Directories"
+msgstr "جار إعادة تسمية ودمج مجلدات المستخدم"
 
 #: src/winecharm/restore.py:257
 msgid "Add Shortcuts to Script List"
-msgstr ""
+msgstr "إضافة الاختصارات إلى قائمة السكربتات"
 
 #: src/winecharm/restore.py:258 src/winecharm/restore.py:274
 #: src/winecharm/import_wine_dir.py:161
 msgid "Create Wineboot Required file"
-msgstr "Create Wineboot Required file"
+msgstr "إنشاء ملف Wineboot المطلوب"
 
 #: src/winecharm/restore.py:267
 #, fuzzy
 msgid "Checking Disk Space"
-msgstr "مساحة القرص غير كافية"
+msgstr "جار التحقق من مساحة القرص"
 
 #: src/winecharm/restore.py:268
 #, fuzzy
 msgid "Extracting WZT Backup File"
-msgstr "Creating backup archive"
+msgstr "جار استخراج ملف النسخ الاحتياطي WZT"
 
 #: src/winecharm/restore.py:269
 #, fuzzy
 msgid "Performing User Related Replacements"
-msgstr "Performing Replacements"
+msgstr "جار تنفيذ الاستبدالات المتعلقة بالمستخدم"
 
 #: src/winecharm/restore.py:270
 #, fuzzy
 msgid "Processing WineZGUI Script Files"
-msgstr "📥 Import WineZGUI Scripts..."
+msgstr "جار معالجة ملفات سكربت WineZGUI"
 
 #: src/winecharm/restore.py:272 src/winecharm/import_wine_dir.py:158
 msgid "Renaming and Merging User Directories"
-msgstr "Renaming and Merging User Directories"
+msgstr "جار إعادة تسمية ودمج مجلدات المستخدم"
 
 #: src/winecharm/restore.py:273
 msgid "Search LNK Files and Append to Found List"
-msgstr ""
+msgstr "البحث عن ملفات LNK وإضافتها إلى القائمة"
 
 #: src/winecharm/restore.py:888
 #, python-format
@@ -1982,7 +1982,7 @@ msgstr "Backing up existing directory"
 #: src/winecharm/import_wine_dir.py:268
 #, python-format
 msgid "The directory %(name)s already exists. Do you want to overwrite it?"
-msgstr ""
+msgstr "The directory %(name)s already exists. Do you want to overwrite it?"
 
 #: src/winecharm/import_wine_dir.py:274
 msgid "Overwrite"
@@ -2039,7 +2039,7 @@ msgstr "Backup directory may still exist at: %s"
 #: src/winecharm/import_wine_dir.py:467
 #, fuzzy
 msgid "Importing..."
-msgstr "Importing %s"
+msgstr "جار الاستيراد..."
 
 #: src/winecharm/single_prefix.py:15
 msgid ""
@@ -2052,7 +2052,7 @@ msgstr ""
 #: src/winecharm/single_prefix.py:22
 #, fuzzy
 msgid "Multiple Prefix Mode"
-msgstr "وضع البادئة الواحدة"
+msgstr "وضع البوادئ المتعددة"
 
 #: src/winecharm/single_prefix.py:36
 msgid "Apply"
@@ -2092,7 +2092,7 @@ msgstr "Do you want to cancel the backup process?"
 
 #: src/winecharm/backup.py:352
 msgid "Bottling..."
-msgstr ""
+msgstr "جار إنشاء الحزمة..."
 
 #: src/winecharm/backup.py:429
 msgid "Creating Bottle archive"
@@ -2138,7 +2138,7 @@ msgstr "Large Game Directory"
 #: src/winecharm/backup.py:621
 #, python-format
 msgid "The game directory size is %(size)sGB. Do you want to continue?"
-msgstr ""
+msgstr "The game directory size is %(size)sGB. Do you want to continue?"
 
 #: src/winecharm/backup.py:869
 msgid "Bottle creation was cancelled"

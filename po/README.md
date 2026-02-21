@@ -35,11 +35,17 @@ WineCharm uses GNU gettext.
    # or all locales
    ./scripts/i18n.sh qa-all
    ```
-6. Compile:
+6. Fix placeholder issues (if QA reports them):
+   ```sh
+   ./scripts/i18n.sh fix-placeholders de
+   # or all locales
+   ./scripts/i18n.sh fix-placeholders-all
+   ```
+7. Compile:
    ```sh
    ./scripts/i18n.sh compile de
    ```
-7. Test:
+8. Test:
    ```sh
    LANGUAGE=de winecharm
    ```

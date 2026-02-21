@@ -15,7 +15,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\\n\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\\n"
 
 #: src/winecharm/import_game_dir.py:48
 msgid "Game Directory Already Exists"
@@ -50,7 +50,7 @@ msgstr "没有足够的空间来导入游戏目录。"
 #: src/winecharm/import_wine_dir.py:119
 #, fuzzy, python-format
 msgid "Importing %(name)s"
-msgstr "Importing %s"
+msgstr "正在导入 %(name)s"
 
 #: src/winecharm/import_game_dir.py:91
 msgid "Copying Game Directory"
@@ -157,7 +157,7 @@ msgstr "参数错误"
 #: src/winecharm/winecharm.py:1345
 #, fuzzy, python-format
 msgid "Invalid arguments: %s"
-msgstr "名称无效"
+msgstr "Invalid arguments: %s"
 
 #: src/winecharm/winecharm.py:1346 src/winecharm/winecharm.py:1404
 msgid "Launch Failed"
@@ -208,7 +208,7 @@ msgstr "复制到剪贴板"
 msgid ""
 "Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You "
 "provided: %s"
-msgstr "仅允许 .exe、.msi、.charm、.bottle、.prefix 或 .wzt 文件。"
+msgstr "Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You provided: %s"
 
 #: src/winecharm/winecharm.py:2705
 msgid "Invalid file type:"
@@ -228,11 +228,11 @@ msgstr "请选择新前缀的默认架构："
 
 #: src/winecharm/set_wine_arch.py:31 src/winecharm/template_manager.py:1219
 msgid "32-bit (win32)"
-msgstr ""
+msgstr "32 位 (win32)"
 
 #: src/winecharm/set_wine_arch.py:32 src/winecharm/template_manager.py:1220
 msgid "64-bit (win64)"
-msgstr ""
+msgstr "64 位 (win64)"
 
 #: src/winecharm/set_wine_arch.py:46 src/winecharm/save_load_users_dir.py:29
 #: src/winecharm/save_load_users_dir.py:275
@@ -275,15 +275,15 @@ msgstr "Template '%(old)s' has been deleted, using '%(new)s'."
 
 #: src/winecharm/wcterm.py:17
 msgid "WCTerm"
-msgstr ""
+msgstr "WCTerm"
 
 #: src/winecharm/wcterm.py:76
 msgid "Copy"
-msgstr ""
+msgstr "复制"
 
 #: src/winecharm/wcterm.py:81
 msgid "Paste"
-msgstr ""
+msgstr "粘贴"
 
 #: src/winecharm/save_load_users_dir.py:26
 msgid "Select Directories to Backup"
@@ -444,12 +444,12 @@ msgstr "正在安装 OpenAL"
 #: src/winecharm/template_manager.py:63
 #, fuzzy, python-format
 msgid "Initializing %(name)s Template..."
-msgstr "正在初始化 Wine 前缀"
+msgstr "Initializing %(name)s Template..."
 
 #: src/winecharm/template_manager.py:124 src/winecharm/template_manager.py:125
 #, fuzzy
 msgid "Initialization Complete!"
-msgstr "安装完成"
+msgstr "初始化完成！"
 
 #: src/winecharm/template_manager.py:135 src/winecharm/ui.py:541
 msgid "Processing..."
@@ -584,7 +584,7 @@ msgstr "确认删除"
 msgid ""
 "Permanently delete:\n"
 "%(name)s?"
-msgstr ""
+msgstr "Permanently delete:\n%(name)s?"
 
 #: src/winecharm/template_manager.py:456
 msgid "Keep"
@@ -707,7 +707,7 @@ msgstr "Template saved to %s"
 
 #: src/winecharm/template_manager.py:767 src/winecharm/backup.py:150
 msgid "Exporting..."
-msgstr ""
+msgstr "正在导出..."
 
 #: src/winecharm/template_manager.py:782 src/winecharm/template_manager.py:786
 #: src/winecharm/backup.py:303 src/winecharm/backup.py:308
@@ -1396,7 +1396,7 @@ msgstr "Step {current}/{total}"
 
 #: src/winecharm/settings.py:84
 msgid "Settings"
-msgstr ""
+msgstr "设置"
 
 #: src/winecharm/settings.py:125
 #, fuzzy
@@ -1490,7 +1490,7 @@ msgstr "Select a runner for the script:"
 #: src/winecharm/runner_manager.py:198 src/winecharm/runner_manager.py:330
 #: src/winecharm/runner_manager.py:404
 msgid "Download Runner"
-msgstr "Download Runner"
+msgstr "下载运行器"
 
 #: src/winecharm/runner_manager.py:239
 msgid "Update Failed"
@@ -1597,27 +1597,27 @@ msgstr "Select the runners you wish to download."
 
 #: src/winecharm/runner_manager.py:744
 msgid "Wine Proton"
-msgstr ""
+msgstr "Wine Proton"
 
 #: src/winecharm/runner_manager.py:745
 msgid "Wine Stable"
-msgstr ""
+msgstr "Wine Stable"
 
 #: src/winecharm/runner_manager.py:746
 msgid "Wine Devel"
-msgstr ""
+msgstr "Wine Devel"
 
 #: src/winecharm/runner_manager.py:747
 msgid "Wine-tkg"
-msgstr ""
+msgstr "Wine-tkg"
 
 #: src/winecharm/runner_manager.py:748
 msgid "Wine-WoW64"
-msgstr ""
+msgstr "Wine-WoW64"
 
 #: src/winecharm/runner_manager.py:757
 msgid "Choose..."
-msgstr ""
+msgstr "选择..."
 
 #: src/winecharm/runner_manager.py:769
 msgid "Download"
@@ -1841,68 +1841,68 @@ msgstr "Failed to start restore: %s"
 
 #: src/winecharm/restore.py:251
 msgid "Checking Uncompressed Size"
-msgstr ""
+msgstr "正在检查解压后大小"
 
 #: src/winecharm/restore.py:252
 #, fuzzy
 msgid "Extracting Backup File"
-msgstr "Creating backup archive"
+msgstr "正在解压备份文件"
 
 #: src/winecharm/restore.py:253
 #, fuzzy
 msgid "Processing Registry Files"
-msgstr "Processing registry files"
+msgstr "正在处理注册表文件"
 
 #: src/winecharm/restore.py:254 src/winecharm/import_wine_dir.py:157
 msgid "Performing Replacements"
-msgstr "Performing Replacements"
+msgstr "正在执行替换"
 
 #: src/winecharm/restore.py:255 src/winecharm/restore.py:271
 #, fuzzy
 msgid "Replacing Symbolic Links with Directories"
-msgstr "Replace symbolic links with directories"
+msgstr "正在将符号链接替换为目录"
 
 #: src/winecharm/restore.py:256
 #, fuzzy
 msgid "Renaming and merging user directories"
-msgstr "Renaming and Merging User Directories"
+msgstr "正在重命名并合并用户目录"
 
 #: src/winecharm/restore.py:257
 msgid "Add Shortcuts to Script List"
-msgstr ""
+msgstr "将快捷方式添加到脚本列表"
 
 #: src/winecharm/restore.py:258 src/winecharm/restore.py:274
 #: src/winecharm/import_wine_dir.py:161
 msgid "Create Wineboot Required file"
-msgstr "Create Wineboot Required file"
+msgstr "创建 Wineboot 所需文件"
 
 #: src/winecharm/restore.py:267
 #, fuzzy
 msgid "Checking Disk Space"
-msgstr "磁盘空间不足"
+msgstr "正在检查磁盘空间"
 
 #: src/winecharm/restore.py:268
 #, fuzzy
 msgid "Extracting WZT Backup File"
-msgstr "Creating backup archive"
+msgstr "正在解压 WZT 备份文件"
 
 #: src/winecharm/restore.py:269
 #, fuzzy
 msgid "Performing User Related Replacements"
-msgstr "Performing Replacements"
+msgstr "正在执行与用户相关的替换"
 
 #: src/winecharm/restore.py:270
 #, fuzzy
 msgid "Processing WineZGUI Script Files"
-msgstr "📥 Import WineZGUI Scripts..."
+msgstr "正在处理 WineZGUI 脚本文件"
 
 #: src/winecharm/restore.py:272 src/winecharm/import_wine_dir.py:158
 msgid "Renaming and Merging User Directories"
-msgstr "Renaming and Merging User Directories"
+msgstr "正在重命名并合并用户目录"
 
 #: src/winecharm/restore.py:273
 msgid "Search LNK Files and Append to Found List"
-msgstr ""
+msgstr "搜索 LNK 文件并追加到已找到列表"
 
 #: src/winecharm/restore.py:888
 #, python-format
@@ -1982,7 +1982,7 @@ msgstr "Backing up existing directory"
 #: src/winecharm/import_wine_dir.py:268
 #, python-format
 msgid "The directory %(name)s already exists. Do you want to overwrite it?"
-msgstr ""
+msgstr "The directory %(name)s already exists. Do you want to overwrite it?"
 
 #: src/winecharm/import_wine_dir.py:274
 msgid "Overwrite"
@@ -2039,7 +2039,7 @@ msgstr "Backup directory may still exist at: %s"
 #: src/winecharm/import_wine_dir.py:467
 #, fuzzy
 msgid "Importing..."
-msgstr "Importing %s"
+msgstr "正在导入..."
 
 #: src/winecharm/single_prefix.py:15
 msgid ""
@@ -2052,7 +2052,7 @@ msgstr ""
 #: src/winecharm/single_prefix.py:22
 #, fuzzy
 msgid "Multiple Prefix Mode"
-msgstr "单前缀模式"
+msgstr "多前缀模式"
 
 #: src/winecharm/single_prefix.py:36
 msgid "Apply"
@@ -2092,7 +2092,7 @@ msgstr "Do you want to cancel the backup process?"
 
 #: src/winecharm/backup.py:352
 msgid "Bottling..."
-msgstr ""
+msgstr "正在创建瓶装包..."
 
 #: src/winecharm/backup.py:429
 msgid "Creating Bottle archive"
@@ -2138,7 +2138,7 @@ msgstr "Large Game Directory"
 #: src/winecharm/backup.py:621
 #, python-format
 msgid "The game directory size is %(size)sGB. Do you want to continue?"
-msgstr ""
+msgstr "The game directory size is %(size)sGB. Do you want to continue?"
 
 #: src/winecharm/backup.py:869
 msgid "Bottle creation was cancelled"

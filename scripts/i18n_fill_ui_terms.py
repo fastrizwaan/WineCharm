@@ -930,6 +930,182 @@ PHASE2: dict[str, dict[str, str]] = {
     "Back": {"fr": "Retour", "pt_BR": "Voltar", "es": "Atras", "ru": "Nazad", "zh_CN": "返回", "ar": "رجوع"},
     "Search": {"fr": "Rechercher", "pt_BR": "Pesquisar", "es": "Buscar", "ru": "Poisk", "zh_CN": "搜索", "ar": "بحث"},
     "Toggle Icon/List View": {"fr": "Basculer vue icones/liste", "pt_BR": "Alternar visualizacao icones/lista", "es": "Alternar vista de iconos/lista", "ru": "Pereklyuchit vid ikonki/spisok", "zh_CN": "切换图标/列表视图", "ar": "تبديل عرض الأيقونات/القائمة"},
+    "Initialization Complete!": {
+        "fr": "Initialisation terminee !",
+        "pt_BR": "Inicializacao concluida!",
+        "es": "Inicializacion completada!",
+        "ru": "Initsializatsiya zavershena!",
+        "zh_CN": "初始化完成！",
+        "ar": "اكتملت التهيئة!",
+    },
+    "Download Runner": {
+        "fr": "Telecharger le runtime",
+        "pt_BR": "Baixar runner",
+        "es": "Descargar runner",
+        "ru": "Skachat runner",
+        "zh_CN": "下载运行器",
+        "ar": "تنزيل المشغل",
+    },
+    "Wine Proton": {
+        "fr": "Wine Proton",
+        "pt_BR": "Wine Proton",
+        "es": "Wine Proton",
+        "ru": "Wine Proton",
+        "zh_CN": "Wine Proton",
+        "ar": "Wine Proton",
+    },
+    "Wine Stable": {
+        "fr": "Wine Stable",
+        "pt_BR": "Wine Stable",
+        "es": "Wine Stable",
+        "ru": "Wine Stable",
+        "zh_CN": "Wine Stable",
+        "ar": "Wine Stable",
+    },
+    "Wine Devel": {
+        "fr": "Wine Devel",
+        "pt_BR": "Wine Devel",
+        "es": "Wine Devel",
+        "ru": "Wine Devel",
+        "zh_CN": "Wine Devel",
+        "ar": "Wine Devel",
+    },
+    "Wine-tkg": {
+        "fr": "Wine-tkg",
+        "pt_BR": "Wine-tkg",
+        "es": "Wine-tkg",
+        "ru": "Wine-tkg",
+        "zh_CN": "Wine-tkg",
+        "ar": "Wine-tkg",
+    },
+    "Wine-WoW64": {
+        "fr": "Wine-WoW64",
+        "pt_BR": "Wine-WoW64",
+        "es": "Wine-WoW64",
+        "ru": "Wine-WoW64",
+        "zh_CN": "Wine-WoW64",
+        "ar": "Wine-WoW64",
+    },
+    "Choose...": {
+        "fr": "Choisir...",
+        "pt_BR": "Escolher...",
+        "es": "Elegir...",
+        "ru": "Vybrat...",
+        "zh_CN": "选择...",
+        "ar": "اختر...",
+    },
+    "Checking Uncompressed Size": {
+        "fr": "Verification de la taille decompressee",
+        "pt_BR": "Verificando tamanho descompactado",
+        "es": "Comprobando tamano descomprimido",
+        "ru": "Proverka razmera posle raspakovki",
+        "zh_CN": "正在检查解压后大小",
+        "ar": "جار التحقق من الحجم بعد فك الضغط",
+    },
+    "Extracting Backup File": {
+        "fr": "Extraction du fichier de sauvegarde",
+        "pt_BR": "Extraindo arquivo de backup",
+        "es": "Extrayendo archivo de copia de seguridad",
+        "ru": "Izvlechenie fayla rezervnoi kopii",
+        "zh_CN": "正在解压备份文件",
+        "ar": "جار استخراج ملف النسخ الاحتياطي",
+    },
+    "Processing Registry Files": {
+        "fr": "Traitement des fichiers de registre",
+        "pt_BR": "Processando arquivos de registro",
+        "es": "Procesando archivos de registro",
+        "ru": "Obrabotka faylov reestra",
+        "zh_CN": "正在处理注册表文件",
+        "ar": "جار معالجة ملفات السجل",
+    },
+    "Performing Replacements": {
+        "fr": "Execution des remplacements",
+        "pt_BR": "Executando substituicoes",
+        "es": "Realizando reemplazos",
+        "ru": "Vypolnenie zamen",
+        "zh_CN": "正在执行替换",
+        "ar": "جار تنفيذ الاستبدالات",
+    },
+    "Replacing Symbolic Links with Directories": {
+        "fr": "Remplacement des liens symboliques par des dossiers",
+        "pt_BR": "Substituindo links simbolicos por diretorios",
+        "es": "Reemplazando enlaces simbolicos por directorios",
+        "ru": "Zamena simvolicheskikh ssylok na katalogi",
+        "zh_CN": "正在将符号链接替换为目录",
+        "ar": "جار استبدال الروابط الرمزية بمجلدات",
+    },
+    "Renaming and merging user directories": {
+        "fr": "Renommage et fusion des dossiers utilisateur",
+        "pt_BR": "Renomeando e mesclando diretorios do usuario",
+        "es": "Renombrando y fusionando directorios de usuario",
+        "ru": "Pereimenovanie i obyedinenie katalogov polzovatelya",
+        "zh_CN": "正在重命名并合并用户目录",
+        "ar": "جار إعادة تسمية ودمج مجلدات المستخدم",
+    },
+    "Add Shortcuts to Script List": {
+        "fr": "Ajouter les raccourcis a la liste des scripts",
+        "pt_BR": "Adicionar atalhos a lista de scripts",
+        "es": "Agregar accesos directos a la lista de scripts",
+        "ru": "Dobavit yarlyki v spisok skriptov",
+        "zh_CN": "将快捷方式添加到脚本列表",
+        "ar": "إضافة الاختصارات إلى قائمة السكربتات",
+    },
+    "Create Wineboot Required file": {
+        "fr": "Creer le fichier requis Wineboot",
+        "pt_BR": "Criar arquivo necessario do Wineboot",
+        "es": "Crear archivo requerido de Wineboot",
+        "ru": "Sozdat obyazatelnyi fayl Wineboot",
+        "zh_CN": "创建 Wineboot 所需文件",
+        "ar": "إنشاء ملف Wineboot المطلوب",
+    },
+    "Checking Disk Space": {
+        "fr": "Verification de l'espace disque",
+        "pt_BR": "Verificando espaco em disco",
+        "es": "Comprobando espacio en disco",
+        "ru": "Proverka svobodnogo mesta",
+        "zh_CN": "正在检查磁盘空间",
+        "ar": "جار التحقق من مساحة القرص",
+    },
+    "Extracting WZT Backup File": {
+        "fr": "Extraction du fichier de sauvegarde WZT",
+        "pt_BR": "Extraindo arquivo de backup WZT",
+        "es": "Extrayendo archivo de copia de seguridad WZT",
+        "ru": "Izvlechenie fayla rezervnoi kopii WZT",
+        "zh_CN": "正在解压 WZT 备份文件",
+        "ar": "جار استخراج ملف النسخ الاحتياطي WZT",
+    },
+    "Performing User Related Replacements": {
+        "fr": "Execution des remplacements lies a l'utilisateur",
+        "pt_BR": "Executando substituicoes relacionadas ao usuario",
+        "es": "Realizando reemplazos relacionados con el usuario",
+        "ru": "Vypolnenie zamen, svyazannykh s polzovatelem",
+        "zh_CN": "正在执行与用户相关的替换",
+        "ar": "جار تنفيذ الاستبدالات المتعلقة بالمستخدم",
+    },
+    "Processing WineZGUI Script Files": {
+        "fr": "Traitement des fichiers script WineZGUI",
+        "pt_BR": "Processando arquivos de script do WineZGUI",
+        "es": "Procesando archivos de script de WineZGUI",
+        "ru": "Obrabotka faylov skriptov WineZGUI",
+        "zh_CN": "正在处理 WineZGUI 脚本文件",
+        "ar": "جار معالجة ملفات سكربت WineZGUI",
+    },
+    "Renaming and Merging User Directories": {
+        "fr": "Renommage et fusion des dossiers utilisateur",
+        "pt_BR": "Renomeando e mesclando diretorios do usuario",
+        "es": "Renombrando y fusionando directorios de usuario",
+        "ru": "Pereimenovanie i obyedinenie katalogov polzovatelya",
+        "zh_CN": "正在重命名并合并用户目录",
+        "ar": "جار إعادة تسمية ودمج مجلدات المستخدم",
+    },
+    "Search LNK Files and Append to Found List": {
+        "fr": "Rechercher les fichiers LNK et les ajouter a la liste trouvee",
+        "pt_BR": "Pesquisar arquivos LNK e adicionar a lista encontrada",
+        "es": "Buscar archivos LNK y agregarlos a la lista encontrada",
+        "ru": "Naiti fayly LNK i dobavit v spisok naidennykh",
+        "zh_CN": "搜索 LNK 文件并追加到已找到列表",
+        "ar": "البحث عن ملفات LNK وإضافتها إلى القائمة",
+    },
 }
 
 
@@ -1015,9 +1191,10 @@ def main() -> None:
         touched[lang] = count
 
     # Fix known plural forms for catalogs where msginit leaves placeholders.
-    fix_plural_forms(po_dir / "zh_CN.po", "nplurals=1; plural=0;")
-    fix_plural_forms(po_dir / "ar.po", "nplurals=6; plural=n==0 ? 0 : n==1 ? 1 : n==2 ? 2 : n%100>=3 && n%100<=10 ? 3 : n%100>=11 ? 4 : 5;")
-    fix_plural_forms(po_dir / "id.po", "nplurals=1; plural=0;")
+    # Keep these aligned with current catalogs where 2 plural forms are used.
+    fix_plural_forms(po_dir / "zh_CN.po", "nplurals=2; plural=(n != 1);")
+    fix_plural_forms(po_dir / "ar.po", "nplurals=2; plural=(n != 1);")
+    fix_plural_forms(po_dir / "id.po", "nplurals=2; plural=(n != 1);")
 
     for lang in sorted(touched):
         print(f"{lang}: filled {touched[lang]} strings")
