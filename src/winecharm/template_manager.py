@@ -121,8 +121,8 @@ def on_template_initialized(self, arch=None, new=False):
     self.hide_processing_spinner()
     
     # Success case
-    self.show_initializing_step("Initialization Complete!")
-    self.mark_step_as_done("Initialization Complete!")
+    self.show_initializing_step(_("Initialization Complete!"))
+    self.mark_step_as_done(_("Initialization Complete!"))
     
 
     
@@ -132,7 +132,7 @@ def on_template_initialized(self, arch=None, new=False):
         file_extension = Path(self.command_line_file).suffix.lower()
         if file_extension in ['.exe', '.msi']:
             print(f"Processing file: {self.command_line_file} (Valid extension: {file_extension})")
-            GLib.idle_add(self.show_processing_spinner, "Processing...")
+            GLib.idle_add(self.show_processing_spinner, _("Processing..."))
             self.process_cli_file(self.command_line_file)
         elif file_extension in ['.wzt', '.bottle', '.prefix']:
             print(f"Restoring from backup: {self.command_line_file}")

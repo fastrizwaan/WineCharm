@@ -195,7 +195,7 @@ def change_runner(self, script, script_key, *args):
     # Create download button
     download_button = Gtk.Button(
         icon_name="emblem-downloads-symbolic",
-        tooltip_text="Download Runner"
+        tooltip_text=_("Download Runner")
     )
     download_button.connect("clicked", lambda btn: self.on_download_runner_clicked(dialog))
 
@@ -401,7 +401,7 @@ def set_default_runner(self, action=None):
     # Create download button
     download_button = Gtk.Button(
         icon_name="emblem-downloads-symbolic",
-        tooltip_text="Download Runner"
+        tooltip_text=_("Download Runner")
     )
     download_button.connect("clicked", lambda btn: self.on_download_runner_clicked_default(dialog))
 
@@ -741,11 +741,11 @@ def on_settings_download_runner_clicked(self, callback=None):
 
     # Dropdown setup
     dropdown_data = [
-        ("Wine Proton", self.runner_data.get("proton", [])),
-        ("Wine Stable", self.runner_data.get("stable", [])),
-        ("Wine Devel", self.runner_data.get("devel", [])),
-        ("Wine-tkg", self.runner_data.get("tkg", [])),
-        ("Wine-WoW64", self.runner_data.get("wow64", []))
+        (_("Wine Proton"), self.runner_data.get("proton", [])),
+        (_("Wine Stable"), self.runner_data.get("stable", [])),
+        (_("Wine Devel"), self.runner_data.get("devel", [])),
+        (_("Wine-tkg"), self.runner_data.get("tkg", [])),
+        (_("Wine-WoW64"), self.runner_data.get("wow64", []))
     ]
 
     combo_boxes = {}
@@ -754,7 +754,7 @@ def on_settings_download_runner_clicked(self, callback=None):
         label = Gtk.Label(label=label_text, xalign=0, width_chars=12)
         
         # Create dropdown with StringList model
-        names = ["Choose..."] + [file['name'] for file in file_list]
+        names = [_("Choose...")] + [file['name'] for file in file_list]
         model = Gtk.StringList.new(names)
         dropdown = Gtk.DropDown(model=model)
         dropdown.set_selected(0)
