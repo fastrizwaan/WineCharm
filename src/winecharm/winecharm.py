@@ -95,6 +95,11 @@ class WineCharmApp(Adw.Application):
         # Move the global variables to instance attributes
         self.debug = False
         self.version = "0.99.9"
+        self.app_icon_names = (
+            "io.github.fastrizwaan.WineCharm",
+            "io.github.fastrizwaan.winecharm",
+        )
+        self.app_icon_name = self.app_icon_names[0]
         # Paths and directories
         self.winecharmdir = Path(os.path.expanduser("~/.var/app/io.github.fastrizwaan.WineCharm/data/winecharm")).resolve()
         self.prefixes_dir = self.winecharmdir / "Prefixes"
@@ -724,49 +729,18 @@ class WineCharmApp(Adw.Application):
 
     def on_about_clicked(self, action=None, param=None):
         self.print_method_name()
-        icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
-        about_icon_info = icon_theme.lookup_icon(
-            "io.github.fastrizwaan.WineCharm",
-            None,
-            128,
-            1,
-            Gtk.TextDirection.NONE,
-            Gtk.IconLookupFlags.NONE
-        )
-
-        if about_icon_info:
-            about_dialog = Adw.AboutWindow(
-                transient_for=self.window,
-                application_name="WineCharm",
-                application_icon="io.github.fastrizwaan.WineCharm",
-                version=f"{self.version}",
-                copyright="GNU General Public License (GPLv3+)",
-                comments="A Charming Wine GUI Application",
-                website="https://github.com/fastrizwaan/WineCharm",
-                developer_name="Mohammed Asif Ali Rizvan",
-                license_type=Gtk.License.GPL_3_0,
-                issue_url="https://github.com/fastrizwaan/WineCharm/issues"
-            )
-            about_dialog.present()
-            return
-
-        # Match header icon behavior: use resolved app icon file when theme lookup fails.
-        about_dialog = Gtk.AboutDialog(
+        about_dialog = Adw.AboutWindow(
             transient_for=self.window,
-            modal=True,
-            program_name="WineCharm",
+            application_name="WineCharm",
+            application_icon=self.app_icon_name,
             version=f"{self.version}",
+            copyright="GNU General Public License (GPLv3+)",
             comments="A Charming Wine GUI Application",
             website="https://github.com/fastrizwaan/WineCharm",
-            copyright="GNU General Public License (GPLv3+)",
+            developer_name="Mohammed Asif Ali Rizvan",
             license_type=Gtk.License.GPL_3_0,
-            authors=["Mohammed Asif Ali Rizvan"],
+            issue_url="https://github.com/fastrizwaan/WineCharm/issues"
         )
-        if getattr(self, "app_icon_path", None):
-            try:
-                about_dialog.set_logo(Gdk.Texture.new_from_filename(self.app_icon_path))
-            except Exception as e:
-                print(f"[DEBUG] Failed to load about dialog icon from file: {e}")
         about_dialog.present()
 
     def quit_app(self, action=None, param=None):
@@ -794,20 +768,23 @@ class WineCharmApp(Adw.Application):
             data_dirs = [Path("/app/share"), Path("/usr/local/share"), Path("/usr/share")]
         return data_dirs
 
-    def get_app_icon_file_path(self, icon_name="io.github.fastrizwaan.WineCharm"):
+    def get_app_icon_file_path(self, icon_names=None):
         # Prefer scalable icon first; fall back to common raster size.
-        candidates = [
-            f"icons/hicolor/scalable/apps/{icon_name}.svg",
-            f"icons/hicolor/128x128/apps/{icon_name}.png",
-            f"icons/hicolor/64x64/apps/{icon_name}.png",
-            f"icons/hicolor/48x48/apps/{icon_name}.png",
-            f"icons/hicolor/32x32/apps/{icon_name}.png",
-        ]
-        for data_dir in self.get_xdg_data_dirs():
-            for rel in candidates:
-                icon_path = data_dir / rel
-                if icon_path.exists():
-                    return icon_path
+        if icon_names is None:
+            icon_names = self.app_icon_names
+        for icon_name in icon_names:
+            candidates = [
+                f"icons/hicolor/scalable/apps/{icon_name}.svg",
+                f"icons/hicolor/128x128/apps/{icon_name}.png",
+                f"icons/hicolor/64x64/apps/{icon_name}.png",
+                f"icons/hicolor/48x48/apps/{icon_name}.png",
+                f"icons/hicolor/32x32/apps/{icon_name}.png",
+            ]
+            for data_dir in self.get_xdg_data_dirs():
+                for rel in candidates:
+                    icon_path = data_dir / rel
+                    if icon_path.exists():
+                        return icon_path
         return None
 
     def setup_icon_theme_paths(self):
@@ -817,20 +794,29 @@ class WineCharmApp(Adw.Application):
             if icons_root.exists():
                 icon_theme.add_search_path(str(icons_root))
                 print(f"[DEBUG] Added icon search path: {icons_root}")
+            hicolor_root = icons_root / "hicolor"
+            if hicolor_root.exists():
+                icon_theme.add_search_path(str(hicolor_root))
+                print(f"[DEBUG] Added icon search path: {hicolor_root}")
         return icon_theme
 
     def on_startup(self, app):
         icon_theme = self.setup_icon_theme_paths()
-        icon_file_path = self.get_app_icon_file_path("io.github.fastrizwaan.WineCharm")
+        icon_file_path = self.get_app_icon_file_path()
         self.app_icon_path = str(icon_file_path) if icon_file_path else None
 
-        self.app_icon_available = icon_theme.has_icon("io.github.fastrizwaan.WineCharm")
+        self.app_icon_available = False
+        for icon_name in self.app_icon_names:
+            if icon_theme.has_icon(icon_name):
+                self.app_icon_name = icon_name
+                self.app_icon_available = True
+                break
 
         # Check if WineCharm icon is available by name.
         if self.app_icon_available:
-            icon_info = icon_theme.lookup_icon("io.github.fastrizwaan.WineCharm", None, 48, 1, Gtk.TextDirection.NONE, Gtk.IconLookupFlags.NONE)
+            icon_info = icon_theme.lookup_icon(self.app_icon_name, None, 48, 1, Gtk.TextDirection.NONE, Gtk.IconLookupFlags.NONE)
             if icon_info:
-                print(f"[DEBUG] WineCharm icon loaded from: {icon_info.get_file().get_path()}")
+                print(f"[DEBUG] App icon '{self.app_icon_name}' loaded from: {icon_info.get_file().get_path()}")
         else:
             print("[DEBUG] WineCharm icon NOT found in icon theme")
             if self.app_icon_path:

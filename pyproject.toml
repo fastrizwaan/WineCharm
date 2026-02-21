@@ -59,7 +59,10 @@ winecharm = [
 "share/applications" = ["data/shortcut/io.github.fastrizwaan.WineCharm.desktop"]
 "share/metainfo" = ["data/appdata/io.github.fastrizwaan.WineCharm.metainfo.xml"]
 "share/mime/packages" = ["data/mimetype/winecharm-backup-file.xml"]
-"share/icons/hicolor/scalable/apps" = ["data/icons/io.github.fastrizwaan.WineCharm.svg"]
+"share/icons/hicolor/scalable/apps" = [
+    "data/icons/io.github.fastrizwaan.WineCharm.svg",
+    "data/icons/io.github.fastrizwaan.winecharm.svg",
+]
 "share/icons/hicolor/128x128/apps" = ["data/icons/org.winehq.Wine.png"]
 "share/icons/hicolor/scalable/actions" = ["data/icons/*-symbolic.svg"]
 

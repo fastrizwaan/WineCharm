@@ -200,6 +200,10 @@ modules:
     buildsystem: simple
     build-commands:
       - pip3 install --no-deps --no-build-isolation --ignore-installed --prefix=${FLATPAK_DEST} .
+      - mkdir -p /app/share/icons/hicolor
+      - if [ ! -f /app/share/icons/hicolor/index.theme ] && [ -f /usr/share/icons/hicolor/index.theme ]; then cp /usr/share/icons/hicolor/index.theme /app/share/icons/hicolor/index.theme; fi
+      - if [ -f /app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg ] && [ ! -f /app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.winecharm.svg ]; then cp /app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg /app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.winecharm.svg; fi
+      - if command -v gtk4-update-icon-cache >/dev/null 2>&1; then gtk4-update-icon-cache -f /app/share/icons/hicolor; elif command -v gtk-update-icon-cache >/dev/null 2>&1; then gtk-update-icon-cache -f /app/share/icons/hicolor; fi
 #    sources:
 #      - type: git
 #        commit: 61efbf3ba982ffac1bb9fab8b854e3b4a5b4cd32
@@ -208,4 +212,3 @@ modules:
       - type: dir
         path: ..
         
-
