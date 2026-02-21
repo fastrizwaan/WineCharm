@@ -745,7 +745,7 @@ class WineCharmApp(Adw.Application):
 
     def get_default_icon_path(self):
         #self.print_method_name()
-        xdg_data_dirs = os.getenv("XDG_DATA_DIRS", "").split(":")
+        xdg_data_dirs = self.get_xdg_data_dirs()
         icon_relative_path = "icons/hicolor/128x128/apps/org.winehq.Wine.png"
 
         for data_dir in xdg_data_dirs:
@@ -756,31 +756,54 @@ class WineCharmApp(Adw.Application):
         # Fallback icon path in case none of the paths in XDG_DATA_DIRS contain the icon
         return Path("/app/share/icons/hicolor/128x128/apps/org.winehq.Wine.png")
 
-    def on_startup(self, app):
-        # Set up icon theme search path to find app icons
-        icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
-        icon_dirs = [
-            Path("/app/share/icons/hicolor"),  # Flatpak hicolor theme
-            Path("/usr/share/icons/hicolor"),  # System hicolor theme
+    def get_xdg_data_dirs(self):
+        xdg_data_dirs = os.getenv("XDG_DATA_DIRS", "")
+        data_dirs = [Path(p) for p in xdg_data_dirs.split(":") if p]
+        if not data_dirs:
+            data_dirs = [Path("/app/share"), Path("/usr/local/share"), Path("/usr/share")]
+        return data_dirs
+
+    def get_app_icon_file_path(self, icon_name="io.github.fastrizwaan.WineCharm"):
+        # Prefer scalable icon first; fall back to common raster size.
+        candidates = [
+            f"icons/hicolor/scalable/apps/{icon_name}.svg",
+            f"icons/hicolor/128x128/apps/{icon_name}.png",
+            f"icons/hicolor/64x64/apps/{icon_name}.png",
+            f"icons/hicolor/48x48/apps/{icon_name}.png",
+            f"icons/hicolor/32x32/apps/{icon_name}.png",
         ]
-        for icon_dir in icon_dirs:
-            if icon_dir.exists():
-                icon_theme.add_search_path(str(icon_dir))
-                print(f"[DEBUG] Added icon search path: {icon_dir}")
-        
-        # Check if WineCharm icon is available
-        if icon_theme.has_icon("io.github.fastrizwaan.WineCharm"):
+        for data_dir in self.get_xdg_data_dirs():
+            for rel in candidates:
+                icon_path = data_dir / rel
+                if icon_path.exists():
+                    return icon_path
+        return None
+
+    def setup_icon_theme_paths(self):
+        icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+        for data_dir in self.get_xdg_data_dirs():
+            icons_root = data_dir / "icons"
+            if icons_root.exists():
+                icon_theme.add_search_path(str(icons_root))
+                print(f"[DEBUG] Added icon search path: {icons_root}")
+        return icon_theme
+
+    def on_startup(self, app):
+        icon_theme = self.setup_icon_theme_paths()
+        self.app_icon_available = icon_theme.has_icon("io.github.fastrizwaan.WineCharm")
+
+        # Check if WineCharm icon is available by name.
+        if self.app_icon_available:
             icon_info = icon_theme.lookup_icon("io.github.fastrizwaan.WineCharm", None, 48, 1, Gtk.TextDirection.NONE, Gtk.IconLookupFlags.NONE)
             if icon_info:
                 print(f"[DEBUG] WineCharm icon loaded from: {icon_info.get_file().get_path()}")
+            self.app_icon_path = None
         else:
             print("[DEBUG] WineCharm icon NOT found in icon theme")
-            # Try loading directly from Flatpak path
-            flatpak_icon = Path("/app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg")
-            if flatpak_icon.exists():
-                print(f"[DEBUG] Found icon at: {flatpak_icon}")
-                # Store for later use
-                self.app_icon_path = str(flatpak_icon)
+            icon_file_path = self.get_app_icon_file_path("io.github.fastrizwaan.WineCharm")
+            if icon_file_path:
+                print(f"[DEBUG] Found app icon file at: {icon_file_path}")
+                self.app_icon_path = str(icon_file_path)
             else:
                 self.app_icon_path = None
 

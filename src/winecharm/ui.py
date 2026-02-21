@@ -48,7 +48,7 @@ def create_main_window(self):
     
     # Try to load app icon from theme or direct file path
     icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
-    if icon_theme.has_icon("io.github.fastrizwaan.WineCharm"):
+    if getattr(self, "app_icon_available", False) and icon_theme.has_icon("io.github.fastrizwaan.WineCharm"):
         app_icon = Gtk.Image.new_from_icon_name("io.github.fastrizwaan.WineCharm")
     elif hasattr(self, 'app_icon_path') and self.app_icon_path:
         app_icon = Gtk.Image.new_from_file(self.app_icon_path)
