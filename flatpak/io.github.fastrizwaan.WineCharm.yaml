@@ -200,8 +200,12 @@ modules:
     buildsystem: simple
     build-commands:
       - pip3 install --no-deps --no-build-isolation --ignore-installed --prefix=${FLATPAK_DEST} .
+#    sources:
+#      - type: git
+#        commit: 61efbf3ba982ffac1bb9fab8b854e3b4a5b4cd32
+#        url: https://github.com/fastrizwaan/WineCharm.git
     sources:
-      - type: git
-        commit: 7342400b2e402663a030944cd384357b80bbef62
-        url: https://github.com/fastrizwaan/WineCharm.git
+      - type: dir
+        path: ..
+        
 
