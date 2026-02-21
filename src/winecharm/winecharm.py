@@ -724,18 +724,39 @@ class WineCharmApp(Adw.Application):
 
     def on_about_clicked(self, action=None, param=None):
         self.print_method_name()
-        about_dialog = Adw.AboutWindow(
+        if getattr(self, "app_icon_available", False):
+            about_dialog = Adw.AboutWindow(
+                transient_for=self.window,
+                application_name="WineCharm",
+                application_icon="io.github.fastrizwaan.WineCharm",
+                version=f"{self.version}",
+                copyright="GNU General Public License (GPLv3+)",
+                comments="A Charming Wine GUI Application",
+                website="https://github.com/fastrizwaan/WineCharm",
+                developer_name="Mohammed Asif Ali Rizvan",
+                license_type=Gtk.License.GPL_3_0,
+                issue_url="https://github.com/fastrizwaan/WineCharm/issues"
+            )
+            about_dialog.present()
+            return
+
+        # Match header icon behavior: use resolved app icon file when theme lookup fails.
+        about_dialog = Gtk.AboutDialog(
             transient_for=self.window,
-            application_name="WineCharm",
-            application_icon="io.github.fastrizwaan.WineCharm",
+            modal=True,
+            program_name="WineCharm",
             version=f"{self.version}",
-            copyright="GNU General Public License (GPLv3+)",
             comments="A Charming Wine GUI Application",
             website="https://github.com/fastrizwaan/WineCharm",
-            developer_name="Mohammed Asif Ali Rizvan",
+            copyright="GNU General Public License (GPLv3+)",
             license_type=Gtk.License.GPL_3_0,
-            issue_url="https://github.com/fastrizwaan/WineCharm/issues"
+            authors=["Mohammed Asif Ali Rizvan"],
         )
+        if getattr(self, "app_icon_path", None):
+            try:
+                about_dialog.set_logo(Gdk.Texture.new_from_filename(self.app_icon_path))
+            except Exception as e:
+                print(f"[DEBUG] Failed to load about dialog icon from file: {e}")
         about_dialog.present()
 
     def quit_app(self, action=None, param=None):
