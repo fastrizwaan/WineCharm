@@ -45,7 +45,16 @@ def create_main_window(self):
 
     # Create title widget with icon and label
     self.title_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
-    app_icon = Gtk.Image.new_from_icon_name("io.github.fastrizwaan.WineCharm")
+    
+    # Try to load app icon from theme or direct file path
+    icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+    if icon_theme.has_icon("io.github.fastrizwaan.WineCharm"):
+        app_icon = Gtk.Image.new_from_icon_name("io.github.fastrizwaan.WineCharm")
+    elif hasattr(self, 'app_icon_path') and self.app_icon_path:
+        app_icon = Gtk.Image.new_from_file(self.app_icon_path)
+    else:
+        app_icon = Gtk.Image()  # Empty image if no icon found
+    
     app_icon.set_pixel_size(18)
     self.title_box.append(app_icon)
     

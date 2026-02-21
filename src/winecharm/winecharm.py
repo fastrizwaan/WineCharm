@@ -775,6 +775,14 @@ class WineCharmApp(Adw.Application):
                 print(f"[DEBUG] WineCharm icon loaded from: {icon_info.get_file().get_path()}")
         else:
             print("[DEBUG] WineCharm icon NOT found in icon theme")
+            # Try loading directly from Flatpak path
+            flatpak_icon = Path("/app/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg")
+            if flatpak_icon.exists():
+                print(f"[DEBUG] Found icon at: {flatpak_icon}")
+                # Store for later use
+                self.app_icon_path = str(flatpak_icon)
+            else:
+                self.app_icon_path = None
 
         self.create_main_window()
         # Clear or initialize the script list
