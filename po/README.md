@@ -23,11 +23,23 @@ WineCharm uses GNU gettext.
    ```sh
    ./scripts/i18n.sh update de
    ```
-4. Compile:
+4. Optional MT draft fill:
+   ```sh
+   ./scripts/i18n.sh mt-fill de
+   # or all locales
+   ./scripts/i18n.sh mt-fill-all
+   ```
+5. Run QA checks:
+   ```sh
+   ./scripts/i18n.sh qa de
+   # or all locales
+   ./scripts/i18n.sh qa-all
+   ```
+6. Compile:
    ```sh
    ./scripts/i18n.sh compile de
    ```
-5. Test:
+7. Test:
    ```sh
    LANGUAGE=de winecharm
    ```
@@ -36,5 +48,6 @@ WineCharm uses GNU gettext.
 
 - Keep placeholders intact (`%s`, `%(name)s`, `%d`, etc.).
 - Keep markup/symbols intact when present.
+- Machine translation is a draft only; final review should be done by native speakers.
 - Run `./scripts/i18n.sh extract` before opening a PR if source strings changed.
 - Include both updated `po/<lang>.po` and compiled `.mo` output.

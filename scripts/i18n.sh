@@ -13,6 +13,10 @@ Usage:
   $0 init <lang>
   $0 update <lang>
   $0 update-all
+  $0 mt-fill [lang]
+  $0 mt-fill-all
+  $0 qa [lang]
+  $0 qa-all
   $0 compile <lang>
   $0 compile-all
 EOF
@@ -70,6 +74,30 @@ update_all() {
     done
 }
 
+mt_fill_lang() {
+    require_cmd python3
+    lang="$1"
+    python3 scripts/i18n_mt_fill.py --lang "$lang"
+}
+
+mt_fill_all() {
+    require_cmd python3
+    python3 scripts/i18n_mt_fill.py --all
+}
+
+qa_lang() {
+    require_cmd python3
+    require_cmd msgfmt
+    lang="$1"
+    python3 scripts/i18n_qa.py --lang "$lang"
+}
+
+qa_all() {
+    require_cmd python3
+    require_cmd msgfmt
+    python3 scripts/i18n_qa.py --all
+}
+
 compile_lang() {
     require_cmd msgfmt
     lang="$1"
@@ -108,6 +136,20 @@ case "$cmd" in
         ;;
     update-all)
         update_all
+        ;;
+    mt-fill)
+        [ $# -eq 2 ] || { usage; exit 1; }
+        mt_fill_lang "$2"
+        ;;
+    mt-fill-all)
+        mt_fill_all
+        ;;
+    qa)
+        [ $# -eq 2 ] || { usage; exit 1; }
+        qa_lang "$2"
+        ;;
+    qa-all)
+        qa_all
         ;;
     compile)
         [ $# -eq 2 ] || { usage; exit 1; }
