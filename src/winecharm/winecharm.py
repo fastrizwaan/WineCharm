@@ -760,8 +760,8 @@ class WineCharmApp(Adw.Application):
         # Set up icon theme search path to find app icons
         icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
         icon_dirs = [
-            Path("/app/share/icons"),  # Flatpak
-            Path("/usr/share/icons"),  # System
+            Path("/app/share/icons/hicolor"),  # Flatpak hicolor theme
+            Path("/usr/share/icons/hicolor"),  # System hicolor theme
         ]
         for icon_dir in icon_dirs:
             if icon_dir.exists():
