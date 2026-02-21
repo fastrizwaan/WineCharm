@@ -757,6 +757,16 @@ class WineCharmApp(Adw.Application):
         return Path("/app/share/icons/hicolor/128x128/apps/org.winehq.Wine.png")
 
     def on_startup(self, app):
+        # Set up icon theme search path to find app icons
+        icon_theme = Gtk.IconTheme.get_for_display(Gdk.Display.get_default())
+        icon_dirs = [
+            Path("/app/share/icons"),  # Flatpak
+            Path("/usr/share/icons"),  # System
+        ]
+        for icon_dir in icon_dirs:
+            if icon_dir.exists():
+                icon_theme.add_search_path(str(icon_dir))
+
         self.create_main_window()
         # Clear or initialize the script list
         self.set_dynamic_variables()
