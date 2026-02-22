@@ -6,6 +6,7 @@
   <description>
     <p>WineCharm is a graphical user interface (GUI) application designed to simplify running and managing Windows applications on Linux using Wine. Built with Python and GTK4/Libadwaita, it provides an intuitive interface for launching .exe and .msi files, managing Wine prefixes, templates, and runners, and creating portable backups.</p>
     <p>Key features include support for both GUI and headless modes, single prefix mode for space efficiency, desktop shortcuts, and compatibility with .prefix, .bottle, and .wzt backup files.</p>
+    <p>i18n Tranlations: Please contribute your language translations to WineCharm.</p>
   </description>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
