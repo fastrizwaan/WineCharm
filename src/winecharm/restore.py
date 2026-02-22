@@ -894,7 +894,9 @@ def check_disk_space_and_show_step(self, file_path):
         return False
 
     # If enough space, update the UI and log the success
-    message = f"Disk space check passed: {size_to_check / (1024 * 1024):.2f} MB required"
+    message = _("Disk space check passed: %(size).2f MB required") % {
+        "size": size_to_check / (1024 * 1024),
+    }
     GLib.idle_add(self.show_initializing_step, message)
     print(message)
     GLib.idle_add(self.mark_step_as_done, message)

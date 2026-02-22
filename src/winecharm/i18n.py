@@ -38,12 +38,21 @@ except locale.Error:
     )
     locale.setlocale(locale.LC_ALL, "C")
 
+# Bind domain for tooling compatibility, but use an explicit translation
+# object so language fallback (e.g. hi_IN -> hi) works even if setlocale()
+# cannot activate that locale in the runtime.
 gettext.bindtextdomain(APP_ID, LOCALE_DIR)
 gettext.textdomain(APP_ID)
+translation = gettext.translation(
+    APP_ID,
+    LOCALE_DIR,
+    languages=None if lang_to_use == "C" else [lang_to_use],
+    fallback=True,
+)
 
 # Standard gettext bindings
-_ = gettext.gettext
-ngettext = gettext.ngettext
+_ = translation.gettext
+ngettext = translation.ngettext
 
 # Inject into builtins (global, no per-file imports needed)
 builtins._ = _

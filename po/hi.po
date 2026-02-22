@@ -48,9 +48,9 @@ msgstr "गेम डायरेक्टरी आयात करने क�
 
 #: src/winecharm/import_game_dir.py:69 src/winecharm/runner_manager.py:1312
 #: src/winecharm/import_wine_dir.py:119
-#, fuzzy, python-format
+#, python-format
 msgid "Importing %(name)s"
-msgstr "Importing %(name)s"
+msgstr "%(name)s आयात किया जा रहा है"
 
 #: src/winecharm/import_game_dir.py:91
 msgid "Copying Game Directory"
@@ -155,9 +155,9 @@ msgid "Argument Error"
 msgstr "तर्क त्रुटि"
 
 #: src/winecharm/winecharm.py:1345
-#, fuzzy, python-format
+#, python-format
 msgid "Invalid arguments: %s"
-msgstr "Invalid arguments: %s"
+msgstr "अमान्य तर्क: %s"
 
 #: src/winecharm/winecharm.py:1346 src/winecharm/winecharm.py:1404
 msgid "Launch Failed"
@@ -204,11 +204,13 @@ msgid "Copy to Clipboard"
 msgstr "क्लिपबोर्ड पर कॉपी करें"
 
 #: src/winecharm/winecharm.py:2692
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You "
 "provided: %s"
-msgstr "Only .exe, .msi, .charm, .bottle, .prefix, or .wzt files are allowed. You provided: %s"
+msgstr ""
+"केवल .exe, .msi, .charm, .bottle, .prefix, या .wzt फ़ाइलें अनुमत हैं। आपने यह दिया: "
+"%s"
 
 #: src/winecharm/winecharm.py:2705
 msgid "Invalid file type:"
@@ -228,11 +230,11 @@ msgstr "नए प्रीफ़िक्स के लिए डिफ़ॉ�
 
 #: src/winecharm/set_wine_arch.py:31 src/winecharm/template_manager.py:1219
 msgid "32-bit (win32)"
-msgstr ""
+msgstr "32-बिट (win32)"
 
 #: src/winecharm/set_wine_arch.py:32 src/winecharm/template_manager.py:1220
 msgid "64-bit (win64)"
-msgstr ""
+msgstr "64-बिट (win64)"
 
 #: src/winecharm/set_wine_arch.py:46 src/winecharm/save_load_users_dir.py:29
 #: src/winecharm/save_load_users_dir.py:275
@@ -275,15 +277,15 @@ msgstr "टेम्पलेट '%(old)s' हटा दिया गया ह�
 
 #: src/winecharm/wcterm.py:17
 msgid "WCTerm"
-msgstr ""
+msgstr "WCTerm"
 
 #: src/winecharm/wcterm.py:76
 msgid "Copy"
-msgstr ""
+msgstr "कॉपी करें"
 
 #: src/winecharm/wcterm.py:81
 msgid "Paste"
-msgstr ""
+msgstr "पेस्ट करें"
 
 #: src/winecharm/save_load_users_dir.py:26
 msgid "Select Directories to Backup"
@@ -395,9 +397,8 @@ msgid "Cannot select the drive_c directory"
 msgstr "drive_c डायरेक्टरी का चयन नहीं कर सकते"
 
 #: src/winecharm/winezgui_importer.py:24
-#, fuzzy
 msgid "Processing WineZGUI Scripts..."
-msgstr "📥 WineZGUI स्क्रिप्ट्स आयात करें..."
+msgstr "WineZGUI स्क्रिप्ट्स संसाधित की जा रही हैं..."
 
 #: src/winecharm/winezgui_importer.py:29
 msgid "Directory Not Found"
@@ -442,14 +443,13 @@ msgid "Installing openal"
 msgstr "openal स्थापित किया जा रहा है"
 
 #: src/winecharm/template_manager.py:63
-#, fuzzy, python-format
+#, python-format
 msgid "Initializing %(name)s Template..."
-msgstr "Initializing %(name)s Template..."
+msgstr "%(name)s टेम्पलेट आरंभ किया जा रहा है..."
 
 #: src/winecharm/template_manager.py:124 src/winecharm/template_manager.py:125
-#, fuzzy
 msgid "Initialization Complete!"
-msgstr "स्थापना पूर्ण"
+msgstr "आरंभीकरण पूर्ण!"
 
 #: src/winecharm/template_manager.py:135 src/winecharm/ui.py:541
 msgid "Processing..."
@@ -497,9 +497,8 @@ msgid "No valid templates found."
 msgstr "कोई वैध टेम्पलेट नहीं मिला।"
 
 #: src/winecharm/template_manager.py:333
-#, fuzzy
 msgid "Select template:"
-msgstr "टेम्पलेट हटाएं"
+msgstr "टेम्पलेट चुनें:"
 
 #: src/winecharm/template_manager.py:337
 msgid "Set Default Template"
@@ -659,9 +658,8 @@ msgid "Select a template to backup:"
 msgstr "बैकअप के लिए एक टेम्पलेट चुनें:"
 
 #: src/winecharm/template_manager.py:629
-#, fuzzy
 msgid "Template Archives"
-msgstr "टेम्पलेट नाम"
+msgstr "टेम्पलेट अभिलेखागार"
 
 #: src/winecharm/template_manager.py:672 src/winecharm/backup.py:432
 #, python-format
@@ -705,7 +703,7 @@ msgstr "टेम्पलेट %s पर सहेजा गया"
 
 #: src/winecharm/template_manager.py:767 src/winecharm/backup.py:150
 msgid "Exporting..."
-msgstr ""
+msgstr "निर्यात किया जा रहा है..."
 
 #: src/winecharm/template_manager.py:782 src/winecharm/template_manager.py:786
 #: src/winecharm/backup.py:303 src/winecharm/backup.py:308
@@ -728,12 +726,11 @@ msgstr "टेम्पलेट बैकअप रद्द कर दिय�
 
 #: src/winecharm/template_manager.py:820
 msgid "WineCharm Template Files (*.template)"
-msgstr ""
+msgstr "WineCharm टेम्पलेट फ़ाइलें (*.template)"
 
 #: src/winecharm/template_manager.py:866
-#, fuzzy
 msgid "Restoring Template"
-msgstr "टेम्पलेट सत्यापित किया जा रहा है"
+msgstr "टेम्पलेट पुनर्स्थापित किया जा रहा है"
 
 #: src/winecharm/template_manager.py:900 src/winecharm/restore.py:213
 #, python-format
@@ -789,9 +786,8 @@ msgid "A template with this name already exists."
 msgstr "इस नाम का एक टेम्पलेट पहले से मौजूद है।"
 
 #: src/winecharm/template_manager.py:1177
-#, fuzzy
 msgid "Cloning template..."
-msgstr "टेम्पलेट क्लोन करें"
+msgstr "टेम्पलेट क्लोन किया जा रहा है..."
 
 #: src/winecharm/template_manager.py:1193
 msgid "Clone Successful"
@@ -1394,85 +1390,69 @@ msgstr "चरण {current}/{total}"
 
 #: src/winecharm/settings.py:84
 msgid "Settings"
-msgstr ""
+msgstr "सेटिंग्स"
 
 #: src/winecharm/settings.py:125
-#, fuzzy
 msgid "Runner Set Default"
 msgstr "डिफ़ॉल्ट रनर सेट करें"
 
 #: src/winecharm/settings.py:126
-#, fuzzy
 msgid "Runner Download"
-msgstr "डाउनलोड"
+msgstr "रनर डाउनलोड करें"
 
 #: src/winecharm/settings.py:127
-#, fuzzy
 msgid "Runner Import"
-msgstr "रनर आयात विफल"
+msgstr "रनर आयात करें"
 
 #: src/winecharm/settings.py:128
-#, fuzzy
 msgid "Runner Backup"
-msgstr "बैकअप रद्द करें"
+msgstr "रनर बैकअप करें"
 
 #: src/winecharm/settings.py:129
-#, fuzzy
 msgid "Runner Restore"
-msgstr "पुनर्स्थापना रद्द करें"
+msgstr "रनर पुनर्स्थापित करें"
 
 #: src/winecharm/settings.py:130
-#, fuzzy
 msgid "Runner Delete"
-msgstr "कोई रनर नहीं चुना गया"
+msgstr "रनर हटाएं"
 
 #: src/winecharm/settings.py:131
-#, fuzzy
 msgid "Template Set Default"
-msgstr "टेम्पलेट हटाया गया"
+msgstr "डिफ़ॉल्ट टेम्पलेट सेट करें"
 
 #: src/winecharm/settings.py:132
-#, fuzzy
 msgid "Template Configure"
-msgstr "टेम्पलेट नाम"
+msgstr "टेम्पलेट कॉन्फ़िगर करें"
 
 #: src/winecharm/settings.py:133
-#, fuzzy
 msgid "Template Terminal"
-msgstr "टर्मिनल खोलें"
+msgstr "टेम्पलेट टर्मिनल"
 
 #: src/winecharm/settings.py:134
-#, fuzzy
 msgid "Template Import"
-msgstr "टेम्पलेट आयात विफल"
+msgstr "टेम्पलेट आयात करें"
 
 #: src/winecharm/settings.py:135
-#, fuzzy
 msgid "Template Create"
-msgstr "मूल टेम्पलेट बन गया"
+msgstr "टेम्पलेट बनाएं"
 
 #: src/winecharm/settings.py:136
-#, fuzzy
 msgid "Template Clone"
-msgstr "टेम्पलेट क्लोन नाम सेट करें"
+msgstr "टेम्पलेट क्लोन करें"
 
 #: src/winecharm/settings.py:137
-#, fuzzy
 msgid "Template Backup"
-msgstr "टेम्पलेट नाम"
+msgstr "टेम्पलेट बैकअप करें"
 
 #: src/winecharm/settings.py:138
-#, fuzzy
 msgid "Template Restore"
-msgstr "टेम्पलेट हटाया गया"
+msgstr "टेम्पलेट पुनर्स्थापित करें"
 
 #: src/winecharm/settings.py:139
-#, fuzzy
 msgid "Template Delete"
 msgstr "टेम्पलेट हटाया गया"
 
 #: src/winecharm/settings.py:140
-#, fuzzy
 msgid "Set Wine Arch"
 msgstr "Wine आर्किटेक्चर सेट करें"
 
@@ -1595,27 +1575,27 @@ msgstr "वे रनर चुनें जिन्हें आप डाउ�
 
 #: src/winecharm/runner_manager.py:744
 msgid "Wine Proton"
-msgstr ""
+msgstr "Wine Proton"
 
 #: src/winecharm/runner_manager.py:745
 msgid "Wine Stable"
-msgstr ""
+msgstr "Wine Stable"
 
 #: src/winecharm/runner_manager.py:746
 msgid "Wine Devel"
-msgstr ""
+msgstr "Wine Devel"
 
 #: src/winecharm/runner_manager.py:747
 msgid "Wine-tkg"
-msgstr ""
+msgstr "Wine-tkg"
 
 #: src/winecharm/runner_manager.py:748
 msgid "Wine-WoW64"
-msgstr ""
+msgstr "Wine-WoW64"
 
 #: src/winecharm/runner_manager.py:757
 msgid "Choose..."
-msgstr ""
+msgstr "चुनें..."
 
 #: src/winecharm/runner_manager.py:769
 msgid "Download"
@@ -1626,9 +1606,8 @@ msgid "Downloading Runners"
 msgstr "रनर डाउनलोड किए जा रहे हैं"
 
 #: src/winecharm/runner_manager.py:804
-#, fuzzy
 msgid "Starting download..."
-msgstr "स्थापना शुरू की जा रही है..."
+msgstr "डाउनलोड शुरू किया जा रहा है..."
 
 #: src/winecharm/runner_manager.py:893
 msgid "Download Error"
@@ -1723,7 +1702,7 @@ msgstr "बैकअप के लिए कृपया एक रनर चु
 
 #: src/winecharm/runner_manager.py:1122 src/winecharm/runner_manager.py:1206
 msgid "Tarball archives (*.tar.gz, *.tar.xz, *.tar.zst)"
-msgstr ""
+msgstr "टारबॉल अभिलेखागार (*.tar.gz, *.tar.xz, *.tar.zst)"
 
 #: src/winecharm/runner_manager.py:1144
 #, python-format
@@ -1812,19 +1791,19 @@ msgstr "नहीं"
 
 #: src/winecharm/restore.py:31
 msgid "Backup Files (*.prefix, *.bottle, *.wzt)"
-msgstr ""
+msgstr "बैकअप फ़ाइलें (*.prefix, *.bottle, *.wzt)"
 
 #: src/winecharm/restore.py:37
 msgid "WineCharm Bottle Files (*.bottle)"
-msgstr ""
+msgstr "WineCharm बॉटल फ़ाइलें (*.bottle)"
 
 #: src/winecharm/restore.py:41
 msgid "WineCharm Prefix Backup (*.prefix)"
-msgstr ""
+msgstr "WineCharm प्रीफ़िक्स बैकअप (*.prefix)"
 
 #: src/winecharm/restore.py:45
 msgid "Winezgui Backup Files (*.wzt)"
-msgstr ""
+msgstr "Winezgui बैकअप फ़ाइलें (*.wzt)"
 
 #: src/winecharm/restore.py:232
 #, python-format
@@ -1838,35 +1817,31 @@ msgstr "पुनर्स्थापना शुरू करने में
 
 #: src/winecharm/restore.py:251
 msgid "Checking Uncompressed Size"
-msgstr ""
+msgstr "असंपीडित आकार की जाँच की जा रही है"
 
 #: src/winecharm/restore.py:252
-#, fuzzy
 msgid "Extracting Backup File"
-msgstr "बैकअप संग्रह बनाया जा रहा है"
+msgstr "बैकअप फ़ाइल निकाली जा रही है"
 
 #: src/winecharm/restore.py:253
-#, fuzzy
 msgid "Processing Registry Files"
-msgstr "रजिस्ट्री फ़ाइलों का प्रसंस्करण"
+msgstr "रजिस्ट्री फ़ाइलों का प्रसंस्करण किया जा रहा है"
 
 #: src/winecharm/restore.py:254 src/winecharm/import_wine_dir.py:157
 msgid "Performing Replacements"
 msgstr "प्रतिस्थापन किए जा रहे हैं"
 
 #: src/winecharm/restore.py:255 src/winecharm/restore.py:271
-#, fuzzy
 msgid "Replacing Symbolic Links with Directories"
-msgstr "सांकेतिक लिंक को डायरेक्टरी से बदलें"
+msgstr "सांकेतिक लिंक को डायरेक्टरी से बदला जा रहा है"
 
 #: src/winecharm/restore.py:256
-#, fuzzy
 msgid "Renaming and merging user directories"
-msgstr "उपयोगकर्ता डायरेक्टरी का नाम बदला जा रहा है और विलय किया जा रहा है"
+msgstr "उपयोगकर्ता डायरेक्टरी का नाम बदला और विलय किया जा रहा है"
 
 #: src/winecharm/restore.py:257
 msgid "Add Shortcuts to Script List"
-msgstr ""
+msgstr "स्क्रिप्ट सूची में शॉर्टकट जोड़े जा रहे हैं"
 
 #: src/winecharm/restore.py:258 src/winecharm/restore.py:274
 #: src/winecharm/import_wine_dir.py:161
@@ -1874,24 +1849,20 @@ msgid "Create Wineboot Required file"
 msgstr "Wineboot आवश्यक फ़ाइल बनाएं"
 
 #: src/winecharm/restore.py:267
-#, fuzzy
 msgid "Checking Disk Space"
-msgstr "अपर्याप्त डिस्क स्थान"
+msgstr "डिस्क स्थान की जाँच की जा रही है"
 
 #: src/winecharm/restore.py:268
-#, fuzzy
 msgid "Extracting WZT Backup File"
-msgstr "बैकअप संग्रह बनाया जा रहा है"
+msgstr "WZT बैकअप फ़ाइल निकाली जा रही है"
 
 #: src/winecharm/restore.py:269
-#, fuzzy
 msgid "Performing User Related Replacements"
-msgstr "प्रतिस्थापन किए जा रहे हैं"
+msgstr "उपयोगकर्ता से संबंधित प्रतिस्थापन किए जा रहे हैं"
 
 #: src/winecharm/restore.py:270
-#, fuzzy
 msgid "Processing WineZGUI Script Files"
-msgstr "📥 WineZGUI स्क्रिप्ट्स आयात करें..."
+msgstr "WineZGUI स्क्रिप्ट फ़ाइलें संसाधित की जा रही हैं"
 
 #: src/winecharm/restore.py:272 src/winecharm/import_wine_dir.py:158
 msgid "Renaming and Merging User Directories"
@@ -1899,7 +1870,7 @@ msgstr "उपयोगकर्ता डायरेक्टरी का न
 
 #: src/winecharm/restore.py:273
 msgid "Search LNK Files and Append to Found List"
-msgstr ""
+msgstr "LNK फ़ाइलें खोजकर मिली सूची में जोड़ी जा रही हैं"
 
 #: src/winecharm/restore.py:888
 #, python-format
@@ -1910,10 +1881,14 @@ msgstr ""
 "अनुमानित आवश्यक स्थान %(need).2f MB है, लेकिन केवल %(avail).2f MB उपलब्ध है। कृपया "
 "स्थान खाली करें।"
 
+#: src/winecharm/restore.py:897
+#, python-format
+msgid "Disk space check passed: %(size).2f MB required"
+msgstr "डिस्क स्थान जाँच सफल: %(size).2f MB आवश्यक"
+
 #: src/winecharm/restore.py:957
-#, fuzzy
 msgid "Cancel Restoring Backup?"
-msgstr "बैकअप रद्द करें"
+msgstr "बैकअप पुनर्स्थापना रद्द करें?"
 
 #: src/winecharm/restore.py:958
 msgid ""
@@ -1957,9 +1932,8 @@ msgid "Creating scripts for .exe files"
 msgstr ".exe फ़ाइलों के लिए स्क्रिप्ट बनाई जा रही हैं"
 
 #: src/winecharm/import_wine_dir.py:166
-#, fuzzy
 msgid "Importing Wine Directory..."
-msgstr "📥 Wine डायरेक्टरी आयात करें"
+msgstr "Wine डायरेक्टरी आयात की जा रही है..."
 
 #: src/winecharm/import_wine_dir.py:191
 #, python-format
@@ -1972,14 +1946,13 @@ msgid "Import failed: %s"
 msgstr "आयात विफल: %s"
 
 #: src/winecharm/import_wine_dir.py:267
-#, fuzzy
 msgid "Overwrite Existing Directory?"
-msgstr "मौजूदा डायरेक्टरी का बैकअप लिया जा रहा है"
+msgstr "मौजूदा डायरेक्टरी को अधिलेखित करें?"
 
 #: src/winecharm/import_wine_dir.py:268
 #, python-format
 msgid "The directory %(name)s already exists. Do you want to overwrite it?"
-msgstr "The directory %(name)s already exists. Do you want to overwrite it?"
+msgstr "डायरेक्टरी %(name)s पहले से मौजूद है। क्या आप इसे अधिलेखित करना चाहते हैं?"
 
 #: src/winecharm/import_wine_dir.py:274
 msgid "Overwrite"
@@ -1991,9 +1964,8 @@ msgid "Could not delete directory: %s"
 msgstr "डायरेक्टरी हटा नहीं सके: %s"
 
 #: src/winecharm/import_wine_dir.py:333
-#, fuzzy
 msgid "Cancel Import"
-msgstr "पुनर्स्थापना रद्द करें"
+msgstr "आयात रद्द करें"
 
 #: src/winecharm/import_wine_dir.py:334
 msgid "Do you want to cancel the wine directory import process?"
@@ -2033,9 +2005,8 @@ msgid "Backup directory may still exist at: %s"
 msgstr "बैकअप डायरेक्टरी अभी भी यहाँ मौजूद हो सकती है: %s"
 
 #: src/winecharm/import_wine_dir.py:467
-#, fuzzy
 msgid "Importing..."
-msgstr "Importing..."
+msgstr "आयात किया जा रहा है..."
 
 #: src/winecharm/single_prefix.py:15
 msgid ""
@@ -2046,9 +2017,8 @@ msgstr ""
 "सिंगल प्रीफ़िक्स स्थान बचाता है लेकिन अलग-अलग गेम्स का बैकअप लेना कठिन बनाता है।"
 
 #: src/winecharm/single_prefix.py:22
-#, fuzzy
 msgid "Multiple Prefix Mode"
-msgstr "सिंगल प्रीफ़िक्स मोड"
+msgstr "मल्टीपल प्रीफ़िक्स मोड"
 
 #: src/winecharm/single_prefix.py:36
 msgid "Apply"
@@ -2088,7 +2058,7 @@ msgstr "क्या आप बैकअप प्रक्रिया रद�
 
 #: src/winecharm/backup.py:352
 msgid "Bottling..."
-msgstr ""
+msgstr "बॉटल बनाई जा रही है..."
 
 #: src/winecharm/backup.py:429
 msgid "Creating Bottle archive"
