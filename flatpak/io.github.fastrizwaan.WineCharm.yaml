@@ -197,11 +197,13 @@ modules:
       - cp -v /usr/share/icons/hicolor/index.theme /app/share/icons/hicolor/index.theme
       - gtk-update-icon-cache -f  /app/share/icons/hicolor
     sources:
-      - type: git
-        tag: 1.0
-        commit: 12c7bda596fe9ae2ecb1a18594daafa4896b5657
-        url: https://github.com/fastrizwaan/WineCharm.git
+#      - type: git
+#        tag: 1.0
+#        commit: 12c7bda596fe9ae2ecb1a18594daafa4896b5657
+#        url: https://github.com/fastrizwaan/WineCharm.git
 
+      - type: dir
+        path: ..
 
         
 
