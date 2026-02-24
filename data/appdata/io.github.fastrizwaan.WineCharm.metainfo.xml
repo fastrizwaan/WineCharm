@@ -57,7 +57,14 @@
     <color type="primary" scheme_preference="dark">#cc7a29</color>
   </branding>  
   <releases>
-    <release version="1.1" date="2026-02-21">
+    <release version="1.1" date="2026-02-24">
+      <description>
+        <p>Fix: CLI/Open-With restore now clears the script list and keeps restore progress visible.</p>
+        <p>Fix: CLI/Open-With EXE/MSI processing now runs in the background so processing progress is shown.</p>
+        <p>Feature: Window is focused after CLI/Open-With script creation.</p>
+        </description>
+    </release>
+    <release version="1.0" date="2026-02-21">
       <description>
         <p>Fix: Icon in about.</p>
         <p>Feature: i18n basic support.</p>
