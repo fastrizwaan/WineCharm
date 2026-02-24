@@ -1389,7 +1389,7 @@ class WineCharmApp(Adw.Application):
             self.handle_ui_error(play_stop_button, row, _("Executable Not Found"), str(exe_file), _("Exe Not Found"))
             return
 
-        _, current_runner_state = self.ensure_runner_wineboot_state(wineprefix, runner_path)
+        runner_changed, current_runner_state = self.ensure_runner_wineboot_state(wineprefix, runner_path)
 
         log_file_path = Path(wineprefix) / f"{exe_file.stem}.log"
         # Safely process arguments
@@ -2682,7 +2682,7 @@ def main():
                 path_env = f"export PATH={shlex.quote(str(runner_dir))}:$PATH"
 
                 # Check runner changes per prefix and request one-time wineboot update when needed.
-                _, current_runner_state = app.ensure_runner_wineboot_state(wineprefix, runner_path)
+                runner_changed, current_runner_state = app.ensure_runner_wineboot_state(wineprefix, runner_path)
                 wineboot_file_path = Path(wineprefix) / "wineboot-required.yml"
                 if wineboot_file_path.exists():
                     prerun_command = [
