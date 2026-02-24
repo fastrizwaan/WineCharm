@@ -893,30 +893,34 @@ class WineCharmApp(Adw.Application):
     def process_cli_file_later(self, file_path):
         print("Processing CLI file later: {}".format(file_path))
 
-        if file_path:
-            file_extension = Path(file_path).suffix.lower()
-            if file_extension in ['.exe', '.msi']:
-                print("Valid executable file detected: {}".format(file_path))
-                GLib.idle_add(self.present_main_window)
-                GLib.idle_add(self.show_processing_spinner, _("Processing"))
-                self.process_cli_file_in_thread(file_path, focus_window=True)
-            elif file_extension in ['.wzt', '.bottle', '.prefix']:
-                print("Valid backup file detected: {}".format(file_path))
-                GLib.idle_add(self.show_processing_spinner, _("Restoring"))
-                self.restore_prefix_bottle_wzt_tar_zst(file_path)
-            else:
-                print(f"Invalid file type: {file_extension}. Only .exe or .msi files are allowed.")
-                GLib.timeout_add_seconds(
-                    0.5,
-                    self.show_info_dialog,
-                    _("Invalid File Type"),
-                    _("Only .exe and .msi files are supported."),
-                )    
-                self.command_line_file = None
-                return False
+        if not file_path:
+            return False
 
-        #self.create_script_list()
-        GLib.idle_add(self.create_script_list)
+        file_extension = Path(file_path).suffix.lower()
+        if file_extension in ['.exe', '.msi']:
+            print("Valid executable file detected: {}".format(file_path))
+            GLib.idle_add(self.present_main_window)
+            GLib.idle_add(self.show_processing_spinner, _("Processing"))
+            self.process_cli_file_in_thread(file_path, focus_window=True)
+            return False
+
+        if file_extension in ['.wzt', '.bottle', '.prefix']:
+            print("Valid backup file detected: {}".format(file_path))
+            GLib.idle_add(self.present_main_window)
+            with self.file_lock:
+                self.script_list = {}
+            self.script_ui_data = {}
+            self.restore_prefix_bottle_wzt_tar_zst(file_path)
+            return False
+
+        print(f"Invalid file type: {file_extension}. Only .exe, .msi, .wzt, .bottle, or .prefix files are allowed.")
+        GLib.timeout_add_seconds(
+            0.5,
+            self.show_info_dialog,
+            _("Invalid File Type"),
+            _("Only .exe, .msi, .wzt, .bottle, and .prefix files are supported."),
+        )
+        self.command_line_file = None
         return False  # Return False to prevent this function from being called again
 
 
