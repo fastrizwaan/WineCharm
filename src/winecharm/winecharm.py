@@ -995,10 +995,11 @@ class WineCharmApp(Adw.Application):
         current_state = self.get_runner_fingerprint(runner_path)
         previous_state = self.load_prefix_runner_state(wineprefix)
 
-        # First launch for a prefix: initialize state silently, no forced wineboot.
+        # First launch for a prefix: require one-time wineboot initialization.
         if previous_state is None:
+            self.create_wineboot_required_file(wineprefix)
             self.save_prefix_runner_state(wineprefix, current_state)
-            return False, current_state
+            return True, current_state
 
         keys = ("runner_path", "runner_mtime_ns", "runner_size")
         runner_changed = any(previous_state.get(k) != current_state.get(k) for k in keys)
