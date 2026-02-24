@@ -897,8 +897,9 @@ class WineCharmApp(Adw.Application):
             file_extension = Path(file_path).suffix.lower()
             if file_extension in ['.exe', '.msi']:
                 print("Valid executable file detected: {}".format(file_path))
+                GLib.idle_add(self.present_main_window)
                 GLib.idle_add(self.show_processing_spinner, _("Processing"))
-                self.process_cli_file_in_thread(file_path)
+                self.process_cli_file_in_thread(file_path, focus_window=True)
             elif file_extension in ['.wzt', '.bottle', '.prefix']:
                 print("Valid backup file detected: {}".format(file_path))
                 GLib.idle_add(self.show_processing_spinner, _("Restoring"))
@@ -927,6 +928,12 @@ class WineCharmApp(Adw.Application):
         if not self.window:
             self.window = Adw.ApplicationWindow(application=self)
         self.window.present()
+
+    def present_main_window(self):
+        """Present the app window on the main loop."""
+        if self.window:
+            self.window.present()
+        return False
 
  
 
@@ -1006,7 +1013,7 @@ class WineCharmApp(Adw.Application):
 
 
 
-    def process_cli_file_in_thread(self, file_path):
+    def process_cli_file_in_thread(self, file_path, focus_window=False):
         try:
             print(f"Processing CLI file in thread: {file_path}")
             abs_file_path = str(Path(file_path).resolve())
@@ -1032,6 +1039,9 @@ class WineCharmApp(Adw.Application):
                 GLib.idle_add(self.hide_processing_spinner)
             
             GLib.timeout_add_seconds(0.5, self.create_script_list)
+            if focus_window:
+                # Present after refresh so Open-With/CLI creations are immediately visible.
+                GLib.timeout_add(100, self.present_main_window)
 
 
         
