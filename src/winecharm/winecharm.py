@@ -901,7 +901,13 @@ class WineCharmApp(Adw.Application):
             print("Valid executable file detected: {}".format(file_path))
             GLib.idle_add(self.present_main_window)
             GLib.idle_add(self.show_processing_spinner, _("Processing"))
-            self.process_cli_file_in_thread(file_path, focus_window=True)
+            self.stop_processing = False
+            self.processing_thread = threading.Thread(
+                target=self.process_cli_file_in_thread,
+                args=(file_path, True),
+                daemon=True
+            )
+            self.processing_thread.start()
             return False
 
         if file_extension in ['.wzt', '.bottle', '.prefix']:
