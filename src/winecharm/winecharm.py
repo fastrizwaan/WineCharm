@@ -945,6 +945,70 @@ class WineCharmApp(Adw.Application):
             self.window.present()
         return False
 
+    def get_prefix_runner_state_file(self, wineprefix):
+        """Return the per-prefix runner state file path."""
+        return Path(wineprefix) / "runner-state.yml"
+
+    def get_runner_fingerprint(self, runner_path):
+        """
+        Build a lightweight fingerprint for runner change detection.
+        Uses resolved path and binary metadata to avoid expensive checks.
+        """
+        runner_resolved = Path(str(runner_path)).expanduser().resolve()
+        stat_result = runner_resolved.stat()
+        return {
+            "runner_path": str(runner_resolved),
+            "runner_mtime_ns": int(stat_result.st_mtime_ns),
+            "runner_size": int(stat_result.st_size),
+        }
+
+    def load_prefix_runner_state(self, wineprefix):
+        """Load persisted runner fingerprint for a prefix."""
+        state_file = self.get_prefix_runner_state_file(wineprefix)
+        if not state_file.exists():
+            return None
+
+        try:
+            with open(state_file, "r", encoding="utf-8") as f:
+                state_data = yaml.safe_load(f) or {}
+            return state_data if isinstance(state_data, dict) else None
+        except Exception as e:
+            print(f"Warning: Could not read runner state file {state_file}: {e}")
+            return None
+
+    def save_prefix_runner_state(self, wineprefix, runner_state):
+        """Persist runner fingerprint for a prefix."""
+        state_file = self.get_prefix_runner_state_file(wineprefix)
+        try:
+            with open(state_file, "w", encoding="utf-8") as f:
+                yaml.safe_dump(runner_state, f, default_flow_style=False)
+        except Exception as e:
+            print(f"Warning: Could not write runner state file {state_file}: {e}")
+
+    def ensure_runner_wineboot_state(self, wineprefix, runner_path):
+        """
+        Detect runner change for a prefix and mark wineboot requirement when needed.
+
+        Returns:
+            tuple(bool, dict): (runner_changed, current_runner_state)
+        """
+        current_state = self.get_runner_fingerprint(runner_path)
+        previous_state = self.load_prefix_runner_state(wineprefix)
+
+        # First launch for a prefix: initialize state silently, no forced wineboot.
+        if previous_state is None:
+            self.save_prefix_runner_state(wineprefix, current_state)
+            return False, current_state
+
+        keys = ("runner_path", "runner_mtime_ns", "runner_size")
+        runner_changed = any(previous_state.get(k) != current_state.get(k) for k in keys)
+
+        if runner_changed:
+            print(f"Runner change detected for prefix: {wineprefix}")
+            self.create_wineboot_required_file(wineprefix)
+
+        return runner_changed, current_state
+
  
 
     def handle_sigint(self, signum, frame):
@@ -1324,6 +1388,8 @@ class WineCharmApp(Adw.Application):
             self.handle_ui_error(play_stop_button, row, _("Executable Not Found"), str(exe_file), _("Exe Not Found"))
             return
 
+        _, current_runner_state = self.ensure_runner_wineboot_state(wineprefix, runner_path)
+
         log_file_path = Path(wineprefix) / f"{exe_file.stem}.log"
         # Safely process arguments
         try:
@@ -1444,6 +1510,7 @@ class WineCharmApp(Adw.Application):
 
                     subprocess.run(prerun_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                     wineboot_file_path.unlink(missing_ok=True)
+                    self.save_prefix_runner_state(wineprefix, current_runner_state)
                     
                     # Schedule main launch after wineboot completes
                     GLib.idle_add(execute_launch)
@@ -2599,29 +2666,44 @@ def main():
 
                 env_vars = script_data.get("env_vars", "").strip()
                 script_args = script_data.get("args", "").strip()
-                runner = script_data.get("runner", "wine")
+                configured_runner = str(script_data.get("runner", "")).strip()
 
-                # Resolve runner path
-                if runner:
-                    runner = Path(runner).expanduser().resolve()
-                    runner_dir = str(runner.parent.expanduser().resolve())
-                    path_env = f'export PATH="{runner_dir}:$PATH"'
+                # Resolve runner path (fallback to system wine when script runner is unset).
+                if configured_runner:
+                    runner_path = Path(configured_runner).expanduser().resolve()
                 else:
-                    runner = "wine"
-                    runner_dir = ""  # Or set a specific default if required
-                    path_env = ""
+                    runner_path = app.find_command_in_path("wine")
+                    if not runner_path:
+                        print("Error: System Wine executable was not found in PATH.")
+                        sys.exit(1)
+
+                runner_dir = runner_path.parent.resolve()
+                path_env = f"export PATH={shlex.quote(str(runner_dir))}:$PATH"
+
+                # Check runner changes per prefix and request one-time wineboot update when needed.
+                _, current_runner_state = app.ensure_runner_wineboot_state(wineprefix, runner_path)
+                wineboot_file_path = Path(wineprefix) / "wineboot-required.yml"
+                if wineboot_file_path.exists():
+                    prerun_command = [
+                        "sh", "-c",
+                        f"export PATH={shlex.quote(str(runner_dir))}:$PATH; "
+                        f"WINEPREFIX={shlex.quote(str(wineprefix))} wineboot -u"
+                    ]
+                    subprocess.run(prerun_command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    wineboot_file_path.unlink(missing_ok=True)
+                    app.save_prefix_runner_state(wineprefix, current_runner_state)
 
                 # Prepare the command safely using shlex for quoting
                 exe_parent = shlex.quote(str(exe_path.parent.resolve()))
-                wineprefix = shlex.quote(str(wineprefix))
-                runner = shlex.quote(str(runner))
+                wineprefix_quoted = shlex.quote(str(wineprefix))
+                runner_quoted = shlex.quote(str(runner_path))
 
                 # Construct the command parts
                 command_parts = []
 
                 # Add path to runner if it exists
                 if path_env:
-                    command_parts.append(f"{path_env}")
+                    command_parts.append(path_env)
 
                 # Change to the executable's directory
                 command_parts.append(f"cd {exe_parent}")
@@ -2631,7 +2713,7 @@ def main():
                     command_parts.append(f"{env_vars}")
 
                 # Add wineprefix and runner
-                command_parts.append(f"WINEPREFIX={wineprefix} {runner} {shlex.quote(str(exe_path))}")
+                command_parts.append(f"WINEPREFIX={wineprefix_quoted} {runner_quoted} {shlex.quote(str(exe_path))}")
 
                 # Process .charm file arguments and paths
                 script_args = script_data.get("args", "").strip()
@@ -2660,7 +2742,7 @@ def main():
                 command_parts.append(f"cd {exe_parent}")
                 if env_vars:
                     command_parts.append(env_vars)
-                command_parts.append(f"WINEPREFIX={wineprefix} {runner} {shlex.quote(str(exe_path))} {processed_script_args}")
+                command_parts.append(f"WINEPREFIX={wineprefix_quoted} {runner_quoted} {shlex.quote(str(exe_path))} {processed_script_args}")
 
                 # Join all the command parts
                 command = " && ".join(command_parts)
