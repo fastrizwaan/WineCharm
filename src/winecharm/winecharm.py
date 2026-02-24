@@ -97,7 +97,6 @@ class WineCharmApp(Adw.Application):
         self.version = "1.0"
         self.app_icon_names = (
             "io.github.fastrizwaan.WineCharm",
-            "io.github.fastrizwaan.winecharm",
         )
         self.app_icon_name = self.app_icon_names[0]
         # Paths and directories

@@ -87,9 +87,8 @@ install_files() {
     chmod +rx "$INSTALL_PATH/winecharm/winecharm.py"
     # Install main script from src/
     ln -sf  "$INSTALL_PATH/winecharm/winecharm.py" "$INSTALL_PATH/bin/winecharm"
-    # Install app icons from data/icons/ (primary name + lowercase alias)
+    # Install app icon from data/icons/
     install -Dm644 data/icons/io.github.fastrizwaan.WineCharm.svg "$INSTALL_PATH/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg"
-    install -Dm644 data/icons/io.github.fastrizwaan.winecharm.svg "$INSTALL_PATH/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.winecharm.svg"
     # Ensure hicolor index.theme exists so icon-theme lookup can index installed icons
     if [ ! -f "$INSTALL_PATH/share/icons/hicolor/index.theme" ] && [ -f "/usr/share/icons/hicolor/index.theme" ]; then
         install -Dm644 /usr/share/icons/hicolor/index.theme "$INSTALL_PATH/share/icons/hicolor/index.theme"
@@ -122,7 +121,6 @@ uninstall_files() {
     rm -f "$INSTALL_PATH/bin/winecharm"
     # Remove app icons
     rm -f "$INSTALL_PATH/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.WineCharm.svg"
-    rm -f "$INSTALL_PATH/share/icons/hicolor/scalable/apps/io.github.fastrizwaan.winecharm.svg"
     # Remove .desktop file
     rm -f "$INSTALL_PATH/share/applications/io.github.fastrizwaan.WineCharm.desktop"
     # Remove additional Wine icon

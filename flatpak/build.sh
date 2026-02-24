@@ -17,5 +17,4 @@ else
     echo "Building and running WineCharm..."
     flatpak-builder --user --install --repo=repo --force-clean build-dir io.github.fastrizwaan.WineCharm.yaml
     flatpak kill io.github.fastrizwaan.WineCharm 2> /dev/null
-    flatpak run io.github.fastrizwaan.WineCharm
 fi
