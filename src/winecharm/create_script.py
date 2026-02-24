@@ -130,7 +130,8 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
             if existing_script_path.exists():
                 existing_script_path.unlink()
                 print(f"Removed existing charm file: {existing_script_path}")
-            del self.script_list[script_key]
+            with self.file_lock:
+                del self.script_list[script_key]
             print(f"Removed old script_key {script_key} from script_list")
         else:
             print(f"Existing charm file in different prefix '{existing_wineprefix}' left intact.")
@@ -184,16 +185,9 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
     # Add the new script data directly to self.script_list
     self.new_scripts.add(yaml_file_path.stem)
 
-    # Add or update script row in UI
-    self.script_list[script_key] = yaml_data
-    # Update the UI row for the renamed script
-    row = self.create_script_row(script_key, yaml_data)
-    if row:
-        self.flowbox.prepend(row)
-    # 
-    self.script_list = {script_key: yaml_data, **self.script_list}
-    self.script_ui_data[script_key]['script_path'] = yaml_data['script_path']
-    #script_data['script_path'] = yaml_data['script_path']
+    # Update in-memory list and refresh UI on the main loop.
+    with self.file_lock:
+        self.script_list = {script_key: yaml_data, **self.script_list}
     
     print(f"Created new charm file: {yaml_file_path} with script_key {script_key}")
     
@@ -339,4 +333,3 @@ def extract_exe_files_from_lnk(self, lnk_files, wineprefix):
                     exe_files.append(exe_path)
                     self.add_lnk_file_to_processed(wineprefix, lnk_file)  # Track the .lnk file, not the .exe file
     return exe_files
-

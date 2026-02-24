@@ -701,13 +701,16 @@ def create_script_list(self):
     """Create UI rows for scripts efficiently with batch updates, including highlighting."""
     self.flowbox.remove_all()
     
-    if not self.script_list:
+    with self.file_lock:
+        script_items = list(self.script_list.items())
+
+    if not script_items:
         return
     
     self.script_ui_data = {}
     
     rows = []
-    for script_key, script_data in self.script_list.items():
+    for script_key, script_data in script_items:
         row = self.create_script_row(script_key, script_data)
         if row:
             rows.append(row)
