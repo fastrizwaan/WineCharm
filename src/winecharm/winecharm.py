@@ -1372,6 +1372,10 @@ class WineCharmApp(Adw.Application):
         wine_debug = self.wine_debug
         wineboot_file_path = Path(wineprefix) / "wineboot-required.yml"
 
+        if not exe_file.exists():
+            self.handle_ui_error(play_stop_button, row, _("Executable Not Found"), str(exe_file), _("Exe Not Found"))
+            return
+
         try:
             runner_path = self.get_runner(script_data)
         except Exception as e:
@@ -1383,10 +1387,6 @@ class WineCharmApp(Adw.Application):
                 _("Failed to get runner. Error: %s") % e,
                 _("Runner Error")
             )
-            return
-
-        if not exe_file.exists():
-            self.handle_ui_error(play_stop_button, row, _("Executable Not Found"), str(exe_file), _("Exe Not Found"))
             return
 
         runner_changed, current_runner_state = self.ensure_runner_wineboot_state(wineprefix, runner_path)
