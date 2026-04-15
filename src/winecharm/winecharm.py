@@ -2618,6 +2618,7 @@ def parse_args():
     """
     parser = argparse.ArgumentParser(description="WineCharm GUI application or headless mode for .charm files")
     parser.add_argument('file', nargs='?', help="Path to the .exe, .msi, .charm, .bottle, .prefix, or .wzt file")
+    parser.add_argument('extra_args', nargs=argparse.REMAINDER, help="Additional arguments passed to the script")
     return parser.parse_args()
 
 def main():
@@ -2718,6 +2719,7 @@ def main():
 
                 # Process .charm file arguments and paths
                 script_args = script_data.get("args", "").strip()
+                processed_script_args_list = []
                 if script_args:
                     # Expand $WINEPREFIX if present
                     script_args = script_args.replace('$WINEPREFIX', str(wineprefix))
@@ -2732,9 +2734,14 @@ def main():
                             current_arg.append(part)
                     if current_arg:
                         args_list.append(' '.join(current_arg))
-                    processed_script_args = ' '.join(shlex.quote(arg) for arg in args_list)
-                else:
-                    processed_script_args = ""
+                    processed_script_args_list.extend([shlex.quote(arg) for arg in args_list])
+
+                # Append extra arguments passed to the WineCharm application
+                if hasattr(args, 'extra_args') and args.extra_args:
+                    print("CLI extra args:", args.extra_args)
+                    processed_script_args_list.extend([shlex.quote(arg) for arg in args.extra_args])
+
+                processed_script_args = ' '.join(processed_script_args_list)
 
                 # Construct the command
                 command_parts = []
@@ -2743,6 +2750,7 @@ def main():
                 command_parts.append(f"cd {exe_parent}")
                 if env_vars:
                     command_parts.append(env_vars)
+                print("Final args:", processed_script_args)
                 command_parts.append(f"WINEPREFIX={wineprefix_quoted} {runner_quoted} {shlex.quote(str(exe_path))} {processed_script_args}")
 
                 # Join all the command parts
