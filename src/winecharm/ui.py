@@ -849,7 +849,7 @@ def create_script_row(self, script_key, script_data):
         container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         container.add_css_class('rounded-container')
         # Set min width so it takes exactly 1 column at default 585px width, but flows to 2 columns at ~600px
-        container.set_size_request(300, -1)
+        container.set_size_request(382, -1)
 
         # Icon (left-aligned)
         script = Path(str(script_data['script_path'])).expanduser()
@@ -865,16 +865,16 @@ def create_script_row(self, script_key, script_data):
             icon_image.set_pixel_size(40)
             icon_image.set_halign(Gtk.Align.CENTER)
             icon_container.append(icon_image)
-            icon_container.set_margin_start(6)
+            icon_container.set_margin_start(4)
         else:
             icon_container = Gtk.Box()
             icon_image = Gtk.Image()
             icon_container.append(icon_image)
-            icon_container.set_margin_start(6)
+            icon_container.set_margin_start(4)
         container.append(icon_container)
 
         # Container for label or buttons
-        label_button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        label_button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         label_button_box.set_hexpand(True)
         label_button_box.set_valign(Gtk.Align.CENTER)
 
@@ -883,26 +883,28 @@ def create_script_row(self, script_key, script_data):
         label_box.set_hexpand(True)
         main_label = Gtk.Label()
         main_label.set_hexpand(True)
-        main_label.set_halign(Gtk.Align.START)
-        main_label.set_wrap(True)
-        main_label.set_max_width_chars(25)
+        main_label.set_xalign(0.0)
+        main_label.set_wrap(False)
+        main_label.set_max_width_chars(1)
         main_label.set_ellipsize(Pango.EllipsizeMode.END)
         main_label.set_markup(title_text)
         label_box.append(main_label)
 
         # Create button_box
-        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
         button_box.set_hexpand(True)
         box_main_label = Gtk.Label()
         box_main_label.set_markup(title_text)
-        box_main_label.set_wrap(True)
-        box_main_label.set_max_width_chars(15)
+        box_main_label.set_xalign(0.0)
+        box_main_label.set_wrap(False)
+        box_main_label.set_max_width_chars(25)
         box_main_label.set_ellipsize(Pango.EllipsizeMode.END)
         
         spacer = Gtk.Box()
         spacer.set_hexpand(True)
         
         play_button = Gtk.Button(icon_name="media-playback-start-symbolic", tooltip_text=_("Play"))
+        play_button.set_margin_end(4)
         play_button.set_size_request(60, -1)
         play_button.set_opacity(1)
         play_button.set_sensitive(True)
@@ -917,7 +919,7 @@ def create_script_row(self, script_key, script_data):
         button_box.append(play_button)
         button_box.append(options_button)
         button_box.set_margin_end(4)
-        button_box.set_size_request(60, 34)
+        button_box.set_size_request(-1, 34)
         label_button_box.append(label_box)
         container.append(label_button_box)
 
