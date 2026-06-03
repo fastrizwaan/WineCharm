@@ -212,6 +212,13 @@ class WineCharmApp(Adw.Application):
             .rounded-container {
                 border-radius: 5px;
             }
+            flowboxchild {
+                padding: 0px;
+                margin: 1px;
+            }
+            flowboxchild:hover {
+                background: rgba(127, 127, 127, 0.1);
+            }
         """)
 
         Gtk.StyleContext.add_provider_for_display(
