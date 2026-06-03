@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
 
 import gi
-import threading
-import subprocess
-import os
-import shutil
-import time
-import yaml
 from pathlib import Path
-from threading import Lock
+from gettext import gettext as _
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 
-from gi.repository import GLib, Gio, Gtk, Adw
+from gi.repository import Gtk, Adw
 
 def set_wine_arch(self):
     self.print_method_name()
@@ -70,7 +64,7 @@ def set_wine_arch(self):
         self.template = new_template
 
         self.settings['template'] = self.replace_home_with_tilde_in_path(str(new_template))
-        self.settings['arch'] = self.replace_home_with_tilde_in_path(str(new_arch))
+        self.settings['arch'] = new_arch
         self.save_settings()
         
         # Resolve template path
@@ -86,7 +80,6 @@ def set_wine_arch(self):
                                 arch=new_arch)
         else:
             print(f"Using existing {new_arch} template")
-            self.show_options_for_settings()
             finalize_arch_change(single_prefix_dir)
 
     # Finalization handler
@@ -98,7 +91,6 @@ def set_wine_arch(self):
         self.set_dynamic_variables()
         self.show_options_for_settings()
 
-    self.show_options_for_settings()
     # Connect response signal and present dialog
     dialog.connect("response", on_response)
     dialog.present(self.window)
