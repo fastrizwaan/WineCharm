@@ -896,7 +896,7 @@ def create_script_row(self, script_key, script_data):
         box_main_label = Gtk.Label()
         box_main_label.set_markup(title_text)
         box_main_label.set_wrap(True)
-        box_main_label.set_max_width_chars(25)
+        box_main_label.set_max_width_chars(15)
         box_main_label.set_ellipsize(Pango.EllipsizeMode.END)
         
         spacer = Gtk.Box()
