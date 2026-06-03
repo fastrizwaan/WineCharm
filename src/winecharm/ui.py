@@ -848,6 +848,8 @@ def create_script_row(self, script_key, script_data):
         # LIST VIEW (unchanged)
         container = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
         container.add_css_class('rounded-container')
+        # Set min width so it takes exactly 1 column at default 585px width, but flows to 2 columns at ~600px
+        container.set_size_request(300, -1)
 
         # Icon (left-aligned)
         script = Path(str(script_data['script_path'])).expanduser()
@@ -894,7 +896,7 @@ def create_script_row(self, script_key, script_data):
         box_main_label = Gtk.Label()
         box_main_label.set_markup(title_text)
         box_main_label.set_wrap(True)
-        box_main_label.set_max_width_chars(15)
+        box_main_label.set_max_width_chars(25)
         box_main_label.set_ellipsize(Pango.EllipsizeMode.END)
         
         spacer = Gtk.Box()
@@ -1203,8 +1205,8 @@ def on_view_toggle_button_clicked(self, button):
     button.set_child(Gtk.Image.new_from_icon_name(icon_name))
 
     # Update the maximum children per line in the flowbox based on the current view state
-    #max_children_per_line = 8 if self.icon_view else 4
-    #self.flowbox.set_max_children_per_line(max_children_per_line)
+    # max_children_per_line = 100
+    # self.flowbox.set_max_children_per_line(max_children_per_line)
     # Recreate the script list with the new view
     self.create_script_list()
     GLib.idle_add(self.save_settings)
