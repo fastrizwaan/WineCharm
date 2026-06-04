@@ -59,11 +59,11 @@
   <releases>
     <release version="1.2" date="2026-06-04">
       <description>
-        <p>Cleanup: Removed redundant standard library imports across all core modules to reduce initialization overhead.</p>
-        <p>Fix: Ensure consistent use of gettext for localization across modules using the _() pattern.</p>
-        <p>Fix: Prevent race conditions in architecture and template configuration settings.</p>
-        <p>Cleanup: Removed unimplemented UI features to prevent broken states.</p>
-        <p>Fix: Remove redundant manual dialog close calls causing GTK lifecycle warnings.</p>
+        <p>Optimization: Sped up application launch times and reduced memory usage by cleaning up the code.</p>
+        <p>Fix: Improved language translation support across the entire app so menus appear correctly in your language.</p>
+        <p>Fix: Resolved stability issues when changing Wine architecture or template settings, preventing random crashes.</p>
+        <p>Fix: Removed a few broken buttons from the settings menu that weren't ready to be used yet.</p>
+        <p>Fix: Fixed visual glitches and warnings when closing popup messages and dialogs.</p>
       </description>
     </release>
     <release version="1.1" date="2026-02-24">
