@@ -101,6 +101,8 @@ def initialize_template(self, template_dir, callback, arch='win64', new=False):
                 
         if not self.stop_processing:
             GLib.idle_add(lambda: self.on_template_initialized(arch, new))
+            if callback:
+                GLib.idle_add(callback)
             GLib.idle_add(self.hide_processing_spinner)
             self.disconnect_open_button()
             GLib.idle_add(self.reset_ui_after_template_init)

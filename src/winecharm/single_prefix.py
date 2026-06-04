@@ -5,6 +5,7 @@ gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
 from gi.repository import Gtk, Adw, GLib
 from pathlib import Path
+from gettext import gettext as _
 
 #####################  single prefix mode
 
@@ -43,7 +44,6 @@ def single_prefix_mode(self):
             new_state = single_prefix_radio.get_active()
             if new_state != current_state:
                 self.handle_prefix_mode_change(new_state)
-        dialog.close()
 
     dialog.connect("response", on_response)
     dialog.present(self.window)
@@ -53,32 +53,30 @@ def handle_prefix_mode_change(self, new_state):
     previous_state = self.single_prefix
     self.single_prefix = new_state
     
-    try:
-        # Determine architecture-specific paths
-        template_dir = (self.default_template_win32 if self.arch == 'win32' 
-                        else self.default_template_win64)
-        single_dir = (self.single_prefix_dir_win32 if self.arch == 'win32'
-                    else self.single_prefix_dir_win64)
+    # Determine architecture-specific paths
+    template_dir = (self.default_template_win32 if self.arch == 'win32' 
+                    else self.default_template_win64)
+    single_dir = (self.single_prefix_dir_win32 if self.arch == 'win32'
+                else self.single_prefix_dir_win64)
 
-        # Initialize template if needed
-        if not template_dir.exists():
-            self.initialize_template(template_dir, 
-                                lambda: self.finalize_prefix_mode_change(single_dir),
-                                arch=self.arch)
-        else:
+    def finish_change():
+        try:
             self.finalize_prefix_mode_change(single_dir)
-            
-        self.save_settings()
-        print(f"Prefix mode changed to {'Single' if new_state else 'Multiple'}")
-        
-    except Exception as e:
-        print(f"Error changing prefix mode: {e}")
-        self.single_prefix = previous_state  # Rollback on error
-        self.save_settings()
-        self.show_error_dialog("Mode Change Failed", str(e))
-    
-    finally:
-        self.set_dynamic_variables()
+            self.save_settings()
+            print(f"Prefix mode changed to {'Single' if new_state else 'Multiple'}")
+        except Exception as e:
+            print(f"Error changing prefix mode: {e}")
+            self.single_prefix = previous_state  # Rollback on error
+            self.save_settings()
+            GLib.idle_add(self.show_error_dialog, "Mode Change Failed", str(e))
+        finally:
+            self.set_dynamic_variables()
+
+    # Initialize template if needed, which runs asynchronously
+    if not template_dir.exists():
+        self.initialize_template(template_dir, finish_change, arch=self.arch)
+    else:
+        finish_change()
 
 def finalize_prefix_mode_change(self, single_dir):
     self.print_method_name()
