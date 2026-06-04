@@ -4,9 +4,7 @@ import gi
 import threading
 import subprocess
 import os
-import shutil
 import time
-import yaml
 from pathlib import Path
 from datetime import datetime
 from gettext import gettext as _
