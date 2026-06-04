@@ -5,26 +5,14 @@ import subprocess
 import os
 import shutil
 import shlex
-import hashlib
-import signal
 import re
 import yaml
-import sys
-import socket
 import time
-import glob
-import fnmatch
-import psutil
 import inspect
-import argparse
 import uuid
-import urllib.request
-import json
-import cairo
-import math
 from pathlib import Path
-from threading import Lock
-from datetime import datetime, timedelta
+from datetime import datetime
+from gettext import gettext as _
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
