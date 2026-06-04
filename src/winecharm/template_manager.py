@@ -6,9 +6,8 @@ import subprocess
 import os
 import shutil
 import time
-import yaml
 from pathlib import Path
-from threading import Lock
+from gettext import gettext as _
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
@@ -205,7 +204,6 @@ def on_cancel_template_init_dialog_response(self, dialog, response):
     """
     if response == "cancel":
         self.stop_processing = True
-    dialog.close()
 
 def cleanup_cancelled_template_init(self, template_dir):
     self.print_method_name()
@@ -462,7 +460,6 @@ def delete_template(self, action=None):
                 )
                 confirm_dialog.present(self.window)
 
-        dialog.close()
 
     dialog.connect("response", on_response, dropdown, templates)
     dialog.present(self.window)
@@ -650,7 +647,6 @@ def on_backup_template_response(self, dialog, response_id, dropdown, templates):
                     print(f"Backup Template failedfailed: {e}")
 
             file_dialog.save(self.window, None, on_save_response)
-    dialog.close()
 
 def create_template_backup(self, template_path, dest_path):
     self.print_method_name()
@@ -794,7 +790,6 @@ def on_cancel_template_backup_dialog_response(self, dialog, response):
     self.print_method_name()
     if response == "cancel":
         self.stop_processing = True
-    dialog.close()
 
 def cleanup_cancelled_template_backup(self):
     self.print_method_name()
@@ -1183,7 +1178,6 @@ def on_clone_template_response(self, dialog, response_id, dropdown, entry, templ
                 daemon=True
             ).start()
 
-    dialog.close()
 
 def perform_template_clone(self, source_path, dest_path):
     self.print_method_name()
@@ -1243,7 +1237,6 @@ def create_template(self, action=None):
                 self.called_from_settings = True
                 self.initialize_template(prefix_dir, callback=None, arch=arch)
 
-        dialog.close()
     
     dialog.connect("response", on_response)
     dialog.present(self.window)
