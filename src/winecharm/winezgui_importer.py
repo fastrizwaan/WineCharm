@@ -2,11 +2,7 @@
 
 import gi
 import threading
-import subprocess
-import shutil
-import shlex
-import yaml
-from pathlib import Path
+from gettext import gettext as _
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
