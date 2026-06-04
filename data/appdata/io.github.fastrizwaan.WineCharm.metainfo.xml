@@ -57,6 +57,15 @@
     <color type="primary" scheme_preference="dark">#cc7a29</color>
   </branding>  
   <releases>
+    <release version="1.2" date="2026-06-04">
+      <description>
+        <p>Cleanup: Removed redundant standard library imports across all core modules to reduce initialization overhead.</p>
+        <p>Fix: Ensure consistent use of gettext for localization across modules using the _() pattern.</p>
+        <p>Fix: Prevent race conditions in architecture and template configuration settings.</p>
+        <p>Cleanup: Removed unimplemented UI features to prevent broken states.</p>
+        <p>Fix: Remove redundant manual dialog close calls causing GTK lifecycle warnings.</p>
+      </description>
+    </release>
     <release version="1.1" date="2026-02-24">
       <description>
         <p>i18n: added Dutch translation, thanks to Heimen Stoffels &lt;vistausss@fastmail.com&gt;</p>
