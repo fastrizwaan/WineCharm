@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
 
 import gi
-import threading
-import subprocess
-import os
 import shutil
-import time
-import yaml
-from pathlib import Path
-from threading import Lock
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Adw', '1')
@@ -42,13 +35,14 @@ def check_required_programs(self):
     
     # Check if at least one terminal is available
     terminal_found = any(shutil.which(term) for term in terminal_options)
+    
+    missing_programs = [prog for prog in required_programs if not shutil.which(prog)]
+    
     if not terminal_found:
         # If no terminal is found, add "terminal-emulator" as a missing requirement
-        missing_programs = [prog for prog in required_programs if not shutil.which(prog)]
         missing_programs.append("terminal-emulator")
-        return missing_programs
         
-    return [prog for prog in required_programs if not shutil.which(prog)]
+    return missing_programs
 
 def show_missing_programs_dialog(self, missing_programs):
     self.print_method_name()
