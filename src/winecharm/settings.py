@@ -2,8 +2,6 @@
 
 import gi
 import yaml
-from pathlib import Path
-import subprocess
 from gettext import gettext as _
 
 gi.require_version('Gtk', '4.0')
@@ -129,7 +127,6 @@ def show_options_for_settings(self, action=None, param=None):
         (_("Runner Restore"), "runner-restore-symbolic", self.restore_runner),
         (_("Runner Delete"), "runner-delete-symbolic", self.delete_runner),
         (_("Template Set Default"), "template-default-symbolic", self.set_default_template),
-        (_("Template Configure"), "template-configure-symbolic", self.configure_template),
         (_("Template Terminal"), "template-terminal-symbolic", self.open_terminal_winecharm),
         (_("Template Import"), "template-import-symbolic", self.import_template),
         (_("Template Create"), "template-create-symbolic", self.create_template),
