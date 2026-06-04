@@ -50,7 +50,6 @@ def set_wine_arch(self):
             if new_arch != current_arch:
                 self.main_frame.set_child(None)
                 handle_architecture_change(new_arch)
-        dialog.close()
 
     # Architecture change handler
     def handle_architecture_change(new_arch):
@@ -59,37 +58,36 @@ def set_wine_arch(self):
         new_template = self.default_template_win32 if new_arch == 'win32' else self.default_template_win64
         single_prefix_dir = self.single_prefix_dir_win32 if new_arch == 'win32' else self.single_prefix_dir_win64
 
-        # Update settings
-        self.arch = new_arch
-        self.template = new_template
+        # Finalization handler
+        def finalize_arch_change(single_prefix_dir):
+            self.print_method_name()
+            # Update settings only when initialization is completely successful
+            self.arch = new_arch
+            self.template = new_template
+            self.settings['template'] = self.replace_home_with_tilde_in_path(str(new_template))
+            self.settings['arch'] = new_arch
+            self.save_settings()
 
-        self.settings['template'] = self.replace_home_with_tilde_in_path(str(new_template))
-        self.settings['arch'] = new_arch
-        self.save_settings()
-        
+            if self.single_prefix and not single_prefix_dir.exists():
+                print(f"Copying to {single_prefix_dir.name}...")
+                self.copy_template(single_prefix_dir)
+            self.set_dynamic_variables()
+            self.show_options_for_settings()
+
         # Resolve template path
-        new_template = Path(new_template).expanduser().resolve()
+        resolved_template = Path(new_template).expanduser().resolve()
         
         # Initialize new template if needed
-        if not new_template.exists():
+        if not resolved_template.exists():
             print(f"Initializing new {new_arch} template...")
             self.on_back_button_clicked(None)
             self.called_from_settings = True
-            self.initialize_template(new_template, 
+            self.initialize_template(resolved_template, 
                                 lambda: finalize_arch_change(single_prefix_dir),
                                 arch=new_arch)
         else:
             print(f"Using existing {new_arch} template")
             finalize_arch_change(single_prefix_dir)
-
-    # Finalization handler
-    def finalize_arch_change(single_prefix_dir):
-        self.print_method_name()
-        if self.single_prefix and not single_prefix_dir.exists():
-            print(f"Copying to {single_prefix_dir.name}...")
-            self.copy_template(single_prefix_dir)
-        self.set_dynamic_variables()
-        self.show_options_for_settings()
 
     # Connect response signal and present dialog
     dialog.connect("response", on_response)
