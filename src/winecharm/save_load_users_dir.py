@@ -1,8 +1,6 @@
 import gi
 import threading
 import subprocess
-import shutil
-import shlex
 import yaml
 import os
 from pathlib import Path
@@ -13,7 +11,7 @@ gi.require_version('Gdk', '4.0')
 gi.require_version('Adw', '1')
 
 from gi.repository import GLib, Gio, Gtk, Gdk, Adw, GdkPixbuf, Pango  # Add Pango here
-from datetime import datetime, timedelta
+from datetime import datetime
 
 def show_save_user_dirs_dialog(self, script, script_key, button):
     """Show dialog to select directories for backup."""
