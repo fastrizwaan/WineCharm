@@ -8,7 +8,6 @@ import shutil
 import time
 import yaml
 from pathlib import Path
-from threading import Lock
 from gettext import gettext as _
 
 gi.require_version('Gtk', '4.0')
