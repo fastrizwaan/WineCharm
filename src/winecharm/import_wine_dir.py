@@ -4,13 +4,12 @@ import gi
 import threading
 import subprocess
 import shutil
-import shlex
-import yaml
 import time
 import os
 import re
 import fnmatch
 from pathlib import Path
+from gettext import gettext as _
 
 gi.require_version('Gtk', '4.0')
 gi.require_version('Gdk', '4.0')
@@ -318,11 +317,8 @@ def on_cancel_import_wine_direcotory_dialog_response(self, dialog, response):
     """
     if response == "cancel":
         self.stop_processing = True
-        dialog.close()
     else:
         self.stop_processing = False
-        dialog.close()
-        #GLib.timeout_add_seconds(0.5, dialog.close)
 
 def on_cancel_import_wine_directory_clicked(self, button):
     self.print_method_name()
