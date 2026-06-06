@@ -2322,6 +2322,7 @@ class WineCharmApp(Adw.Application):
                 shell=True,
                 capture_output=True,
                 text=True,
+                errors="replace",
                 check=True
             )
             return result.stdout.strip()
@@ -2332,9 +2333,14 @@ class WineCharmApp(Adw.Application):
     def find_exe_path(self, wineprefix, exe_name):
         self.print_method_name()
         drive_c = Path(wineprefix) / "drive_c"
+        
+        import re
+        pattern_str = '^' + re.escape(exe_name.lower()).replace('\ufffd', '.') + '$'
+        pattern = re.compile(pattern_str)
+        
         for root, dirs, files in os.walk(drive_c):
             for file in files:
-                if file.lower() == exe_name.lower():
+                if pattern.match(file.lower()):
                     return Path(root) / file
         return None
 
