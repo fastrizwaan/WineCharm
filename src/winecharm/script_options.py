@@ -114,7 +114,6 @@ def open_terminal(self, script, script_key, *args):
     exe_file = Path(str(script_data['exe_file'])).expanduser().resolve()
     progname = script_data['progname']
     script_args = script_data['args']
-    script_key = script_data['sha256sum']  # Use sha256sum as the key
     env_vars = script_data.get('env_vars', '')   # Ensure env_vars is initialized if missing
     # Split the env_vars string into individual variable assignments
     env_vars_list = env_vars.split(';')
@@ -236,7 +235,7 @@ def on_run_other_exe_response(self, dialog, result, script, script_key):
     script = Path(str(script_data.get('script_path', ''))).expanduser().resolve()
     progname = str(script_data.get('progname', ''))
     script_args = str(script_data.get('args', ''))
-    script_key = str(script_data.get('sha256sum', script_key))
+
     env_vars = str(script_data.get('env_vars', ''))
     wine_debug = str(script_data.get('wine_debug', ''))
     exe_name = Path(str(exe_file)).name
@@ -503,7 +502,7 @@ def wine_config(self, script, script_key, *args):
     script = Path(str(script_data.get('script_path', ''))).expanduser().resolve()
     progname = str(script_data.get('progname', ''))
     script_args = str(script_data.get('args', ''))
-    script_key = str(script_data.get('sha256sum', script_key))
+
     env_vars = str(script_data.get('env_vars', ''))
     wine_debug = str(script_data.get('wine_debug', ''))
     exe_name = Path(str(exe_file)).name
@@ -545,7 +544,7 @@ def wine_registry_editor(self, script, script_key, *args):
     script = Path(str(script_data.get('script_path', ''))).expanduser().resolve()
     progname = str(script_data.get('progname', ''))
     script_args = str(script_data.get('args', ''))
-    script_key = str(script_data.get('sha256sum', script_key))
+
     env_vars = str(script_data.get('env_vars', ''))
     wine_debug = self.wine_debug
     exe_name = Path(str(exe_file)).name
@@ -1370,7 +1369,6 @@ def on_show_rename_shortcut_dialog_response(self, dialog, response_id, entry, sc
             with open(new_script_path, 'w') as file:
                 script_data['script_path'] = str(new_script_path).replace(str(Path.home()), "~")
                 yaml.dump(script_data, file, default_style="'", default_flow_style=False, width=10000)
-            # Ensure that script_data still contains the same sha256sum
             existing_sha256sum = script_data.get('sha256sum')
             # Extract icon and create desktop entry
             exe_file = Path(str(script_data['exe_file']))  # Assuming exe_file exists in script_data
@@ -1378,35 +1376,41 @@ def on_show_rename_shortcut_dialog_response(self, dialog, response_id, entry, sc
             print("#" * 100)
             print(icon_path)
             # Remove the old script_key and update script data with the new path
+            
+            # Calculate the new script_key
+            script_path_str = str(new_script_path).replace(str(Path.home()), "~")
+            path_hash = hashlib.md5(script_path_str.encode('utf-8')).hexdigest()[:8]
+            new_script_key = f"{existing_sha256sum}_{path_hash}"
+            
             if script_key in self.script_list:
                 # Load the script data first
-                script_data = self.script_list[script_key]
-                #print(script_data['script_path'])
+                script_data = self.script_list.pop(script_key)
+                
                 # Update the script path with the new script path
                 script_data['script_path'] = str(new_script_path)
                 script_data['mtime'] = new_script_path.stat().st_mtime
                 print(script_data['script_path'])
-                # Update the script_list with the updated script_data
-                self.script_list[script_key] = script_data
-                # Update the UI row for the renamed script
-                row = self.create_script_row(script_key, script_data)
-                if row:
-                    self.flowbox.prepend(row)
+                # Update the script_list with the updated script_data under the new key
+                self.script_list[new_script_key] = script_data
                 print(f"Removed old script_key {script_key} from script_list")
+            
             if script_key in self.script_ui_data:
                 # Update the script_path for the given script_key
-                self.script_ui_data[script_key]['script_path'] = str(new_script_path)
-                print(f"Updated script_path for {script_key} to {new_script_path}")
+                ui_data = self.script_ui_data.pop(script_key)
+                ui_data['script_path'] = str(new_script_path)
+                self.script_ui_data[new_script_key] = ui_data
+                print(f"Updated script_path for {new_script_key} to {new_script_path}")
             else:
-                print(f"Error: script_key {script_key} not found in script_data_two")
+                print(f"Error: script_key {script_key} not found in script_ui_data")
                 print("#" * 100)
-            # Add the updated script data to self.script_list using the existing sha256sum
-            self.script_list[existing_sha256sum] = script_data
-            row = self.create_script_row(existing_sha256sum, script_data)
+            
+            # Update the UI row for the renamed script
+            row = self.create_script_row(new_script_key, script_data)
+            if row:
+                self.flowbox.prepend(row)
+            
             # Mark the script as new and update the UI
             self.new_scripts.add(new_script_path.stem)
-            # Add or update script row in UI
-            self.script_list = {existing_sha256sum: script_data, **self.script_list}
             # Refresh the UI to load the renamed script
             # self.create_script_list()
             print(f"Renamed and loaded script: {new_script_path}")

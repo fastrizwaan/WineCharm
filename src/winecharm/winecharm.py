@@ -2592,7 +2592,9 @@ class WineCharmApp(Adw.Application):
 
                     script_data['mtime'] = os.path.getmtime(charm_file)
 
-                    script_key = script_data['sha256sum']
+                    script_path_str = str(script_data.get('script_path', charm_file)).replace(str(Path.home()), "~")
+                    path_hash = hashlib.md5(script_path_str.encode('utf-8')).hexdigest()[:8]
+                    script_key = f"{script_data.get('sha256sum', 'unknown')}_{path_hash}"
                     temp_script_list[script_key] = script_data
 
                 except yaml.YAMLError as yaml_err:

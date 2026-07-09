@@ -692,8 +692,9 @@ def add_charm_files_to_script_list(self, extracted_prefix_dir):
                     print(f"Invalid format in {charm_file}")
                     continue
 
-                # Extract the script key (e.g., sha256sum) from the loaded data
-                script_key = script_data.get('sha256sum')
+                script_path_str = str(script_data.get('script_path', charm_file)).replace(str(Path.home()), "~")
+                path_hash = hashlib.md5(script_path_str.encode('utf-8')).hexdigest()[:8]
+                script_key = f"{script_data.get('sha256sum', 'unknown')}_{path_hash}"
                 if not script_key:
                     print(f"Missing 'sha256sum' in {charm_file}, skipping...")
                     continue

@@ -57,6 +57,11 @@
     <color type="primary" scheme_preference="dark">#cc7a29</color>
   </branding>  
   <releases>
+    <release version="1.4" date="2026-07-09">
+      <description>
+        <p>Fix: Prevent duplicate identical executables in different wineprefixes from overwriting each other by generating a composite script key.</p>
+      </description>
+    </release>
     <release version="1.3" date="2026-06-06">
       <description>
         <p>Fix: Shortcut creation when exe path contains invalid UTF-8 characters.</p>

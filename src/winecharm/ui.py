@@ -1137,8 +1137,7 @@ def replace_open_button_with_launch(self, script, row, script_key):
     self.launch_button.set_size_request(-1, 40)
 
     #yaml_info = self.extract_yaml_info(script)
-    script_key = script_data['sha256sum']  # Use sha256sum as the key
-
+    # script_key is already provided and unique
     if script_key in self.running_processes:
         launch_icon = Gtk.Image.new_from_icon_name("media-playback-stop-symbolic")
         self.launch_button.set_tooltip_text(_("Stop"))

@@ -61,7 +61,6 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
         for byte_block in iter(lambda: f.read(4096), b""):
             sha256_hash.update(byte_block)
     sha256sum = sha256_hash.hexdigest()[:10]
-    script_key = sha256_hash.hexdigest()
     # string to path
     self.template = Path(self.template).expanduser().resolve()
     print(f"         => create_yaml_file -> self.template = {self.template}")
@@ -116,29 +115,6 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
         # Resolve the user-provided prefix directory
         prefix_dir = Path(prefix_dir).expanduser().resolve()
 
-    # Check if a script with the same sha256sum and wineprefix already exists
-    if script_key in self.script_list:
-        existing_script_data = self.script_list[script_key]
-        existing_script_path = Path(existing_script_data['script_path']).expanduser().resolve()
-        existing_wineprefix = existing_script_path.parent
-
-        current_wineprefix = prefix_dir
-
-        # Compare resolved paths to ensure accuracy
-        if existing_wineprefix == current_wineprefix:
-            # Remove existing .charm file and its entry
-            if existing_script_path.exists():
-                existing_script_path.unlink()
-                print(f"Removed existing charm file: {existing_script_path}")
-            with self.file_lock:
-                del self.script_list[script_key]
-            print(f"Removed old script_key {script_key} from script_list")
-        else:
-            print(f"Existing charm file in different prefix '{existing_wineprefix}' left intact.")
-
-    # Proceed to create the YAML configuration and charm file
-    wineprefix_name = prefix_dir.name
-
     # Extract product name using exiftool
     product_cmd = ['exiftool', shlex.quote(str(exe_file))]
     product_output = self.run_command(" ".join(product_cmd))
@@ -156,6 +132,31 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
         
     # Create YAML file with proper naming
     yaml_file_path = prefix_dir / f"{exe_no_space if use_exe_name else progname.replace(' ', '_')}.charm"
+
+    # Now calculate the new unique script_key
+    script_path_str = self.replace_home_with_tilde_in_path(str(yaml_file_path))
+    path_hash = hashlib.md5(script_path_str.encode('utf-8')).hexdigest()[:8]
+    script_key = f"{sha256_hash.hexdigest()}_{path_hash}"
+
+    # Check if a script with the same sha256sum and wineprefix already exists
+    keys_to_remove = []
+    for k, v in self.script_list.items():
+        if v.get('sha256sum') == sha256_hash.hexdigest():
+            existing_script_path = Path(v.get('script_path', '')).expanduser().resolve()
+            if existing_script_path.parent == prefix_dir:
+                keys_to_remove.append(k)
+                if existing_script_path.exists() and existing_script_path != yaml_file_path:
+                    try:
+                        existing_script_path.unlink()
+                        print(f"Removed existing charm file: {existing_script_path}")
+                    except Exception as e:
+                        print(f"Error removing existing charm file: {e}")
+
+    with self.file_lock:
+        for k in keys_to_remove:
+            if k in self.script_list:
+                del self.script_list[k]
+                print(f"Removed old script_key {k} from script_list")
 
     # Prepare YAML data with runner_to_use
     yaml_data = {
