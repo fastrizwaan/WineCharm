@@ -39,7 +39,7 @@ def determine_progname(self, productname, exe_no_space, exe_name):
         return productname if productname and not any(char.isdigit() for char in productname) and productname.isascii() else exe_no_space
 
 
-def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner_override=None):
+def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner_override=None, force_copy=False):
     self.print_method_name()
     # Determine runner_to_use
     if runner_override is not None:
@@ -131,7 +131,17 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
         progname = self.determine_progname(productname, exe_no_space, exe_name)
         
     # Create YAML file with proper naming
-    yaml_file_path = prefix_dir / f"{exe_no_space if use_exe_name else progname.replace(' ', '_')}.charm"
+    base_name = exe_no_space if use_exe_name else progname.replace(' ', '_')
+    yaml_file_path = prefix_dir / f"{base_name}.charm"
+    
+    if force_copy or yaml_file_path.exists():
+        counter = 1
+        while yaml_file_path.exists():
+            yaml_file_path = prefix_dir / f"{base_name}_copy{counter}.charm"
+            counter += 1
+        
+        # Append copy suffix to the display name for the UI and Desktop shortcuts
+        progname = f"{progname} copy{counter - 1}"
 
     # Now calculate the new unique script_key
     script_path_str = self.replace_home_with_tilde_in_path(str(yaml_file_path))
@@ -140,17 +150,18 @@ def create_yaml_file(self, exe_path, prefix_dir=None, use_exe_name=False, runner
 
     # Check if a script with the same sha256sum and wineprefix already exists
     keys_to_remove = []
-    for k, v in self.script_list.items():
-        if v.get('sha256sum') == sha256_hash.hexdigest():
-            existing_script_path = Path(v.get('script_path', '')).expanduser().resolve()
-            if existing_script_path.parent == prefix_dir:
-                keys_to_remove.append(k)
-                if existing_script_path.exists() and existing_script_path != yaml_file_path:
-                    try:
-                        existing_script_path.unlink()
-                        print(f"Removed existing charm file: {existing_script_path}")
-                    except Exception as e:
-                        print(f"Error removing existing charm file: {e}")
+    if not force_copy:
+        for k, v in self.script_list.items():
+            if v.get('sha256sum') == sha256_hash.hexdigest():
+                existing_script_path = Path(v.get('script_path', '')).expanduser().resolve()
+                if existing_script_path.parent == prefix_dir:
+                    keys_to_remove.append(k)
+                    if existing_script_path.exists() and existing_script_path != yaml_file_path:
+                        try:
+                            existing_script_path.unlink()
+                            print(f"Removed existing charm file: {existing_script_path}")
+                        except Exception as e:
+                            print(f"Error removing existing charm file: {e}")
 
     with self.file_lock:
         for k in keys_to_remove:

@@ -507,6 +507,8 @@ class WineCharmApp(Adw.Application):
                 'open_script_file',
                 'run_other_exe',
                 'on_run_other_exe_response',
+                'create_shortcut',
+                'on_create_shortcut_response',
                 'set_environment_variables',
                 'on_env_vars_dialog_response',
                 'validate_environment_variables',

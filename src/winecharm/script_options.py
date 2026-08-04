@@ -10,6 +10,7 @@ import yaml
 import time
 import inspect
 import uuid
+import hashlib
 from pathlib import Path
 from datetime import datetime
 from gettext import gettext as _
@@ -54,6 +55,7 @@ def show_options_for_script(self, ui_state, row, script_key):
         (_("Edit Script File"), "text-editor-symbolic", self.open_script_file),
         (_("Delete Wineprefix"), "user-trash-symbolic", self.show_delete_wineprefix_confirmation),
         (_("Delete Shortcut"), "edit-delete-symbolic", self.show_delete_shortcut_confirmation),
+        (_("Create Shortcut"), "document-new-symbolic", self.create_shortcut),
         (_("Wine Arguments"), "mail-attachment-symbolic", self.show_wine_arguments_entry),
         (_("Rename Shortcut"), "text-editor-symbolic", self.show_rename_shortcut_entry),
         (_("Change Icon"), "applications-graphics-symbolic", self.show_change_icon_dialog),
@@ -268,8 +270,154 @@ def on_run_other_exe_response(self, dialog, result, script, script_key):
             subprocess.Popen(command, shell=True)
             print(f"Running {exe_path} from Wine prefix {wineprefix}")
     except Exception as e:
-        if e.domain != 'gtk-dialog-error-quark' or e.code != 2:
+        if getattr(e, 'domain', None) != 'gtk-dialog-error-quark' or getattr(e, 'code', None) != 2:
             print(f"An error occurred: {e}")
+
+def create_shortcut(self, script, script_key, *args):
+    self.print_method_name()
+    """
+    Open a file dialog in the prefix directory to allow the user to select an EXE or MSI file to create a shortcut for.
+    """
+    script_data = self.script_list.get(script_key)
+    if not script_data:
+        return
+    wineprefix = Path(str(script_data.get('script_path', ''))).parent.expanduser().resolve()
+    
+    file_dialog = Gtk.FileDialog.new()
+    file_filter = self.create_file_filter()  # Assuming this filters for .exe and .msi
+    filter_model = Gio.ListStore.new(Gtk.FileFilter)
+    filter_model.append(file_filter)
+    file_dialog.set_filters(filter_model)
+    
+    # Set the initial folder to the wine prefix
+    initial_folder = Gio.File.new_for_path(str(wineprefix))
+    file_dialog.set_initial_folder(initial_folder)
+    
+    file_dialog.open(self.window, None, lambda dlg, res: self.on_create_shortcut_response(dlg, res, script, script_key, wineprefix))
+
+def on_create_shortcut_response(self, dialog, result, script, script_key, wineprefix):
+    self.print_method_name()
+    try:
+        file = dialog.open_finish(result)
+        if file:
+            exe_path = Path(file.get_path()).expanduser().resolve()
+            
+            # Verify the selected file is inside the wineprefix
+            # Resolve Flatpak document portal paths by searching the prefix
+            if "flatpak" in exe_path.parts and "doc" in exe_path.parts:
+                matched_paths = []
+                try:
+                    target_size = exe_path.stat().st_size
+                    target_name = exe_path.name
+                    
+                    # Compute sha256 hash of the portal file
+                    target_hash = hashlib.sha256()
+                    with open(exe_path, "rb") as f:
+                        for byte_block in iter(lambda: f.read(4096), b""):
+                            target_hash.update(byte_block)
+                    target_hash_hex = target_hash.hexdigest()
+
+                    for root, dirs, files in os.walk(wineprefix):
+                        if target_name in files:
+                            candidate = Path(root) / target_name
+                            try:
+                                if candidate.stat().st_size == target_size:
+                                    # Compute sha256 hash of the candidate file
+                                    candidate_hash = hashlib.sha256()
+                                    with open(candidate, "rb") as f:
+                                        for byte_block in iter(lambda: f.read(4096), b""):
+                                            candidate_hash.update(byte_block)
+                                            
+                                    if candidate_hash.hexdigest() == target_hash_hex:
+                                        matched_paths.append(candidate)
+                            except OSError:
+                                pass
+                except OSError:
+                    pass
+
+                if matched_paths:
+                    exe_path = matched_paths[0]
+            
+            # Flatpak sandbox paths can differ from resolved paths, so we use a robust check
+            is_valid = False
+            if str(exe_path).startswith(str(wineprefix)):
+                is_valid = True
+            elif wineprefix.name in exe_path.parts and "drive_c" in exe_path.parts:
+                is_valid = True
+                
+            if not is_valid:
+                self.show_info_dialog(_("Invalid Selection"), _("You must select an executable inside the prefix directory."))
+                return
+
+            script_data = self.script_list.get(script_key)
+            if not script_data:
+                return
+            runner_path = self.get_runner(script_data)
+            
+            # Check if a shortcut for this executable already exists in this prefix
+            existing_script_key = None
+            for k, v in self.script_list.items():
+                if Path(v.get('exe_file', '')).expanduser().resolve() == exe_path and \
+                   Path(v.get('wineprefix', '')).expanduser().resolve() == wineprefix:
+                    existing_script_key = k
+                    break
+
+            if existing_script_key:
+                dialog_conflict = Adw.AlertDialog(
+                    heading=_("Shortcut Exists"),
+                    body=_("A shortcut for this executable already exists in this prefix. What would you like to do?")
+                )
+                dialog_conflict.add_response("cancel", _("Cancel"))
+                dialog_conflict.add_response("copy", _("Create Copy"))
+                dialog_conflict.add_response("overwrite", _("Overwrite"))
+                dialog_conflict.set_response_appearance("overwrite", Adw.ResponseAppearance.DESTRUCTIVE)
+                dialog_conflict.props.default_response = "copy"
+                dialog_conflict.props.close_response = "cancel"
+
+                def on_conflict_response(d, response):
+                    if response == "cancel":
+                        return
+                    elif response == "overwrite":
+                        old_v = self.script_list.get(existing_script_key)
+                        if old_v:
+                            old_path = Path(old_v.get('script_path', '')).expanduser().resolve()
+                            if old_path.exists():
+                                old_path.unlink()
+                            with self.file_lock:
+                                del self.script_list[existing_script_key]
+                        
+                        self.create_yaml_file(exe_path, prefix_dir=wineprefix, use_exe_name=False, runner_override=str(runner_path))
+                        self.show_info_dialog(
+                            _("Success"), 
+                            _("Shortcut overwritten successfully for ") + exe_path.name + ".", 
+                            callback=lambda: self.on_back_button_clicked(None)
+                        )
+                    elif response == "copy":
+                        self.create_yaml_file(exe_path, prefix_dir=wineprefix, use_exe_name=False, runner_override=str(runner_path), force_copy=True)
+                        self.show_info_dialog(
+                            _("Success"), 
+                            _("Shortcut copy created successfully for ") + exe_path.name + ".", 
+                            callback=lambda: self.on_back_button_clicked(None)
+                        )
+
+                dialog_conflict.connect("response", on_conflict_response)
+                dialog_conflict.present(self.window)
+                return
+            
+            # Call create_yaml_file which will create the .charm file
+            self.create_yaml_file(exe_path, prefix_dir=wineprefix, use_exe_name=False, runner_override=str(runner_path))
+            
+            # Show success dialog and return to main window
+            self.show_info_dialog(
+                _("Success"), 
+                _("Shortcut created successfully for ") + exe_path.name + ".", 
+                callback=lambda: self.on_back_button_clicked(None)
+            )
+    except Exception as e:
+        if getattr(e, 'domain', None) != 'gtk-dialog-error-quark' or getattr(e, 'code', None) != 2:
+            import traceback
+            print(f"An error occurred: {e}")
+            traceback.print_exc()
 
 def set_environment_variables(self, script, script_key, *args):
     self.print_method_name()
