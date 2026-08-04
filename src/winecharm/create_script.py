@@ -204,10 +204,17 @@ def extract_icon(self, exe_file, wineprefix, exe_no_space, progname):
     ico_path = self.tempdir / f"{exe_no_space}.ico"
    # print(f"-----{ico_path}")
     try:
-        bash_cmd = f"""
-        wrestool -x -t 14 {shlex.quote(str(exe_file))} > {shlex.quote(str(ico_path))} 2>/dev/null
-        icotool -x {shlex.quote(str(ico_path))} -o {shlex.quote(str(self.tempdir))} 2>/dev/null
-        """
+        is_ico = str(exe_file).lower().endswith('.ico')
+        if is_ico:
+            bash_cmd = f"""
+            cp {shlex.quote(str(exe_file))} {shlex.quote(str(ico_path))} 2>/dev/null
+            icotool -x {shlex.quote(str(ico_path))} -o {shlex.quote(str(self.tempdir))} 2>/dev/null
+            """
+        else:
+            bash_cmd = f"""
+            wrestool -x -t 14 {shlex.quote(str(exe_file))} > {shlex.quote(str(ico_path))} 2>/dev/null
+            icotool -x {shlex.quote(str(ico_path))} -o {shlex.quote(str(self.tempdir))} 2>/dev/null
+            """
         try:
             subprocess.run(bash_cmd, shell=True, executable='/bin/bash', check=True)
         except subprocess.CalledProcessError as e:

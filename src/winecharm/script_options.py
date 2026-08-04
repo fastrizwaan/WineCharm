@@ -1476,9 +1476,11 @@ def show_change_icon_dialog(self, script, script_key, *args):
     file_filter.add_mime_type("image/png")
     file_filter.add_mime_type("image/svg+xml")
     file_filter.add_mime_type("image/jpeg")  # For .jpg and .jpeg
+    file_filter.add_mime_type("image/vnd.microsoft.icon")
+    file_filter.add_mime_type("image/x-icon")
     file_filter.add_mime_type("application/x-ms-dos-executable")
     # Add patterns for case-insensitive extensions
-    for ext in ["*.exe", "*.EXE", "*.msi", "*.MSI", "*.wzt", "*.WZT", "*.bottle", "*.BOTTLE", "*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.png", "*.PNG", "*.svg", "*.SVG"]:
+    for ext in ["*.exe", "*.EXE", "*.msi", "*.MSI", "*.wzt", "*.WZT", "*.bottle", "*.BOTTLE", "*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.png", "*.PNG", "*.svg", "*.SVG", "*.ico", "*.ICO"]:
         file_filter.add_pattern(ext)
     filter_model = Gio.ListStore.new(Gtk.FileFilter)
     filter_model.append(file_filter)
@@ -1494,7 +1496,7 @@ def on_change_icon_response(self, dialog, result, script_path):
             suffix = Path(file_path).suffix.lower()
             if suffix in [".png", ".svg", ".jpg", ".jpeg"]:
                 self.change_icon(script_path, file_path)
-            elif suffix in [".exe", ".msi"]:
+            elif suffix in [".exe", ".msi", ".ico"]:
                 self.extract_and_change_icon(script_path, file_path)
             # Update the icon in the title bar
             self.headerbar.set_title_widget(self.create_icon_title_widget(script_path))
