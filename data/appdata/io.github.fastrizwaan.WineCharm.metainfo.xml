@@ -57,8 +57,9 @@
     <color type="primary" scheme_preference="dark">#cc7a29</color>
   </branding>  
   <releases>
-    <release version="1.4" date="2026-07-09">
+    <release version="1.4" date="2026-08-04">
       <description>
+        <p>Feature: Added "Create Shortcut" to quickly generate .charm shortcuts for executables, complete with automatic copy handling for duplicates.</p>
         <p>Fix: Prevent duplicate identical executables in different wineprefixes from overwriting each other by generating a composite script key.</p>
       </description>
     </release>
