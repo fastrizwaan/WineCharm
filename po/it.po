@@ -2151,3 +2151,28 @@ msgstr "Cancel Bottle Creation"
 #: src/winecharm/backup.py:891
 msgid "Do you want to cancel the bottle creation process?"
 msgstr "Do you want to cancel the bottle creation process?"
+
+msgid "Create Shortcut"
+msgstr "Crea scorciatoia"
+
+msgid "Shortcut Exists"
+msgstr "Scorciatoia esistente"
+
+msgid "A shortcut for this executable already exists in this prefix. What would you like to do?"
+msgstr "Esiste già una scorciatoia per questo eseguibile in questo prefisso. Cosa vorresti fare?"
+
+msgid "Create Copy"
+msgstr "Crea copia"
+
+msgid "Shortcut overwritten successfully for "
+msgstr "Scorciatoia sovrascritta con successo per "
+
+msgid "Shortcut copy created successfully for "
+msgstr "Copia della scorciatoia creata con successo per "
+
+msgid "Shortcut created successfully for "
+msgstr "Scorciatoia creata con successo per "
+
+msgid "You must select an executable inside the prefix directory."
+msgstr "Devi selezionare un eseguibile all'interno della directory del prefisso."
+

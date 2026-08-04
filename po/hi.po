@@ -2117,3 +2117,28 @@ msgstr "बोतल निर्माण रद्द करें"
 #: src/winecharm/backup.py:891
 msgid "Do you want to cancel the bottle creation process?"
 msgstr "क्या आप बोतल निर्माण प्रक्रिया रद्द करना चाहते हैं?"
+
+msgid "Create Shortcut"
+msgstr "शॉर्टकट बनाएँ"
+
+msgid "Shortcut Exists"
+msgstr "शॉर्टकट मौजूद है"
+
+msgid "A shortcut for this executable already exists in this prefix. What would you like to do?"
+msgstr "इस प्रीफ़िक्स में इस निष्पादन योग्य फ़ाइल के लिए एक शॉर्टकट पहले से मौजूद है। आप क्या करना चाहेंगे?"
+
+msgid "Create Copy"
+msgstr "कॉपी बनाएँ"
+
+msgid "Shortcut overwritten successfully for "
+msgstr "इसके लिए शॉर्टकट सफलतापूर्वक ओवरराइट किया गया "
+
+msgid "Shortcut copy created successfully for "
+msgstr "इसके लिए शॉर्टकट की कॉपी सफलतापूर्वक बनाई गई "
+
+msgid "Shortcut created successfully for "
+msgstr "इसके लिए शॉर्टकट सफलतापूर्वक बनाया गया "
+
+msgid "You must select an executable inside the prefix directory."
+msgstr "आपको प्रीफ़िक्स निर्देशिका के अंदर एक निष्पादन योग्य फ़ाइल का चयन करना होगा।"
+

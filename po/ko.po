@@ -2150,3 +2150,28 @@ msgstr "Cancel Bottle Creation"
 #: src/winecharm/backup.py:891
 msgid "Do you want to cancel the bottle creation process?"
 msgstr "Do you want to cancel the bottle creation process?"
+
+msgid "Create Shortcut"
+msgstr "바로가기 만들기"
+
+msgid "Shortcut Exists"
+msgstr "바로가기 존재함"
+
+msgid "A shortcut for this executable already exists in this prefix. What would you like to do?"
+msgstr "이 접두사에 이 실행 파일의 바로가기가 이미 존재합니다. 어떻게 하시겠습니까?"
+
+msgid "Create Copy"
+msgstr "복사본 만들기"
+
+msgid "Shortcut overwritten successfully for "
+msgstr "다음에 대한 바로가기를 성공적으로 덮어썼습니다: "
+
+msgid "Shortcut copy created successfully for "
+msgstr "다음에 대한 바로가기 복사본을 성공적으로 만들었습니다: "
+
+msgid "Shortcut created successfully 전 for "
+msgstr "다음에 대한 바로가기를 성공적으로 만들었습니다: "
+
+msgid "You must select an executable inside the prefix directory."
+msgstr "접두사 디렉토리 내의 실행 파일을 선택해야 합니다."
+

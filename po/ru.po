@@ -2105,3 +2105,28 @@ msgstr "Канкел Боттле Креатион"
 #: src/winecharm/backup.py:891
 msgid "Do you want to cancel the bottle creation process?"
 msgstr "До ёу вант то канкел тхе боттле креатион прокесс?"
+
+msgid "Create Shortcut"
+msgstr "Создать ярлык"
+
+msgid "Shortcut Exists"
+msgstr "Ярлык существует"
+
+msgid "A shortcut for this executable already exists in this prefix. What would you like to do?"
+msgstr "Ярлык для этого исполняемого файла уже существует в этом префиксе. Что бы вы хотели сделать?"
+
+msgid "Create Copy"
+msgstr "Создать копию"
+
+msgid "Shortcut overwritten successfully for "
+msgstr "Ярлык успешно перезаписан для "
+
+msgid "Shortcut copy created successfully for "
+msgstr "Копия ярлыка успешно создана для "
+
+msgid "Shortcut created successfully for "
+msgstr "Ярлык успешно создан для "
+
+msgid "You must select an executable inside the prefix directory."
+msgstr "Вы должны выбрать исполняемый файл внутри каталога префикса."
+
